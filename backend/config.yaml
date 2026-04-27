@@ -1,0 +1,16 @@
+server:
+  host: "0.0.0.0"
+  port: 9527
+
+database:
+  path: "./data/tvplayer.db"
+
+stream:
+  cache_dir: "./data/cache"
+  max_concurrent: 50
+  buffer_size: 4096
+  health_check_sec: 30
+
+auth:
+  secret: "tvplayer-change-this-secret-key"
+  expire_hours: 720

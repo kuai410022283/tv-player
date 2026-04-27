@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手机端分组Tab -->
+<TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="32dp"
+    android:gravity="center"
+    android:paddingHorizontal="16dp"
+    android:textColor="@color/text_group"
+    android:textSize="13sp"
+    android:background="@drawable/selector_group_tab"
+    android:layout_marginHorizontal="2dp"
+    android:singleLine="true" />
