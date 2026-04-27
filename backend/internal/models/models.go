@@ -49,6 +49,7 @@ type EPGProgram struct {
 type PlayHistory struct {
 	ID        int64     `json:"id" db:"id"`
 	ChannelID int64     `json:"channel_id" db:"channel_id"`
+	ClientID  int64     `json:"client_id,omitempty" db:"client_id"`
 	Duration  int       `json:"duration" db:"duration"` // seconds watched
 	LastPos   int       `json:"last_pos" db:"last_pos"` // last position in seconds
 	CreatedAt time.Time `json:"created_at" db:"created_at"`

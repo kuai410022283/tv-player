@@ -22,18 +22,43 @@ class ChannelRepository {
         }
     }
 
+    /**
+     * 获取所有频道（自动分页拉取全部）
+     */
     suspend fun getChannels(
         groupId: Long? = null,
         favorite: Boolean? = null,
         search: String? = null
     ): Result<List<Channel>> = withContext(Dispatchers.IO) {
         try {
-            val res = api.getChannels(groupId = groupId, favorite = favorite, search = search, pageSize = 500)
-            if (res.isSuccessful && res.body()?.code == 0) {
-                Result.success(res.body()!!.data?.items ?: emptyList())
-            } else {
-                Result.failure(Exception(res.body()?.message ?: "加载失败"))
+            val allChannels = mutableListOf<Channel>()
+            var page = 1
+            val pageSize = 200
+
+            while (true) {
+                val res = api.getChannels(
+                    groupId = groupId,
+                    favorite = favorite,
+                    search = search,
+                    page = page,
+                    pageSize = pageSize
+                )
+
+                if (!res.isSuccessful || res.body()?.code != 0) {
+                    if (page == 1) {
+                        return@withContext Result.failure(Exception(res.body()?.message ?: "加载失败"))
+                    }
+                    break
+                }
+
+                val items = res.body()!!.data?.items ?: emptyList()
+                allChannels.addAll(items)
+
+                if (items.size < pageSize) break // 最后一页
+                page++
             }
+
+            Result.success(allChannels)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -62,9 +87,9 @@ class ChannelRepository {
         }
     }
 
-    suspend fun addHistory(channelId: Long, duration: Int, lastPos: Int): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun addHistory(channelId: Long, duration: Int, lastPos: Int, clientId: Long = 0): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            api.addHistory(PlayHistory(id = 0, channelId = channelId, duration = duration, lastPos = lastPos))
+            api.addHistory(PlayHistory(id = 0, channelId = channelId, clientId = clientId, duration = duration, lastPos = lastPos))
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -66,8 +66,23 @@ func (imp *M3UImporter) ImportFromString(content string) (int, error) {
 func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error) {
 	groupCache := make(map[string]int64)
 	imported := 0
+	existingURLs := make(map[string]bool)
+
+	// 获取已有频道的 URL 列表用于去重
+	if existing, err := imp.channelSvc.ListChannels(0, false, "", &models.PageRequest{Page: 1, PageSize: 10000}); err == nil {
+		if items, ok := existing.Items.([]models.Channel); ok {
+			for _, ch := range items {
+				existingURLs[ch.StreamURL] = true
+			}
+		}
+	}
 
 	for _, ch := range channels {
+		// 去重：跳过已存在的流地址
+		if existingURLs[ch["url"]] {
+			continue
+		}
+
 		groupName := ch["group-title"]
 		if groupName == "" {
 			groupName = "未分类"

@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/tvplayer/backend/internal/middleware"
 )
 
 type Handlers struct {
@@ -19,7 +20,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/client/verify", hs.ClientHandler.Verify)
 	r.POST("/client/verify", hs.ClientHandler.Verify)
 
-	// ── 客户端自服务 (需要 token) ───────────────────
+	// ── 客户端自服务 (需要客户端 token) ──────────────
 	r.GET("/client/me", hs.ClientHandler.Me)
 
 	// ── 频道组 ──────────────────────────────────────
@@ -60,15 +61,17 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 	}
 
-	// ── 历史 & 设置 & 统计 ──────────────────────────
+	// ── 历史 & 设置 & 统计 & EPG ─────────────────────
 	r.GET("/history", hs.Handler.GetHistory)
 	r.POST("/history", hs.Handler.AddHistory)
 	r.GET("/settings", hs.Handler.GetSettings)
 	r.POST("/settings", hs.Handler.SetSetting)
 	r.GET("/stats", hs.Handler.GetStats)
+	r.GET("/epg", hs.Handler.GetEPG)
 
 	// ── 管理端：客户端管理 (需要 admin 权限) ────────
 	clients := r.Group("/admin/clients")
+	clients.Use(middleware.RequireAdmin())
 	{
 		clients.GET("", hs.ClientHandler.List)
 		clients.GET("/stats", hs.ClientHandler.GetStats)

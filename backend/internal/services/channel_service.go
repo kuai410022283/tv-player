@@ -139,15 +139,32 @@ func (s *ChannelService) UpdateStatus(id int64, status string) error {
 	return err
 }
 
+func (s *ChannelService) CountByStatus(status string, count *int64) error {
+	return s.db.QueryRow(`SELECT COUNT(*) FROM channels WHERE status=?`, status).Scan(count)
+}
+
 // ── Play History ───────────────────────────────────────
 
 func (s *ChannelService) AddHistory(h *models.PlayHistory) error {
 	now := time.Now()
-	res, err := s.db.Exec(`INSERT INTO play_history (channel_id, duration, last_pos, created_at) VALUES (?,?,?,?)`,
-		h.ChannelID, h.Duration, h.LastPos, now)
-	if err != nil { return err }
+	res, err := s.db.Exec(`INSERT INTO play_history (channel_id, client_id, duration, last_pos, created_at) VALUES (?,?,?,?,?)`,
+		h.ChannelID, h.ClientID, h.Duration, h.LastPos, now)
+	if err != nil {
+		return err
+	}
 	h.ID, _ = res.LastInsertId()
 	h.CreatedAt = now
+
+	// 更新客户端累计播放时长 (duration 秒 → 分钟)
+	if h.ClientID > 0 && h.Duration > 0 {
+		minutes := h.Duration / 60
+		if minutes < 1 {
+			minutes = 1
+		}
+		s.db.Exec(`UPDATE clients SET total_play_minutes = total_play_minutes + ?, last_seen=?, updated_at=? WHERE id=?`,
+			minutes, now, now, h.ClientID)
+	}
+
 	return nil
 }
 

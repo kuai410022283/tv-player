@@ -68,6 +68,7 @@ func createTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS play_history (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		channel_id INTEGER NOT NULL,
+		client_id INTEGER DEFAULT 0,
 		duration INTEGER DEFAULT 0,
 		last_pos INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

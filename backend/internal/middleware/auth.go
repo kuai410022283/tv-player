@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -123,6 +125,13 @@ func ClientRateLimit() gin.HandlerFunc {
 
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
 		c.Next()
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		log.Printf("[API] %s %s %s %d %v", clientIP, method, path, status, latency)
 	}
 }

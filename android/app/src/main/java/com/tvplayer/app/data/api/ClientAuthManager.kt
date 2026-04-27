@@ -51,7 +51,7 @@ class ClientAuthManager(private val context: Context) {
             )
 
             val res = api.registerClient(req)
-            if (res.isSuccessful) {
+            if (res.isSuccessful || res.code() == 202) {
                 val body = res.body()
                 if (body != null) {
                     val data = body.data
@@ -77,12 +77,16 @@ class ClientAuthManager(private val context: Context) {
                 } else {
                     Result.failure(Exception("空响应"))
                 }
-            } else if (res.code() == 403) {
-                // 被封禁
-                prefs.edit().putString(KEY_STATUS, "banned").apply()
-                Result.failure(Exception("设备已被封禁"))
             } else {
-                Result.failure(Exception("注册失败: HTTP ${res.code()}"))
+                val errorMsg = when (res.code()) {
+                    403 -> "设备已被封禁"
+                    429 -> "注册请求过于频繁，请稍后再试"
+                    else -> "注册失败: HTTP ${res.code()}"
+                }
+                if (res.code() == 403) {
+                    prefs.edit().putString(KEY_STATUS, "banned").apply()
+                }
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(e)

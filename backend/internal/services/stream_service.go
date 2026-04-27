@@ -22,6 +22,7 @@ type StreamProxy struct {
 	streams   map[int64]*streamState
 	client    *http.Client
 	channelSvc *ChannelService
+	sem       chan struct{} // 并发控制
 }
 
 type streamState struct {
@@ -36,13 +37,19 @@ type streamState struct {
 }
 
 func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *StreamProxy {
+	maxConcurrent := cfg.MaxConcurrent
+	if maxConcurrent <= 0 {
+		maxConcurrent = 50
+	}
 	sp := &StreamProxy{
 		cfg:        cfg,
 		streams:    make(map[int64]*streamState),
 		channelSvc: channelSvc,
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			// 不设置全局 Timeout，否则长流会被中断
+			// 通过 context 控制单次请求超时
 		},
+		sem: make(chan struct{}, maxConcurrent),
 	}
 	os.MkdirAll(cfg.CacheDir, 0755)
 	return sp
@@ -55,9 +62,12 @@ func (sp *StreamProxy) CheckHealth(url, streamType string) (*models.StreamStatus
 		Status: "unknown",
 	}
 
+	// 健康检查用独立短超时 client
+	healthClient := &http.Client{Timeout: 10 * time.Second}
+
 	switch streamType {
 	case "hls", "mp4", "dash", "flv":
-		resp, err := sp.client.Head(url)
+		resp, err := healthClient.Head(url)
 		if err != nil {
 			status.Status = "error"
 			status.ErrorMsg = err.Error()
@@ -99,21 +109,34 @@ func (sp *StreamProxy) StartHealthCheck(stop <-chan struct{}) {
 }
 
 func (sp *StreamProxy) checkAllChannels() {
-	// simplified: in production, paginate through all channels
-	p := &models.PageRequest{Page: 1, PageSize: 200}
-	resp, err := sp.channelSvc.ListChannels(0, false, "", p)
-	if err != nil { return }
-
-	channels, ok := resp.Items.([]models.Channel)
-	if !ok { return }
-
-	for _, ch := range channels {
-		status, _ := sp.CheckHealth(ch.StreamURL, ch.StreamType)
-		newStatus := "offline"
-		if status.Status == "online" {
-			newStatus = "online"
+	// 分页遍历所有频道
+	page := 1
+	pageSize := 100
+	for {
+		p := &models.PageRequest{Page: page, PageSize: pageSize}
+		resp, err := sp.channelSvc.ListChannels(0, false, "", p)
+		if err != nil || resp == nil {
+			break
 		}
-		sp.channelSvc.UpdateStatus(ch.ID, newStatus)
+
+		channels, ok := resp.Items.([]models.Channel)
+		if !ok || len(channels) == 0 {
+			break
+		}
+
+		for _, ch := range channels {
+			status, _ := sp.CheckHealth(ch.StreamURL, ch.StreamType)
+			newStatus := "offline"
+			if status.Status == "online" {
+				newStatus = "online"
+			}
+			sp.channelSvc.UpdateStatus(ch.ID, newStatus)
+		}
+
+		if len(channels) < pageSize {
+			break
+		}
+		page++
 	}
 }
 
@@ -124,6 +147,14 @@ func (sp *StreamProxy) GetProxyURL(channelID int64, baseURL string) string {
 
 // ServeStream proxies the actual stream data
 func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *http.Request) error {
+	// 并发控制
+	select {
+	case sp.sem <- struct{}{}:
+		defer func() { <-sp.sem }()
+	default:
+		return fmt.Errorf("并发流数已达上限 (%d)", sp.cfg.MaxConcurrent)
+	}
+
 	ch, err := sp.channelSvc.GetChannel(channelID)
 	if err != nil {
 		return fmt.Errorf("channel not found: %w", err)

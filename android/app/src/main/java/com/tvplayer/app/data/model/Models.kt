@@ -79,6 +79,7 @@ data class StreamStatus(
 data class PlayHistory(
     @SerializedName("id") val id: Long,
     @SerializedName("channel_id") val channelId: Long,
+    @SerializedName("client_id") val clientId: Long = 0,
     @SerializedName("duration") val duration: Int = 0,
     @SerializedName("last_pos") val lastPos: Int = 0,
     @SerializedName("created_at") val createdAt: String = ""

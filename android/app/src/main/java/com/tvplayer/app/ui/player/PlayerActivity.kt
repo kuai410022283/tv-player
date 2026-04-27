@@ -388,7 +388,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun saveProgress() {
         val pos = player?.currentPosition?.div(1000)?.toInt() ?: 0
-        lifecycleScope.launch { repo.addHistory(channelId, pos, pos) }
+        val clientId = authManager.getClientId()
+        lifecycleScope.launch { repo.addHistory(channelId, pos, pos, clientId) }
     }
 
     // ═══════════════════════════════════════════════════

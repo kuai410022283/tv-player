@@ -289,17 +289,31 @@ func (h *Handler) SetSetting(c *gin.Context) {
 	ok(c, nil)
 }
 
+// ── EPG ────────────────────────────────────────────────
+
+func (h *Handler) GetEPG(c *gin.Context) {
+	channelID := c.Query("channel_id")
+	if channelID == "" {
+		fail(c, 400, "请提供 channel_id")
+		return
+	}
+	// EPG 数据源待接入，返回空列表
+	ok(c, []interface{}{})
+}
+
 // ── Server Stats ───────────────────────────────────────
 
 func (h *Handler) GetStats(c *gin.Context) {
 	p := &models.PageRequest{Page: 1, PageSize: 1}
 	totalResp, _ := h.channelSvc.ListChannels(0, false, "", p)
 	totalChannels := int64(0)
-	if totalResp != nil { totalChannels = totalResp.Total }
+	if totalResp != nil {
+		totalChannels = totalResp.Total
+	}
 
-	onlineResp, _ := h.channelSvc.ListChannels(0, false, "", &models.PageRequest{Page: 1, PageSize: 1})
-	onlineChannels := int64(0)
-	if onlineResp != nil { onlineChannels = onlineResp.Total }
+	// 统计在线频道数 (需要按 status 过滤)
+	var onlineChannels int64
+	h.channelSvc.CountByStatus("online", &onlineChannels)
 
 	stats := models.ServerStats{
 		TotalChannels:  int(totalChannels),
