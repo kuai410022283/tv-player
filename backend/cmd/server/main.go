@@ -69,6 +69,9 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
 
+	// Init JWT secret and admin password
+	api.InitSecret(cfg.Auth.Secret, cfg.Auth.AdminPassword)
+
 	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
@@ -84,7 +87,7 @@ func main() {
 	})
 
 	// API v1
-	h := api.NewHandler(channelSvc, streamProxy, importer)
+	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc)
 	ch := api.NewClientHandler(clientSvc)
 	hs := api.NewHandlers(h, ch)
 

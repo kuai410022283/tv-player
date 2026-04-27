@@ -149,6 +149,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>授权策略</span>
     </div>
+    <div class="nav-section">账户</div>
+    <div class="nav-item" onclick="logout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>退出登录</span>
+    </div>
   </div>
 
   <div class="main">
@@ -182,6 +187,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
       </div>
       <div class="card">
         <table><thead><tr><th>ID</th><th>名称</th><th>分组</th><th>类型</th><th>状态</th><th>收藏</th><th>操作</th></tr></thead><tbody id="channels-body"></tbody></table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="channels-info" style="font-size:13px;color:var(--text2)"></span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="channelPrevPage()">上一页</button>
+          <span id="channels-page" style="font-size:13px;line-height:32px">1</span>
+          <button class="btn btn-ghost btn-sm" onclick="channelNextPage()">下一页</button>
+        </div>
       </div>
     </div>
 
@@ -249,6 +262,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
           </tr></thead>
           <tbody id="clients-body"></tbody>
         </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="clients-info" style="font-size:13px;color:var(--text2)"></span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="clientPrevPage()">上一页</button>
+          <span id="clients-page" style="font-size:13px;line-height:32px">1</span>
+          <button class="btn btn-ghost btn-sm" onclick="clientNextPage()">下一页</button>
+        </div>
       </div>
     </div>
 
@@ -433,13 +454,40 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 <div class="toast" id="toast" style="display:none"></div>
 
+<!-- ═══ Login Modal ═══ -->
+<div class="modal-overlay show" id="login-modal" style="z-index:300">
+  <div class="modal" style="width:380px">
+    <h3>🔑 管理后台登录</h3>
+    <div class="form-group">
+      <label>管理密码</label>
+      <input type="password" id="login-password" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+      <div style="font-size:11px;color:var(--text2);margin-top:6px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '/api/v1';
 let groups = [], selectedClientIds = new Set();
+let adminToken = localStorage.getItem('admin_token') || '';
+let channelPage = 1, clientPage = 1;
+const PAGE_SIZE = 20;
 
 // ═══ API helpers ══════════════════════════════════════
 async function api(path, opts = {}) {
-  const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+  const res = await fetch(API + path, { headers, ...opts });
+  if (res.status === 401 || res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    if (data.message && data.message.includes('需要管理员权限')) {
+      showLogin();
+      throw new Error('需要认证');
+    }
+  }
   return res.json();
 }
 function toast(msg, type = 'success') {
@@ -449,6 +497,47 @@ function toast(msg, type = 'success') {
 }
 function showModal(id) { document.getElementById(id).classList.add('show'); }
 function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ═══ Login ════════════════════════════════════════════
+function showLogin() {
+  document.getElementById('login-modal').classList.add('show');
+  document.getElementById('login-password').focus();
+}
+function hideLogin() { document.getElementById('login-modal').classList.remove('show'); }
+
+async function doLogin() {
+  const password = document.getElementById('login-password').value;
+  if (!password) { toast('请输入密码', 'error'); return; }
+  try {
+    const res = await fetch(API + '/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (data.code === 0 && data.data && data.data.token) {
+      adminToken = data.data.token;
+      localStorage.setItem('admin_token', adminToken);
+      hideLogin();
+      toast('登录成功');
+      loadDashboard();
+    } else {
+      toast(data.message || '密码错误', 'error');
+    }
+  } catch (e) {
+    toast('登录失败: ' + e.message, 'error');
+  }
+}
+
+function logout() {
+  adminToken = '';
+  localStorage.removeItem('admin_token');
+  showLogin();
+  toast('已退出登录');
+}
+
+// 检查登录状态
+if (!adminToken) { showLogin(); } else { hideLogin(); }
 function timeAgo(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr), now = new Date(), diff = (now - d) / 1000;
@@ -495,17 +584,23 @@ async function loadDashboard() {
 }
 
 // ═══ Channels ═════════════════════════════════════════
+let channelTotal = 0;
 async function loadChannels(search = '') {
-  const q = search ? `?search=${encodeURIComponent(search)}` : '';
+  const q = search ? `?search=${encodeURIComponent(search)}&page=${channelPage}&page_size=${PAGE_SIZE}` : `?page=${channelPage}&page_size=${PAGE_SIZE}`;
   const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups')]);
   groups = grpRes.data || [];
   const gm = {}; groups.forEach(g => gm[g.id] = g.name);
   const body = document.getElementById('channels-body');
   if (chRes.data && chRes.data.items) {
+    channelTotal = chRes.data.total || 0;
     body.innerHTML = chRes.data.items.map(c => `<tr><td>${c.id}</td><td><strong>${esc(c.name)}</strong></td><td>${gm[c.group_id]||'-'}</td><td><span class="badge badge-${c.stream_type}">${c.stream_type.toUpperCase()}</span></td><td>${badge(c.status)}</td><td>${c.is_favorite?'⭐':'-'}</td><td><div class="btn-group"><button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">编辑</button><button class="btn btn-ghost btn-sm" onclick="toggleFav(${c.id})">${c.is_favorite?'取消':'⭐'}</button><button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">删除</button></div></td></tr>`).join('');
   }
   document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('channels-page').textContent = channelPage;
+  document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
 }
+function channelPrevPage() { if (channelPage > 1) { channelPage--; loadChannels(document.getElementById('channel-search').value); } }
+function channelNextPage() { if (channelPage * PAGE_SIZE < channelTotal) { channelPage++; loadChannels(document.getElementById('channel-search').value); } }
 function searchChannels() { clearTimeout(window._st); window._st = setTimeout(() => loadChannels(document.getElementById('channel-search').value), 300); }
 async function saveChannel() {
   const id = document.getElementById('ch-edit-id').value;
@@ -575,10 +670,11 @@ async function loadStreams() {
 // ═══ CLIENT MANAGEMENT ════════════════════════════════
 // ═══════════════════════════════════════════════════════
 
+let clientTotal = 0;
 async function loadClients() {
   const status = document.getElementById('client-status-filter').value;
   const search = document.getElementById('client-search').value;
-  let q = '?page_size=100';
+  let q = `?page=${clientPage}&page_size=${PAGE_SIZE}`;
   if (status) q += '&status=' + status;
   if (search) q += '&search=' + encodeURIComponent(search);
 
@@ -591,34 +687,38 @@ async function loadClients() {
 
   const body = document.getElementById('clients-body');
   const items = listRes.data ? listRes.data.items || [] : [];
+  clientTotal = listRes.data ? listRes.data.total || 0 : 0;
   selectedClientIds.clear();
 
   if (items.length === 0) {
     body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:40px">暂无设备</td></tr>';
-    return;
+  } else {
+    body.innerHTML = items.map(c => `<tr>
+      <td><input type="checkbox" class="client-check" value="${c.id}" onchange="updateSelectedClients()"></td>
+      <td>${c.id}</td>
+      <td><strong>${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(c.device_id).substring(0,16)}...</span></td>
+      <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
+      <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
+      <td>${badge(c.status)}</td>
+      <td>${c.max_streams}</td>
+      <td>${c.total_play_minutes}分钟</td>
+      <td>${timeAgo(c.last_seen)}</td>
+      <td>${fmtDate(c.created_at)}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="showClientDetail(${c.id})">详情</button>
+          ${c.status==='pending'?`<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button><button class="btn btn-danger btn-sm" onclick="showRejectModal(${c.id})">拒绝</button>`:''}
+          ${c.status==='approved'?`<button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">吊销</button>`:''}
+          ${c.status==='rejected'||c.status==='banned'?`<button class="btn btn-info btn-sm" onclick="unbanClient(${c.id})">解封</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
   }
-
-  body.innerHTML = items.map(c => `<tr>
-    <td><input type="checkbox" class="client-check" value="${c.id}" onchange="updateSelectedClients()"></td>
-    <td>${c.id}</td>
-    <td><strong>${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(c.device_id).substring(0,16)}...</span></td>
-    <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
-    <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
-    <td>${badge(c.status)}</td>
-    <td>${c.max_streams}</td>
-    <td>${c.total_play_minutes}分钟</td>
-    <td>${timeAgo(c.last_seen)}</td>
-    <td>${fmtDate(c.created_at)}</td>
-    <td>
-      <div class="btn-group">
-        <button class="btn btn-ghost btn-sm" onclick="showClientDetail(${c.id})">详情</button>
-        ${c.status==='pending'?`<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button><button class="btn btn-danger btn-sm" onclick="showRejectModal(${c.id})">拒绝</button>`:''}
-        ${c.status==='approved'?`<button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">吊销</button>`:''}
-        ${c.status==='rejected'||c.status==='banned'?`<button class="btn btn-info btn-sm" onclick="unbanClient(${c.id})">解封</button>`:''}
-      </div>
-    </td>
-  </tr>`).join('');
+  document.getElementById('clients-page').textContent = clientPage;
+  document.getElementById('clients-info').textContent = `共 ${clientTotal} 台设备`;
 }
+function clientPrevPage() { if (clientPage > 1) { clientPage--; loadClients(); } }
+function clientNextPage() { if (clientPage * PAGE_SIZE < clientTotal) { clientPage++; loadClients(); } }
 
 function searchClients() { clearTimeout(window._ct); window._ct = setTimeout(loadClients, 300); }
 

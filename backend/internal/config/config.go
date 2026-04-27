@@ -29,8 +29,9 @@ type StreamConfig struct {
 }
 
 type AuthConfig struct {
-	Secret   string `yaml:"secret"`
-	ExpireH  int    `yaml:"expire_hours"`
+	Secret        string `yaml:"secret"`
+	ExpireH       int    `yaml:"expire_hours"`
+	AdminPassword string `yaml:"admin_password"`
 }
 
 func Load(path string) (*Config, error) {

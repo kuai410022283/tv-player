@@ -1,5 +1,6 @@
 package com.tvplayer.app.ui.player
 
+import android.content.Intent
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +30,7 @@ import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
 import com.tvplayer.app.data.model.Channel
 import com.tvplayer.app.data.repository.ChannelRepository
+import com.tvplayer.app.service.PlaybackService
 import com.tvplayer.app.util.DeviceUtils
 import com.tvplayer.app.util.PlayerGestureController
 import kotlinx.coroutines.launch
@@ -81,6 +83,11 @@ class PlayerActivity : AppCompatActivity() {
     private val hideVolumeRunnable = Runnable { layoutVolumeIndicator?.visibility = View.GONE }
     private val hideBrightnessRunnable = Runnable { layoutBrightnessIndicator?.visibility = View.GONE }
     private val hideSpeedRunnable = Runnable { tvSpeedIndicator?.visibility = View.GONE }
+
+    // ── Retry ──
+    private var retryCount = 0
+    private val maxRetries = 3
+    private val baseRetryDelay = 3000L // 3秒
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -245,6 +252,7 @@ class PlayerActivity : AppCompatActivity() {
                         Player.STATE_READY -> {
                             progressBar?.visibility = View.GONE
                             tvStatus?.text = "播放中"
+                            retryCount = 0
                             handler.postDelayed({ hideChannelInfo() }, 3000)
                         }
                         Player.STATE_IDLE -> tvStatus?.text = "准备中..."
@@ -255,8 +263,15 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onPlayerError(error: PlaybackException) {
                     tvStatus?.text = "播放失败: ${error.message}"
                     progressBar?.visibility = View.GONE
-                    Toast.makeText(this@PlayerActivity, "播放失败，3秒后重试...", Toast.LENGTH_SHORT).show()
-                    handler.postDelayed({ retryPlay() }, 3000)
+                    if (retryCount < maxRetries) {
+                        retryCount++
+                        val delayMs = (3000L * (1 shl (retryCount - 1))) // 3s, 6s, 12s
+                        Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
+                        handler.postDelayed({ retryPlay() }, delayMs)
+                    } else {
+                        Toast.makeText(this@PlayerActivity, "播放失败，已重试${maxRetries}次", Toast.LENGTH_LONG).show()
+                        retryCount = 0
+                    }
                 }
 
                 override fun onTracksChanged(tracks: Tracks) {
@@ -276,6 +291,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun playStream(url: String, type: String) {
         val player = player ?: return
+        retryCount = 0
         progressBar?.visibility = View.VISIBLE
         tvChannelName?.text = channelName
         tvStreamType?.text = type.uppercase()
@@ -459,11 +475,19 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // 启动后台播放服务
+        val serviceIntent = Intent(this, PlaybackService::class.java).apply {
+            putExtra("stream_url", streamUrl)
+            putExtra("channel_name", channelName)
+        }
+        try { startForegroundService(serviceIntent) } catch (_: Exception) {}
         player?.pause()
     }
 
     override fun onResume() {
         super.onResume()
+        // 停止后台播放服务
+        stopService(Intent(this, PlaybackService::class.java))
         player?.play()
         hideSystemUI()
     }

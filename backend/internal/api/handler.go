@@ -2,24 +2,68 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/tvplayer/backend/internal/models"
 	"github.com/tvplayer/backend/internal/services"
 )
+
+// startTime 记录服务启动时间，用于 uptime 统计
+var startTime = time.Now()
+
+// jwtSecret 存储 JWT 密钥，由 Init 设置
+var jwtSecret string
+var adminPassword string
+
+// InitSecret 设置 JWT 密钥和管理员密码
+func InitSecret(secret, password string) {
+	jwtSecret = secret
+	adminPassword = password
+}
+
+func getJWTSecret() string {
+	if jwtSecret != "" {
+		return jwtSecret
+	}
+	return "tvplayer-secret-key-change-me"
+}
+
+func getAdminPassword() string {
+	if adminPassword != "" {
+		return adminPassword
+	}
+	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
+		return p
+	}
+	return "admin123"
+}
+
+func generateAdminToken(secret string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"role": "admin",
+		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+	})
+	return token.SignedString([]byte(secret))
+}
 
 type Handler struct {
 	channelSvc  *services.ChannelService
 	streamProxy *services.StreamProxy
 	importer    *services.M3UImporter
+	clientSvc   *services.ClientService
 }
 
-func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter) *Handler {
+func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService) *Handler {
 	return &Handler{
 		channelSvc:  channelSvc,
 		streamProxy: streamProxy,
 		importer:    importer,
+		clientSvc:   clientSvc,
 	}
 }
 
@@ -297,8 +341,40 @@ func (h *Handler) GetEPG(c *gin.Context) {
 		fail(c, 400, "请提供 channel_id")
 		return
 	}
-	// EPG 数据源待接入，返回空列表
-	ok(c, []interface{}{})
+	programs, err := h.channelSvc.GetEPGPrograms(channelID)
+	if err != nil {
+		ok(c, []interface{}{})
+		return
+	}
+	ok(c, programs)
+}
+
+// ── Admin Login ────────────────────────────────────────
+
+func (h *Handler) AdminLogin(c *gin.Context) {
+	var body struct {
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "请提供密码")
+		return
+	}
+
+	// 从配置中获取 admin 密码 (通过环境变量或默认值)
+	adminPassword := getAdminPassword()
+	if body.Password != adminPassword {
+		fail(c, 401, "密码错误")
+		return
+	}
+
+	// 生成 JWT token
+	token, err := generateAdminToken(getJWTSecret())
+	if err != nil {
+		fail(c, 500, "生成令牌失败")
+		return
+	}
+
+	ok(c, gin.H{"token": token, "message": "登录成功"})
 }
 
 // ── Server Stats ───────────────────────────────────────
@@ -315,10 +391,30 @@ func (h *Handler) GetStats(c *gin.Context) {
 	var onlineChannels int64
 	h.channelSvc.CountByStatus("online", &onlineChannels)
 
+	// 客户端统计
+	totalClients, pendingClients, onlineClients := 0, 0, 0
+	if h.clientSvc != nil {
+		totalClients, pendingClients, onlineClients = h.clientSvc.GetClientStats()
+	}
+
+	// 内存统计
+	var memMB int64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memMB = int64(m.Alloc / 1024 / 1024)
+
+	// 运行时长
+	uptime := int64(time.Since(startTime).Seconds())
+
 	stats := models.ServerStats{
 		TotalChannels:  int(totalChannels),
 		OnlineChannels: int(onlineChannels),
 		ActiveStreams:   len(h.streamProxy.GetActiveStreams()),
+		TotalClients:   totalClients,
+		PendingClients: pendingClients,
+		OnlineClients:  onlineClients,
+		Uptime:         uptime,
+		MemoryMB:       memMB,
 	}
 	ok(c, stats)
 }

@@ -14,3 +14,4 @@ stream:
 auth:
   secret: "tvplayer-change-this-secret-key"
   expire_hours: 720
+  admin_password: "admin123"

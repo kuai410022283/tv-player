@@ -170,14 +170,14 @@ func (s *ChannelService) AddHistory(h *models.PlayHistory) error {
 
 func (s *ChannelService) GetHistory(limit int) ([]models.PlayHistory, error) {
 	if limit <= 0 { limit = 50 }
-	rows, err := s.db.Query(`SELECT id, channel_id, duration, last_pos, created_at FROM play_history ORDER BY created_at DESC LIMIT ?`, limit)
+	rows, err := s.db.Query(`SELECT id, channel_id, client_id, duration, last_pos, created_at FROM play_history ORDER BY created_at DESC LIMIT ?`, limit)
 	if err != nil { return nil, err }
 	defer rows.Close()
 
 	var items []models.PlayHistory
 	for rows.Next() {
 		var h models.PlayHistory
-		if err := rows.Scan(&h.ID, &h.ChannelID, &h.Duration, &h.LastPos, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.ChannelID, &h.ClientID, &h.Duration, &h.LastPos, &h.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, h)
@@ -242,4 +242,24 @@ func (s *ChannelService) AddM3USource(m *models.M3USource) error {
 func (s *ChannelService) DeleteM3USource(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM m3u_sources WHERE id=?`, id)
 	return err
+}
+
+// ── EPG ────────────────────────────────────────────────
+
+func (s *ChannelService) GetEPGPrograms(channelID string) ([]models.EPGProgram, error) {
+	rows, err := s.db.Query(`SELECT id, epg_channel_id, title, start_time, end_time, description FROM epg_programs WHERE epg_channel_id=? ORDER BY start_time`, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.EPGProgram
+	for rows.Next() {
+		var p models.EPGProgram
+		if err := rows.Scan(&p.ID, &p.ChannelID, &p.Title, &p.StartTime, &p.EndTime, &p.Desc); err != nil {
+			return nil, err
+		}
+		items = append(items, p)
+	}
+	return items, nil
 }

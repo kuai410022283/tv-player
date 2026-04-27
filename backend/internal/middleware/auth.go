@@ -19,6 +19,13 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		auth := c.GetHeader("Authorization")
 		clientToken := c.GetHeader("X-Client-Token")
 
+		// 公开接口无需认证
+		path := c.Request.URL.Path
+		if path == "/api/v1/client/register" || path == "/api/v1/client/verify" || path == "/api/v1/admin/login" {
+			c.Next()
+			return
+		}
+
 		// GET 请求允许匿名访问 (只读)
 		if c.Request.Method == "GET" && auth == "" && clientToken == "" {
 			c.Next()
