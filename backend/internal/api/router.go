@@ -23,9 +23,6 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	// ── 管理员登录 (无需认证) ─────────────────────
 	r.POST("/admin/login", hs.Handler.AdminLogin)
 
-	// ── Admin 登录 (公开) ───────────────────────────
-	r.POST("/admin/login", hs.Handler.AdminLogin)
-
 	// ── 客户端自服务 (需要客户端 token) ──────────────
 	r.GET("/client/me", hs.ClientHandler.Me)
 
