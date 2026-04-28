@@ -8,7 +8,15 @@ import (
 )
 
 func InitDB(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
+	var dsn string
+	if dbPath == ":memory:" {
+		// modernc.org/sqlite 需要使用 file::memory:?cache=shared 格式
+		// 才能正确支持带参数的内存数据库
+		dsn = "file::memory:?cache=shared&_journal_mode=WAL&_busy_timeout=5000"
+	} else {
+		dsn = dbPath + "?_journal_mode=WAL&_busy_timeout=5000"
+	}
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
