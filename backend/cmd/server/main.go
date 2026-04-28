@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -77,12 +76,17 @@ func main() {
 	api.InitSecret(cfg.Auth.Secret, cfg.Auth.AdminPassword, cfg.Auth.ExpireH)
 
 	// ── CORS（限制允许的来源）────────────────────────
+	corsOrigins := cfg.CORS.AllowedOrigins
+	if len(corsOrigins) == 0 {
+		corsOrigins = []string{"*"}
+	}
+	allowCreds := len(corsOrigins) == 1 && corsOrigins[0] != "*"
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Client-Token"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false, // AllowOrigins=* 时必须为 false
+		AllowCredentials: allowCreds,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -226,10 +230,4 @@ func startClientExpiry(clientSvc *services.ClientService, stop <-chan struct{}) 
 			}
 		}
 	}
-}
-
-// 用于 admin login 的路由注册，避免与 router.go 中重复
-func init() {
-	// 抑制未使用导入的编译错误
-	_ = strings.Contains
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"os"
@@ -38,7 +39,7 @@ func getJWTSecret() string {
 	if jwtSecret != "" {
 		return jwtSecret
 	}
-	return "tvplayer-secret-key-change-me"
+	panic("JWT secret is empty, check config.yaml auth.secret")
 }
 
 func getAdminPassword() string {
@@ -48,7 +49,7 @@ func getAdminPassword() string {
 	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
 		return p
 	}
-	return "admin123"
+	panic("admin password is empty, check config.yaml auth.admin_password")
 }
 
 func generateAdminToken(secret string) (string, error) {
@@ -385,7 +386,7 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 	}
 
 	pwd := getAdminPassword()
-	if body.Password != pwd {
+	if subtle.ConstantTimeCompare([]byte(body.Password), []byte(pwd)) != 1 {
 		slog.Warn("admin login failed", "ip", c.ClientIP())
 		fail(c, 401, "密码错误")
 		return
@@ -428,7 +429,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 	stats := models.ServerStats{
 		TotalChannels:  int(totalChannels),
 		OnlineChannels: int(onlineChannels),
-		ActiveStreams:   len(h.streamProxy.GetActiveStreams()),
+		ActiveStreams:  len(h.streamProxy.GetActiveStreams()),
 		TotalClients:   totalClients,
 		PendingClients: pendingClients,
 		OnlineClients:  onlineClients,
