@@ -19,6 +19,7 @@
     <color name="status_online">#FF00D4AA</color>
     <color name="status_offline">#FFFF6B6B</color>
     <color name="star">#FFFECB57</color>
+    <color name="warn">#FFFFA726</color>
 
     <color name="channel_focused">#20FFFFFF</color>
     <color name="channel_pressed">#10FFFFFF</color>
