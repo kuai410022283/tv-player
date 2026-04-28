@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -232,5 +231,3 @@ func TestSecurityHeaders(t *testing.T) {
 		t.Error("missing X-Frame-Options header")
 	}
 }
-
-
