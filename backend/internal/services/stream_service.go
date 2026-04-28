@@ -67,6 +67,13 @@ func (sp *StreamProxy) CheckHealth(url, streamType string) (*models.StreamStatus
 		Status: "unknown",
 	}
 
+	// 校验 URL
+	if err := ValidateStreamURL(url); err != nil {
+		status.Status = "error"
+		status.ErrorMsg = "URL 不安全: " + err.Error()
+		return status, err
+	}
+
 	// 健康检查用独立短超时 client
 	healthClient := &http.Client{Timeout: 10 * time.Second}
 
@@ -114,10 +121,10 @@ func (sp *StreamProxy) StartHealthCheck(stop <-chan struct{}) {
 }
 
 func (sp *StreamProxy) checkAllChannels() {
-	// 分页遍历所有频道
 	page := 1
-	pageSize := 100
-	for {
+	pageSize := 50
+	maxPages := 10
+	for page <= maxPages {
 		p := &models.PageRequest{Page: page, PageSize: pageSize}
 		resp, err := sp.channelSvc.ListChannels(0, false, "", p)
 		if err != nil || resp == nil {
@@ -163,6 +170,11 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 	ch, err := sp.channelSvc.GetChannel(channelID)
 	if err != nil {
 		return fmt.Errorf("channel not found: %w", err)
+	}
+
+	// 校验流地址，防止 SSRF
+	if err := ValidateStreamURL(ch.StreamURL); err != nil {
+		return fmt.Errorf("流地址不安全: %w", err)
 	}
 
 	// Update stream state

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tvplayer/backend/internal/models"
@@ -59,41 +60,67 @@ func (s *ChannelService) UpdateGroup(g *models.ChannelGroup) error {
 }
 
 func (s *ChannelService) DeleteGroup(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM channel_groups WHERE id=?`, id)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var defaultGroupID int64
+	err = tx.QueryRow("SELECT id FROM channel_groups WHERE name = '未分类'").Scan(&defaultGroupID)
+	if err != nil {
+		res, err := tx.Exec("INSERT INTO channel_groups (name, sort_order) VALUES ('未分类', 99)")
+		if err != nil {
+			return err
+		}
+		defaultGroupID, _ = res.LastInsertId()
+	}
+
+	_, err = tx.Exec("UPDATE channels SET group_id = ?, updated_at = ? WHERE group_id = ?", defaultGroupID, time.Now(), id)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("DELETE FROM channel_groups WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // ── Channels ───────────────────────────────────────────
 
 func (s *ChannelService) ListChannels(groupID int64, favorite bool, search string, p *models.PageRequest) (*models.PageResponse, error) {
 	p.Normalize()
-	where := "WHERE is_hidden = 0"
-	args := []interface{}{}
+	var whereClauses []string
+	var args []interface{}
+
+	whereClauses = append(whereClauses, "is_hidden = 0")
 
 	if groupID > 0 {
-		where += " AND group_id = ?"
+		whereClauses = append(whereClauses, "group_id = ?")
 		args = append(args, groupID)
 	}
 	if favorite {
-		where += " AND is_favorite = 1"
+		whereClauses = append(whereClauses, "is_favorite = 1")
 	}
 	if search != "" {
-		where += " AND name LIKE ?"
+		whereClauses = append(whereClauses, "name LIKE ?")
 		args = append(args, "%"+search+"%")
 	}
 
+	where := "WHERE " + strings.Join(whereClauses, " AND ")
+
 	var total int64
 	countArgs := append([]interface{}{}, args...)
-	if err := s.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM channels %s", where), countArgs...).Scan(&total); err != nil {
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM channels "+where, countArgs...).Scan(&total); err != nil {
 		return nil, err
 	}
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	rows, err := s.db.Query(fmt.Sprintf(
-		"SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, last_check, created_at, updated_at FROM channels %s ORDER BY sort_order LIMIT ? OFFSET ?", where),
-		queryArgs...,
-	)
+	rows, err := s.db.Query("SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, last_check, created_at, updated_at FROM channels "+where+" ORDER BY sort_order LIMIT ? OFFSET ?", queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +151,11 @@ func (s *ChannelService) GetChannel(id int64) (*models.Channel, error) {
 }
 
 func (s *ChannelService) CreateChannel(c *models.Channel) error {
+	// 校验流地址，防止 SSRF
+	if err := ValidateStreamURL(c.StreamURL); err != nil {
+		return fmt.Errorf("流地址不安全: %w", err)
+	}
+
 	now := time.Now()
 	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, c.IsFavorite, c.IsHidden, c.SortOrder, "unknown", now, now)
@@ -137,6 +169,11 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 }
 
 func (s *ChannelService) UpdateChannel(c *models.Channel) error {
+	// 校验流地址，防止 SSRF
+	if err := ValidateStreamURL(c.StreamURL); err != nil {
+		return fmt.Errorf("流地址不安全: %w", err)
+	}
+
 	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_favorite=?, is_hidden=?, sort_order=?, updated_at=? WHERE id=?`,
 		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, c.IsFavorite, c.IsHidden, c.SortOrder, time.Now(), c.ID)
 	return err

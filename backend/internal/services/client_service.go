@@ -315,23 +315,43 @@ func (s *ClientService) Delete(id int64) error {
 // ── 批量操作 ───────────────────────────────────────────
 
 func (s *ClientService) Batch(req *models.ClientBatchReq, approver string) (int, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("开启事务失败: %w", err)
+	}
+	defer tx.Rollback()
+
 	count := 0
+	now := time.Now()
+
 	for _, id := range req.IDs {
 		var err error
 		switch req.Action {
 		case "approve":
-			err = s.Approve(id, &models.ClientApproveReq{MaxDays: 365, MaxStreams: 2}, approver)
+			token := generateToken()
+			_, err = tx.Exec(`UPDATE clients SET status='approved', access_token=?, max_streams=?, expires_at=?, approved_by=?, reject_reason='', updated_at=? WHERE id=?`,
+				token, 2, now.AddDate(0, 0, 365), approver, now, id)
 		case "reject":
-			err = s.Reject(id, &models.ClientRejectReq{Reason: "批量拒绝"})
+			_, err = tx.Exec(`UPDATE clients SET status='rejected', reject_reason=?, access_token='', updated_at=? WHERE id=?`,
+				"批量拒绝", now, id)
 		case "ban":
-			err = s.Ban(id, "批量封禁")
+			_, err = tx.Exec(`UPDATE clients SET status='banned', reject_reason=?, access_token='', updated_at=? WHERE id=?`,
+				"批量封禁", now, id)
 		case "delete":
-			err = s.Delete(id)
+			_, err = tx.Exec(`DELETE FROM clients WHERE id=?`, id)
+		default:
+			return 0, fmt.Errorf("未知操作: %s", req.Action)
 		}
+
 		if err == nil {
 			count++
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("提交事务失败: %w", err)
+	}
+
 	return count, nil
 }
 

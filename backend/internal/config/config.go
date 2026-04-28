@@ -52,9 +52,9 @@ func Load(path string) (*Config, error) {
 			HealthCheckSec: 30,
 		},
 		Auth: AuthConfig{
-			Secret:        "tvplayer-secret-key-change-me",
+			Secret:        "",
 			ExpireH:       720,
-			AdminPassword: "admin123",
+			AdminPassword: "",
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: []string{"*"},
@@ -75,9 +75,6 @@ func Load(path string) (*Config, error) {
 	}
 
 	// 校验必填项
-	if cfg.Auth.Secret == "" {
-		cfg.Auth.Secret = "tvplayer-secret-key-change-me"
-	}
 	if cfg.Auth.ExpireH <= 0 {
 		cfg.Auth.ExpireH = 720
 	}

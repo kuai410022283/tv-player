@@ -39,7 +39,7 @@ func getJWTSecret() string {
 	if jwtSecret != "" {
 		return jwtSecret
 	}
-	panic("JWT secret is empty, check config.yaml auth.secret")
+	return ""
 }
 
 func getAdminPassword() string {
@@ -49,7 +49,7 @@ func getAdminPassword() string {
 	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
 		return p
 	}
-	panic("admin password is empty, check config.yaml auth.admin_password")
+	return ""
 }
 
 func generateAdminToken(secret string) (string, error) {
