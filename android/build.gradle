@@ -11,9 +11,4 @@ buildscript {
     }
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+// 仓库已在 settings.gradle 的 dependencyResolutionManagement 中统一配置
