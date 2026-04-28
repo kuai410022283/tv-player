@@ -93,6 +93,7 @@ class PlayerActivity : AppCompatActivity() {
     private var retryCount = 0
     private val maxRetries = 3
     private val baseRetryDelay = 3000L // 3秒
+    private var backPressedTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -246,12 +247,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun initPlayer() {
         player = ExoPlayer.Builder(this).build().apply {
             playerView.player = this
-            if (isTvMode) {
-                playerView.useController = false
-            } else {
-                playerView.useController = true
-                playerView.controllerShowTimeoutMs = 3000
-            }
+            // 直播流不需要内置 seek bar，用自定义手势替代
+            playerView.useController = false
 
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
@@ -364,11 +361,21 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun nextChannel() {
+        if (allChannels.isEmpty()) {
+            Toast.makeText(this, "频道列表加载中...", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (channelIndex < allChannels.size - 1) switchChannel(channelIndex + 1)
+        else switchChannel(0) // 循环到第一个
     }
 
     private fun prevChannel() {
+        if (allChannels.isEmpty()) {
+            Toast.makeText(this, "频道列表加载中...", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (channelIndex > 0) switchChannel(channelIndex - 1)
+        else switchChannel(allChannels.size - 1) // 循环到最后一个
     }
 
     // ═══════════════════════════════════════════════════
@@ -396,12 +403,24 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 layoutEpg?.visibility = View.VISIBLE
                 val now = java.util.Date()
+                val formats = arrayOf(
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    "yyyy-MM-dd'T'HH:mm:ssZ",
+                    "yyyy-MM-dd'T'HH:mm:ssXXX",
+                    "yyyy-MM-dd HH:mm:ss"
+                )
+                fun parseDate(s: String): java.util.Date? {
+                    for (fmt in formats) {
+                        try {
+                            return java.text.SimpleDateFormat(fmt, java.util.Locale.getDefault()).parse(s)
+                        } catch (_: Exception) {}
+                    }
+                    return null
+                }
                 val current = programs.find { p ->
-                    try {
-                        val start = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(p.startTime)
-                        val end = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(p.endTime)
-                        start != null && end != null && now.after(start) && now.before(end)
-                    } catch (_: Exception) { false }
+                    val start = parseDate(p.startTime)
+                    val end = parseDate(p.endTime)
+                    start != null && end != null && now.after(start) && now.before(end)
                 }
                 val next = if (current != null) {
                     val idx = programs.indexOf(current)
@@ -461,13 +480,25 @@ class PlayerActivity : AppCompatActivity() {
         if (!isTvMode) {
             // 手机模式只处理基本按键
             when (keyCode) {
-                KeyEvent.KEYCODE_BACK -> { saveProgress(); finish(); return true }
+                KeyEvent.KEYCODE_BACK -> {
+                    if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                        saveProgress(); finish()
+                    } else {
+                        Toast.makeText(this, "再按一次返回键退出播放", Toast.LENGTH_SHORT).show()
+                        backPressedTime = System.currentTimeMillis()
+                    }
+                    return true
+                }
                 KeyEvent.KEYCODE_VOLUME_UP -> {
                     audioManager?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, 0)
+                    val vol = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                    showVolumeIndicator(vol)
                     return true
                 }
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     audioManager?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, 0)
+                    val vol = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                    showVolumeIndicator(vol)
                     return true
                 }
             }
@@ -502,7 +533,15 @@ class PlayerActivity : AppCompatActivity() {
                 player?.let { it.playWhenReady = !it.playWhenReady }; return true
             }
             KeyEvent.KEYCODE_MEDIA_STOP -> { finish(); return true }
-            KeyEvent.KEYCODE_BACK -> { saveProgress(); finish(); return true }
+            KeyEvent.KEYCODE_BACK -> {
+                if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                    saveProgress(); finish()
+                } else {
+                    Toast.makeText(this, "再按一次返回键退出播放", Toast.LENGTH_SHORT).show()
+                    backPressedTime = System.currentTimeMillis()
+                }
+                return true
+            }
 
             // 数字键直接跳转频道
             in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
@@ -520,25 +559,25 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        // 启动后台播放服务
+        // 不暂停 player，让它在后台继续播放
+        // 启动前台服务保活进程
         val serviceIntent = Intent(this, PlaybackService::class.java).apply {
-            putExtra("stream_url", streamUrl)
             putExtra("channel_name", channelName)
         }
         try { startForegroundService(serviceIntent) } catch (_: Exception) {}
-        player?.pause()
     }
 
     override fun onResume() {
         super.onResume()
-        // 停止后台播放服务
+        // 停止保活服务
         stopService(Intent(this, PlaybackService::class.java))
-        player?.play()
+        player?.playWhenReady = true
         hideSystemUI()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopService(Intent(this, PlaybackService::class.java))
         handler.removeCallbacksAndMessages(null)
         player?.release()
         player = null

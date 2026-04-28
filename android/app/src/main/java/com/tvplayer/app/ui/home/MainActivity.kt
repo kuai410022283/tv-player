@@ -312,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                 if (list.isNotEmpty()) {
                     currentChannelIndex = 0
                     if (isTvMode) {
-                        tvChannelsRv?.requestFocus()
+                        tvChannelsRv?.post { tvChannelsRv?.requestFocus() }
                     }
                 }
             }.onFailure {
@@ -398,9 +398,19 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    companion object {
+        // 设置页修改了服务器地址后标记需要刷新
+        @Volatile
+        @JvmStatic
+        var settingsChanged = false
+    }
+
     override fun onResume() {
         super.onResume()
-        loadData()
+        if (settingsChanged || allChannels.isEmpty()) {
+            loadData()
+            settingsChanged = false
+        }
     }
 
     override fun onDestroy() {

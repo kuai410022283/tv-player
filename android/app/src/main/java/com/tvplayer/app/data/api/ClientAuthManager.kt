@@ -29,8 +29,15 @@ class ClientAuthManager(private val context: Context) {
     fun getDeviceId(): String {
         var id = prefs.getString(KEY_DEVICE_ID, null)
         if (id == null) {
-            id = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_DEVICE_ID)
-                ?: Build.FINGERPRINT.hashCode().toString(16)
+            // 优先用 ANDROID_ID，稳定且恢复出厂后会变（符合预期）
+            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            id = if (!androidId.isNullOrEmpty() && androidId != "9774d56d682e549c") {
+                androidId
+            } else {
+                // fallback: 组合多个硬件特征
+                val raw = "${Build.BOARD}:${Build.DEVICE}:${Build.MANUFACTURER}:${Build.MODEL}:${Build.SERIAL}"
+                raw.hashCode().toLong().toString(16)
+            }
             prefs.edit().putString(KEY_DEVICE_ID, id).apply()
         }
         return id

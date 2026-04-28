@@ -59,6 +59,7 @@ class SettingsActivity : AppCompatActivity() {
             if (url != oldUrl) {
                 authManager.clearAuth()
                 ApiClient.reset()
+                com.tvplayer.app.ui.home.MainActivity.settingsChanged = true
             }
 
             prefs.edit().putString("server_url", url).apply()

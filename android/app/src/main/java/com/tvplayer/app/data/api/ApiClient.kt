@@ -74,11 +74,12 @@ object ApiClient {
     }
 
     fun getStreamProxyUrl(channelId: Long): String {
-        val base = baseUrl.removeSuffix("/api/v1/")
-        // Stream proxy 需要附带 token
+        // 从 baseUrl 构建 stream proxy URL
+        // baseUrl 格式: http://host:port/api/v1/
+        val serverBase = baseUrl.removeSuffix("/").removeSuffix("/api/v1").removeSuffix("/api/v1/")
         val prefs = TVPlayerApp.instance.getSharedPreferences("tvplayer_auth", 0)
         val token = prefs.getString("access_token", "") ?: ""
-        return "$base/api/v1/stream/proxy/$channelId?token=$token"
+        return "$serverBase/api/v1/stream/proxy/$channelId?token=$token"
     }
 
     fun reset() {
