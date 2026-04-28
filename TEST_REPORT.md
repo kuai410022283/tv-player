@@ -105,3 +105,41 @@
 2. **go.sum**: 需在 Go 环境中执行 `cd backend && go mod tidy` 生成
 3. **Android 签名**: 正式发布需配置 keystore 签名
 4. **HTTPS**: 生产环境建议配置 TLS 反向代理
+
+---
+
+## 第二阶段 - 深度测试报告
+
+**测试维度**: 16 项深度检查
+
+### 测试结果
+
+| 类别 | 检查项 | 结果 |
+|------|--------|------|
+| 数据流完整性 | 注册/审批/播放全链路模型对齐 | ✅ |
+| 状态机验证 | 5种状态转换前后端一致 | ✅ |
+| 并发安全 | Go RWMutex / Android Dispatchers.IO | ✅ |
+| 输入验证 | 17个验证点 + URL非空检查 | ✅ |
+| 内存泄漏 | Handler清理 / 无静态Context引用 | ✅ |
+| 错误恢复 | DB WAL模式 / 空数据处理 | ✅ |
+| API响应格式 | code/message/data 三端一致 | ✅ |
+| 边界值 | 分页归一化 / 空搜索 / ID=0 | ✅ |
+| 外键级联 | ON DELETE CASCADE 正确配置 | ✅ |
+| HTTP状态码 | 400/401/404/500/502 使用一致 | ✅ |
+| 日志安全 | Android 0处泄露 / Go 适度日志 | ✅ |
+| 代码清理 | 移除1个未使用import + 1个死代码文件 | ✅ 修复 |
+
+### 发现并修复的问题
+
+1. **PlayerActivity 未使用 import** `android.provider.Settings` → 已移除
+2. **epg_service.go 死代码** → EPGService 从未被实例化，EPG 功能通过 ChannelService 实现 → 已删除
+
+### 非阻塞观察项
+
+| # | 内容 | 影响 |
+|---|------|------|
+| 1 | Android 无网络重试 interceptor | 网络抖动时需用户手动重试 |
+| 2 | ImageView 无 contentDescription | 无障碍支持不足 |
+| 3 | 部分触控元素 < 48dp | 不符合无障碍标准 |
+| 4 | loadData() 无重入保护 | 快速下拉刷新可能触发重复请求 |
+| 5 | 默认 URL `10.0.2.2:9527` 在4处重复 | 可提取为 Prefs.DEFAULT_SERVER_URL |
