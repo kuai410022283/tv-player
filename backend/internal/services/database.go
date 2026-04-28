@@ -18,8 +18,8 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	}
 
 	// 连接池配置（SQLite 单文件，限制并发写入）
-	db.SetMaxOpenConns(1)          // SQLite 单写入者
-	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(5)          // SQLite 单写入者
+	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(0)       // 不复用连接（SQLite 文件句柄）
 
 	if err := createTables(db); err != nil {

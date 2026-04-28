@@ -189,7 +189,7 @@ func checkSecurityDefaults(cfg *config.Config) {
 	}
 
 	if cfg.Auth.AdminPassword == "" || cfg.Auth.AdminPassword == "admin123" {
-		warnings = append(warnings, "管理员密码使用了默认值，请在 config.yaml 中修改 auth.admin_password")
+		warnings = append(warnings, "管理员密码使用了默认值或为空，请在 config.yaml 中修改 auth.admin_password")
 	}
 
 	if len(warnings) > 0 {

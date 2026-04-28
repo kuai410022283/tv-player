@@ -62,9 +62,15 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		if token == "" {
 			token = strings.TrimPrefix(auth, "Bearer ")
 		}
-		// 流代理场景：通过 query 参数传递 token
+		// 流代理场景：通过 query 参数传递 token（已废弃，建议用 Header）
 		if token == "" {
 			token = c.Query("token")
+			if token != "" {
+				slog.Warn("token 通过 URL query 传递已废弃，请使用 Header",
+					"path", c.Request.URL.Path,
+					"ip", c.ClientIP(),
+				)
+			}
 		}
 		if token != "" && db != nil {
 			var clientID int64
@@ -155,6 +161,7 @@ type rateLimiter struct {
 	visitors map[string]*visitor
 	rate     int           // 每窗口允许的请求数
 	window   time.Duration // 窗口大小
+	maxSize  int
 }
 
 type visitor struct {
@@ -166,12 +173,14 @@ var loginLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
 	rate:     5,              // 5 次
 	window:   1 * time.Minute, // 每分钟
+	maxSize:  10000,
 }
 
 var apiLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
 	rate:     60,             // 60 次
 	window:   1 * time.Minute, // 每分钟
+	maxSize:  50000,
 }
 
 func (rl *rateLimiter) allow(key string) bool {
@@ -182,6 +191,12 @@ func (rl *rateLimiter) allow(key string) bool {
 	now := time.Now()
 
 	if !exists || now.Sub(v.lastSeen) > rl.window {
+		if !exists && len(rl.visitors) >= rl.maxSize {
+			rl.cleanupLocked(now)
+			if len(rl.visitors) >= rl.maxSize {
+				return false
+			}
+		}
 		rl.visitors[key] = &visitor{count: 1, lastSeen: now}
 		return true
 	}
@@ -195,16 +210,19 @@ func (rl *rateLimiter) allow(key string) bool {
 	return true
 }
 
-// 定期清理过期 visitor（由 main 中调用）
-func (rl *rateLimiter) Cleanup() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	now := time.Now()
+func (rl *rateLimiter) cleanupLocked(now time.Time) {
 	for k, v := range rl.visitors {
 		if now.Sub(v.lastSeen) > rl.window*2 {
 			delete(rl.visitors, k)
 		}
 	}
+}
+
+// 定期清理过期 visitor（由 main 中调用）
+func (rl *rateLimiter) Cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.cleanupLocked(time.Now())
 }
 
 // LoginRateLimit 登录接口限流（每 IP 每分钟 5 次）

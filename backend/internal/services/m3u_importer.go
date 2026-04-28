@@ -35,10 +35,22 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (int, error) {
 		return 0, fmt.Errorf("source not found: %d", sourceID)
 	}
 
+	// 校验 M3U 源 URL
+	if err := ValidateStreamURL(source.URL); err != nil {
+		return 0, fmt.Errorf("M3U 源地址不安全: %w", err)
+	}
+
 	resp, err := http.Get(source.URL)
 	if err != nil {
 		return 0, err
 	}
+
+	// 检查 HTTP 响应状态码
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		resp.Body.Close()
+		return 0, fmt.Errorf("M3U 源返回错误状态码: %d", resp.StatusCode)
+	}
+
 	defer resp.Body.Close()
 
 	channels, err := ParseM3U(resp.Body)
@@ -68,11 +80,14 @@ func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error
 	imported := 0
 	existingURLs := make(map[string]bool)
 
-	// 获取已有频道的 URL 列表用于去重
-	if existing, err := imp.channelSvc.ListChannels(0, false, "", &models.PageRequest{Page: 1, PageSize: 10000}); err == nil {
-		if items, ok := existing.Items.([]models.Channel); ok {
-			for _, ch := range items {
-				existingURLs[ch.StreamURL] = true
+	// 使用数据库查询去重，而非加载全部频道到内存
+	rows, err := imp.channelSvc.db.Query("SELECT stream_url FROM channels")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var url string
+			if rows.Scan(&url) == nil {
+				existingURLs[url] = true
 			}
 		}
 	}
