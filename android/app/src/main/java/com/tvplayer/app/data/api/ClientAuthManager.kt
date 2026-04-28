@@ -3,6 +3,7 @@ package com.tvplayer.app.data.api
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import com.tvplayer.app.Prefs
 import com.tvplayer.app.TVPlayerApp
 import com.tvplayer.app.data.model.*
 import kotlinx.coroutines.Dispatchers
@@ -11,14 +12,14 @@ import retrofit2.Response
 
 class ClientAuthManager(private val context: Context) {
 
-    private val prefs = context.getSharedPreferences("tvplayer_auth", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
     private val api = ApiClient.getApi()
 
     companion object {
-        private const val KEY_TOKEN = "access_token"
-        private const val KEY_CLIENT_ID = "client_id"
-        private const val KEY_STATUS = "client_status"
-        private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_TOKEN = Prefs.KEY_ACCESS_TOKEN
+        private const val KEY_CLIENT_ID = Prefs.KEY_CLIENT_ID
+        private const val KEY_STATUS = Prefs.KEY_CLIENT_STATUS
+        private const val KEY_DEVICE_ID = Prefs.KEY_DEVICE_ID
     }
 
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)

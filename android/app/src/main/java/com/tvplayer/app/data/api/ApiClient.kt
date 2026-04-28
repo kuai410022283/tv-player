@@ -1,5 +1,6 @@
 package com.tvplayer.app.data.api
 
+import com.tvplayer.app.Prefs
 import com.tvplayer.app.TVPlayerApp
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -37,8 +38,8 @@ object ApiClient {
                                original.url.encodedPath.contains("client/verify")
 
                 val request = if (!skipAuth) {
-                    val prefs = TVPlayerApp.instance.getSharedPreferences("tvplayer_auth", 0)
-                    val token = prefs.getString("access_token", null)
+                    val prefs = TVPlayerApp.instance.getSharedPreferences(Prefs.FILE, 0)
+                    val token = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
                     if (token != null) {
                         original.newBuilder()
                             .header("X-Client-Token", token)
@@ -62,23 +63,23 @@ object ApiClient {
                 .addInterceptor(logging)
                 .build()
 
-            retrofit = Retrofit.Builder()
+            val rf = Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
-
-            api = retrofit!!.create(TVPlayerApi::class.java)
+            retrofit = rf
+            api = rf.create(TVPlayerApi::class.java)
         }
-        return api!!
+        return api ?: throw IllegalStateException("API not initialized")
     }
 
     fun getStreamProxyUrl(channelId: Long): String {
         // 从 baseUrl 构建 stream proxy URL
         // baseUrl 格式: http://host:port/api/v1/
         val serverBase = baseUrl.removeSuffix("/").removeSuffix("/api/v1").removeSuffix("/api/v1/")
-        val prefs = TVPlayerApp.instance.getSharedPreferences("tvplayer_auth", 0)
-        val token = prefs.getString("access_token", "") ?: ""
+        val prefs = TVPlayerApp.instance.getSharedPreferences(Prefs.FILE, 0)
+        val token = prefs.getString(Prefs.KEY_ACCESS_TOKEN, "") ?: ""
         return "$serverBase/api/v1/stream/proxy/$channelId?token=$token"
     }
 

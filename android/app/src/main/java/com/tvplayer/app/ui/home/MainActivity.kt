@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.tvplayer.app.Prefs
 import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
@@ -88,8 +89,8 @@ class MainActivity : AppCompatActivity() {
 
         authManager = ClientAuthManager(this)
 
-        val prefs = getSharedPreferences("tvplayer", MODE_PRIVATE)
-        val serverUrl = prefs.getString("server_url", "http://10.0.2.2:9527") ?: "http://10.0.2.2:9527"
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, "http://10.0.2.2:9527") ?: "http://10.0.2.2:9527"
         ApiClient.init(serverUrl)
 
         setupAdapters()
@@ -115,8 +116,10 @@ class MainActivity : AppCompatActivity() {
         tvChannelsRv?.let { FocusHelper.setupTvRecyclerView(it) }
 
         // 左右列表焦点联动
-        if (tvGroupsRv != null && tvChannelsRv != null) {
-            FocusHelper.linkHorizontalFocus(tvGroupsRv!!, tvChannelsRv!!)
+        val groupsRv = tvGroupsRv
+        val channelsRv = tvChannelsRv
+        if (groupsRv != null && channelsRv != null) {
+            FocusHelper.linkHorizontalFocus(groupsRv, channelsRv)
         }
     }
 
@@ -257,7 +260,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startAuthPolling() {
-        authPollRunnable = object : Runnable {
+        val runnable = object : Runnable {
             override fun run() {
                 lifecycleScope.launch {
                     authManager.checkStatus().onSuccess { status ->
@@ -267,7 +270,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        authPollHandler.postDelayed(authPollRunnable!!, 10000)
+        authPollRunnable = runnable
+        authPollHandler.postDelayed(runnable, 10000)
     }
 
     private fun showAuthWaiting(message: String) {

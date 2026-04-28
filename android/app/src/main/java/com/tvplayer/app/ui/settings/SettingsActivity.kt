@@ -3,6 +3,7 @@ package com.tvplayer.app.ui.settings
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.tvplayer.app.Prefs
 import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
@@ -24,9 +25,9 @@ class SettingsActivity : AppCompatActivity() {
 
         authManager = ClientAuthManager(this)
 
-        val prefs = getSharedPreferences("tvplayer", MODE_PRIVATE)
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val etServerUrl = findViewById<android.widget.EditText>(R.id.etServerUrl)
-        etServerUrl.setText(prefs.getString("server_url", "http://10.0.2.2:9527"))
+        etServerUrl.setText(prefs.getString(Prefs.KEY_SERVER_URL, "http://10.0.2.2:9527"))
 
         // 返回按钮 (手机模式)
         findViewById<android.view.View>(R.id.btnBack)?.setOnClickListener { finish() }
@@ -55,14 +56,14 @@ class SettingsActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val oldUrl = prefs.getString("server_url", "")
+            val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
             if (url != oldUrl) {
                 authManager.clearAuth()
                 ApiClient.reset()
                 com.tvplayer.app.ui.home.MainActivity.settingsChanged = true
             }
 
-            prefs.edit().putString("server_url", url).apply()
+            prefs.edit().putString(Prefs.KEY_SERVER_URL, url).apply()
             ApiClient.init(url)
             Toast.makeText(this, "设置已保存，重新启动应用生效", Toast.LENGTH_SHORT).show()
             finish()

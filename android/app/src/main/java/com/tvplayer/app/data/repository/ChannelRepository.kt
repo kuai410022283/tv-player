@@ -12,10 +12,11 @@ class ChannelRepository {
     suspend fun getGroups(): Result<List<ChannelGroup>> = withContext(Dispatchers.IO) {
         try {
             val res = api.getGroups()
-            if (res.isSuccessful && res.body()?.code == 0) {
-                Result.success(res.body()!!.data ?: emptyList())
+            val body = res.body()
+            if (res.isSuccessful && body?.code == 0) {
+                Result.success(body.data ?: emptyList())
             } else {
-                Result.failure(Exception(res.body()?.message ?: "加载失败"))
+                Result.failure(Exception(body?.message ?: "加载失败"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -44,14 +45,15 @@ class ChannelRepository {
                     pageSize = pageSize
                 )
 
-                if (!res.isSuccessful || res.body()?.code != 0) {
+                val body = res.body()
+                if (!res.isSuccessful || body?.code != 0) {
                     if (page == 1) {
-                        return@withContext Result.failure(Exception(res.body()?.message ?: "加载失败"))
+                        return@withContext Result.failure(Exception(body?.message ?: "加载失败"))
                     }
                     break
                 }
 
-                val items = res.body()!!.data?.items ?: emptyList()
+                val items = body.data?.items ?: emptyList()
                 allChannels.addAll(items)
 
                 if (items.size < pageSize) break // 最后一页
@@ -67,8 +69,10 @@ class ChannelRepository {
     suspend fun getChannel(id: Long): Result<Channel> = withContext(Dispatchers.IO) {
         try {
             val res = api.getChannel(id)
-            if (res.isSuccessful && res.body()?.code == 0 && res.body()!!.data != null) {
-                Result.success(res.body()!!.data!!)
+            val body = res.body()
+            val data = body?.data
+            if (res.isSuccessful && body?.code == 0 && data != null) {
+                Result.success(data)
             } else {
                 Result.failure(Exception("频道不存在"))
             }
@@ -99,8 +103,9 @@ class ChannelRepository {
     suspend fun getHistory(): Result<List<PlayHistory>> = withContext(Dispatchers.IO) {
         try {
             val res = api.getHistory()
-            if (res.isSuccessful && res.body()?.code == 0) {
-                Result.success(res.body()!!.data ?: emptyList())
+            val body = res.body()
+            if (res.isSuccessful && body?.code == 0) {
+                Result.success(body.data ?: emptyList())
             } else {
                 Result.failure(Exception("加载失败"))
             }
@@ -112,8 +117,9 @@ class ChannelRepository {
     suspend fun getStats(): Result<ServerStats> = withContext(Dispatchers.IO) {
         try {
             val res = api.getStats()
-            if (res.isSuccessful && res.body()?.code == 0) {
-                Result.success(res.body()!!.data ?: ServerStats())
+            val body = res.body()
+            if (res.isSuccessful && body?.code == 0) {
+                Result.success(body.data ?: ServerStats())
             } else {
                 Result.failure(Exception("加载失败"))
             }
@@ -125,8 +131,9 @@ class ChannelRepository {
     suspend fun getEPG(channelId: String): Result<List<EPGProgram>> = withContext(Dispatchers.IO) {
         try {
             val res = api.getEPG(channelId)
-            if (res.isSuccessful && res.body()?.code == 0) {
-                Result.success(res.body()!!.data ?: emptyList())
+            val body = res.body()
+            if (res.isSuccessful && body?.code == 0) {
+                Result.success(body.data ?: emptyList())
             } else {
                 Result.success(emptyList())
             }

@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import com.tvplayer.app.Prefs
 import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
@@ -218,16 +219,16 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showGestureHintOnce() {
-        val prefs = getSharedPreferences("tvplayer", MODE_PRIVATE)
-        if (!prefs.getBoolean("gesture_hint_shown", false)) {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        if (!prefs.getBoolean(Prefs.KEY_GESTURE_HINT_SHOWN, false)) {
             layoutGestureHint?.visibility = View.VISIBLE
             layoutGestureHint?.setOnClickListener {
                 layoutGestureHint?.visibility = View.GONE
-                prefs.edit().putBoolean("gesture_hint_shown", true).apply()
+                prefs.edit().putBoolean(Prefs.KEY_GESTURE_HINT_SHOWN, true).apply()
             }
             handler.postDelayed({
                 layoutGestureHint?.visibility = View.GONE
-                prefs.edit().putBoolean("gesture_hint_shown", true).apply()
+                prefs.edit().putBoolean(Prefs.KEY_GESTURE_HINT_SHOWN, true).apply()
             }, 5000)
         }
     }
