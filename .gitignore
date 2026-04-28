@@ -38,6 +38,9 @@ android/app/release/
 data/
 cache/
 
+# Build artifacts
+backend/web/dist/
+
 # OS
 .DS_Store
 Thumbs.db
