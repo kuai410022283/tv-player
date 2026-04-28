@@ -86,6 +86,31 @@
                 android:textSize="11sp"
                 android:layout_marginStart="10dp" />
         </LinearLayout>
+
+        <!-- EPG 节目信息 -->
+        <LinearLayout
+            android:id="@+id/layoutEpg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvEpgNow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#ccc"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvEpgNext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#888"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- 手势提示浮层 (首次使用时显示) -->

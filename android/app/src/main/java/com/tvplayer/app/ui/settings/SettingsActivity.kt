@@ -31,6 +31,23 @@ class SettingsActivity : AppCompatActivity() {
         // 返回按钮 (手机模式)
         findViewById<android.view.View>(R.id.btnBack)?.setOnClickListener { finish() }
 
+        // 填充关于信息
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            findViewById<android.widget.TextView>(R.id.tvAppVersion)?.text = "${pInfo.versionName} (${pInfo.longVersionCode})"
+        } catch (_: Exception) {
+            findViewById<android.widget.TextView>(R.id.tvAppVersion)?.text = "1.0.0"
+        }
+        findViewById<android.widget.TextView>(R.id.tvDeviceId)?.text = authManager.getDeviceId().take(16) + "..."
+        findViewById<android.widget.TextView>(R.id.tvAuthStatusInfo)?.text = when (authManager.getStatus()) {
+            "approved" -> "已授权"
+            "pending" -> "等待审批"
+            "rejected" -> "已拒绝"
+            "banned" -> "已封禁"
+            "expired" -> "已过期"
+            else -> "未注册"
+        }
+
         findViewById<android.view.View>(R.id.btnSave).setOnClickListener {
             val url = etServerUrl.text.toString().trim()
             if (url.isEmpty()) {

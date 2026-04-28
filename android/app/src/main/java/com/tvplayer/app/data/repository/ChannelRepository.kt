@@ -121,4 +121,17 @@ class ChannelRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun getEPG(channelId: String): Result<List<EPGProgram>> = withContext(Dispatchers.IO) {
+        try {
+            val res = api.getEPG(channelId)
+            if (res.isSuccessful && res.body()?.code == 0) {
+                Result.success(res.body()!!.data ?: emptyList())
+            } else {
+                Result.success(emptyList())
+            }
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
+    }
 }

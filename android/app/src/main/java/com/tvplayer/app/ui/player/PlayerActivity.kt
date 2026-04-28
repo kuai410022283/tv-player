@@ -54,6 +54,11 @@ class PlayerActivity : AppCompatActivity() {
     private var tvStatus: android.widget.TextView? = null
     private var tvResolution: android.widget.TextView? = null
 
+    // ── EPG views ──
+    private var layoutEpg: View? = null
+    private var tvEpgNow: android.widget.TextView? = null
+    private var tvEpgNext: android.widget.TextView? = null
+
     // ── Phone-only views ──
     private var layoutGestureHint: View? = null
     private var layoutVolumeIndicator: View? = null
@@ -135,6 +140,9 @@ class PlayerActivity : AppCompatActivity() {
         tvStreamType = findViewById(R.id.tvStreamType)
         tvStatus = findViewById(R.id.tvStatus)
         tvResolution = findViewById(R.id.tvResolution)
+        layoutEpg = findViewById(R.id.layoutEpg)
+        tvEpgNow = findViewById(R.id.tvEpgNow)
+        tvEpgNext = findViewById(R.id.tvEpgNext)
     }
 
     private fun setupPhonePlayerViews() {
@@ -145,6 +153,9 @@ class PlayerActivity : AppCompatActivity() {
         tvStreamType = findViewById(R.id.tvStreamType)
         tvStatus = findViewById(R.id.tvStatus)
         tvResolution = findViewById(R.id.tvResolution)
+        layoutEpg = findViewById(R.id.layoutEpg)
+        tvEpgNow = findViewById(R.id.tvEpgNow)
+        tvEpgNext = findViewById(R.id.tvEpgNext)
 
         layoutGestureHint = findViewById(R.id.layoutGestureHint)
         layoutVolumeIndicator = findViewById(R.id.layoutVolumeIndicator)
@@ -366,8 +377,42 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showChannelInfo() {
         layoutChannelInfo?.visibility = View.VISIBLE
+        loadEPG()
         handler.removeCallbacks(hideInfoRunnable)
         handler.postDelayed(hideInfoRunnable, 5000)
+    }
+
+    private fun loadEPG() {
+        val epgId = allChannels.getOrNull(channelIndex)?.epgChannelId
+        if (epgId.isNullOrEmpty()) {
+            layoutEpg?.visibility = View.GONE
+            return
+        }
+        lifecycleScope.launch {
+            repo.getEPG(epgId).onSuccess { programs ->
+                if (programs.isEmpty()) {
+                    layoutEpg?.visibility = View.GONE
+                    return@onSuccess
+                }
+                layoutEpg?.visibility = View.VISIBLE
+                val now = java.util.Date()
+                val current = programs.find { p ->
+                    try {
+                        val start = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(p.startTime)
+                        val end = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(p.endTime)
+                        start != null && end != null && now.after(start) && now.before(end)
+                    } catch (_: Exception) { false }
+                }
+                val next = if (current != null) {
+                    val idx = programs.indexOf(current)
+                    programs.getOrNull(idx + 1)
+                } else {
+                    programs.firstOrNull()
+                }
+                tvEpgNow?.text = if (current != null) "📺 正在播放: ${current.title}" else ""
+                tvEpgNext?.text = if (next != null) "⏭ 下一节目: ${next.title}" else ""
+            }
+        }
     }
 
     private fun hideChannelInfo() {

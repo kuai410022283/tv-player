@@ -12,11 +12,13 @@ import android.view.View
 import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
@@ -51,6 +53,12 @@ class MainActivity : AppCompatActivity() {
     private var phoneSearchLayout: View? = null
     private var phoneSearchEdit: EditText? = null
     private var phoneScrollView: HorizontalScrollView? = null
+    private var phoneSwipeRefresh: SwipeRefreshLayout? = null
+
+    // ── Shared loading/empty views ──
+    private var progressLoading: ProgressBar? = null
+    private var layoutEmpty: View? = null
+    private var tvEmptyText: TextView? = null
 
     // ── Data ──
     private var groups = listOf<ChannelGroup>()
@@ -98,6 +106,9 @@ class MainActivity : AppCompatActivity() {
         tvChannelCount = findViewById(R.id.tvChannelCount)
         tvAuthWaiting = findViewById(R.id.layoutAuthWaiting)
         tvContent = findViewById(R.id.layoutContent)
+        progressLoading = findViewById(R.id.progressLoading)
+        layoutEmpty = findViewById(R.id.layoutEmpty)
+        tvEmptyText = findViewById(R.id.tvEmptyText)
 
         // TV 焦点优化
         tvGroupsRv?.let { FocusHelper.setupTvRecyclerView(it) }
@@ -122,6 +133,14 @@ class MainActivity : AppCompatActivity() {
         phoneSearchLayout = findViewById(R.id.layoutSearch)
         phoneSearchEdit = findViewById(R.id.etSearch)
         phoneScrollView = findViewById(R.id.layoutGroupTabs)?.parent as? HorizontalScrollView
+        phoneSwipeRefresh = findViewById(R.id.swipeRefresh)
+        progressLoading = findViewById(R.id.progressLoading)
+        layoutEmpty = findViewById(R.id.layoutEmpty)
+        tvEmptyText = findViewById(R.id.tvEmptyText)
+
+        // 下拉刷新
+        phoneSwipeRefresh?.setColorSchemeResources(R.color.accent)
+        phoneSwipeRefresh?.setOnRefreshListener { loadData() }
 
         // 搜索按钮
         findViewById<View>(R.id.btnSearch)?.setOnClickListener {
@@ -166,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         }
         channelAdapter.submitList(filteredChannels)
         updateChannelCount()
+        showEmpty(filteredChannels.isEmpty(), "未找到匹配的频道")
     }
 
     // ═══════════════════════════════════════════════════
@@ -274,6 +294,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadData() {
+        showLoading(true)
         lifecycleScope.launch {
             repo.getGroups().onSuccess { list ->
                 groups = listOf(ChannelGroup(id = 0, name = "全部")) + list
@@ -287,14 +308,28 @@ class MainActivity : AppCompatActivity() {
                 filteredChannels = list
                 channelAdapter.submitList(list)
                 updateChannelCount()
+                showEmpty(list.isEmpty())
                 if (list.isNotEmpty()) {
                     currentChannelIndex = 0
                     if (isTvMode) {
                         tvChannelsRv?.requestFocus()
                     }
                 }
+            }.onFailure {
+                showEmpty(true, "加载失败，请检查网络")
             }
+            showLoading(false)
+            phoneSwipeRefresh?.isRefreshing = false
         }
+    }
+
+    private fun showLoading(show: Boolean) {
+        progressLoading?.visibility = if (show) View.VISIBLE else View.GONE
+    }
+
+    private fun showEmpty(show: Boolean, message: String = getString(R.string.no_channels)) {
+        layoutEmpty?.visibility = if (show) View.VISIBLE else View.GONE
+        tvEmptyText?.text = message
     }
 
     private fun filterChannels() {
@@ -305,6 +340,7 @@ class MainActivity : AppCompatActivity() {
         }
         channelAdapter.submitList(filteredChannels)
         updateChannelCount()
+        showEmpty(filteredChannels.isEmpty(), "该分组暂无频道")
     }
 
     private fun updateChannelCount() {

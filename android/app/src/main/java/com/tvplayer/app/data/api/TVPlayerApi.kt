@@ -57,4 +57,8 @@ interface TVPlayerApi {
     // ── Stats ──────────────────────────────────────────
     @GET("stats")
     suspend fun getStats(): Response<ApiResponse<ServerStats>>
+
+    // ── EPG ────────────────────────────────────────────
+    @GET("epg")
+    suspend fun getEPG(@Query("channel_id") channelId: String): Response<ApiResponse<List<EPGProgram>>>
 }
