@@ -61,7 +61,7 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (int, error) {
 	count, err := imp.importChannels(channels)
 	if err == nil {
 		// 更新特定源的同步时间
-		imp.channelSvc.db.Exec("UPDATE m3u_sources SET last_sync=? WHERE id=?", time.Now(), sourceID)
+		_, _ = imp.channelSvc.db.Exec("UPDATE m3u_sources SET last_sync=? WHERE id=?", time.Now(), sourceID)
 	}
 	return count, err
 }
@@ -116,7 +116,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error
 			}
 			if !found {
 				newGroup := &models.ChannelGroup{Name: groupName, SortOrder: len(groups)}
-				imp.channelSvc.CreateGroup(newGroup)
+				_ = imp.channelSvc.CreateGroup(newGroup)
 				groupID = newGroup.ID
 			}
 			groupCache[groupName] = groupID

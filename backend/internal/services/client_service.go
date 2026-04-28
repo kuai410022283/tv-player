@@ -319,7 +319,7 @@ func (s *ClientService) Batch(req *models.ClientBatchReq, approver string) (int,
 	if err != nil {
 		return 0, fmt.Errorf("开启事务失败: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	count := 0
 	now := time.Now()
@@ -421,10 +421,10 @@ func (s *ClientService) GetRecentLogs(limit int) ([]models.AccessLog, error) {
 // ── 统计 ───────────────────────────────────────────────
 
 func (s *ClientService) GetClientStats() (total, pending, online int) {
-	s.db.QueryRow(`SELECT COUNT(*) FROM clients`).Scan(&total)
-	s.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE status='pending'`).Scan(&pending)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM clients`).Scan(&total)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE status='pending'`).Scan(&pending)
 	// 5分钟内活跃
-	s.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE last_seen > datetime('now', '-5 minutes')`).Scan(&online)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM clients WHERE last_seen > datetime('now', '-5 minutes')`).Scan(&online)
 	return
 }
 

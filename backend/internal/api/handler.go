@@ -412,7 +412,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 	}
 
 	var onlineChannels int64
-	h.channelSvc.CountByStatus("online", &onlineChannels)
+	_ = h.channelSvc.CountByStatus("online", &onlineChannels)
 
 	totalClients, pendingClients, onlineClients := 0, 0, 0
 	if h.clientSvc != nil {

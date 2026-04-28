@@ -64,7 +64,7 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var defaultGroupID int64
 	err = tx.QueryRow("SELECT id FROM channel_groups WHERE name = '未分类'").Scan(&defaultGroupID)

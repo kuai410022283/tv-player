@@ -142,7 +142,7 @@ func (sp *StreamProxy) checkAllChannels() {
 			if status.Status == "online" {
 				newStatus = "online"
 			}
-			sp.channelSvc.UpdateStatus(ch.ID, newStatus)
+			_ = sp.channelSvc.UpdateStatus(ch.ID, newStatus)
 		}
 
 		if len(channels) < pageSize {
