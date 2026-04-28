@@ -17,6 +17,11 @@ func InitDB(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
+	// 连接池配置（SQLite 单文件，限制并发写入）
+	db.SetMaxOpenConns(1)          // SQLite 单写入者
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)       // 不复用连接（SQLite 文件句柄）
+
 	if err := createTables(db); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}

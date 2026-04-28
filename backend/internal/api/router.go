@@ -15,13 +15,11 @@ func NewHandlers(h *Handler, ch *ClientHandler) *Handlers {
 }
 
 func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
-	// ── 客户端公开接口 (无需认证) ────────────────────
-	r.POST("/client/register", hs.ClientHandler.Register)
-	r.GET("/client/verify", hs.ClientHandler.Verify)
-	r.POST("/client/verify", hs.ClientHandler.Verify)
-
-	// ── 管理员登录 (无需认证) ─────────────────────
-	r.POST("/admin/login", hs.Handler.AdminLogin)
+	// ── 客户端公开接口 (已在 main.go 中注册，带限流) ───
+	// r.POST("/client/register", ...) — 已移至 main.go
+	// r.GET("/client/verify", ...) — 已移至 main.go
+	// r.POST("/client/verify", ...) — 已移至 main.go
+	// r.POST("/admin/login", ...) — 已移至 main.go
 
 	// ── 客户端自服务 (需要客户端 token) ──────────────
 	r.GET("/client/me", hs.ClientHandler.Me)
@@ -64,13 +62,14 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 	}
 
-	// ── 历史 & 设置 & 统计 & EPG ─────────────────────
+	// ── 历史 & 设置 & 统计 & EPG & 版本 ─────────────────
 	r.GET("/history", hs.Handler.GetHistory)
 	r.POST("/history", hs.Handler.AddHistory)
 	r.GET("/settings", hs.Handler.GetSettings)
 	r.POST("/settings", hs.Handler.SetSetting)
 	r.GET("/stats", hs.Handler.GetStats)
 	r.GET("/epg", hs.Handler.GetEPG)
+	r.GET("/version", hs.Handler.GetVersion)
 
 	// ── 管理端：客户端管理 (需要 admin 权限) ────────
 	clients := r.Group("/admin/clients")

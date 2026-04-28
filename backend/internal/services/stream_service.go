@@ -46,8 +46,13 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		streams:    make(map[int64]*streamState),
 		channelSvc: channelSvc,
 		client: &http.Client{
-			// 不设置全局 Timeout，否则长流会被中断
-			// 通过 context 控制单次请求超时
+			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
+			Transport: &http.Transport{
+				ResponseHeaderTimeout: 30 * time.Second, // 等待上游响应头的最长时间
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   10,
+			},
 		},
 		sem: make(chan struct{}, maxConcurrent),
 	}

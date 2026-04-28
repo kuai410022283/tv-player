@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
@@ -13,17 +14,24 @@ import (
 	"github.com/tvplayer/backend/internal/services"
 )
 
+// Version 由编译时注入: go build -ldflags "-X main.Version=v1.0.0"
+var Version = "dev"
+
 // startTime 记录服务启动时间，用于 uptime 统计
 var startTime = time.Now()
 
 // jwtSecret 存储 JWT 密钥，由 Init 设置
 var jwtSecret string
 var adminPassword string
+var jwtExpireHours int = 720
 
 // InitSecret 设置 JWT 密钥和管理员密码
-func InitSecret(secret, password string) {
+func InitSecret(secret, password string, expireHours int) {
 	jwtSecret = secret
 	adminPassword = password
+	if expireHours > 0 {
+		jwtExpireHours = expireHours
+	}
 }
 
 func getJWTSecret() string {
@@ -44,9 +52,12 @@ func getAdminPassword() string {
 }
 
 func generateAdminToken(secret string) (string, error) {
+	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"role": "admin",
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+		"iss":  "tvplayer",
+		"iat":  now.Unix(),
+		"exp":  now.Add(time.Duration(jwtExpireHours) * time.Hour).Unix(),
 	})
 	return token.SignedString([]byte(secret))
 }
@@ -71,8 +82,15 @@ func ok(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, models.APIResponse{Code: 0, Message: "ok", Data: data})
 }
 
+// fail 返回用户友好的错误信息，不泄露内部细节
 func fail(c *gin.Context, code int, msg string) {
 	c.JSON(code, models.APIResponse{Code: code, Message: msg})
+}
+
+// failInternal 记录内部错误并返回通用错误信息
+func failInternal(c *gin.Context, err error, userMsg string) {
+	slog.Error("internal error", "path", c.Request.URL.Path, "error", err)
+	c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: userMsg})
 }
 
 // ── Groups ─────────────────────────────────────────────
@@ -80,7 +98,7 @@ func fail(c *gin.Context, code int, msg string) {
 func (h *Handler) ListGroups(c *gin.Context) {
 	groups, err := h.channelSvc.ListGroups()
 	if err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "获取分组列表失败")
 		return
 	}
 	ok(c, groups)
@@ -93,7 +111,7 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 		return
 	}
 	if err := h.channelSvc.CreateGroup(&g); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "创建分组失败")
 		return
 	}
 	ok(c, g)
@@ -108,7 +126,7 @@ func (h *Handler) UpdateGroup(c *gin.Context) {
 	}
 	g.ID = id
 	if err := h.channelSvc.UpdateGroup(&g); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "更新分组失败")
 		return
 	}
 	ok(c, g)
@@ -117,7 +135,7 @@ func (h *Handler) UpdateGroup(c *gin.Context) {
 func (h *Handler) DeleteGroup(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.DeleteGroup(id); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "删除分组失败")
 		return
 	}
 	ok(c, nil)
@@ -135,7 +153,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	p := &models.PageRequest{Page: page, PageSize: pageSize}
 	resp, err := h.channelSvc.ListChannels(groupID, favorite, search, p)
 	if err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "获取频道列表失败")
 		return
 	}
 	ok(c, resp)
@@ -158,7 +176,7 @@ func (h *Handler) CreateChannel(c *gin.Context) {
 		return
 	}
 	if err := h.channelSvc.CreateChannel(&ch); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "创建频道失败")
 		return
 	}
 	ok(c, ch)
@@ -173,7 +191,7 @@ func (h *Handler) UpdateChannel(c *gin.Context) {
 	}
 	ch.ID = id
 	if err := h.channelSvc.UpdateChannel(&ch); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "更新频道失败")
 		return
 	}
 	ok(c, ch)
@@ -182,7 +200,7 @@ func (h *Handler) UpdateChannel(c *gin.Context) {
 func (h *Handler) DeleteChannel(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.DeleteChannel(id); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "删除频道失败")
 		return
 	}
 	ok(c, nil)
@@ -191,7 +209,7 @@ func (h *Handler) DeleteChannel(c *gin.Context) {
 func (h *Handler) ToggleFavorite(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.ToggleFavorite(id); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "操作失败")
 		return
 	}
 	ok(c, nil)
@@ -202,7 +220,11 @@ func (h *Handler) ToggleFavorite(c *gin.Context) {
 func (h *Handler) ProxyStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.streamProxy.ServeStream(id, c.Writer, c.Request); err != nil {
-		fail(c, 502, "流媒体代理失败: "+err.Error())
+		slog.Error("stream proxy failed", "channel_id", id, "error", err)
+		// 流代理失败时 Writer 可能已经写入了 header，不能再写 JSON
+		if !c.Writer.Written() {
+			fail(c, 502, "流媒体代理失败")
+		}
 	}
 }
 
@@ -227,7 +249,7 @@ func (h *Handler) GetActiveStreams(c *gin.Context) {
 func (h *Handler) ListM3USources(c *gin.Context) {
 	sources, err := h.channelSvc.ListM3USources()
 	if err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "获取 M3U 源列表失败")
 		return
 	}
 	ok(c, sources)
@@ -240,7 +262,7 @@ func (h *Handler) AddM3USource(c *gin.Context) {
 		return
 	}
 	if err := h.channelSvc.AddM3USource(&src); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "添加 M3U 源失败")
 		return
 	}
 	ok(c, src)
@@ -250,7 +272,8 @@ func (h *Handler) ImportM3U(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	count, err := h.importer.ImportFromURL(id)
 	if err != nil {
-		fail(c, 500, "导入失败: "+err.Error())
+		slog.Error("M3U import failed", "source_id", id, "error", err)
+		fail(c, 500, "导入失败，请检查 M3U 源地址是否正确")
 		return
 	}
 	ok(c, gin.H{"imported": count})
@@ -266,7 +289,8 @@ func (h *Handler) ImportM3UString(c *gin.Context) {
 	}
 	count, err := h.importer.ImportFromString(body.Content)
 	if err != nil {
-		fail(c, 500, "导入失败: "+err.Error())
+		slog.Error("M3U string import failed", "error", err)
+		fail(c, 500, "导入失败，请检查 M3U 格式")
 		return
 	}
 	ok(c, gin.H{"imported": count})
@@ -275,7 +299,7 @@ func (h *Handler) ImportM3UString(c *gin.Context) {
 func (h *Handler) DeleteM3USource(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.DeleteM3USource(id); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "删除 M3U 源失败")
 		return
 	}
 	ok(c, nil)
@@ -287,7 +311,7 @@ func (h *Handler) GetHistory(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	items, err := h.channelSvc.GetHistory(limit)
 	if err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "获取播放历史失败")
 		return
 	}
 	ok(c, items)
@@ -300,7 +324,7 @@ func (h *Handler) AddHistory(c *gin.Context) {
 		return
 	}
 	if err := h.channelSvc.AddHistory(&hist); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "记录播放历史失败")
 		return
 	}
 	ok(c, hist)
@@ -311,7 +335,7 @@ func (h *Handler) AddHistory(c *gin.Context) {
 func (h *Handler) GetSettings(c *gin.Context) {
 	settings, err := h.channelSvc.GetAllSettings()
 	if err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "获取设置失败")
 		return
 	}
 	ok(c, settings)
@@ -327,7 +351,7 @@ func (h *Handler) SetSetting(c *gin.Context) {
 		return
 	}
 	if err := h.channelSvc.SetSetting(body.Key, body.Value); err != nil {
-		fail(c, 500, err.Error())
+		failInternal(c, err, "保存设置失败")
 		return
 	}
 	ok(c, nil)
@@ -360,17 +384,16 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 		return
 	}
 
-	// 从配置中获取 admin 密码 (通过环境变量或默认值)
-	adminPassword := getAdminPassword()
-	if body.Password != adminPassword {
+	pwd := getAdminPassword()
+	if body.Password != pwd {
+		slog.Warn("admin login failed", "ip", c.ClientIP())
 		fail(c, 401, "密码错误")
 		return
 	}
 
-	// 生成 JWT token
 	token, err := generateAdminToken(getJWTSecret())
 	if err != nil {
-		fail(c, 500, "生成令牌失败")
+		failInternal(c, err, "生成令牌失败")
 		return
 	}
 
@@ -387,23 +410,19 @@ func (h *Handler) GetStats(c *gin.Context) {
 		totalChannels = totalResp.Total
 	}
 
-	// 统计在线频道数 (需要按 status 过滤)
 	var onlineChannels int64
 	h.channelSvc.CountByStatus("online", &onlineChannels)
 
-	// 客户端统计
 	totalClients, pendingClients, onlineClients := 0, 0, 0
 	if h.clientSvc != nil {
 		totalClients, pendingClients, onlineClients = h.clientSvc.GetClientStats()
 	}
 
-	// 内存统计
 	var memMB int64
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	memMB = int64(m.Alloc / 1024 / 1024)
 
-	// 运行时长
 	uptime := int64(time.Since(startTime).Seconds())
 
 	stats := models.ServerStats{
@@ -417,4 +436,14 @@ func (h *Handler) GetStats(c *gin.Context) {
 		MemoryMB:       memMB,
 	}
 	ok(c, stats)
+}
+
+// ── Version ────────────────────────────────────────────
+
+func (h *Handler) GetVersion(c *gin.Context) {
+	ok(c, gin.H{
+		"version":    Version,
+		"go_version": runtime.Version(),
+		"started_at": startTime.Format(time.RFC3339),
+	})
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -29,7 +30,8 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	ip := c.ClientIP()
 	resp, err := h.clientSvc.Register(&req, ip)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client register failed", "error", err, "device_id", req.DeviceID)
+		fail(c, 500, "注册失败，请稍后重试")
 		return
 	}
 
@@ -62,7 +64,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 
 	client, err := h.clientSvc.Validate(token, c.ClientIP())
 	if err != nil {
-		fail(c, 401, err.Error())
+		fail(c, 401, "令牌无效或已过期")
 		return
 	}
 
@@ -109,7 +111,8 @@ func (h *ClientHandler) List(c *gin.Context) {
 	p := &models.PageRequest{Page: page, PageSize: pageSize}
 	resp, err := h.clientSvc.List(status, search, p)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client list failed", "error", err)
+		fail(c, 500, "获取客户端列表失败")
 		return
 	}
 	ok(c, resp)
@@ -140,7 +143,8 @@ func (h *ClientHandler) Approve(c *gin.Context) {
 	}
 
 	if err := h.clientSvc.Approve(id, &req, approver); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client approve failed", "client_id", id, "error", err)
+		fail(c, 500, "审批操作失败")
 		return
 	}
 
@@ -158,7 +162,8 @@ func (h *ClientHandler) Reject(c *gin.Context) {
 	}
 
 	if err := h.clientSvc.Reject(id, &req); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client reject failed", "client_id", id, "error", err)
+		fail(c, 500, "拒绝操作失败")
 		return
 	}
 
@@ -175,7 +180,8 @@ func (h *ClientHandler) Ban(c *gin.Context) {
 	c.ShouldBindJSON(&body)
 
 	if err := h.clientSvc.Ban(id, body.Reason); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client ban failed", "client_id", id, "error", err)
+		fail(c, 500, "封禁操作失败")
 		return
 	}
 
@@ -187,7 +193,8 @@ func (h *ClientHandler) Ban(c *gin.Context) {
 func (h *ClientHandler) Unban(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.clientSvc.Unban(id); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client unban failed", "client_id", id, "error", err)
+		fail(c, 500, "解封操作失败")
 		return
 	}
 	ok(c, gin.H{"message": "已解封"})
@@ -198,7 +205,8 @@ func (h *ClientHandler) Unban(c *gin.Context) {
 func (h *ClientHandler) RevokeToken(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.clientSvc.RevokeToken(id); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("token revoke failed", "client_id", id, "error", err)
+		fail(c, 500, "吊销操作失败")
 		return
 	}
 	ok(c, gin.H{"message": "令牌已吊销"})
@@ -210,7 +218,8 @@ func (h *ClientHandler) RegenerateToken(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	token, err := h.clientSvc.RegenerateToken(id)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("token regenerate failed", "client_id", id, "error", err)
+		fail(c, 500, "重新生成令牌失败")
 		return
 	}
 	ok(c, gin.H{"token": token, "message": "新令牌已生成"})
@@ -232,7 +241,8 @@ func (h *ClientHandler) Batch(c *gin.Context) {
 
 	count, err := h.clientSvc.Batch(&req, approver)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("batch operation failed", "error", err, "action", req.Action, "ids", req.IDs)
+		fail(c, 500, "批量操作失败")
 		return
 	}
 
@@ -244,7 +254,8 @@ func (h *ClientHandler) Batch(c *gin.Context) {
 func (h *ClientHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.clientSvc.Delete(id); err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("client delete failed", "client_id", id, "error", err)
+		fail(c, 500, "删除失败")
 		return
 	}
 	ok(c, gin.H{"message": "已删除"})
@@ -258,7 +269,8 @@ func (h *ClientHandler) GetLogs(c *gin.Context) {
 
 	logs, err := h.clientSvc.GetLogs(id, limit)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("get logs failed", "client_id", id, "error", err)
+		fail(c, 500, "获取日志失败")
 		return
 	}
 	ok(c, logs)
@@ -268,7 +280,8 @@ func (h *ClientHandler) GetRecentLogs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	logs, err := h.clientSvc.GetRecentLogs(limit)
 	if err != nil {
-		fail(c, 500, err.Error())
+		slog.Error("get recent logs failed", "error", err)
+		fail(c, 500, "获取日志失败")
 		return
 	}
 	ok(c, logs)

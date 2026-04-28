@@ -1,7 +1,9 @@
 package config
 
 import (
+	"log/slog"
 	"os"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -10,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Stream   StreamConfig   `yaml:"stream"`
 	Auth     AuthConfig     `yaml:"auth"`
+	CORS     CORSConfig     `yaml:"cors"`
 }
 
 type ServerConfig struct {
@@ -22,16 +25,20 @@ type DatabaseConfig struct {
 }
 
 type StreamConfig struct {
-	CacheDir        string `yaml:"cache_dir"`
-	MaxConcurrent   int    `yaml:"max_concurrent"`
-	BufferSize      int    `yaml:"buffer_size"`
-	HealthCheckSec  int    `yaml:"health_check_sec"`
+	CacheDir       string `yaml:"cache_dir"`
+	MaxConcurrent  int    `yaml:"max_concurrent"`
+	BufferSize     int    `yaml:"buffer_size"`
+	HealthCheckSec int    `yaml:"health_check_sec"`
 }
 
 type AuthConfig struct {
 	Secret        string `yaml:"secret"`
 	ExpireH       int    `yaml:"expire_hours"`
 	AdminPassword string `yaml:"admin_password"`
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 func Load(path string) (*Config, error) {
@@ -44,12 +51,36 @@ func Load(path string) (*Config, error) {
 			BufferSize:     4096,
 			HealthCheckSec: 30,
 		},
-		Auth: AuthConfig{Secret: "tvplayer-secret-key-change-me", ExpireH: 720},
+		Auth: AuthConfig{
+			Secret:        "tvplayer-secret-key-change-me",
+			ExpireH:       720,
+			AdminPassword: "admin123",
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{"*"},
+		},
 	}
 
 	data, err := os.ReadFile(path)
-	if err == nil {
-		yaml.Unmarshal(data, cfg)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("config read failed", "path", path, "error", err)
+		}
+		return cfg, nil
 	}
+
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		slog.Warn("config parse failed", "path", path, "error", err)
+		return cfg, err
+	}
+
+	// 校验必填项
+	if cfg.Auth.Secret == "" {
+		cfg.Auth.Secret = "tvplayer-secret-key-change-me"
+	}
+	if cfg.Auth.ExpireH <= 0 {
+		cfg.Auth.ExpireH = 720
+	}
+
 	return cfg, nil
 }
