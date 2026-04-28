@@ -1,0 +1,10 @@
+// ========================================
+// build.gradle (app) — 添加加密依赖
+// ========================================
+
+dependencies {
+    // ★ 新增：AndroidX Security 加密 SharedPreferences
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
+
+    // ... 其他依赖保持不变
+}
