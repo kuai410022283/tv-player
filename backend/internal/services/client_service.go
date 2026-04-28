@@ -248,7 +248,9 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 	}
 
 	var total int64
-	s.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM clients %s", where), args...).Scan(&total)
+	if err := s.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM clients %s", where), args...).Scan(&total); err != nil {
+		return nil, err
+	}
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
@@ -264,12 +266,21 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.MaxStreams, &c.ExpiresAt, &c.ApprovedBy, &c.RejectReason, &c.LastSeen, &c.TotalPlayMin, &c.RequestNote, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
-		// 令牌预览 (不暴露完整令牌)
-		c.TokenPreview = ""
 		clients = append(clients, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-	return &models.PageResponse{Total: total, Page: p.Page, PageSize: p.PageSize, Items: clients}, nil
+	resp := &models.PageResponse{Total: total, Page: p.Page, PageSize: p.PageSize, Items: clients}
+	if items, ok := resp.Items.([]models.Client); ok {
+		for i := range items {
+			if len(items[i].AccessToken) > 8 {
+				items[i].TokenPreview = items[i].AccessToken[:8] + "..."
+			}
+		}
+	}
+	return resp, nil
 }
 
 func (s *ClientService) GetByID(id int64) (*models.Client, error) {
@@ -357,6 +368,9 @@ func (s *ClientService) GetLogs(clientID int64, limit int) ([]models.AccessLog, 
 		}
 		logs = append(logs, l)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return logs, nil
 }
 
@@ -377,6 +391,9 @@ func (s *ClientService) GetRecentLogs(limit int) ([]models.AccessLog, error) {
 			return nil, err
 		}
 		logs = append(logs, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return logs, nil
 }
