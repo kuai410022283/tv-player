@@ -1,0 +1,46 @@
+# Go
+backend/bin/
+backend/data/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Android
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures
+.externalNativeBuild
+.cxx
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# Runtime
+*.db
+*.db-journal
+*.db-wal
+*.log
+data/
+cache/
+
+# Build artifacts
+backend/web/dist/
+
+# OS
+.DS_Store
+Thumbs.db

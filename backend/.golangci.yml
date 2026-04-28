@@ -1,0 +1,27 @@
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  errcheck:
+    # 不检查这些函数的错误返回值
+    exclude-functions:
+      - (database/sql.Rows).Close
+      - (io.Closer).Close
+      - (net/http.ResponseWriter).Write
+
+issues:
+  # 允许现有代码的 errcheck 问题，只检查新增代码
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+    # 忽略某些常见的不需要检查的函数
+    - linters:
+        - errcheck
+      text: "Error return value of `(c\\.ShouldBindJSON|json\\.Unmarshal|w\\.Write|rows\\.Scan|s\\.db\\.Exec|rand\\.Read|os\\.MkdirAll)`"

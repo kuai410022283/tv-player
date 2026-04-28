@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TVPlayer 管理后台">
+<title>TVPlayer 管理后台</title>
+<link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      <span>TVPlayer</span>
+    </div>
+    <div class="nav-item active" onclick="showSection('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>仪表盘</span>
+    </div>
+    <div class="nav-section">内容管理</div>
+    <div class="nav-item" onclick="showSection('channels',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      <span>频道管理</span>
+    </div>
+    <div class="nav-item" onclick="showSection('groups',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span>分组管理</span>
+    </div>
+    <div class="nav-item" onclick="showSection('sources',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>M3U源</span>
+    </div>
+    <div class="nav-item" onclick="showSection('streams',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>活跃流</span>
+    </div>
+    <div class="nav-section">客户端授权</div>
+    <div class="nav-item" onclick="showSection('clients',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>设备管理</span>
+    </div>
+    <div class="nav-item" onclick="showSection('client-logs',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span>访问日志</span>
+    </div>
+    <div class="nav-item" onclick="showSection('client-settings',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>授权策略</span>
+    </div>
+    <div class="nav-section">账户</div>
+    <div class="nav-item" onclick="logout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>退出登录</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Dashboard -->
+    <div id="sec-dashboard">
+      <div class="header"><h1>仪表盘</h1></div>
+      <div class="stats">
+        <div class="stat-card"><div class="label">总频道数</div><div class="value" id="stat-total">-</div></div>
+        <div class="stat-card"><div class="label">在线频道</div><div class="value" id="stat-online">-</div></div>
+        <div class="stat-card"><div class="label">活跃流</div><div class="value" id="stat-streams">-</div></div>
+        <div class="stat-card info"><div class="label">已授权设备</div><div class="value" id="stat-clients">-</div></div>
+        <div class="stat-card warn"><div class="label">待审批</div><div class="value" id="stat-pending">-</div></div>
+        <div class="stat-card"><div class="label">在线设备</div><div class="value" id="stat-online-clients">-</div></div>
+        <div class="stat-card"><div class="label">M3U源</div><div class="value" id="stat-sources">-</div></div>
+        <div class="stat-card"><div class="label">总播放时长</div><div class="value" id="stat-playtime">-</div></div>
+      </div>
+      <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-bottom:28px">
+        <div class="stat-card"><div class="label">运行时长</div><div class="value" id="stat-uptime" style="font-size:24px">-</div></div>
+        <div class="stat-card"><div class="label">内存占用</div><div class="value" id="stat-memory" style="font-size:24px">-</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>最近访问</h2><button class="btn btn-ghost btn-sm" onclick="loadDashboard()">刷新</button></div>
+        <table><thead><tr><th>设备</th><th>操作</th><th>IP</th><th>时间</th></tr></thead><tbody id="dash-logs-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Channels -->
+    <div id="sec-channels" style="display:none">
+      <div class="header">
+        <h1>频道管理</h1>
+        <div class="search">
+          <input type="text" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
+          <button class="btn btn-primary" onclick="showModal('channel-modal')">+ 添加频道</button>
+        </div>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>ID</th><th>名称</th><th>分组</th><th>类型</th><th>状态</th><th>收藏</th><th>操作</th></tr></thead><tbody id="channels-body"></tbody></table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="channels-info" style="font-size:13px;color:var(--text2)"></span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="channelPrevPage()">上一页</button>
+          <span id="channels-page" style="font-size:13px;line-height:32px">1</span>
+          <button class="btn btn-ghost btn-sm" onclick="channelNextPage()">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Groups -->
+    <div id="sec-groups" style="display:none">
+      <div class="header"><h1>分组管理</h1><button class="btn btn-primary" onclick="showModal('group-modal')">+ 添加分组</button></div>
+      <div class="card">
+        <table><thead><tr><th>ID</th><th>名称</th><th>排序</th><th>操作</th></tr></thead><tbody id="groups-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Sources -->
+    <div id="sec-sources" style="display:none">
+      <div class="header">
+        <h1>M3U 源管理</h1>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="showModal('source-modal')">+ 添加源</button>
+          <button class="btn btn-ghost" onclick="showModal('import-modal')">📋 粘贴导入</button>
+        </div>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>ID</th><th>名称</th><th>URL</th><th>上次同步</th><th>操作</th></tr></thead><tbody id="sources-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Active Streams -->
+    <div id="sec-streams" style="display:none">
+      <div class="header"><h1>活跃流</h1><button class="btn btn-ghost" onclick="loadStreams()">刷新</button></div>
+      <div class="card">
+        <table><thead><tr><th>频道ID</th><th>URL</th><th>状态</th><th>启动时间</th></tr></thead><tbody id="streams-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Clients -->
+    <div id="sec-clients" style="display:none">
+      <div class="header">
+        <h1>设备管理</h1>
+        <div class="filter-bar">
+          <select id="client-status-filter" onchange="loadClients()">
+            <option value="">全部状态</option>
+            <option value="pending">待审批</option>
+            <option value="approved">已授权</option>
+            <option value="rejected">已拒绝</option>
+            <option value="banned">已封禁</option>
+            <option value="expired">已过期</option>
+          </select>
+          <input type="text" placeholder="搜索设备名/IP/ID..." id="client-search" oninput="searchClients()" style="width:220px">
+          <button class="btn btn-primary btn-sm" onclick="showModal('batch-modal')">批量操作</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadClients()">刷新</button>
+        </div>
+      </div>
+      <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="stat-card"><div class="label">总设备数</div><div class="value" id="cstat-total">-</div></div>
+        <div class="stat-card warn"><div class="label">待审批</div><div class="value" id="cstat-pending">-</div></div>
+        <div class="stat-card"><div class="label">在线(5分钟)</div><div class="value" id="cstat-online">-</div></div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="check-all-clients" onchange="toggleAllClients(this)"></th>
+            <th>ID</th><th>设备名称</th><th>设备型号</th><th>IP</th><th>状态</th><th>最大流</th><th>播放时长</th><th>最近在线</th><th>注册时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="clients-body"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="clients-info" style="font-size:13px;color:var(--text2)"></span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="clientPrevPage()">上一页</button>
+          <span id="clients-page" style="font-size:13px;line-height:32px">1</span>
+          <button class="btn btn-ghost btn-sm" onclick="clientNextPage()">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Client Logs -->
+    <div id="sec-client-logs" style="display:none">
+      <div class="header"><h1>访问日志</h1><button class="btn btn-ghost btn-sm" onclick="loadClientLogs()">刷新</button></div>
+      <div class="card">
+        <table><thead><tr><th>ID</th><th>客户端ID</th><th>操作</th><th>频道</th><th>IP</th><th>详情</th><th>时间</th></tr></thead><tbody id="client-logs-body"></tbody></table>
+      </div>
+    </div>
+
+    <!-- Client Settings -->
+    <div id="sec-client-settings" style="display:none">
+      <div class="header"><h1>授权策略</h1></div>
+      <div class="card" style="padding:24px">
+        <div class="form-group">
+          <label>自动审批</label>
+          <select id="set-auto-approve" onchange="saveClientSetting('auto_approve', this.value)">
+            <option value="false">关闭 (手动审批)</option>
+            <option value="true">开启 (自动通过)</option>
+          </select>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">新设备注册时是否自动审批通过</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>默认最大并发流</label>
+            <input type="number" id="set-max-streams" value="2" min="1" max="10">
+          </div>
+          <div class="form-group">
+            <label>默认授权天数</label>
+            <input type="number" id="set-expire-days" value="365" min="0">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>注册时要求填写备注</label>
+          <select id="set-require-note">
+            <option value="false">否</option>
+            <option value="true">是</option>
+          </select>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="channel-modal">
+  <div class="modal">
+    <h3 id="channel-modal-title">添加频道</h3>
+    <input type="hidden" id="ch-edit-id">
+    <div class="form-group"><label>名称</label><input type="text" id="ch-name"></div>
+    <div class="form-group"><label>分组</label><select id="ch-group"></select></div>
+    <div class="form-group"><label>流地址</label><input type="text" id="ch-url" placeholder="https://..."></div>
+    <div class="form-group"><label>流类型</label>
+      <select id="ch-type"><option value="hls">HLS</option><option value="flv">FLV</option><option value="rtmp">RTMP</option><option value="rtsp">RTSP</option><option value="mp4">MP4</option><option value="dash">DASH</option></select>
+    </div>
+    <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
+    <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveChannel()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="group-modal">
+  <div class="modal">
+    <h3>添加分组</h3>
+    <input type="hidden" id="grp-edit-id">
+    <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
+    <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveGroup()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="source-modal">
+  <div class="modal">
+    <h3>添加M3U源</h3>
+    <div class="form-group"><label>名称</label><input type="text" id="src-name"></div>
+    <div class="form-group"><label>URL</label><input type="text" id="src-url" placeholder="https://example.com/playlist.m3u"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('source-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSource()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <h3>粘贴M3U内容</h3>
+    <div class="form-group"><label>M3U内容</label><textarea id="import-content" rows="10" placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
+      <button class="btn btn-primary" onclick="importM3UContent()">导入</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="client-detail-modal">
+  <div class="modal" style="width:620px">
+    <h3>设备详情</h3>
+    <div id="client-detail-content"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="approve-modal">
+  <div class="modal">
+    <h3>审批设备</h3>
+    <input type="hidden" id="approve-client-id">
+    <div class="form-row">
+      <div class="form-group"><label>授权天数</label><input type="number" id="approve-days" value="365" min="0"><div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永久</div></div>
+      <div class="form-group"><label>最大并发流</label><input type="number" id="approve-streams" value="2" min="1" max="10"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('approve-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doApprove()">确认通过</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reject-modal">
+  <div class="modal">
+    <h3>拒绝设备</h3>
+    <input type="hidden" id="reject-client-id">
+    <div class="form-group"><label>拒绝原因</label><textarea id="reject-reason" rows="3" placeholder="填写拒绝原因..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('reject-modal')">取消</button>
+      <button class="btn btn-danger" onclick="doReject()">确认拒绝</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="token-modal">
+  <div class="modal">
+    <h3>令牌管理</h3>
+    <div id="token-modal-content"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('token-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="batch-modal">
+  <div class="modal">
+    <h3>批量操作</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">对勾选的设备执行操作</p>
+    <div class="form-group">
+      <label>操作</label>
+      <select id="batch-action">
+        <option value="approve">批量通过</option>
+        <option value="reject">批量拒绝</option>
+        <option value="ban">批量封禁</option>
+        <option value="delete">批量删除</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('batch-modal')">取消</button>
+      <button class="btn btn-danger" onclick="doBatch()">执行</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" style="display:none"></div>
+<div class="loading-overlay" id="loading-overlay"><div class="loading-spinner"></div><span>加载中...</span></div>
+
+<!-- Login Modal -->
+<div class="modal-overlay show" id="login-modal" style="z-index:300">
+  <div class="modal" style="width:380px">
+    <h3>🔑 管理后台登录</h3>
+    <div class="form-group">
+      <label>管理密码</label>
+      <input type="password" id="login-password" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+      <div style="font-size:11px;color:var(--text2);margin-top:6px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
+<script src="/admin/app.js"></script>
+</body>
+</html>
