@@ -1,4 +1,4 @@
-# TVPlayer 配置文件
+# TVPlayer v1.0.0配置文件
 # ⚠️ 部署前必须修改 auth.secret 和 auth.admin_password
 
 server:
