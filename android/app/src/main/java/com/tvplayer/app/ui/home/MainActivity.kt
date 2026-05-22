@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         phoneContent = findViewById(R.id.layoutContent)
         phoneSearchLayout = findViewById(R.id.layoutSearch)
         phoneSearchEdit = findViewById(R.id.etSearch)
-        phoneScrollView = findViewById(R.id.layoutGroupTabs)?.parent as? HorizontalScrollView
+        phoneScrollView = findViewById<View>(R.id.layoutGroupTabs)?.parent as? HorizontalScrollView
         phoneSwipeRefresh = findViewById(R.id.swipeRefresh)
         progressLoading = findViewById(R.id.progressLoading)
         layoutEmpty = findViewById(R.id.layoutEmpty)
@@ -265,8 +265,8 @@ class MainActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     authManager.checkStatus().onSuccess { status ->
                         if (status == "approved") { showContent(); return@launch }
-                        authPollHandler.postDelayed(this@Runnable, 10000)
-                    }.onFailure { authPollHandler.postDelayed(this@Runnable, 15000) }
+                        authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
+                    }.onFailure { authPollRunnable?.let { authPollHandler.postDelayed(it, 15000) } }
                 }
             }
         }

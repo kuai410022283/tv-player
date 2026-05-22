@@ -117,6 +117,6 @@ object FocusHelper {
      * 请求初始焦点
      */
     fun requestInitialFocus(vararg views: View) {
-        views.firstOrNull()?.post { it.requestFocus() }
+        views.firstOrNull()?.let { v -> v.post { v.requestFocus() } }
     }
 }
