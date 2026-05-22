@@ -35,7 +35,8 @@ class SettingsActivity : AppCompatActivity() {
         // 填充关于信息
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            findViewById<android.widget.TextView>(R.id.tvAppVersion)?.text = "${pInfo.versionName} (${pInfo.longVersionCode})"
+            val vCode = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(pInfo)
+            findViewById<android.widget.TextView>(R.id.tvAppVersion)?.text = "${pInfo.versionName} ($vCode)"
         } catch (_: Exception) {
             findViewById<android.widget.TextView>(R.id.tvAppVersion)?.text = "1.0.0"
         }
