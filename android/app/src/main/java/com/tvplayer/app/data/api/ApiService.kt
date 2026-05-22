@@ -12,7 +12,7 @@ interface ApiService {
     // ── 管理员认证 ─────────────────────────────────────
 
     @POST("admin/login")
-    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<Map<String, Any>>>
+    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<com.google.gson.JsonElement>>
 
     // ── 客户端注册 & 验证 ──────────────────────────────
 
@@ -20,10 +20,10 @@ interface ApiService {
     suspend fun clientRegister(@Body body: Map<String, String>): Response<APIResponse<ClientRegisterResp>>
 
     @GET("client/verify")
-    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<Map<String, Any>>>
+    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<com.google.gson.JsonElement>>
 
     @GET("client/me")
-    suspend fun clientMe(): Response<APIResponse<Map<String, Any>>>
+    suspend fun clientMe(): Response<APIResponse<com.google.gson.JsonElement>>
 
     // ── 频道分组 ───────────────────────────────────────
 
@@ -45,7 +45,7 @@ interface ApiService {
     suspend fun getChannel(@Path("id") id: Long): Response<APIResponse<Channel>>
 
     @POST("channels/{id}/favorite")
-    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<Any>>
+    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<com.google.gson.JsonElement>>
 
     // ── EPG ────────────────────────────────────────────
 
@@ -55,5 +55,6 @@ interface ApiService {
     // ── 播放历史 ───────────────────────────────────────
 
     @POST("history")
-    suspend fun addHistory(@Body body: Map<String, Any>): Response<APIResponse<Any>>
+    @JvmSuppressWildcards
+    suspend fun addHistory(@Body body: Map<String, Any>): Response<APIResponse<com.google.gson.JsonElement>>
 }
