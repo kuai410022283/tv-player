@@ -38,6 +38,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
