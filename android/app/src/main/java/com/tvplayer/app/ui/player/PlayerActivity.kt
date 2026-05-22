@@ -545,7 +545,7 @@ class PlayerActivity : AppCompatActivity() {
 
             // 数字键直接跳转频道
             in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
-                val num = keyCode - KeyEvent.KEYCODE_0
+                // val num = keyCode - KeyEvent.KEYCODE_0
                 // 可扩展：输入频道号跳转
                 return true
             }
@@ -564,7 +564,7 @@ class PlayerActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, PlaybackService::class.java).apply {
             putExtra("channel_name", channelName)
         }
-        try { startForegroundService(serviceIntent) } catch (_: Exception) {}
+        try { androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent) } catch (_: Exception) {}
     }
 
     override fun onResume() {
