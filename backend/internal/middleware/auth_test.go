@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -118,7 +119,8 @@ func TestRateLimiter_Allow(t *testing.T) {
 	rl := &rateLimiter{
 		visitors: make(map[string]*visitor),
 		rate:     3,
-		window:   60,
+		window:   60 * time.Second,
+		maxSize:  100,
 	}
 
 	// 前 3 次应该允许
@@ -143,10 +145,12 @@ func TestRateLimiter_Cleanup(t *testing.T) {
 	rl := &rateLimiter{
 		visitors: make(map[string]*visitor),
 		rate:     5,
-		window:   1, // 1 nanosecond window for testing
+		window:   1 * time.Millisecond,
+		maxSize:  100,
 	}
 
 	rl.allow("old-ip")
+	time.Sleep(3 * time.Millisecond) // Wait for window*2 to expire
 	rl.Cleanup()
 
 	// cleanup 后应该重新允许（因为 window 很短）

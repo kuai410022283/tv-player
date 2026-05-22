@@ -53,6 +53,8 @@ func setupRouter(clientSvc *services.ClientService) *gin.Engine {
 			ch := NewClientHandler(clientSvc)
 			ch.Me(c)
 		})
+		auth.POST("/groups", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
+		auth.GET("/protected", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 	}
 
 	return r
@@ -208,7 +210,7 @@ func TestAdminTokenAccess(t *testing.T) {
 	token := data["token"].(string)
 
 	// 用 token 访问受保护接口
-	req := httptest.NewRequest("GET", "/api/v1/client/me", nil)
+	req := httptest.NewRequest("GET", "/api/v1/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
