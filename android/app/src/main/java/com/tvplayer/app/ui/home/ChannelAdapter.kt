@@ -81,7 +81,7 @@ class ChannelAdapter(
         private val playingIndicator: View = itemView.findViewById(R.id.viewPlaying)
 
         fun bind(item: Channel, isPlaying: Boolean) {
-            tvIndex.text = String.format("%02d", adapterPosition + 1)
+            tvIndex.text = String.format("%02d", bindingAdapterPosition + 1)
             tvName.text = item.name
             tvType.text = item.streamType.uppercase()
 
