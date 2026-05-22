@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
  */
 object ApiClient {
 
-    private var serverUrl: String = "http://10.0.2.2:9527"
+    private var serverUrl: String = com.tvplayer.app.Prefs.DEFAULT_SERVER_URL
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
 

@@ -27,7 +27,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val etServerUrl = findViewById<android.widget.EditText>(R.id.etServerUrl)
-        etServerUrl.setText(prefs.getString(Prefs.KEY_SERVER_URL, "http://10.0.2.2:9527"))
+        etServerUrl.setText(prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL))
 
         // 返回按钮 (手机模式)
         findViewById<android.view.View>(R.id.btnBack)?.setOnClickListener { finish() }

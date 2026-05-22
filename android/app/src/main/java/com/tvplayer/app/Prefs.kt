@@ -7,6 +7,7 @@ object Prefs {
     const val FILE = "tvplayer_prefs"
 
     // 通用设置
+    const val DEFAULT_SERVER_URL = "http://nas.laokhome.cn:9527"
     const val KEY_SERVER_URL = "server_url"
     const val KEY_GESTURE_HINT_SHOWN = "gesture_hint_shown"
 

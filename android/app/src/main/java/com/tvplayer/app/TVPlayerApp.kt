@@ -11,7 +11,7 @@ class TVPlayerApp : Application() {
 
         // Initialize API with saved server URL or default
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, "http://10.0.2.2:9527") ?: "http://10.0.2.2:9527"
+        val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
         ApiClient.init(serverUrl)
     }
 
