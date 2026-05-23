@@ -129,7 +129,19 @@ class MainActivity : AppCompatActivity() {
                 val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
                 if (!isMenuVisible) {
                     layoutZappingMenu?.visibility = View.VISIBLE
-                    tvChannelsRv?.requestFocus()
+                    
+                    val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
+                    val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
+                    if (indexInFiltered >= 0) {
+                        tvChannelsRv?.scrollToPosition(indexInFiltered)
+                        tvChannelsRv?.post {
+                            val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                            lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                        }
+                    } else {
+                        tvChannelsRv?.requestFocus()
+                    }
+
                     uiHandler.removeCallbacks(hideZappingRunnable)
                     uiHandler.postDelayed(hideZappingRunnable, 10000)
                 } else {
@@ -277,6 +289,10 @@ class MainActivity : AppCompatActivity() {
         tvOsdChannelNum?.text = String.format("%03d", index + 1)
         tvOsdChannelName?.text = channel.name
         tvOsdInfo?.text = "连接中..."
+        
+        // 记忆功能：保存最后播放的频道 ID
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        prefs.edit().putLong("last_channel_id", channel.id).apply()
         
         loadEpgForChannel(channel)
         showOsd()
@@ -539,7 +555,17 @@ class MainActivity : AppCompatActivity() {
                 
                 if (list.isNotEmpty()) {
                     if (isTvMode) {
-                        playTvChannel(0)
+                        // 尝试恢复上次播放的频道
+                        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                        val lastChannelId = prefs.getLong("last_channel_id", -1L)
+                        var targetIndex = 0
+                        if (lastChannelId != -1L) {
+                            val foundIndex = list.indexOfFirst { it.id == lastChannelId }
+                            if (foundIndex != -1) {
+                                targetIndex = foundIndex
+                            }
+                        }
+                        playTvChannel(targetIndex)
                         videoLayout?.requestFocus()
                     } else {
                         currentChannelIndex = 0
@@ -569,6 +595,7 @@ class MainActivity : AppCompatActivity() {
             allChannels.filter { it.groupId == currentGroupId }
         }
         channelAdapter.submitList(filteredChannels)
+        tvChannelsRv?.scrollToPosition(0) // 分组切换时，频道列表重置到顶部
         if (!isTvMode) updateChannelCount()
         if (!isTvMode) showEmpty(filteredChannels.isEmpty(), "该分组暂无频道")
     }
@@ -623,7 +650,19 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     if (!isMenuVisible) {
                         layoutZappingMenu?.visibility = View.VISIBLE
-                        tvChannelsRv?.requestFocus()
+                        
+                        val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
+                        val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
+                        if (indexInFiltered >= 0) {
+                            tvChannelsRv?.scrollToPosition(indexInFiltered)
+                            tvChannelsRv?.post {
+                                val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                                lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                            }
+                        } else {
+                            tvChannelsRv?.requestFocus()
+                        }
+
                         uiHandler.removeCallbacks(hideZappingRunnable)
                         uiHandler.postDelayed(hideZappingRunnable, 10000)
                         return true
