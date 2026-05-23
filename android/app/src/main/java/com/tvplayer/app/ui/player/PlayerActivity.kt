@@ -285,13 +285,7 @@ class PlayerActivity : AppCompatActivity() {
                                 }
                             } else if (track.type == IMedia.Track.Type.Audio) {
                                 val at = track as IMedia.AudioTrack
-                                val c = at.codec
-                                audioCodec = String(charArrayOf(
-                                    (c and 0xff).toChar(),
-                                    ((c shr 8) and 0xff).toChar(),
-                                    ((c shr 16) and 0xff).toChar(),
-                                    ((c shr 24) and 0xff).toChar()
-                                )).trim().uppercase()
+                                audioCodec = at.codec?.trim()?.uppercase() ?: ""
                             }
                         }
                     }
