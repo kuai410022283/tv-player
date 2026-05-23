@@ -22,6 +22,14 @@ object DeviceUtils {
             return DeviceType.TV
         }
 
+        // 许多定制的机顶盒（非原生 Android TV）不会报告 TELEVISION 模式
+        // 但它们通常没有触摸屏。如果设备没有触摸屏，我们强制认定为 TV
+        if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)) {
+            return DeviceType.TV
+        }
+        
+        // 还有一种情况是模拟器或外接显示器，如果有物理方向键也大概率是TV（可选扩展）
+
         val screenLayout = context.resources.configuration.screenLayout and
                 Configuration.SCREENLAYOUT_SIZE_MASK
         return when {
