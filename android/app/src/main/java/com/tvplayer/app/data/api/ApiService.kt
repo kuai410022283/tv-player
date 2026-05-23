@@ -4,16 +4,17 @@ import com.tvplayer.app.data.model.*
 import retrofit2.Response
 import retrofit2.http.*
 
+import com.google.gson.JsonElement
+
 /**
  * Retrofit API 接口定义 —— 对应后端 /api/v1/ 路由
  */
-@JvmSuppressWildcards
 interface ApiService {
 
     // ── 管理员认证 ─────────────────────────────────────
 
     @POST("admin/login")
-    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<Any>>
+    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<JsonElement>>
 
     // ── 客户端注册 & 验证 ──────────────────────────────
 
@@ -21,10 +22,10 @@ interface ApiService {
     suspend fun clientRegister(@Body body: Map<String, String>): Response<APIResponse<ClientRegisterResp>>
 
     @GET("client/verify")
-    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<Any>>
+    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<JsonElement>>
 
     @GET("client/me")
-    suspend fun clientMe(): Response<APIResponse<Any>>
+    suspend fun clientMe(): Response<APIResponse<JsonElement>>
 
     // ── 频道分组 ───────────────────────────────────────
 
@@ -46,7 +47,7 @@ interface ApiService {
     suspend fun getChannel(@Path("id") id: Long): Response<APIResponse<Channel>>
 
     @POST("channels/{id}/favorite")
-    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<Any>>
+    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<JsonElement>>
 
     // ── EPG ────────────────────────────────────────────
 
@@ -56,5 +57,5 @@ interface ApiService {
     // ── 播放历史 ───────────────────────────────────────
 
     @POST("history")
-    suspend fun addHistory(@Body body: Map<String, Any>): Response<APIResponse<Any>>
+    suspend fun addHistory(@Body body: @JvmSuppressWildcards Map<String, Any>): Response<APIResponse<JsonElement>>
 }

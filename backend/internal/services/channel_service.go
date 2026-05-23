@@ -130,11 +130,15 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	for rows.Next() {
 		var c models.Channel
 		var isFav, isHid int
-		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var lastCheck sql.NullTime
+		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &lastCheck, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.IsFavorite = isFav == 1
 		c.IsHidden = isHid == 1
+		if lastCheck.Valid {
+			c.LastCheck = lastCheck.Time
+		}
 		channels = append(channels, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -146,13 +150,17 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 func (s *ChannelService) GetChannel(id int64) (*models.Channel, error) {
 	var c models.Channel
 	var isFav, isHid int
+	var lastCheck sql.NullTime
 	err := s.db.QueryRow(`SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, last_check, created_at, updated_at FROM channels WHERE id=?`, id).
-		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &lastCheck, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	c.IsFavorite = isFav == 1
 	c.IsHidden = isHid == 1
+	if lastCheck.Valid {
+		c.LastCheck = lastCheck.Time
+	}
 	return &c, nil
 }
 
@@ -306,10 +314,14 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 	for rows.Next() {
 		var m models.M3USource
 		var autoSync int
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &m.LastSync, &m.CreatedAt); err != nil {
+		var lastSync sql.NullTime
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &lastSync, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		m.AutoSync = autoSync == 1
+		if lastSync.Valid {
+			m.LastSync = lastSync.Time
+		}
 		items = append(items, m)
 	}
 	if err := rows.Err(); err != nil {

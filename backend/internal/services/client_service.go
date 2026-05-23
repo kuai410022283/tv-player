@@ -35,8 +35,10 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	// 检查是否已注册
 	var existing models.Client
+	var nullExpiresAt sql.NullTime
 	err := s.db.QueryRow(`SELECT id, status, access_token, expires_at FROM clients WHERE device_id=?`, req.DeviceID).
-		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &existing.ExpiresAt)
+		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt)
+	if nullExpiresAt.Valid { existing.ExpiresAt = nullExpiresAt.Time }
 
 	if err == nil {
 		// 已注册，更新信息
@@ -115,8 +117,10 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 	var c models.Client
+	var expiresAt sql.NullTime
 	err := s.db.QueryRow(`SELECT id, name, device_id, device_model, status, max_streams, expires_at, access_token FROM clients WHERE access_token=?`, token).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &c.ExpiresAt, &c.AccessToken)
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken)
+	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
 	if err != nil {
 		return nil, fmt.Errorf("无效的令牌")
 	}
@@ -263,9 +267,16 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 	var clients []models.Client
 	for rows.Next() {
 		var c models.Client
-		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.MaxStreams, &c.ExpiresAt, &c.ApprovedBy, &c.RejectReason, &c.LastSeen, &c.TotalPlayMin, &c.RequestNote, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var expiresAt, lastSeen sql.NullTime
+		var approvedBy, rejectReason, reqNote sql.NullString
+		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
+		if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
+		if lastSeen.Valid { c.LastSeen = lastSeen.Time }
+		if approvedBy.Valid { c.ApprovedBy = approvedBy.String }
+		if rejectReason.Valid { c.RejectReason = rejectReason.String }
+		if reqNote.Valid { c.RequestNote = reqNote.String }
 		clients = append(clients, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -285,11 +296,18 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 
 func (s *ClientService) GetByID(id int64) (*models.Client, error) {
 	var c models.Client
+	var expiresAt, lastSeen sql.NullTime
+	var approvedBy, rejectReason, reqNote sql.NullString
 	err := s.db.QueryRow(`SELECT id, name, device_id, device_model, device_os, app_version, ip, access_token, status, max_streams, expires_at, approved_by, reject_reason, last_seen, total_play_minutes, request_note, created_at, updated_at FROM clients WHERE id=?`, id).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.MaxStreams, &c.ExpiresAt, &c.ApprovedBy, &c.RejectReason, &c.LastSeen, &c.TotalPlayMin, &c.RequestNote, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
+	if lastSeen.Valid { c.LastSeen = lastSeen.Time }
+	if approvedBy.Valid { c.ApprovedBy = approvedBy.String }
+	if rejectReason.Valid { c.RejectReason = rejectReason.String }
+	if reqNote.Valid { c.RequestNote = reqNote.String }
 	// 生成预览
 	if len(c.AccessToken) > 8 {
 		c.TokenPreview = c.AccessToken[:8] + "..."
