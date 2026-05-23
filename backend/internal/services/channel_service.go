@@ -129,9 +129,12 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &c.IsFavorite, &c.IsHidden, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var isFav, isHid int
+		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
+		c.IsFavorite = isFav == 1
+		c.IsHidden = isHid == 1
 		channels = append(channels, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -142,11 +145,14 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 
 func (s *ChannelService) GetChannel(id int64) (*models.Channel, error) {
 	var c models.Channel
+	var isFav, isHid int
 	err := s.db.QueryRow(`SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, last_check, created_at, updated_at FROM channels WHERE id=?`, id).
-		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &c.IsFavorite, &c.IsHidden, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &c.SortOrder, &c.Status, &c.LastCheck, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	c.IsFavorite = isFav == 1
+	c.IsHidden = isHid == 1
 	return &c, nil
 }
 
@@ -157,8 +163,11 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	}
 
 	now := time.Now()
+	fav, hid := 0, 0
+	if c.IsFavorite { fav = 1 }
+	if c.IsHidden { hid = 1 }
 	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, sort_order, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, c.IsFavorite, c.IsHidden, c.SortOrder, "unknown", now, now)
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, c.SortOrder, "unknown", now, now)
 	if err != nil {
 		return err
 	}
@@ -174,8 +183,11 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 		return fmt.Errorf("流地址不安全: %w", err)
 	}
 
+	fav, hid := 0, 0
+	if c.IsFavorite { fav = 1 }
+	if c.IsHidden { hid = 1 }
 	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_favorite=?, is_hidden=?, sort_order=?, updated_at=? WHERE id=?`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, c.IsFavorite, c.IsHidden, c.SortOrder, time.Now(), c.ID)
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, c.SortOrder, time.Now(), c.ID)
 	return err
 }
 
@@ -293,9 +305,11 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 	var items []models.M3USource
 	for rows.Next() {
 		var m models.M3USource
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &m.AutoSync, &m.LastSync, &m.CreatedAt); err != nil {
+		var autoSync int
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &m.LastSync, &m.CreatedAt); err != nil {
 			return nil, err
 		}
+		m.AutoSync = autoSync == 1
 		items = append(items, m)
 	}
 	if err := rows.Err(); err != nil {
@@ -306,7 +320,9 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 
 func (s *ChannelService) AddM3USource(m *models.M3USource) error {
 	now := time.Now()
-	res, err := s.db.Exec(`INSERT INTO m3u_sources (name, url, auto_sync, created_at) VALUES (?,?,?,?)`, m.Name, m.URL, m.AutoSync, now)
+	autoSyncInt := 0
+	if m.AutoSync { autoSyncInt = 1 }
+	res, err := s.db.Exec(`INSERT INTO m3u_sources (name, url, auto_sync, created_at) VALUES (?,?,?,?)`, m.Name, m.URL, autoSyncInt, now)
 	if err != nil {
 		return err
 	}

@@ -254,6 +254,9 @@ func (sp *StreamProxy) GetActiveStreams() []streamState {
 // M3U parsing
 func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 	scanner := bufio.NewScanner(reader)
+	// 增加 buffer 限制，防止某些 M3U 文件单行过长（如带有大尺寸 base64 logo url 时）超过 64KB
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 	var channels []map[string]string
 	var current map[string]string
 

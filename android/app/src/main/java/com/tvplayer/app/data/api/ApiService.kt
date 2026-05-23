@@ -7,12 +7,13 @@ import retrofit2.http.*
 /**
  * Retrofit API 接口定义 —— 对应后端 /api/v1/ 路由
  */
+@JvmSuppressWildcards
 interface ApiService {
 
     // ── 管理员认证 ─────────────────────────────────────
 
     @POST("admin/login")
-    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<com.google.gson.JsonElement>>
+    suspend fun adminLogin(@Body body: Map<String, String>): Response<APIResponse<Any>>
 
     // ── 客户端注册 & 验证 ──────────────────────────────
 
@@ -20,10 +21,10 @@ interface ApiService {
     suspend fun clientRegister(@Body body: Map<String, String>): Response<APIResponse<ClientRegisterResp>>
 
     @GET("client/verify")
-    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<com.google.gson.JsonElement>>
+    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<Any>>
 
     @GET("client/me")
-    suspend fun clientMe(): Response<APIResponse<com.google.gson.JsonElement>>
+    suspend fun clientMe(): Response<APIResponse<Any>>
 
     // ── 频道分组 ───────────────────────────────────────
 
@@ -45,7 +46,7 @@ interface ApiService {
     suspend fun getChannel(@Path("id") id: Long): Response<APIResponse<Channel>>
 
     @POST("channels/{id}/favorite")
-    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<com.google.gson.JsonElement>>
+    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<Any>>
 
     // ── EPG ────────────────────────────────────────────
 
@@ -55,6 +56,5 @@ interface ApiService {
     // ── 播放历史 ───────────────────────────────────────
 
     @POST("history")
-    @JvmSuppressWildcards
-    suspend fun addHistory(@Body body: Map<String, Any>): Response<APIResponse<com.google.gson.JsonElement>>
+    suspend fun addHistory(@Body body: Map<String, Any>): Response<APIResponse<Any>>
 }

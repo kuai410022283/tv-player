@@ -96,8 +96,9 @@ class ClientAuthManager(private val context: Context) {
                     Result.success("approved")
                 } else {
                     // 检查注册状态
+                    val name = "${Build.MANUFACTURER} ${Build.MODEL}"
                     val regResp = ApiClient.getService().clientRegister(
-                        mapOf("name" to "", "device_id" to getDeviceId())
+                        mapOf("name" to name, "device_id" to getDeviceId())
                     )
                     if (regResp.isSuccessful) {
                         val status = regResp.body()?.data?.status ?: "pending"
