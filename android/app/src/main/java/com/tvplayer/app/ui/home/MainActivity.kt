@@ -97,6 +97,8 @@ class MainActivity : AppCompatActivity() {
 
     private val authPollHandler = Handler(Looper.getMainLooper())
     private var authPollRunnable: Runnable? = null
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+    private var heartbeatRunnable: Runnable? = null
 
     // ── VLC Player (TV Only) ──
     private var libVlc: LibVLC? = null
@@ -661,6 +663,23 @@ class MainActivity : AppCompatActivity() {
             phoneContent?.visibility = View.VISIBLE
         }
         loadData()
+        startHeartbeat()
+    }
+
+    private fun startHeartbeat() {
+        heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                lifecycleScope.launch {
+                    try {
+                        authManager.verify()
+                    } catch (_: Exception) {}
+                }
+                heartbeatHandler.postDelayed(this, 3 * 60 * 1000) // 每3分钟心跳
+            }
+        }
+        heartbeatRunnable = runnable
+        heartbeatHandler.postDelayed(runnable, 3 * 60 * 1000)
     }
 
     private fun loadData() {
@@ -915,11 +934,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        authPollHandler.removeCallbacksAndMessages(null)
-        uiHandler.removeCallbacksAndMessages(null)
-        if (isTvMode) {
-            mediaPlayer?.release()
-            libVlc?.release()
-        }
+        authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
+        heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+        uiHandler.removeCallbacks(hideOsdRunnable)
+        uiHandler.removeCallbacks(hideZappingRunnable)
+        mediaPlayer?.release()
+        libVlc?.release()
     }
 }

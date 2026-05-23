@@ -9,6 +9,7 @@ type ChannelGroup struct {
 	Name      string    `json:"name" db:"name"`
 	Icon      string    `json:"icon,omitempty" db:"icon"`
 	SortOrder int       `json:"sort_order" db:"sort_order"`
+	IsDirect  bool      `json:"is_direct" db:"is_direct"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -26,6 +27,7 @@ type Channel struct {
 	EPGChannelID string   `json:"epg_channel_id,omitempty" db:"epg_channel_id"`
 	IsFavorite  bool      `json:"is_favorite" db:"is_favorite"`
 	IsHidden    bool      `json:"is_hidden" db:"is_hidden"`
+	IsDirect    bool      `json:"is_direct" db:"is_direct"`
 	SortOrder   int       `json:"sort_order" db:"sort_order"`
 	Status      string    `json:"status" db:"status"` // online, offline, unknown
 	LastCheck   time.Time `json:"last_check,omitempty" db:"last_check"`

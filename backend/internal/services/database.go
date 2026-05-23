@@ -49,6 +49,7 @@ func createTables(db *sql.DB) error {
 		name TEXT NOT NULL UNIQUE,
 		icon TEXT DEFAULT '',
 		sort_order INTEGER DEFAULT 0,
+		is_direct INTEGER DEFAULT 1,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -64,6 +65,7 @@ func createTables(db *sql.DB) error {
 		epg_channel_id TEXT DEFAULT '',
 		is_favorite INTEGER DEFAULT 0,
 		is_hidden INTEGER DEFAULT 0,
+		is_direct INTEGER DEFAULT 1,
 		sort_order INTEGER DEFAULT 0,
 		status TEXT DEFAULT 'unknown',
 		last_check DATETIME,
@@ -96,6 +98,14 @@ func createTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS user_settings (
 		key TEXT PRIMARY KEY,
 		value TEXT NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS client_channel_favorites (
+		client_id INTEGER NOT NULL,
+		channel_id INTEGER NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (client_id, channel_id),
+		FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS m3u_sources (
@@ -179,5 +189,10 @@ func createTables(db *sql.DB) error {
 	`
 
 	_, err := db.Exec(schema)
+	
+	// 执行自动迁移
+	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN is_direct INTEGER DEFAULT 1;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN is_direct INTEGER DEFAULT 1;")
+	
 	return err
 }

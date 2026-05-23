@@ -33,36 +33,20 @@ class ChannelRepository {
         search: String? = null
     ): Result<List<Channel>> = withContext(Dispatchers.IO) {
         try {
-            val allChannels = mutableListOf<Channel>()
-            var page = 1
-            val pageSize = 200
+            val resp = ApiClient.getService().getChannels(
+                groupId = if (groupId == 0L) null else groupId,
+                favorite = if (favorite) "true" else null,
+                search = search,
+                page = 1,
+                pageSize = 1000 // 限制最大拉取数量，防止电视盒子 OOM 卡死
+            )
 
-            while (true) {
-                val resp = ApiClient.getService().getChannels(
-                    groupId = groupId,
-                    favorite = if (favorite) "true" else null,
-                    search = search,
-                    page = page,
-                    pageSize = pageSize
-                )
-
-                if (resp.isSuccessful && resp.body()?.code == 0) {
-                    val pageData = resp.body()!!.data
-                    val items = pageData?.items ?: emptyList()
-                    allChannels.addAll(items)
-
-                    if (allChannels.size >= (pageData?.total ?: 0) || items.size < pageSize) {
-                        break
-                    }
-                    page++
-                } else {
-                    return@withContext Result.failure(
-                        Exception(resp.body()?.message ?: "获取频道失败")
-                    )
-                }
+            if (resp.isSuccessful && resp.body()?.code == 0) {
+                val pageData = resp.body()!!.data
+                Result.success(pageData?.items ?: emptyList())
+            } else {
+                Result.failure(Exception(resp.body()?.message ?: "获取频道失败"))
             }
-
-            Result.success(allChannels)
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -230,6 +230,9 @@
     <div class="form-group"><label>流类型</label>
       <select id="ch-type"><option value="hls">HLS</option><option value="flv">FLV</option><option value="rtmp">RTMP</option><option value="rtsp">RTSP</option><option value="mp4">MP4</option><option value="dash">DASH</option></select>
     </div>
+    <div class="form-group"><label>直连模式</label>
+      <select id="ch-is-direct"><option value="true">开启 (默认，省宽带)</option><option value="false">关闭 (经代理加密源)</option></select>
+    </div>
     <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
     <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
     <div class="form-actions">
@@ -245,6 +248,9 @@
     <input type="hidden" id="grp-edit-id">
     <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
     <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
+    <div class="form-group"><label>所有频道直连模式</label>
+      <select id="grp-is-direct"><option value="true">开启 (默认，省宽带)</option><option value="false">关闭 (经代理加密源)</option></select>
+    </div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveGroup()">保存</button>

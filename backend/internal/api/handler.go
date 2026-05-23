@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -152,17 +153,51 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
 	p := &models.PageRequest{Page: page, PageSize: pageSize}
-	resp, err := h.channelSvc.ListChannels(groupID, favorite, search, p)
+	var clientID int64
+	if id, exists := c.Get("client_id"); exists {
+		clientID = id.(int64)
+	}
+	resp, err := h.channelSvc.ListChannels(groupID, favorite, search, p, clientID)
 	if err != nil {
 		failInternal(c, err, "获取频道列表失败")
 		return
 	}
+
+	// 如果未开启直连，且请求来自客户端，动态将流地址替换为代理地址
+	authType, _ := c.Get("auth_type")
+	if authType == "client" {
+		if items, ok := resp.Items.([]models.Channel); ok {
+			host := c.Request.Host
+			scheme := "http"
+			if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+				scheme = "https"
+			}
+			baseURL := scheme + "://" + host
+			
+			clientToken := ""
+			if t, exists := c.Get("client_token"); exists {
+				clientToken = t.(string)
+			}
+
+			for i := range items {
+				if !items[i].IsDirect {
+					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, items[i].ID, clientToken)
+				}
+			}
+			resp.Items = items
+		}
+	}
+
 	ok(c, resp)
 }
 
 func (h *Handler) GetChannel(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	ch, err := h.channelSvc.GetChannel(id)
+	var clientID int64
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+	}
+	ch, err := h.channelSvc.GetChannel(id, clientID)
 	if err != nil {
 		fail(c, 404, "频道不存在")
 		return
@@ -209,7 +244,15 @@ func (h *Handler) DeleteChannel(c *gin.Context) {
 
 func (h *Handler) ToggleFavorite(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err := h.channelSvc.ToggleFavorite(id); err != nil {
+	var clientID int64
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+	}
+	if clientID == 0 {
+		fail(c, 403, "缺少客户端授权")
+		return
+	}
+	if err := h.channelSvc.ToggleFavorite(id, clientID); err != nil {
 		failInternal(c, err, "操作失败")
 		return
 	}
@@ -231,7 +274,7 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 
 func (h *Handler) CheckStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	ch, err := h.channelSvc.GetChannel(id)
+	ch, err := h.channelSvc.GetChannel(id, 0)
 	if err != nil {
 		fail(c, 404, "频道不存在")
 		return
@@ -405,7 +448,7 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 
 func (h *Handler) GetStats(c *gin.Context) {
 	p := &models.PageRequest{Page: 1, PageSize: 1}
-	totalResp, _ := h.channelSvc.ListChannels(0, false, "", p)
+	totalResp, _ := h.channelSvc.ListChannels(0, false, "", p, 0)
 	totalChannels := int64(0)
 	if totalResp != nil {
 		totalChannels = totalResp.Total

@@ -220,7 +220,8 @@ async function saveChannel() {
     stream_url: document.getElementById('ch-url').value,
     stream_type: document.getElementById('ch-type').value,
     logo: document.getElementById('ch-logo').value,
-    epg_channel_id: document.getElementById('ch-epg').value
+    epg_channel_id: document.getElementById('ch-epg').value,
+    is_direct: document.getElementById('ch-is-direct').value === 'true'
   };
   if (!d.name || !d.stream_url) { toast('请填写名称和流地址', 'error'); return; }
   await api(id ? `/channels/${id}` : '/channels', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
@@ -240,6 +241,7 @@ async function editChannel(id) {
   document.getElementById('ch-type').value = c.stream_type;
   document.getElementById('ch-logo').value = c.logo || '';
   document.getElementById('ch-epg').value = c.epg_channel_id || '';
+  document.getElementById('ch-is-direct').value = c.is_direct !== false ? 'true' : 'false';
   document.getElementById('channel-modal-title').textContent = '编辑频道';
   showModal('channel-modal');
 }
@@ -261,7 +263,7 @@ async function loadGroups() {
   document.getElementById('groups-body').innerHTML = (r.data || []).map(g => `<tr>
     <td>${g.id}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
     <td><div class="btn-group">
-      <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${esc(g.name)}',${g.sort_order})">编辑</button>
+      <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${esc(g.name)}',${g.sort_order},${g.is_direct})">编辑</button>
       <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">删除</button>
     </div></td>
   </tr>`).join('');
@@ -269,7 +271,11 @@ async function loadGroups() {
 
 async function saveGroup() {
   const id = document.getElementById('grp-edit-id').value;
-  const d = { name: document.getElementById('grp-name').value, sort_order: +document.getElementById('grp-sort').value || 0 };
+  const d = { 
+    name: document.getElementById('grp-name').value, 
+    sort_order: +document.getElementById('grp-sort').value || 0,
+    is_direct: document.getElementById('grp-is-direct').value === 'true'
+  };
   if (!d.name) { toast('请填写名称', 'error'); return; }
   await api(id ? `/groups/${id}` : '/groups', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('group-modal');
@@ -277,10 +283,11 @@ async function saveGroup() {
   toast(id ? '已更新' : '已添加');
 }
 
-function editGroup(id, n, s) {
+function editGroup(id, n, s, d) {
   document.getElementById('grp-edit-id').value = id;
   document.getElementById('grp-name').value = n;
   document.getElementById('grp-sort').value = s;
+  document.getElementById('grp-is-direct').value = d !== false ? 'true' : 'false';
   showModal('group-modal');
 }
 

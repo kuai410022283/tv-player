@@ -20,13 +20,8 @@ var publicPaths = map[string]bool{
 	"/ping":                   true,
 }
 
-// 只读公开接口 — GET 请求允许匿名访问（频道列表等供未注册设备浏览）
-var readOnlyPublicPaths = map[string]bool{
-	"/api/v1/channels":  true,
-	"/api/v1/channels/": true, // 前缀匹配用
-	"/api/v1/groups":    true,
-	"/api/v1/epg":       true,
-}
+// 已经取消只读公开接口，全部强制鉴权以防止防盗链失效
+var readOnlyPublicPaths = map[string]bool{}
 
 // AuthMiddleware 支持两种认证方式：
 // 1. Admin JWT token (Bearer xxx) → 完整管理权限
@@ -193,8 +188,13 @@ func (rl *rateLimiter) allow(key string) bool {
 	if !exists || now.Sub(v.lastSeen) > rl.window {
 		if !exists && len(rl.visitors) >= rl.maxSize {
 			rl.cleanupLocked(now)
+			// 如果清理过期记录后依然满载，说明遇到了海量伪造 IP 的 CC 攻击
+			// 此时为了自保并防止合法用户被拦截，随机剔除一个旧元素 (利用 Go map 的随机遍历特性, O(1) 开销)
 			if len(rl.visitors) >= rl.maxSize {
-				return false
+				for k := range rl.visitors {
+					delete(rl.visitors, k)
+					break
+				}
 			}
 		}
 		rl.visitors[key] = &visitor{count: 1, lastSeen: now}

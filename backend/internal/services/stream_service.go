@@ -126,7 +126,7 @@ func (sp *StreamProxy) checkAllChannels() {
 	maxPages := 10
 	for page <= maxPages {
 		p := &models.PageRequest{Page: page, PageSize: pageSize}
-		resp, err := sp.channelSvc.ListChannels(0, false, "", p)
+		resp, err := sp.channelSvc.ListChannels(0, false, "", p, 0)
 		if err != nil || resp == nil {
 			break
 		}
@@ -167,7 +167,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 		return fmt.Errorf("并发流数已达上限 (%d)", sp.cfg.MaxConcurrent)
 	}
 
-	ch, err := sp.channelSvc.GetChannel(channelID)
+	ch, err := sp.channelSvc.GetChannel(channelID, 0)
 	if err != nil {
 		return fmt.Errorf("channel not found: %w", err)
 	}
