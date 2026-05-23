@@ -236,7 +236,7 @@ func (s *ChannelService) AddHistory(h *models.PlayHistory) error {
 		if minutes < 1 {
 			minutes = 1
 		}
-		s.db.Exec(`UPDATE clients SET total_play_minutes = total_play_minutes + ?, last_seen=?, updated_at=? WHERE id=?`,
+		_, _ = s.db.Exec(`UPDATE clients SET total_play_minutes = total_play_minutes + ?, last_seen=?, updated_at=? WHERE id=?`,
 			minutes, now, now, h.ClientID)
 	}
 

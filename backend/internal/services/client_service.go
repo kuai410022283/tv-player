@@ -42,7 +42,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	if err == nil {
 		// 已注册，更新信息
-		s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, updated_at=? WHERE id=?`,
+		_, _ = s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, updated_at=? WHERE id=?`,
 			req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, now, existing.ID)
 
 		resp := &models.ClientRegisterResp{
@@ -132,12 +132,12 @@ func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 
 	// 检查过期
 	if !c.ExpiresAt.IsZero() && c.ExpiresAt.Before(time.Now()) {
-		s.db.Exec(`UPDATE clients SET status='expired', updated_at=? WHERE id=?`, time.Now(), c.ID)
+		_, _ = s.db.Exec(`UPDATE clients SET status='expired', updated_at=? WHERE id=?`, time.Now(), c.ID)
 		return nil, fmt.Errorf("授权已过期")
 	}
 
 	// 更新最后在线
-	s.db.Exec(`UPDATE clients SET last_seen=?, ip=? WHERE id=?`, time.Now(), ip, c.ID)
+	_, _ = s.db.Exec(`UPDATE clients SET last_seen=?, ip=? WHERE id=?`, time.Now(), ip, c.ID)
 
 	return &c, nil
 }
@@ -384,7 +384,7 @@ func (s *ClientService) AddPlayTime(clientID int64, minutes int) error {
 // ── 访问日志 ───────────────────────────────────────────
 
 func (s *ClientService) AddLog(clientID int64, action string, channelID int64, ip, userAgent, detail string) {
-	s.db.Exec(`INSERT INTO access_logs (client_id, action, channel_id, ip, user_agent, detail, created_at) VALUES (?,?,?,?,?,?,?)`,
+	_, _ = s.db.Exec(`INSERT INTO access_logs (client_id, action, channel_id, ip, user_agent, detail, created_at) VALUES (?,?,?,?,?,?,?)`,
 		clientID, action, channelID, ip, userAgent, detail, time.Now())
 }
 

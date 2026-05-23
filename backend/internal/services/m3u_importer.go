@@ -97,7 +97,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, status) VALUES (?, ?, ?, ?, ?, ?, 'unknown')`)
 	if err != nil {

@@ -26,9 +26,9 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	}
 
 	// 显式执行 PRAGMA，确保 WAL 和 Busy Timeout 绝对生效，防止 database is locked
-	db.Exec("PRAGMA journal_mode=WAL;")
-	db.Exec("PRAGMA busy_timeout=5000;")
-	db.Exec("PRAGMA synchronous=NORMAL;")
+	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+	_, _ = db.Exec("PRAGMA busy_timeout=5000;")
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
 
 	// 连接池配置（SQLite 单文件，限制并发写入）
 	db.SetMaxOpenConns(5) // SQLite 单写入者
