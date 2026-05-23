@@ -39,8 +39,16 @@ class GroupAdapter(
         holder.bind(item, item.id == selectedId)
         holder.itemView.setOnClickListener { onClick(item) }
 
+        // TV 焦点与触控兼容处理
+        holder.itemView.isFocusable = true
+        holder.itemView.isFocusableInTouchMode = false
+
         // TV 焦点动画
         holder.itemView.setOnFocusChangeListener { v, hasFocus ->
+            // 当用遥控器选中某个分组时，立刻联动右侧显示该分组的频道（免去按OK）
+            if (hasFocus) {
+                onClick(item)
+            }
             v.animate()
                 .alpha(if (hasFocus) 1.0f else if (item.id == selectedId) 1.0f else 0.7f)
                 .scaleX(if (hasFocus) 1.05f else 1.0f)

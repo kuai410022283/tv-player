@@ -43,8 +43,9 @@ class ChannelAdapter(
         holder.itemView.setOnClickListener { onClick(item, position) }
 
         if (isTvMode) {
-            // TV 模式: D-pad 焦点处理
+            // TV 模式: D-pad 焦点处理，并且防止触控模式下的双击问题
             holder.itemView.isFocusable = true
+            holder.itemView.isFocusableInTouchMode = false
             holder.itemView.setOnFocusChangeListener { v, hasFocus ->
                 v.animate()
                     .scaleX(if (hasFocus) 1.03f else 1.0f)
