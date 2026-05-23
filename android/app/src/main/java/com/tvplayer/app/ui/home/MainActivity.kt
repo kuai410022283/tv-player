@@ -59,6 +59,15 @@ class MainActivity : AppCompatActivity() {
     private var progressEpg: ProgressBar? = null
     private var progressBuffering: ProgressBar? = null
     private var videoLayout: VLCVideoLayout? = null
+    
+    // ── Settings Sidebar ──
+    private var layoutSettingsMenu: View? = null
+    private var etSettingsUrl: EditText? = null
+    private var sbSettingsCache: android.widget.SeekBar? = null
+    private var tvSettingsCacheValue: TextView? = null
+    private var btnSettingsCancel: View? = null
+    private var btnSettingsSave: View? = null
+    private var tvSettingsInfo: TextView? = null
 
     // ── Views (Phone mode) ──
     private var phoneGroupTabs: LinearLayout? = null
@@ -125,6 +134,10 @@ class MainActivity : AppCompatActivity() {
     // ── Touch Gestures for Mobile/Tablet ──
     private fun setupTouchGestures() {
         val gestureDetector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: android.view.MotionEvent): Boolean {
+                return true
+            }
+
             override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
                 val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
                 if (!isMenuVisible) {
@@ -149,6 +162,11 @@ class MainActivity : AppCompatActivity() {
                     hideZappingRunnable.run()
                 }
                 return true
+            }
+
+            override fun onLongPress(e: android.view.MotionEvent) {
+                // 长按屏幕直接呼出右侧设置菜单
+                showSettingsMenu()
             }
 
             override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
@@ -202,6 +220,17 @@ class MainActivity : AppCompatActivity() {
         layoutEmpty = findViewById(R.id.layoutEmpty)
         tvEmptyText = findViewById(R.id.tvEmptyText)
 
+        // Settings sidebar
+        layoutSettingsMenu = findViewById(R.id.layoutSettingsMenu)
+        etSettingsUrl = findViewById(R.id.etSettingsUrl)
+        sbSettingsCache = findViewById(R.id.sbSettingsCache)
+        tvSettingsCacheValue = findViewById(R.id.tvSettingsCacheValue)
+        btnSettingsCancel = findViewById(R.id.btnSettingsCancel)
+        btnSettingsSave = findViewById(R.id.btnSettingsSave)
+        tvSettingsInfo = findViewById(R.id.tvSettingsInfo)
+
+        setupSettingsViews()
+
         tvGroupsRv?.let { FocusHelper.setupTvRecyclerView(it) }
         tvChannelsRv?.let { FocusHelper.setupTvRecyclerView(it) }
 
@@ -212,14 +241,109 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupSettingsViews() {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
+        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
+
+        etSettingsUrl?.setText(url)
+        
+        // cacheMs: 500 to 5000, step 100.
+        // progress: 0 to 45
+        val progress = ((cacheMs - 500) / 100).coerceIn(0, 45)
+        sbSettingsCache?.progress = progress
+        tvSettingsCacheValue?.text = " ${cacheMs / 1000f} 秒"
+
+        sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val newCacheMs = 500 + progress * 100
+                tvSettingsCacheValue?.text = " ${newCacheMs / 1000f} 秒"
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        btnSettingsCancel?.setOnClickListener {
+            hideSettingsMenu()
+        }
+
+        btnSettingsSave?.setOnClickListener {
+            val newUrl = etSettingsUrl?.text?.toString()?.trim() ?: ""
+            val newCacheMs = 500 + (sbSettingsCache?.progress ?: 0) * 100
+            
+            if (newUrl.isEmpty()) {
+                Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
+            if (newUrl != oldUrl) {
+                authManager.clearAuth()
+                com.tvplayer.app.data.api.ApiClient.reset()
+                settingsChanged = true
+            }
+
+            prefs.edit()
+                .putString(Prefs.KEY_SERVER_URL, newUrl)
+                .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
+                .apply()
+                
+            com.tvplayer.app.data.api.ApiClient.init(newUrl)
+            Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
+            hideSettingsMenu()
+            
+            // 如果缓存变了或者服务器变了，立刻重新连接流
+            if (allChannels.isNotEmpty() && currentChannelIndex >= 0) {
+                playTvChannel(currentChannelIndex)
+            }
+        }
+    }
+
+    private fun showSettingsMenu() {
+        if (layoutSettingsMenu?.visibility == View.VISIBLE) return
+        
+        // 隐藏左侧菜单
+        layoutZappingMenu?.visibility = View.GONE
+        
+        layoutSettingsMenu?.visibility = View.VISIBLE
+        // 填充关于信息
+        val authManager = ClientAuthManager(this)
+        var versionText = "1.0.0"
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            val vCode = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(pInfo)
+            versionText = "${pInfo.versionName} ($vCode)"
+        } catch (_: Exception) {}
+        
+        val authStatus = when (authManager.getStatus()) {
+            "approved" -> "已授权"
+            "pending" -> "等待审批"
+            "rejected" -> "已拒绝"
+            "banned" -> "已封禁"
+            "expired" -> "已过期"
+            else -> "未注册"
+        }
+        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId().take(16)}...\n授权状态: $authStatus"
+        
+        sbSettingsCache?.requestFocus()
+    }
+
+    private fun hideSettingsMenu() {
+        layoutSettingsMenu?.visibility = View.GONE
+        videoLayout?.requestFocus()
+    }
+
     private fun initVlcPlayer() {
+        val prefs = getSharedPreferences(com.tvplayer.app.Prefs.FILE, MODE_PRIVATE)
+        val cacheMs = prefs.getInt(com.tvplayer.app.Prefs.KEY_NETWORK_CACHE, com.tvplayer.app.Prefs.DEFAULT_NETWORK_CACHE)
+
         val options = ArrayList<String>()
         options.add("--aout=opensles")
         options.add("--audio-time-stretch")
         options.add("-vvv")
         options.add("--drop-late-frames")
         options.add("--skip-frames")
-        options.add("--network-caching=1500")
+        options.add("--network-caching=$cacheMs")
 
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc)
@@ -301,8 +425,11 @@ class MainActivity : AppCompatActivity() {
         retryCount = 0
         progressBuffering?.visibility = View.VISIBLE
 
+        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
+        
         val media = Media(libVlc, Uri.parse(channel.streamUrl))
         media.setHWDecoderEnabled(true, false)
+        media.addOption(":network-caching=$cacheMs")
         player.media = media
         player.play()
         
@@ -646,31 +773,21 @@ class MainActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
             val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
-            when (keyCode) {
-                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    if (!isMenuVisible) {
-                        layoutZappingMenu?.visibility = View.VISIBLE
-                        
-                        val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
-                        val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
-                        if (indexInFiltered >= 0) {
-                            tvChannelsRv?.scrollToPosition(indexInFiltered)
-                            tvChannelsRv?.post {
-                                val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
-                                lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
-                            }
-                        } else {
-                            tvChannelsRv?.requestFocus()
-                        }
+            val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+            
+            // 任何时候按下菜单键，直接显示右侧设置
+            if (keyCode == KeyEvent.KEYCODE_MENU) {
+                if (isSettingsVisible) hideSettingsMenu() else showSettingsMenu()
+                return true
+            }
 
-                        uiHandler.removeCallbacks(hideZappingRunnable)
-                        uiHandler.postDelayed(hideZappingRunnable, 10000)
-                        return true
-                    } else if (keyCode == KeyEvent.KEYCODE_MENU) {
-                        startActivity(Intent(this, SettingsActivity::class.java))
-                        return true
-                    }
-                }
+            // 当菜单未显示时，开始追踪 OK 键的长按事件
+            if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                event?.startTracking()
+                return true
+            }
+
+            when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (!isMenuVisible) {
                         val prev = if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
@@ -686,6 +803,9 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (isSettingsVisible) {
+                        return true // 防止设置面板里左方向键触发别的
+                    }
                     if (!isMenuVisible) {
                         layoutZappingMenu?.visibility = View.VISIBLE
                         tvGroupsRv?.requestFocus()
@@ -695,6 +815,9 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (isSettingsVisible) {
+                        return true
+                    }
                     if (isMenuVisible) {
                         uiHandler.removeCallbacks(hideZappingRunnable)
                         hideZappingRunnable.run()
@@ -702,7 +825,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_BACK -> {
-                    if (isMenuVisible) {
+                    if (isSettingsVisible) {
+                        hideSettingsMenu()
+                        return true
+                    } else if (isMenuVisible) {
                         uiHandler.removeCallbacks(hideZappingRunnable)
                         hideZappingRunnable.run()
                         return true
@@ -713,12 +839,50 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            if (isMenuVisible) {
+            if (isMenuVisible && keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
                 uiHandler.removeCallbacks(hideZappingRunnable)
                 uiHandler.postDelayed(hideZappingRunnable, 10000)
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isTvMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+            // 长按 OK 键呼出右侧设置
+            showSettingsMenu()
+            return true
+        }
+        return super.onKeyLongPress(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
+            val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
+            val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+            
+            if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                if (event?.isTracking == true && !event.isCanceled) {
+                    // 短按 OK 键，呼出频道列表
+                    layoutZappingMenu?.visibility = View.VISIBLE
+                    val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
+                    val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
+                    if (indexInFiltered >= 0) {
+                        tvChannelsRv?.scrollToPosition(indexInFiltered)
+                        tvChannelsRv?.post {
+                            val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                            lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                        }
+                    } else {
+                        tvChannelsRv?.requestFocus()
+                    }
+                    uiHandler.removeCallbacks(hideZappingRunnable)
+                    uiHandler.postDelayed(hideZappingRunnable, 10000)
+                }
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     companion object {
@@ -732,16 +896,20 @@ class MainActivity : AppCompatActivity() {
         if (settingsChanged || allChannels.isEmpty()) {
             loadData()
             settingsChanged = false
-        }
-        if (isTvMode) {
-            mediaPlayer?.play()
+        } else if (isTvMode && allChannels.isNotEmpty() && currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
+            // 直播流在切后台后会断开或缓冲失效，必须重新连接加载
+            videoLayout?.post {
+                playTvChannel(currentChannelIndex)
+            }
         }
     }
     
     override fun onPause() {
         super.onPause()
         if (isTvMode) {
-            mediaPlayer?.pause()
+            // 直播流切后台直接彻底停止，释放硬件解码器和网络连接
+            mediaPlayer?.stop()
+            mediaPlayer?.vlcVout?.detachViews()
         }
     }
 

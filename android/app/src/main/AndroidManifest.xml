@@ -23,12 +23,12 @@
         android:theme="@style/Theme.TVPlayer"
         android:usesCleartextTraffic="true">
 
-        <!-- 主界面: 同时支持 TV 和手机启动 -->
+        <!-- 主界面: 强制横屏，沉浸式大一统体验 -->
         <activity
             android:name=".ui.home.MainActivity"
             android:exported="true"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout"
-            android:screenOrientation="unspecified">
+            android:screenOrientation="sensorLandscape">
             <!-- TV 启动器 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,7 +51,7 @@
         <!-- 设置 -->
         <activity
             android:name=".ui.settings.SettingsActivity"
-            android:screenOrientation="unspecified" />
+            android:screenOrientation="sensorLandscape" />
 
         <!-- 后台播放服务 -->
         <service

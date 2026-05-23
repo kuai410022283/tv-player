@@ -16,18 +16,17 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val isTv = DeviceUtils.isTV(this)
-        if (isTv) {
-            setContentView(R.layout.activity_settings)
-        } else {
-            setContentView(R.layout.activity_settings_phone)
-        }
+        // 强制所有设备使用相同的设置页面布局
+        setContentView(R.layout.activity_settings)
 
         authManager = ClientAuthManager(this)
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val etServerUrl = findViewById<android.widget.EditText>(R.id.etServerUrl)
+        val etNetworkCache = findViewById<android.widget.EditText>(R.id.etNetworkCache)
+        
         etServerUrl.setText(prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL))
+        etNetworkCache.setText(prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE).toString())
 
         // 返回按钮 (手机模式)
         findViewById<android.view.View>(R.id.btnBack)?.setOnClickListener { finish() }
@@ -58,13 +57,20 @@ class SettingsActivity : AppCompatActivity() {
             }
 
             val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
+            val cacheStr = etNetworkCache.text.toString().trim()
+            val cacheValue = if (cacheStr.isNotEmpty()) cacheStr.toIntOrNull() ?: Prefs.DEFAULT_NETWORK_CACHE else Prefs.DEFAULT_NETWORK_CACHE
+            
             if (url != oldUrl) {
                 authManager.clearAuth()
                 ApiClient.reset()
                 com.tvplayer.app.ui.home.MainActivity.settingsChanged = true
             }
 
-            prefs.edit().putString(Prefs.KEY_SERVER_URL, url).apply()
+            prefs.edit()
+                .putString(Prefs.KEY_SERVER_URL, url)
+                .putInt(Prefs.KEY_NETWORK_CACHE, cacheValue)
+                .apply()
+                
             ApiClient.init(url)
             Toast.makeText(this, "设置已保存，重新启动应用生效", Toast.LENGTH_SHORT).show()
             finish()

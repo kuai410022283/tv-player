@@ -10,6 +10,10 @@ object Prefs {
     const val DEFAULT_SERVER_URL = "http://nas.laokhome.cn:9527"
     const val KEY_SERVER_URL = "server_url"
     const val KEY_GESTURE_HINT_SHOWN = "gesture_hint_shown"
+    
+    // 播放器设置
+    const val KEY_NETWORK_CACHE = "network_cache_ms"
+    const val DEFAULT_NETWORK_CACHE = 1500
 
     // 认证信息
     const val KEY_ACCESS_TOKEN = "access_token"

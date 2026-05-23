@@ -165,7 +165,119 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 4. 顶层：授权/启动等待界面 -->
+    <!-- 4. 右侧侧滑设置菜单 (Settings Menu) -->
+    <LinearLayout
+        android:id="@+id/layoutSettingsMenu"
+        android:layout_width="400dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="#CC000000"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="设置"
+            android:textColor="@color/accent"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="32dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="服务器地址"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
+            android:id="@+id/etSettingsUrl"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="#33FFFFFF"
+            android:textColor="#FFFFFF"
+            android:paddingHorizontal="16dp"
+            android:inputType="textUri"
+            android:singleLine="true"
+            android:layout_marginBottom="24dp"
+            android:nextFocusDown="@+id/sbSettingsCache" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="网络缓存时长:"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+            <TextView
+                android:id="@+id/tvSettingsCacheValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" 1.5 秒"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/sbSettingsCache"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="45"
+            android:progress="10"
+            android:layout_marginBottom="32dp"
+            android:nextFocusUp="@+id/etSettingsUrl"
+            android:nextFocusDown="@+id/btnSettingsSave" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+            
+            <Button
+                android:id="@+id/btnSettingsCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="取消"
+                android:textColor="#AAAAAA"
+                android:background="@android:color/transparent"
+                android:layout_marginEnd="16dp"
+                android:nextFocusUp="@+id/sbSettingsCache" />
+
+            <Button
+                android:id="@+id/btnSettingsSave"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:text="保存"
+                android:backgroundTint="@color/accent"
+                android:textColor="#000000"
+                android:nextFocusUp="@+id/sbSettingsCache" />
+        </LinearLayout>
+        
+        <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+        
+        <!-- 关于信息 -->
+        <TextView
+            android:id="@+id/tvSettingsInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:lineSpacingExtra="4dp" />
+            
+    </LinearLayout>
+
+    <!-- 5. 顶层：授权/启动等待界面 -->
     <LinearLayout
         android:id="@+id/layoutAuthWaiting"
         android:layout_width="match_parent"
