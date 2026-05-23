@@ -48,10 +48,7 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout"
             android:theme="@style/Theme.TVPlayer.Player" />
 
-        <!-- 设置 -->
-        <activity
-            android:name=".ui.settings.SettingsActivity"
-            android:screenOrientation="sensorLandscape" />
+
 
         <!-- 后台播放服务 -->
         <service
