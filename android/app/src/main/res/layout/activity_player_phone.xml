@@ -7,15 +7,12 @@
     android:layout_height="match_parent"
     android:background="#000">
 
-    <!-- 播放器 -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <!-- 核心播放器 View -->
+    <org.videolan.libvlc.util.VLCVideoLayout
+        android:id="@+id/videoLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:resize_mode="fit"
-        app:use_controller="true"
-        app:show_timeout="3000"
-        app:show_buffering="when_playing" />
+        android:fitsSystemWindows="false" />
 
     <!-- 缓冲指示器 -->
     <ProgressBar

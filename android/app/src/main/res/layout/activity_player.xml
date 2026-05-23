@@ -8,12 +8,11 @@
     android:background="#000">
 
     <!-- 播放器 -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <org.videolan.libvlc.util.VLCVideoLayout
+        android:id="@+id/videoLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:resize_mode="zoom"
-        app:use_controller="false" />
+        android:fitsSystemWindows="false" />
 
     <!-- 缓冲指示器 -->
     <ProgressBar

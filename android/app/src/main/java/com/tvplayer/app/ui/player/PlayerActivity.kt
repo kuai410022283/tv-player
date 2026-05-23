@@ -14,16 +14,12 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.Tracks
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.dash.DashMediaSource
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.exoplayer.rtsp.RtspMediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.datasource.DefaultHttpDataSource
+import android.net.Uri
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
+import org.videolan.libvlc.util.VLCVideoLayout
 import com.tvplayer.app.Prefs
 import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
@@ -41,13 +37,14 @@ import kotlin.math.min
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
 
-    private var player: ExoPlayer? = null
+    private var libVlc: LibVLC? = null
+    private var mediaPlayer: MediaPlayer? = null
     private val repo = ChannelRepository()
     private lateinit var authManager: ClientAuthManager
     private var isTvMode = false
 
     // ── Views ──
-    private lateinit var playerView: androidx.media3.ui.PlayerView
+    private lateinit var videoLayout: VLCVideoLayout
     private var progressBar: View? = null
     private var layoutChannelInfo: View? = null
     private var tvChannelName: android.widget.TextView? = null
@@ -135,7 +132,7 @@ class PlayerActivity : AppCompatActivity() {
     // ═══════════════════════════════════════════════════
 
     private fun setupTvPlayerViews() {
-        playerView = findViewById(R.id.playerView)
+        videoLayout = findViewById(R.id.videoLayout)
         progressBar = findViewById(R.id.progressBar)
         layoutChannelInfo = findViewById(R.id.layoutChannelInfo)
         tvChannelName = findViewById(R.id.tvChannelName)
@@ -148,7 +145,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setupPhonePlayerViews() {
-        playerView = findViewById(R.id.playerView)
+        videoLayout = findViewById(R.id.videoLayout)
         progressBar = findViewById(R.id.progressBar)
         layoutChannelInfo = findViewById(R.id.layoutChannelInfo)
         tvChannelName = findViewById(R.id.tvChannelName)
@@ -174,7 +171,7 @@ class PlayerActivity : AppCompatActivity() {
             override fun onChannelPrev() = prevChannel()
             override fun onToggleInfo() = toggleChannelInfo()
             override fun onTogglePlayPause() {
-                player?.let { it.playWhenReady = !it.playWhenReady }
+                mediaPlayer?.let { if (it.isPlaying) it.pause() else it.play() }
             }
 
             override fun onVolumeChange(delta: Float) {
@@ -194,27 +191,27 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onSeekDelta(deltaMs: Long) {
-                player?.let { p ->
-                    val newPos = max(0, p.currentPosition + deltaMs)
-                    p.seekTo(newPos)
+                mediaPlayer?.let { p ->
+                    val newPos = max(0, p.time + deltaMs)
+                    p.time = newPos
                 }
             }
 
             override fun onLongPressStart() {
                 isLongPressingSpeed = true
-                player?.setPlaybackSpeed(2.0f)
+                mediaPlayer?.rate = 2.0f
                 showSpeedIndicator("2.0x ▶▶")
             }
 
             override fun onLongPressEnd() {
                 isLongPressingSpeed = false
-                player?.setPlaybackSpeed(1.0f)
+                mediaPlayer?.rate = 1.0f
                 showSpeedIndicator("1.0x ▶")
             }
         })
 
-        // 绑定到 PlayerView 的覆盖层（非播放器控件本身）
-        val gestureOverlay = findViewById<View>(R.id.playerView)
+        // 绑定到 VideoLayout 的覆盖层
+        val gestureOverlay = findViewById<View>(R.id.videoLayout)
         gestureController?.attachTo(gestureOverlay)
     }
 
@@ -246,35 +243,73 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initPlayer() {
-        player = ExoPlayer.Builder(this).build().apply {
-            playerView.player = this
-            // 直播流不需要内置 seek bar，用自定义手势替代
-            playerView.useController = false
+        val options = ArrayList<String>()
+        options.add("--aout=opensles")
+        options.add("--audio-time-stretch")
+        options.add("-vvv")
+        options.add("--drop-late-frames")
+        options.add("--skip-frames")
+        options.add("--network-caching=1500")
 
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_BUFFERING -> {
-                            progressBar?.visibility = View.VISIBLE
-                            tvStatus?.text = "缓冲中..."
-                        }
-                        Player.STATE_READY -> {
-                            progressBar?.visibility = View.GONE
-                            tvStatus?.text = "播放中"
-                            retryCount = 0
-                            handler.postDelayed({ hideChannelInfo() }, 3000)
-                        }
-                        Player.STATE_IDLE -> tvStatus?.text = "准备中..."
-                        Player.STATE_ENDED -> tvStatus?.text = "播放结束"
+        libVlc = LibVLC(this, options)
+        mediaPlayer = MediaPlayer(libVlc)
+        mediaPlayer?.attachViews(videoLayout, null, false, false)
+
+        mediaPlayer?.setEventListener { event ->
+            when (event.type) {
+                MediaPlayer.Event.Buffering -> {
+                    if (event.buffering == 100f) {
+                        progressBar?.visibility = View.GONE
+                        tvStatus?.text = "播放中"
+                        retryCount = 0
+                        handler.postDelayed({ hideChannelInfo() }, 3000)
+                    } else {
+                        progressBar?.visibility = View.VISIBLE
+                        tvStatus?.text = "缓冲中... ${event.buffering.toInt()}%"
                     }
                 }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    tvStatus?.text = "播放失败: ${error.message}"
+                MediaPlayer.Event.Playing -> {
+                    progressBar?.visibility = View.GONE
+                    tvStatus?.text = "播放中"
+                    retryCount = 0
+                    
+                    var videoRes = ""
+                    var audioCodec = ""
+                    mediaPlayer?.media?.let { media ->
+                        for (i in 0 until media.trackCount) {
+                            val track = media.getTrack(i)
+                            if (track.type == IMedia.Track.Type.Video) {
+                                val vt = track as IMedia.VideoTrack
+                                if (vt.width > 0 && vt.height > 0) {
+                                    videoRes = "${vt.width}x${vt.height}"
+                                }
+                            } else if (track.type == IMedia.Track.Type.Audio) {
+                                val at = track as IMedia.AudioTrack
+                                val c = at.codec
+                                audioCodec = String(charArrayOf(
+                                    (c and 0xff).toChar(),
+                                    ((c shr 8) and 0xff).toChar(),
+                                    ((c shr 16) and 0xff).toChar(),
+                                    ((c shr 24) and 0xff).toChar()
+                                )).trim().uppercase()
+                            }
+                        }
+                    }
+                    val info = buildString {
+                        if (videoRes.isNotEmpty()) append(videoRes)
+                        if (videoRes.isNotEmpty() && audioCodec.isNotEmpty()) append(" | ")
+                        if (audioCodec.isNotEmpty()) append(audioCodec)
+                    }
+                    if (info.isNotEmpty()) {
+                        tvResolution?.text = info
+                    }
+                }
+                MediaPlayer.Event.EncounteredError -> {
+                    tvStatus?.text = "播放失败"
                     progressBar?.visibility = View.GONE
                     if (retryCount < maxRetries) {
                         retryCount++
-                        val delayMs = (3000L * (1 shl (retryCount - 1))) // 3s, 6s, 12s
+                        val delayMs = (3000L * (1 shl (retryCount - 1)))
                         Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
                         handler.postDelayed({ retryPlay() }, delayMs)
                     } else {
@@ -282,57 +317,22 @@ class PlayerActivity : AppCompatActivity() {
                         retryCount = 0
                     }
                 }
-
-                override fun onTracksChanged(tracks: Tracks) {
-                    for (group in tracks.groups) {
-                        for (i in 0 until group.length) {
-                            val format = group.getTrackFormat(i)
-                            if (format.width > 0 && format.height > 0) {
-                                tvResolution?.text = "${format.width}x${format.height}"
-                                return
-                            }
-                        }
-                    }
-                }
-            })
+            }
         }
     }
 
     private fun playStream(url: String, type: String) {
-        val player = player ?: return
+        val player = mediaPlayer ?: return
         retryCount = 0
         progressBar?.visibility = View.VISIBLE
         tvChannelName?.text = channelName
         tvStreamType?.text = type.uppercase()
 
-        val streamUrl = if (url.startsWith("http")) {
-            val token = authManager.getToken()
-            if (token != null && url.contains(ApiClient.getStreamProxyUrl(0).substringBeforeLast("/"))) {
-                "$url?token=$token"
-            } else {
-                ApiClient.getStreamProxyUrl(channelId)
-            }
-        } else {
-            url
-        }
-
-        val mediaItem = MediaItem.fromUri(streamUrl)
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("TVPlayer/1.0")
-            .setConnectTimeoutMs(10000)
-            .setReadTimeoutMs(15000)
-
-        val mediaSource = when (type.lowercase()) {
-            "hls" -> HlsMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-            "dash" -> DashMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-            "rtsp" -> RtspMediaSource.Factory().createMediaSource(mediaItem)
-            "flv", "mp4" -> ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-            else -> HlsMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
-        }
-
-        player.setMediaSource(mediaSource)
-        player.prepare()
-        player.playWhenReady = true
+        val media = Media(libVlc, Uri.parse(url))
+        // 允许硬解
+        media.setHWDecoderEnabled(true, false)
+        player.media = media
+        player.play()
     }
 
     private fun retryPlay() = playStream(streamUrl, streamType)
@@ -468,7 +468,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun saveProgress() {
-        val pos = player?.currentPosition?.div(1000)?.toInt() ?: 0
+        val pos = mediaPlayer?.time?.div(1000)?.toInt() ?: 0
         val clientId = authManager.getClientId()
         lifecycleScope.launch { repo.addHistory(channelId, pos, pos, clientId) }
     }
@@ -531,7 +531,7 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                player?.let { it.playWhenReady = !it.playWhenReady }; return true
+                mediaPlayer?.let { if (it.isPlaying) it.pause() else it.play() }; return true
             }
             KeyEvent.KEYCODE_MEDIA_STOP -> { finish(); return true }
             KeyEvent.KEYCODE_BACK -> {
@@ -572,7 +572,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onResume()
         // 停止保活服务
         stopService(Intent(this, PlaybackService::class.java))
-        player?.playWhenReady = true
+        mediaPlayer?.play()
         hideSystemUI()
     }
 
@@ -580,7 +580,9 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         stopService(Intent(this, PlaybackService::class.java))
         handler.removeCallbacksAndMessages(null)
-        player?.release()
-        player = null
+        mediaPlayer?.release()
+        libVlc?.release()
+        mediaPlayer = null
+        libVlc = null
     }
 }

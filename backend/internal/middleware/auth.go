@@ -178,7 +178,7 @@ var loginLimiter = &rateLimiter{
 
 var apiLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
-	rate:     60,             // 60 次
+	rate:     300,            // 放宽至 300 次/分钟，防止管理后台正常刷新被误伤
 	window:   1 * time.Minute, // 每分钟
 	maxSize:  50000,
 }

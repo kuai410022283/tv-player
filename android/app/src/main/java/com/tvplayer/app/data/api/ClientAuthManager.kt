@@ -86,27 +86,35 @@ class ClientAuthManager(private val context: Context) {
     /** 轮询检查审批状态 */
     suspend fun checkStatus(): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val token = getToken() ?: return@withContext Result.failure(Exception("无令牌"))
-            val response = ApiClient.getService().clientVerify("Bearer $token")
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.code == 0) {
+            val token = getToken()
+            if (token != null) {
+                val response = ApiClient.getService().clientVerify("Bearer $token")
+                if (response.isSuccessful && response.body()?.code == 0) {
                     // token 有效 = 已审批
                     prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, "approved").apply()
-                    Result.success("approved")
+                    return@withContext Result.success("approved")
+                }
+            }
+            
+            // 没有 token 或者验证失败，调用 register 接口获取最新状态
+            val name = "${Build.MANUFACTURER} ${Build.MODEL}"
+            val regResp = ApiClient.getService().clientRegister(
+                mapOf(
+                    "name" to name, 
+                    "device_id" to getDeviceId(),
+                    "device_model" to Build.MODEL,
+                    "device_os" to "Android ${Build.VERSION.RELEASE}",
+                    "app_version" to "1.0.0"
+                )
+            )
+            if (regResp.isSuccessful) {
+                val resp = regResp.body()
+                val data = resp?.data
+                if (data != null) {
+                    saveAuth(data)
+                    Result.success(data.status)
                 } else {
-                    // 检查注册状态
-                    val name = "${Build.MANUFACTURER} ${Build.MODEL}"
-                    val regResp = ApiClient.getService().clientRegister(
-                        mapOf("name" to name, "device_id" to getDeviceId())
-                    )
-                    if (regResp.isSuccessful) {
-                        val status = regResp.body()?.data?.status ?: "pending"
-                        prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, status).apply()
-                        Result.success(status)
-                    } else {
-                        Result.success(prefs.getString(Prefs.KEY_CLIENT_STATUS, "pending") ?: "pending")
-                    }
+                    Result.success(prefs.getString(Prefs.KEY_CLIENT_STATUS, "pending") ?: "pending")
                 }
             } else {
                 Result.success(prefs.getString(Prefs.KEY_CLIENT_STATUS, "pending") ?: "pending")

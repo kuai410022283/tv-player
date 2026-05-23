@@ -67,14 +67,13 @@ dependencies {
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.leanback:leanback-tab:1.1.0-beta01'
 
-    // Media3 / ExoPlayer
+    // Media3 / ExoPlayer (保留核心库以免其他地方报错，移除 UI 等冗余库)
     implementation 'androidx.media3:media3-exoplayer:1.2.1'
     implementation 'androidx.media3:media3-exoplayer-hls:1.2.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
-    implementation 'androidx.media3:media3-exoplayer-rtsp:1.2.1'
-    implementation 'androidx.media3:media3-ui:1.2.1'
-    implementation 'androidx.media3:media3-session:1.2.1'
     implementation 'androidx.media3:media3-common:1.2.1'
+
+    // VLC Android SDK (行业级全能解码器，专治各种 IPTV 奇葩音视频格式无声)
+    implementation 'org.videolan.android:libvlc-all:3.5.1'
 
     // Network
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'

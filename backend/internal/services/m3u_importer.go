@@ -92,6 +92,19 @@ func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error
 		}
 	}
 
+	// 开启事务进行批量插入，极大提升性能并防止锁死整个数据库
+	tx, err := imp.channelSvc.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, status) VALUES (?, ?, ?, ?, ?, ?, 'unknown')`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
 	for _, ch := range channels {
 		// 去重：跳过已存在的流地址
 		if existingURLs[ch["url"]] {
@@ -123,17 +136,14 @@ func (imp *M3UImporter) importChannels(channels []map[string]string) (int, error
 		}
 
 		streamType := detectStreamType(ch["url"])
-		channel := &models.Channel{
-			GroupID:      groupID,
-			Name:         ch["name"],
-			Logo:         ch["tvg-logo"],
-			StreamURL:    ch["url"],
-			StreamType:   streamType,
-			EPGChannelID: ch["tvg-id"],
-		}
-		if err := imp.channelSvc.CreateChannel(channel); err == nil {
+		_, err := stmt.Exec(groupID, ch["name"], ch["tvg-logo"], ch["url"], streamType, ch["tvg-id"])
+		if err == nil {
 			imported++
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
 	}
 
 	return imported, nil
@@ -154,6 +164,8 @@ func detectStreamType(url string) string {
 		return "dash"
 	case strings.Contains(lower, ".mp4"):
 		return "mp4"
+	case strings.Contains(lower, "/udp/") || strings.Contains(lower, "/rtp/") || strings.HasSuffix(lower, ".ts"):
+		return "ts"
 	default:
 		return "hls"
 	}

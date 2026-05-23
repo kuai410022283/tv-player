@@ -10,11 +10,11 @@ import (
 func InitDB(dbPath string) (*sql.DB, error) {
 	var dsn string
 	if dbPath == ":memory:" {
-		// modernc.org/sqlite 需要使用 file::memory:?cache=shared 格式
-		// 才能正确支持带参数的内存数据库
-		dsn = "file::memory:?cache=shared&_journal_mode=WAL&_busy_timeout=5000"
+		// modernc.org/sqlite 内存数据库
+		dsn = "file::memory:?cache=shared&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	} else {
-		dsn = dbPath + "?_journal_mode=WAL&_busy_timeout=5000"
+		// 必须使用 _pragma=name(value) 格式，否则现代纯 Go 驱动不会生效
+		dsn = dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	}
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -24,6 +24,11 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
+
+	// 显式执行 PRAGMA，确保 WAL 和 Busy Timeout 绝对生效，防止 database is locked
+	db.Exec("PRAGMA journal_mode=WAL;")
+	db.Exec("PRAGMA busy_timeout=5000;")
+	db.Exec("PRAGMA synchronous=NORMAL;")
 
 	// 连接池配置（SQLite 单文件，限制并发写入）
 	db.SetMaxOpenConns(5) // SQLite 单写入者
