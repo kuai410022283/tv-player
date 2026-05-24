@@ -532,19 +532,36 @@ async function importM3UContent() {
 }
 
 // ═══ Streams ══════════════════════════════════════════
+function formatSpeed(bytesPerSec) {
+  if (!bytesPerSec) return '0 KB/s';
+  if (bytesPerSec > 1024 * 1024) return (bytesPerSec / (1024 * 1024)).toFixed(2) + ' MB/s';
+  return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+}
+
 async function loadStreams() {
   const r = await api('/stream/active');
   const body = document.getElementById('streams-body');
   if (r.data && r.data.length) {
     body.innerHTML = r.data.map(s => `<tr>
-      <td>${s.channel_id}</td>
-      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(s.url)}</td>
-      <td>${badge(s.status)}</td>
-      <td>${fmtDate(s.started_at)}</td>
+      <td><div style="font-size:12px;color:var(--text2)">${s.session_id.substring(0, 15)}...</div>
+          <strong>${esc(s.client_name) || ('设备ID: ' + s.client_id)}</strong><br>
+          <span style="font-size:11px;color:var(--text2)">IP: ${s.client_ip}</span></td>
+      <td><strong>${esc(s.channel_name)}</strong><br><span style="font-size:11px;color:var(--text2)">ID: ${s.channel_id}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.url)}">${esc(s.url)}</td>
+      <td>${badge(s.status)}<br><span style="font-size:12px;color:var(--accent);font-weight:bold">${formatSpeed(s.speed_bytes)}</span></td>
+      <td><span style="font-size:11px">启动: ${fmtDate(s.started_at)}</span><br><span style="font-size:11px;color:var(--text2)">活跃: ${fmtDate(s.last_active)}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="killStream('${s.session_id}')">踢下线</button></td>
     </tr>`).join('');
   } else {
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:40px">暂无活跃流</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">暂无活跃流</td></tr>';
   }
+}
+
+async function killStream(sessionId) {
+  if (!confirm('确定要强制断开该代理流吗？')) return;
+  await api(`/stream/active/${sessionId}`, { method: 'DELETE' });
+  toast('指令已发送');
+  setTimeout(loadStreams, 500);
 }
 
 // ═══ Clients ══════════════════════════════════════════

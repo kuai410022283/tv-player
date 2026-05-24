@@ -2,6 +2,7 @@ package services
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,22 +20,14 @@ import (
 type StreamProxy struct {
 	cfg       *config.StreamConfig
 	mu        sync.RWMutex
-	streams   map[int64]*streamState
+	streams   map[string]*models.ActiveStream
+	cancels   map[string]context.CancelFunc
 	client    *http.Client
 	channelSvc *ChannelService
 	sem       chan struct{} // 并发控制
 }
 
-type streamState struct {
-	ChannelID  int64
-	URL        string
-	Status     string // playing, buffering, error, stopped
-	Bitrate    int64
-	BufferPct  int
-	ErrorMsg   string
-	StartedAt  time.Time
-	LastActive time.Time
-}
+// removed streamState
 
 func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *StreamProxy {
 	maxConcurrent := cfg.MaxConcurrent
@@ -43,7 +36,8 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 	}
 	sp := &StreamProxy{
 		cfg:        cfg,
-		streams:    make(map[int64]*streamState),
+		streams:    make(map[string]*models.ActiveStream),
+		cancels:    make(map[string]context.CancelFunc),
 		channelSvc: channelSvc,
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
@@ -158,7 +152,7 @@ func (sp *StreamProxy) GetProxyURL(channelID int64, baseURL string) string {
 }
 
 // ServeStream proxies the actual stream data
-func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *http.Request) error {
+func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request) error {
 	// 并发控制
 	select {
 	case sp.sem <- struct{}{}:
@@ -177,25 +171,37 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 		return fmt.Errorf("流地址不安全: %w", err)
 	}
 
+	sessionID := fmt.Sprintf("%d-%d-%d", channelID, clientID, time.Now().UnixNano())
+
+	ctx, cancel := context.WithCancel(r.Context())
+
 	// Update stream state
 	sp.mu.Lock()
-	sp.streams[channelID] = &streamState{
-		ChannelID:  channelID,
-		URL:        ch.StreamURL,
-		Status:     "playing",
-		StartedAt:  time.Now(),
-		LastActive: time.Now(),
+	sp.streams[sessionID] = &models.ActiveStream{
+		SessionID:   sessionID,
+		ChannelID:   channelID,
+		ChannelName: ch.Name,
+		ClientID:    clientID,
+		ClientName:  clientName,
+		ClientIP:    clientIP,
+		URL:         ch.StreamURL,
+		Status:      "playing",
+		StartedAt:   time.Now(),
+		LastActive:  time.Now(),
 	}
+	sp.cancels[sessionID] = cancel
 	sp.mu.Unlock()
 
 	defer func() {
+		cancel()
 		sp.mu.Lock()
-		delete(sp.streams, channelID)
+		delete(sp.streams, sessionID)
+		delete(sp.cancels, sessionID)
 		sp.mu.Unlock()
 	}()
 
 	// Proxy the stream
-	req, err := http.NewRequestWithContext(r.Context(), "GET", ch.StreamURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", ch.StreamURL, nil)
 	if err != nil {
 		return err
 	}
@@ -228,6 +234,9 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 	buf := make([]byte, sp.cfg.BufferSize)
 	reader := bufio.NewReaderSize(resp.Body, sp.cfg.BufferSize)
 	
+	lastUpdate := time.Now()
+	var bytesSinceLastUpdate int64 = 0
+
 	for {
 		n, err := reader.Read(buf)
 		if n > 0 {
@@ -235,11 +244,20 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
-			sp.mu.Lock()
-			if s, ok := sp.streams[channelID]; ok {
-				s.LastActive = time.Now()
+			
+			bytesSinceLastUpdate += int64(n)
+			now := time.Now()
+			
+			if now.Sub(lastUpdate) >= time.Second {
+				sp.mu.Lock()
+				if s, ok := sp.streams[sessionID]; ok {
+					s.LastActive = now
+					s.SpeedBytes = bytesSinceLastUpdate
+				}
+				sp.mu.Unlock()
+				bytesSinceLastUpdate = 0
+				lastUpdate = now
 			}
-			sp.mu.Unlock()
 		}
 		if err != nil {
 			if err == io.EOF { return nil }
@@ -248,12 +266,23 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 	}
 }
 
+// KillStream forces a specific proxy stream to disconnect
+func (sp *StreamProxy) KillStream(sessionID string) bool {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	if cancel, ok := sp.cancels[sessionID]; ok {
+		cancel()
+		return true
+	}
+	return false
+}
+
 // GetActiveStreams returns currently active stream states
-func (sp *StreamProxy) GetActiveStreams() []streamState {
+func (sp *StreamProxy) GetActiveStreams() []models.ActiveStream {
 	sp.mu.RLock()
 	defer sp.mu.RUnlock()
 
-	var streams []streamState
+	var streams []models.ActiveStream
 	for _, s := range sp.streams {
 		streams = append(streams, *s)
 	}

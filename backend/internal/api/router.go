@@ -53,6 +53,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		stream.GET("/proxy/:id", hs.Handler.ProxyStream)
 		stream.GET("/check/:id", hs.Handler.CheckStream)
 		stream.GET("/active", hs.Handler.GetActiveStreams)
+		stream.DELETE("/active/:id", hs.Handler.KillStream)
 	}
 
 	// ── M3U 源 ──────────────────────────────────────

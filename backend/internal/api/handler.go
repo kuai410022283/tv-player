@@ -354,7 +354,18 @@ func (h *Handler) ToggleFavorite(c *gin.Context) {
 
 func (h *Handler) ProxyStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err := h.streamProxy.ServeStream(id, c.Writer, c.Request); err != nil {
+	
+	var clientID int64
+	var clientName string
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+	}
+	if cname, exists := c.Get("client_name"); exists {
+		clientName = cname.(string)
+	}
+	clientIP := c.ClientIP()
+
+	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request); err != nil {
 		slog.Error("stream proxy failed", "channel_id", id, "error", err)
 		// 流代理失败时 Writer 可能已经写入了 header，不能再写 JSON
 		if !c.Writer.Written() {
@@ -377,6 +388,15 @@ func (h *Handler) CheckStream(c *gin.Context) {
 func (h *Handler) GetActiveStreams(c *gin.Context) {
 	streams := h.streamProxy.GetActiveStreams()
 	ok(c, streams)
+}
+
+func (h *Handler) KillStream(c *gin.Context) {
+	sessionID := c.Param("id")
+	if h.streamProxy.KillStream(sessionID) {
+		ok(c, "ok")
+	} else {
+		fail(c, 404, "Stream not found or already disconnected")
+	}
 }
 
 // ── M3U Sources ────────────────────────────────────────

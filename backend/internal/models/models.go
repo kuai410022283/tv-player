@@ -237,3 +237,19 @@ type ServerStats struct {
 	Uptime         int64 `json:"uptime_seconds"`
 	MemoryMB       int64 `json:"memory_mb"`
 }
+
+// ActiveStream 代表当前正在通过服务端代理转发的活跃流状态
+type ActiveStream struct {
+	SessionID   string    `json:"session_id"`
+	ClientID    int64     `json:"client_id"`
+	ClientIP    string    `json:"client_ip"`
+	ClientName  string    `json:"client_name"`
+	ChannelID   int64     `json:"channel_id"`
+	ChannelName string    `json:"channel_name"`
+	URL         string    `json:"url"`
+	Status      string    `json:"status"`
+	SpeedBytes  int64     `json:"speed_bytes"` // 实时速度 (Bytes/s)
+	ErrorMsg    string    `json:"error_msg,omitempty"`
+	StartedAt   time.Time `json:"started_at"`
+	LastActive  time.Time `json:"last_active"`
+}

@@ -70,7 +70,8 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		if token != "" && db != nil {
 			var clientID int64
 			var status string
-			err := db.QueryRow(`SELECT id, status FROM clients WHERE access_token=?`, token).Scan(&clientID, &status)
+			var name string
+			err := db.QueryRow(`SELECT id, status, name FROM clients WHERE access_token=?`, token).Scan(&clientID, &status, &name)
 			if err == nil {
 				if status != "approved" {
 					c.JSON(http.StatusForbidden, gin.H{
@@ -82,6 +83,7 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 				}
 				c.Set("auth_type", "client")
 				c.Set("client_id", clientID)
+				c.Set("client_name", name)
 				c.Set("client_token", token)
 				c.Next()
 				return
