@@ -59,16 +59,16 @@ func TestPublicPaths_NoAuth(t *testing.T) {
 	}
 }
 
-func TestReadOnlyPublic_GetAllowed(t *testing.T) {
+func TestReadOnlyPublic_GetDenied(t *testing.T) {
 	r := setupMiddlewareRouter("test-secret")
 
-	// 只读公开 GET 接口（频道列表、分组等）允许匿名访问
+	// 取消了只读公开接口后，匿名访问应被拒绝
 	req := httptest.NewRequest("GET", "/api/v1/channels", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("GET /api/v1/channels: expected 200, got %d", w.Code)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("GET /api/v1/channels: expected 401, got %d", w.Code)
 	}
 }
 
@@ -164,9 +164,9 @@ func TestIsReadOnlyPublic(t *testing.T) {
 		path   string
 		expect bool
 	}{
-		{"/api/v1/channels", true},
-		{"/api/v1/groups", true},
-		{"/api/v1/epg", true},
+		{"/api/v1/channels", false},
+		{"/api/v1/groups", false},
+		{"/api/v1/epg", false},
 		{"/api/v1/client/me", false},
 		{"/api/v1/stats", false},
 		{"/api/v1/admin/clients", false},
