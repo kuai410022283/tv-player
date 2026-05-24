@@ -29,6 +29,8 @@ type Channel struct {
 	StreamURL   string    `json:"stream_url" db:"stream_url"`
 	StreamType  string    `json:"stream_type" db:"stream_type"` // hls, flv, rtmp, rtsp, mp4, dash
 	EPGChannelID string   `json:"epg_channel_id,omitempty" db:"epg_channel_id"`
+	CurrentEPG   string   `json:"current_epg,omitempty" db:"-"`
+	EpgPercent   int      `json:"epg_percent,omitempty" db:"-"`
 	IsFavorite  bool      `json:"is_favorite" db:"is_favorite"`
 	IsHidden    bool      `json:"is_hidden" db:"is_hidden"`
 	IsDirect    bool      `json:"is_direct" db:"is_direct"`

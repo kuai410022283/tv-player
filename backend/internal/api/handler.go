@@ -236,6 +236,16 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						items[i].CustomHeaders = ""
 					}
 				}
+
+				if items[i].EPGChannelID != "" {
+					title, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].EPGChannelID)
+					items[i].CurrentEPG = title
+					items[i].EpgPercent = pct
+				} else {
+					title, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].Name)
+					items[i].CurrentEPG = title
+					items[i].EpgPercent = pct
+				}
 			}
 			resp.Items = items
 		}

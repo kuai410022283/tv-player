@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -63,13 +64,14 @@ var globalEPGIndex = &epgIndex{
 // xmltv 时间格式 "20060102150405 -0700"
 func parseXmltvTime(s string) (time.Time, error) {
 	if len(s) >= 14 {
-		// 尝试带时区
+		// 注意：Go 的时间解析模板必须使用 "-0700" 来代表时区，不能写 "+0800"
 		t, err := time.Parse("20060102150405 -0700", s)
 		if err == nil {
 			return t, nil
 		}
-		// 尝试无时区
-		t, err = time.Parse("20060102150405", s[:14])
+		// 尝试无时区，默认按照东八区解析
+		loc := time.FixedZone("CST", 8*3600)
+		t, err = time.ParseInLocation("20060102150405", s[:14], loc)
 		if err == nil {
 			return t, nil
 		}
@@ -117,7 +119,7 @@ func (s *EPGService) FetchAndBuildIndex() {
 	}
 
 	slog.Info("开始拉取 EPG 数据", "url", sourceURL)
-	
+
 	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Get(sourceURL)
 	if err != nil {
@@ -205,27 +207,120 @@ func (s *EPGService) FetchAndBuildIndex() {
 	slog.Info("EPG 数据更新完成", "channels", len(newIndex))
 }
 
+// normalizeChannelName 标准化频道名称，专门处理 CCTV 频道的各种变体
+func normalizeChannelName(s string) string {
+	// 1. URL 解码 (处理类似 CCTV-10%20%E7%A7%91%E6%95%99 的情况)
+	if unescaped, err := url.QueryUnescape(s); err == nil {
+		s = unescaped
+	}
+
+	// 2. 转小写并去除常见的分隔符和空格
+	s = strings.ToLower(s)
+	// 将全角加号替换为半角加号
+	s = strings.ReplaceAll(s, "＋", "+")
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, "_", "")
+
+	// 3. 针对 cctv 频道的特殊提取逻辑
+	if strings.HasPrefix(s, "cctv") {
+		// 提取 cctv 后面的数字，以及可能带有的 '+' 或 'k'（比如 cctv5+, cctv4k）
+		prefix := "cctv"
+		idx := 4
+		hasNumber := false
+		for idx < len(s) && s[idx] >= '0' && s[idx] <= '9' {
+			prefix += string(s[idx])
+			idx++
+			hasNumber = true
+		}
+
+		if hasNumber {
+			// 将你注释掉的代码恢复，因为它们负责提取后缀（如果不提取，prefix 永远只是 cctv5）
+			if idx < len(s) && s[idx] == '+' {
+				prefix += "+"
+				idx++
+			} else if idx < len(s) && s[idx] == 'k' {
+				prefix += "k"
+				idx++
+			}
+
+			// 针对 CCTV5+ 、CCTV5Plus 等别名处理
+			if prefix == "cctv5" && (strings.Contains(s, "plus") || strings.Contains(s, "赛事")) {
+				prefix = "cctv5+"
+			}
+
+			// 针对 CCTV-4，需要保留欧洲、美洲等地域区分
+			if prefix == "cctv4" {
+				if strings.Contains(s, "欧") || strings.Contains(s, "europe") || strings.Contains(s, "euo") || strings.Contains(s, "euro") {
+					prefix += "欧洲"
+				} else if strings.Contains(s, "美") || strings.Contains(s, "america") || strings.Contains(s, "ame") {
+					prefix += "美洲"
+				}
+				// 亚洲/中文国际版通常作为默认版，不再加后缀
+			}
+
+			// 对于 CCTV4K，保留测试频道的差异
+			if prefix == "cctv4k" && strings.Contains(s, "测试") {
+				prefix += "测试"
+			}
+
+			return prefix // 统一返回标准格式
+		} else {
+			// 处理类似 "cctv新闻" 没有数字的纯文字后缀情况
+			if strings.Contains(s, "新闻") {
+				return "cctv13"
+			}
+			if strings.Contains(s, "少儿") {
+				return "cctv14"
+			}
+			if strings.Contains(s, "音乐") {
+				return "cctv15"
+			}
+		}
+	}
+
+	// 4. 针对 CGTN 频道的特殊提取逻辑
+	if strings.HasPrefix(s, "cgtn") {
+		prefix := "cgtn"
+		if strings.Contains(s, "俄") || strings.Contains(s, "russian") {
+			prefix += "俄语"
+		} else if strings.Contains(s, "法") || strings.Contains(s, "french") {
+			prefix += "法语"
+		} else if strings.Contains(s, "西") || strings.Contains(s, "spanish") {
+			prefix += "西班牙语"
+		} else if strings.Contains(s, "阿") || strings.Contains(s, "arabic") {
+			prefix += "阿拉伯语"
+		} else if strings.Contains(s, "纪录") || strings.Contains(s, "doc") {
+			prefix += "纪录"
+		} else {
+			// 如果没有上述后缀，通常就是默认的英文新闻频道
+			prefix += "新闻"
+		}
+		return prefix
+	}
+
+	return s
+}
+
 // GetEPG 从内存索引中获取当天的 EPG
 func (s *EPGService) GetEPG(channelID string, date string) []models.EPGProgram {
 	globalEPGIndex.mu.RLock()
 	defer globalEPGIndex.mu.RUnlock()
 
 	chID := strings.ToLower(channelID)
-	
+
 	// 尝试精确匹配
 	if dateMap, ok := globalEPGIndex.programs[chID]; ok {
 		if progs, ok2 := dateMap[date]; ok2 {
 			return progs
 		}
 	}
-	
-	// 尝试模糊匹配（剔除横杠和空格，比如 CCTV-1 等于 cctv1）
-	chIDClean := strings.ReplaceAll(chID, "-", "")
-	chIDClean = strings.ReplaceAll(chIDClean, " ", "")
-	
+
+	// 尝试基于统一规则的模糊匹配
+	chIDClean := normalizeChannelName(channelID)
+
 	for key, dateMap := range globalEPGIndex.programs {
-		keyClean := strings.ReplaceAll(key, "-", "")
-		keyClean = strings.ReplaceAll(keyClean, " ", "")
+		keyClean := normalizeChannelName(key)
 		if keyClean == chIDClean {
 			if progs, ok2 := dateMap[date]; ok2 {
 				return progs
@@ -234,6 +329,51 @@ func (s *EPGService) GetEPG(channelID string, date string) []models.EPGProgram {
 	}
 
 	return []models.EPGProgram{}
+}
+
+// GetCurrentEPGWithProgress 从内存索引中获取当前正在播放的节目名称和进度百分比
+func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, int) {
+	globalEPGIndex.mu.RLock()
+	defer globalEPGIndex.mu.RUnlock()
+
+	chIDClean := normalizeChannelName(channelID)
+	now := time.Now()
+
+	// 找到对应的频道的所有日期 EPG
+	var targetDateMap map[string][]models.EPGProgram
+	chID := strings.ToLower(channelID)
+	if dateMap, ok := globalEPGIndex.programs[chID]; ok {
+		targetDateMap = dateMap
+	} else {
+		for key, dateMap := range globalEPGIndex.programs {
+			if normalizeChannelName(key) == chIDClean {
+				targetDateMap = dateMap
+				break
+			}
+		}
+	}
+
+	if targetDateMap == nil {
+		return "", 0
+	}
+
+	// 不再依赖 time.Now() 格式化后的 dateStr，因为如果服务器是 UTC 而 EPG 是 +0800 会导致跨天时取不到数据
+	// 直接遍历该频道的全部日期（通常只有 3-7 天），使用 UTC 绝对时间匹配
+	for _, progs := range targetDateMap {
+		for _, p := range progs {
+			if now.After(p.StartTime) && now.Before(p.EndTime) {
+				total := p.EndTime.Sub(p.StartTime).Seconds()
+				elapsed := now.Sub(p.StartTime).Seconds()
+				if total > 0 {
+					pct := int((elapsed / total) * 100)
+					return p.Title, pct
+				}
+				return p.Title, 0
+			}
+		}
+	}
+
+	return "", 0
 }
 
 // ForceRefresh 强制刷新

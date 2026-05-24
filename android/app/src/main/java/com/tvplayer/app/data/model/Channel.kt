@@ -11,6 +11,8 @@ data class Channel(
     @SerializedName("stream_url") val streamUrl: String = "",
     @SerializedName("stream_type") val streamType: String = "hls",
     @SerializedName("epg_channel_id") val epgChannelId: String = "",
+    @SerializedName("current_epg") val currentEpg: String = "",
+    @SerializedName("epg_percent") val epgPercent: Int = 0,
     @SerializedName("is_favorite") val isFavorite: Boolean = false,
     @SerializedName("is_hidden") val isHidden: Boolean = false,
     @SerializedName("sort_order") val sortOrder: Int = 0,

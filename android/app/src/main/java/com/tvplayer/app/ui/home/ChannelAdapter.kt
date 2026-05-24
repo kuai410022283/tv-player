@@ -75,16 +75,36 @@ class ChannelAdapter(
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvIndex: TextView = itemView.findViewById(R.id.tvChannelIndex)
         private val tvName: TextView = itemView.findViewById(R.id.tvChannelName)
-        private val tvType: TextView = itemView.findViewById(R.id.tvStreamType)
+        private val tvCurrentEpg: TextView = itemView.findViewById(R.id.tvCurrentEpg)
+        private val tvTypeBadge: TextView = itemView.findViewById(R.id.tvStreamTypeBadge)
+        private val progressEpgItem: android.widget.ProgressBar = itemView.findViewById(R.id.progressEpgItem)
         private val ivLogo: ImageView = itemView.findViewById(R.id.ivChannelLogo)
         private val ivFav: ImageView = itemView.findViewById(R.id.ivFavorite)
-        private val ivStatus: ImageView = itemView.findViewById(R.id.ivStatus)
         private val playingIndicator: View = itemView.findViewById(R.id.viewPlaying)
 
         fun bind(item: Channel, isPlaying: Boolean) {
             tvIndex.text = String.format("%02d", bindingAdapterPosition + 1)
             tvName.text = item.name
-            tvType.text = item.streamType.uppercase()
+            
+            // 下方显示当前 EPG，如果没有则占位
+            if (item.currentEpg.isNotEmpty()) {
+                tvCurrentEpg.text = item.currentEpg
+                tvCurrentEpg.visibility = View.VISIBLE
+                if (item.epgPercent > 0) {
+                    progressEpgItem.progress = item.epgPercent
+                    progressEpgItem.visibility = View.VISIBLE
+                } else {
+                    progressEpgItem.visibility = View.GONE
+                }
+            } else {
+                tvCurrentEpg.text = "精彩节目"
+                tvCurrentEpg.visibility = View.VISIBLE
+                progressEpgItem.visibility = View.GONE
+            }
+
+            // 右侧流类型角标
+            tvTypeBadge.text = item.streamType.uppercase()
+            tvTypeBadge.visibility = View.VISIBLE
 
             if (item.logo.isNotEmpty()) {
                 ivLogo.load(item.logo) {
@@ -97,18 +117,6 @@ class ChannelAdapter(
             }
 
             ivFav.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
-
-            when (item.status) {
-                "online" -> {
-                    ivStatus.setImageResource(R.drawable.ic_status_online)
-                    ivStatus.visibility = View.VISIBLE
-                }
-                "offline" -> {
-                    ivStatus.setImageResource(R.drawable.ic_status_offline)
-                    ivStatus.visibility = View.VISIBLE
-                }
-                else -> ivStatus.visibility = View.GONE
-            }
 
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
         }

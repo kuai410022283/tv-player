@@ -422,47 +422,13 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun loadEPG() {
-        val epgId = allChannels.getOrNull(channelIndex)?.epgChannelId
-        if (epgId.isNullOrEmpty()) {
+        val channel = allChannels.getOrNull(channelIndex)
+        if (channel != null && channel.currentEpg.isNotEmpty()) {
+            layoutEpg?.visibility = View.VISIBLE
+            tvEpgNow?.text = "📺 正在播放: ${channel.currentEpg}"
+            tvEpgNext?.text = ""
+        } else {
             layoutEpg?.visibility = View.GONE
-            return
-        }
-        lifecycleScope.launch {
-            repo.getEPG(epgId).onSuccess { programs ->
-                if (programs.isEmpty()) {
-                    layoutEpg?.visibility = View.GONE
-                    return@onSuccess
-                }
-                layoutEpg?.visibility = View.VISIBLE
-                val now = java.util.Date()
-                val formats = arrayOf(
-                    "yyyy-MM-dd'T'HH:mm:ss",
-                    "yyyy-MM-dd'T'HH:mm:ssZ",
-                    "yyyy-MM-dd'T'HH:mm:ssXXX",
-                    "yyyy-MM-dd HH:mm:ss"
-                )
-                fun parseDate(s: String): java.util.Date? {
-                    for (fmt in formats) {
-                        try {
-                            return java.text.SimpleDateFormat(fmt, java.util.Locale.getDefault()).parse(s)
-                        } catch (_: Exception) {}
-                    }
-                    return null
-                }
-                val current = programs.find { p ->
-                    val start = parseDate(p.startTime)
-                    val end = parseDate(p.endTime)
-                    start != null && end != null && now.after(start) && now.before(end)
-                }
-                val next = if (current != null) {
-                    val idx = programs.indexOf(current)
-                    programs.getOrNull(idx + 1)
-                } else {
-                    programs.firstOrNull()
-                }
-                tvEpgNow?.text = if (current != null) "📺 正在播放: ${current.title}" else ""
-                tvEpgNext?.text = if (next != null) "⏭ 下一节目: ${next.title}" else ""
-            }
         }
     }
 

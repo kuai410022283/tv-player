@@ -471,49 +471,14 @@ class MainActivity : AppCompatActivity() {
         uiHandler.postDelayed(hideOsdRunnable, 5000)
     }
     
+
     private fun loadEpgForChannel(channel: Channel) {
-        if (channel.epgChannelId.isNullOrEmpty()) {
-            tvOsdEpg?.text = "无节目信息"
+        if (channel.currentEpg.isNotEmpty()) {
+            tvOsdEpg?.text = "正在播放: ${channel.currentEpg}"
+            progressEpg?.progress = channel.epgPercent
+        } else {
+            tvOsdEpg?.text = "暂无当前节目信息"
             progressEpg?.progress = 0
-            return
-        }
-        lifecycleScope.launch {
-            repo.getEPG(channel.epgChannelId).onSuccess { programs ->
-                val now = java.util.Date()
-                val formats = arrayOf(
-                    "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ssZ",
-                    "yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd HH:mm:ss"
-                )
-                fun parseDate(s: String): java.util.Date? {
-                    for (fmt in formats) {
-                        try { return java.text.SimpleDateFormat(fmt, java.util.Locale.getDefault()).parse(s) } catch (_: Exception) {}
-                    }
-                    return null
-                }
-                val current = programs.find { p ->
-                    val start = parseDate(p.startTime)
-                    val end = parseDate(p.endTime)
-                    start != null && end != null && now.after(start) && now.before(end)
-                }
-                if (current != null) {
-                    val next = programs.getOrNull(programs.indexOf(current) + 1)
-                    val nextText = if (next != null) " | 接下来: ${next.title}" else ""
-                    tvOsdEpg?.text = "正在播放: ${current.title}$nextText"
-                    
-                    val start = parseDate(current.startTime)?.time ?: 0
-                    val end = parseDate(current.endTime)?.time ?: 0
-                    val currentMs = now.time
-                    if (end > start && currentMs > start) {
-                        val pct = ((currentMs - start).toFloat() / (end - start).toFloat() * 100).toInt()
-                        progressEpg?.progress = max(0, pct)
-                    } else {
-                        progressEpg?.progress = 0
-                    }
-                } else {
-                    tvOsdEpg?.text = "暂无当前节目信息"
-                    progressEpg?.progress = 0
-                }
-            }
         }
     }
 
