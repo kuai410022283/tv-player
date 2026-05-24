@@ -235,13 +235,11 @@ func normalizeChannelName(s string) string {
 		}
 
 		if hasNumber {
-			// 将你注释掉的代码恢复，因为它们负责提取后缀（如果不提取，prefix 永远只是 cctv5）
+			// 提取后缀
 			if idx < len(s) && s[idx] == '+' {
 				prefix += "+"
-				idx++
 			} else if idx < len(s) && s[idx] == 'k' {
 				prefix += "k"
-				idx++
 			}
 
 			// 针对 CCTV5+ 、CCTV5Plus 等别名处理
