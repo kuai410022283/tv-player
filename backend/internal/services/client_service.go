@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tvplayer/backend/internal/models"
@@ -149,18 +150,35 @@ func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, ap
 	token := generateToken()
 
 	maxStreams := req.MaxStreams
+	var expiresAt *time.Time
+	var planID int64 = req.PlanID
+
+	// 若选择了套餐，获取套餐详情
+	if planID > 0 {
+		var days, pStreams int
+		err := s.db.QueryRow(`SELECT days, max_streams FROM subscription_plans WHERE id=?`, planID).Scan(&days, &pStreams)
+		if err == nil {
+			maxStreams = pStreams
+			if days > 0 {
+				t := now.AddDate(0, 0, days)
+				expiresAt = &t
+			}
+		} else {
+			planID = 0 // 退回默认
+		}
+	} else {
+		if req.MaxDays > 0 {
+			t := now.AddDate(0, 0, req.MaxDays)
+			expiresAt = &t
+		}
+	}
+
 	if maxStreams <= 0 {
 		maxStreams = 2
 	}
 
-	var expiresAt *time.Time
-	if req.MaxDays > 0 {
-		t := now.AddDate(0, 0, req.MaxDays)
-		expiresAt = &t
-	}
-
-	_, err := s.db.Exec(`UPDATE clients SET status='approved', access_token=?, max_streams=?, expires_at=?, approved_by=?, reject_reason='', updated_at=? WHERE id=?`,
-		token, maxStreams, expiresAt, approver, now, clientID)
+	_, err := s.db.Exec(`UPDATE clients SET status='approved', access_token=?, max_streams=?, expires_at=?, approved_by=?, reject_reason='', updated_at=?, plan_id=? WHERE id=?`,
+		token, maxStreams, expiresAt, approver, now, planID, clientID)
 	if err != nil {
 		return err
 	}
@@ -258,7 +276,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT id, name, device_id, device_model, device_os, app_version, ip, status, max_streams, expires_at, approved_by, reject_reason, last_seen, total_play_minutes, request_note, created_at, updated_at FROM clients %s ORDER BY created_at DESC LIMIT ? OFFSET ?`, where), queryArgs...)
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.Replace(where, "status", "c.status", -1)), queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +287,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 		var c models.Client
 		var expiresAt, lastSeen sql.NullTime
 		var approvedBy, rejectReason, reqNote sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt, &c.PlanName); err != nil {
 			return nil, err
 		}
 		if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
@@ -298,8 +316,8 @@ func (s *ClientService) GetByID(id int64) (*models.Client, error) {
 	var c models.Client
 	var expiresAt, lastSeen sql.NullTime
 	var approvedBy, rejectReason, reqNote sql.NullString
-	err := s.db.QueryRow(`SELECT id, name, device_id, device_model, device_os, app_version, ip, access_token, status, max_streams, expires_at, approved_by, reject_reason, last_seen, total_play_minutes, request_note, created_at, updated_at FROM clients WHERE id=?`, id).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt)
+	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.access_token, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.id=?`, id).
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.CreatedAt, &c.UpdatedAt, &c.PlanName)
 	if err != nil {
 		return nil, err
 	}

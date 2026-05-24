@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -35,6 +36,41 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(0) // 不复用连接（SQLite 文件句柄）
 
+	// 自动迁移字段
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN source TEXT DEFAULT '手动'`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN source TEXT DEFAULT '手动'`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN user_agent TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN custom_headers TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT ''`)
+
+	// 移除 channel_groups.name 的 UNIQUE 约束
+	var sqlStmt string
+	err = db.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name='channel_groups'").Scan(&sqlStmt)
+	if err == nil && strings.Contains(sqlStmt, "UNIQUE") {
+		_, _ = db.Exec(`
+			PRAGMA foreign_keys=off;
+			CREATE TABLE channel_groups_new (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				icon TEXT DEFAULT '',
+				sort_order INTEGER DEFAULT 0,
+				is_direct INTEGER DEFAULT 1,
+				source TEXT DEFAULT '手动',
+				user_agent TEXT DEFAULT '',
+				custom_headers TEXT DEFAULT '',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			INSERT INTO channel_groups_new (id, name, icon, sort_order, is_direct, source, created_at, updated_at)
+			SELECT id, name, icon, sort_order, is_direct, COALESCE(source, '手动'), created_at, updated_at FROM channel_groups;
+			DROP TABLE channel_groups;
+			ALTER TABLE channel_groups_new RENAME TO channel_groups;
+			PRAGMA foreign_keys=on;
+		`)
+	}
+
 	if err := createTables(db); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
@@ -46,10 +82,13 @@ func createTables(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS channel_groups (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL UNIQUE,
+		name TEXT NOT NULL,
 		icon TEXT DEFAULT '',
 		sort_order INTEGER DEFAULT 0,
 		is_direct INTEGER DEFAULT 1,
+		source TEXT DEFAULT '手动',
+		user_agent TEXT DEFAULT '',
+		custom_headers TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -69,6 +108,10 @@ func createTables(db *sql.DB) error {
 		sort_order INTEGER DEFAULT 0,
 		status TEXT DEFAULT 'unknown',
 		last_check DATETIME,
+		m3u_source_id INTEGER DEFAULT 0,
+		source TEXT DEFAULT '手动',
+		user_agent TEXT DEFAULT '',
+		custom_headers TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -113,6 +156,9 @@ func createTables(db *sql.DB) error {
 		name TEXT NOT NULL,
 		url TEXT NOT NULL,
 		auto_sync INTEGER DEFAULT 0,
+		sync_interval INTEGER DEFAULT 12,
+		user_agent TEXT DEFAULT '',
+		custom_headers TEXT DEFAULT '',
 		last_sync DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -129,6 +175,7 @@ func createTables(db *sql.DB) error {
 		ip TEXT DEFAULT '',
 		access_token TEXT UNIQUE,
 		status TEXT NOT NULL DEFAULT 'pending',  -- pending / approved / rejected / banned / expired
+		plan_id INTEGER DEFAULT 0,
 		max_streams INTEGER DEFAULT 2,
 		expires_at DATETIME,
 		approved_by TEXT DEFAULT '',
@@ -176,7 +223,17 @@ func createTables(db *sql.DB) error {
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('default_expire_days', '365');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('require_note', 'false');
 
-	-- Insert default groups
+	CREATE TABLE IF NOT EXISTS subscription_plans (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		days INTEGER DEFAULT 30,
+		max_streams INTEGER DEFAULT 1,
+		price REAL DEFAULT 0.0,
+		description TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('央视', 1);
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('卫视', 2);
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('地方台', 3);
@@ -193,6 +250,15 @@ func createTables(db *sql.DB) error {
 	// 执行自动迁移
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN is_direct INTEGER DEFAULT 1;")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN is_direct INTEGER DEFAULT 1;")
+	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN plan_id INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN m3u_source_id INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN custom_headers TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_interval INTEGER DEFAULT 12;")
+	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN user_agent TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN custom_headers TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT '';")
 	
 	return err
 }

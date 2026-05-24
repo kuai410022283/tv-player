@@ -3,9 +3,9 @@
 // ═══════════════════════════════════════════════════════
 
 const API = '/api/v1';
-let groups = [], selectedClientIds = new Set();
+let groups = [], selectedClientIds = new Set(), selectedGroupIds = new Set();
 let adminToken = localStorage.getItem('admin_token') || '';
-let channelPage = 1, clientPage = 1;
+let channelPage = 1, clientPage = 1, groupPage = 1;
 const PAGE_SIZE = 20;
 
 // ═══ API helpers ══════════════════════════════════════
@@ -27,14 +27,19 @@ async function api(path, opts = {}) {
   showLoading();
   try {
     const res = await fetch(API + path, { headers, ...opts });
-    if (res.status === 401 || res.status === 403) {
-      const data = await res.json().catch(() => ({}));
-      if (data.message && data.message.includes('需要管理员权限')) {
-        showLogin();
-        throw new Error('需要认证');
-      }
+    let data = {};
+    const text = await res.text();
+    if (text) {
+      try { data = JSON.parse(text); } catch(e) {}
     }
-    return res.json();
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        showLogin();
+        throw new Error('需要重新登录');
+      }
+      throw new Error(data.message || `请求失败 (${res.status})`);
+    }
+    return data;
   } catch (e) {
     toast('请求失败: ' + e.message, 'error');
     throw e;
@@ -64,7 +69,10 @@ function timeAgo(dateStr) {
   return Math.floor(diff / 86400) + '天前';
 }
 
-function fmtDate(d) { return d ? new Date(d).toLocaleString('zh-CN') : '-'; }
+function fmtDate(d) { 
+  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">从未同步</span>';
+  return new Date(d).toLocaleString('zh-CN'); 
+}
 function badge(status) { return `<span class="badge badge-${status}">${status}</span>`; }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -130,6 +138,7 @@ function showSection(name, el) {
     dashboard: loadDashboard,
     channels: loadChannels,
     groups: loadGroups,
+    plans: loadPlans,
     sources: loadSources,
     streams: loadStreams,
     clients: loadClients,
@@ -181,9 +190,11 @@ async function loadChannels(search = '') {
   if (chRes.data && chRes.data.items) {
     channelTotal = chRes.data.total || 0;
     body.innerHTML = chRes.data.items.map(c => `<tr>
+      <td><input type="checkbox" class="ch-check" value="${c.id}"></td>
       <td>${c.id}</td>
-      <td><strong>${esc(c.name)}</strong></td>
+      <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
       <td>${gm[c.group_id] || '-'}</td>
+      <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
       <td><span class="badge badge-${c.stream_type}">${c.stream_type.toUpperCase()}</span></td>
       <td>${badge(c.status)}</td>
       <td>${c.is_favorite ? '⭐' : '-'}</td>
@@ -194,9 +205,23 @@ async function loadChannels(search = '') {
       </div></td>
     </tr>`).join('');
   }
+  document.getElementById('check-all-channels').checked = false;
   document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
   document.getElementById('channels-page').textContent = channelPage;
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
+}
+
+function toggleAllChannels(cb) {
+  document.querySelectorAll('.ch-check').forEach(el => el.checked = cb.checked);
+}
+
+async function doChannelBatchDelete() {
+  const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
+  if (!ids.length) { toast('请先选择要删除的频道', 'error'); return; }
+  await api('/channels/batch', { method: 'DELETE', body: JSON.stringify({ ids }) });
+  hideModal('channel-batch-modal');
+  toast(`已删除 ${ids.length} 个频道`);
+  loadChannels(document.getElementById('channel-search').value);
 }
 
 function channelPrevPage() {
@@ -209,7 +234,27 @@ function channelNextPage() {
 
 function searchChannels() {
   clearTimeout(window._st);
-  window._st = setTimeout(() => loadChannels(document.getElementById('channel-search').value), 300);
+  window._st = setTimeout(() => {
+    channelPage = 1;
+    loadChannels(document.getElementById('channel-search').value);
+  }, 300);
+}
+
+function showAddChannelModal() {
+  document.getElementById('channel-modal-title').textContent = '添加频道';
+  document.getElementById('ch-edit-id').value = '';
+  document.getElementById('ch-name').value = '';
+  if (groups.length > 0) {
+    document.getElementById('ch-group').value = groups[0].id;
+  }
+  document.getElementById('ch-url').value = '';
+  document.getElementById('ch-type').value = '';
+  document.getElementById('ch-logo').value = '';
+  document.getElementById('ch-epg').value = '';
+  document.getElementById('ch-is-direct').value = 'true';
+  document.getElementById('ch-user-agent').value = '';
+  document.getElementById('ch-headers').value = '';
+  showModal('channel-modal');
 }
 
 async function saveChannel() {
@@ -221,9 +266,19 @@ async function saveChannel() {
     stream_type: document.getElementById('ch-type').value,
     logo: document.getElementById('ch-logo').value,
     epg_channel_id: document.getElementById('ch-epg').value,
-    is_direct: document.getElementById('ch-is-direct').value === 'true'
+    is_direct: document.getElementById('ch-is-direct').value === 'true',
+    user_agent: document.getElementById('ch-user-agent').value,
+    custom_headers: document.getElementById('ch-headers').value
   };
   if (!d.name || !d.stream_url) { toast('请填写名称和流地址', 'error'); return; }
+  if (d.custom_headers) {
+    try {
+      JSON.parse(d.custom_headers);
+    } catch (e) {
+      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      return;
+    }
+  }
   await api(id ? `/channels/${id}` : '/channels', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('channel-modal');
   loadChannels();
@@ -242,6 +297,8 @@ async function editChannel(id) {
   document.getElementById('ch-logo').value = c.logo || '';
   document.getElementById('ch-epg').value = c.epg_channel_id || '';
   document.getElementById('ch-is-direct').value = c.is_direct !== false ? 'true' : 'false';
+  document.getElementById('ch-user-agent').value = c.user_agent || '';
+  document.getElementById('ch-headers').value = c.custom_headers || '';
   document.getElementById('channel-modal-title').textContent = '编辑频道';
   showModal('channel-modal');
 }
@@ -258,15 +315,80 @@ async function toggleFav(id) {
 }
 
 // ═══ Groups ═══════════════════════════════════════════
+let groupTotal = 0;
+
 async function loadGroups() {
-  const r = await api('/groups');
-  document.getElementById('groups-body').innerHTML = (r.data || []).map(g => `<tr>
+  const search = document.getElementById('group-search').value;
+  let q = `?page=${groupPage}&page_size=${PAGE_SIZE}`;
+  if (search) q += '&search=' + encodeURIComponent(search);
+
+  const r = await api('/admin/groups' + q);
+  const items = r.data ? r.data.items || [] : [];
+  groupTotal = r.data ? r.data.total || 0 : 0;
+  selectedGroupIds.clear();
+
+  // Merge items into global groups array
+  items.forEach(item => {
+    const idx = groups.findIndex(g => g.id === item.id);
+    if (idx >= 0) {
+      groups[idx] = item;
+    } else {
+      groups.push(item);
+    }
+  });
+
+  document.getElementById('groups-body').innerHTML = items.map(g => {
+    const isDefault = g.name === '未分类';
+    return `<tr>
+    <td>${isDefault ? '' : `<input type="checkbox" class="group-check" value="${g.id}" onchange="updateSelectedGroups()">`}</td>
     <td>${g.id}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
-    <td><div class="btn-group">
-      <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id},'${esc(g.name)}',${g.sort_order},${g.is_direct})">编辑</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">删除</button>
-    </div></td>
-  </tr>`).join('');
+    <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
+    <td>${g.is_direct ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-warn">关闭</span>'}</td>
+    <td>
+      ${isDefault ? '<span style="color:var(--text3);font-size:12px;user-select:none">系统内置</span>' : `<div class="btn-group">
+        <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id})">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id}, '${esc(g.source || '手动')}', '${esc(g.name)}', ${g.channel_count})">删除</button>
+      </div>`}
+    </td>
+  </tr>`}).join('');
+
+  document.getElementById('groups-page').textContent = groupPage;
+  document.getElementById('groups-info').textContent = `共 ${groupTotal} 个分组`;
+}
+
+function groupPrevPage() { if (groupPage > 1) { groupPage--; loadGroups(); } }
+function groupNextPage() { if (groupPage * PAGE_SIZE < groupTotal) { groupPage++; loadGroups(); } }
+function searchGroups() { clearTimeout(window._gt); window._gt = setTimeout(() => { groupPage = 1; loadGroups(); }, 300); }
+
+function toggleAllGroups(el) {
+  document.querySelectorAll('.group-check').forEach(cb => { cb.checked = el.checked; });
+  updateSelectedGroups();
+}
+
+function updateSelectedGroups() {
+  selectedGroupIds.clear();
+  document.querySelectorAll('.group-check:checked').forEach(cb => selectedGroupIds.add(+cb.value));
+}
+
+async function doGroupBatchDelete() {
+  if (selectedGroupIds.size === 0) { toast('请先勾选分组', 'error'); hideModal('group-batch-modal'); return; }
+  const r = await api('/groups/batch', {
+    method: 'POST',
+    body: JSON.stringify({ ids: [...selectedGroupIds], action: 'delete' })
+  });
+  hideModal('group-batch-modal');
+  toast(`已删除勾选的分组`);
+  loadGroups();
+}
+
+function showAddGroupModal() {
+  document.getElementById('grp-edit-id').value = '';
+  document.getElementById('grp-name').value = '';
+  document.getElementById('grp-sort').value = '0';
+  document.getElementById('grp-is-direct').value = 'true';
+  document.getElementById('grp-user-agent').value = '';
+  document.getElementById('grp-headers').value = '';
+  showModal('group-modal');
 }
 
 async function saveGroup() {
@@ -274,57 +396,122 @@ async function saveGroup() {
   const d = { 
     name: document.getElementById('grp-name').value, 
     sort_order: +document.getElementById('grp-sort').value || 0,
-    is_direct: document.getElementById('grp-is-direct').value === 'true'
+    is_direct: document.getElementById('grp-is-direct').value === 'true',
+    user_agent: document.getElementById('grp-user-agent').value,
+    custom_headers: document.getElementById('grp-headers').value
   };
   if (!d.name) { toast('请填写名称', 'error'); return; }
+  if (d.custom_headers) {
+    try {
+      JSON.parse(d.custom_headers);
+    } catch (e) {
+      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      return;
+    }
+  }
   await api(id ? `/groups/${id}` : '/groups', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('group-modal');
   loadGroups();
   toast(id ? '已更新' : '已添加');
 }
 
-function editGroup(id, n, s, d) {
-  document.getElementById('grp-edit-id').value = id;
-  document.getElementById('grp-name').value = n;
-  document.getElementById('grp-sort').value = s;
-  document.getElementById('grp-is-direct').value = d !== false ? 'true' : 'false';
+function editGroup(id) {
+  const g = groups.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('grp-edit-id').value = g.id;
+  document.getElementById('grp-name').value = g.name;
+  document.getElementById('grp-sort').value = g.sort_order;
+  document.getElementById('grp-is-direct').value = g.is_direct !== false ? 'true' : 'false';
+  document.getElementById('grp-user-agent').value = g.user_agent || '';
+  document.getElementById('grp-headers').value = g.custom_headers || '';
   showModal('group-modal');
 }
 
-async function deleteGroup(id) {
-  if (!confirm('确定？')) return;
+async function deleteGroup(id, source, name, count) {
+  if (!confirm(`该分组 [${source} - ${name}] 下包含 ${count} 个频道。\n删除分组将同步删除这些频道，此操作不可恢复，确定要删除吗？`)) return;
   await api(`/groups/${id}`, { method: 'DELETE' });
   loadGroups();
 }
 
-// ═══ Sources ══════════════════════════════════════════
+let sourcesList = [];
 async function loadSources() {
   const r = await api('/m3u');
-  document.getElementById('sources-body').innerHTML = (r.data || []).map(s => `<tr>
+  sourcesList = r.data || [];
+  document.getElementById('sources-body').innerHTML = sourcesList.map(s => `<tr>
     <td>${s.id}</td>
-    <td>${esc(s.name)}</td>
-    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(s.url)}</td>
+    <td><strong>${esc(s.name)}</strong></td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
+    <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
     <td>${fmtDate(s.last_sync)}</td>
     <td><div class="btn-group">
       <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">同步</button>
+      <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">编辑</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">删除</button>
     </div></td>
   </tr>`).join('');
 }
 
+function showAddSourceModal() {
+  document.getElementById('src-modal-title').innerText = '添加M3U源';
+  document.getElementById('src-edit-id').value = '';
+  document.getElementById('src-name').value = '';
+  document.getElementById('src-url').value = '';
+  document.getElementById('src-auto-sync').value = 'false';
+  document.getElementById('src-sync-interval').value = '12';
+  document.getElementById('src-user-agent').value = '';
+  document.getElementById('src-headers').value = '';
+  showModal('source-modal');
+}
+
+function editSource(id) {
+  const s = sourcesList.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('src-modal-title').innerText = '编辑M3U源';
+  document.getElementById('src-edit-id').value = s.id;
+  document.getElementById('src-name').value = s.name;
+  document.getElementById('src-url').value = s.url;
+  document.getElementById('src-auto-sync').value = s.auto_sync ? 'true' : 'false';
+  document.getElementById('src-sync-interval').value = s.sync_interval || 12;
+  document.getElementById('src-user-agent').value = s.user_agent || '';
+  document.getElementById('src-headers').value = s.custom_headers || '';
+  showModal('source-modal');
+}
+
 async function saveSource() {
-  const d = { name: document.getElementById('src-name').value, url: document.getElementById('src-url').value };
+  const id = document.getElementById('src-edit-id').value;
+  const d = { 
+    name: document.getElementById('src-name').value, 
+    url: document.getElementById('src-url').value,
+    auto_sync: document.getElementById('src-auto-sync').value === 'true',
+    sync_interval: parseInt(document.getElementById('src-sync-interval').value) || 12,
+    user_agent: document.getElementById('src-user-agent').value,
+    custom_headers: document.getElementById('src-headers').value
+  };
   if (!d.name || !d.url) { toast('请填写完整', 'error'); return; }
-  await api('/m3u', { method: 'POST', body: JSON.stringify(d) });
+  if (d.custom_headers) {
+    try {
+      JSON.parse(d.custom_headers);
+    } catch (e) {
+      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      return;
+    }
+  }
+  await api(id ? `/m3u/${id}` : '/m3u', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('source-modal');
   loadSources();
-  toast('已添加');
+  toast(id ? '已更新' : '已添加');
 }
 
 async function importSource(id) {
-  toast('正在导入...');
+  toast('已发起后台同步...');
   const r = await api(`/m3u/${id}/import`, { method: 'POST' });
-  toast(r.data ? `导入: ${r.data.imported} 频道` : '失败', 'error');
+  if (r.data && r.data.message) {
+    toast(r.data.message, 'success');
+  } else {
+    toast('失败', 'error');
+  }
+  // 3秒后刷新列表查看同步状态
+  setTimeout(loadSources, 3000);
 }
 
 async function deleteSource(id) {
@@ -334,10 +521,12 @@ async function deleteSource(id) {
 }
 
 async function importM3UContent() {
+  const n = document.getElementById('import-name').value;
   const c = document.getElementById('import-content').value;
+  if (!n) { toast('请填写来源名称', 'error'); return; }
   if (!c) { toast('请粘贴内容', 'error'); return; }
   toast('正在导入...');
-  const r = await api('/m3u/import-string', { method: 'POST', body: JSON.stringify({ content: c }) });
+  const r = await api('/m3u/import-string', { method: 'POST', body: JSON.stringify({ name: n, content: c }) });
   toast(r.data ? `导入: ${r.data.imported} 频道` : '失败', 'error');
   if (r.data) hideModal('import-modal');
 }
@@ -437,6 +626,7 @@ async function showClientDetail(id) {
       <div class="label">客户端版本</div><div class="value">${esc(c.app_version)}</div>
       <div class="label">IP地址</div><div class="value" style="font-family:monospace">${esc(c.ip)}</div>
       <div class="label">状态</div><div class="value">${badge(c.status)}</div>
+      <div class="label">当前套餐</div><div class="value">${c.plan_name ? '<span class="badge badge-info">' + esc(c.plan_name) + '</span>' : '-'}</div>
       <div class="label">最大并发流</div><div class="value">${c.max_streams}</div>
       <div class="label">授权过期</div><div class="value">${fmtDate(c.expires_at)}</div>
       <div class="label">审批人</div><div class="value">${esc(c.approved_by) || '-'}</div>
@@ -457,17 +647,95 @@ async function showClientDetail(id) {
   showModal('client-detail-modal');
 }
 
-function showApproveModal(id) {
+let allPlans = [];
+
+async function loadPlans() {
+  const r = await api('/admin/plans');
+  allPlans = r.data || [];
+  document.getElementById('plans-body').innerHTML = allPlans.map(p => `<tr>
+    <td>${p.id}</td>
+    <td><strong>${esc(p.name)}</strong></td>
+    <td>${p.days > 0 ? p.days + ' 天' : '永久'}</td>
+    <td>${p.max_streams}</td>
+    <td>${p.price > 0 ? '¥' + p.price : '-'}</td>
+    <td>${esc(p.description)}</td>
+    <td><div class="btn-group">
+      <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">编辑</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+async function savePlan() {
+  const id = document.getElementById('plan-edit-id').value;
+  const d = {
+    name: document.getElementById('plan-name').value,
+    days: +document.getElementById('plan-days').value || 0,
+    max_streams: +document.getElementById('plan-streams').value || 1,
+    price: parseFloat(document.getElementById('plan-price').value) || 0.0,
+    description: document.getElementById('plan-desc').value
+  };
+  if (!d.name) { toast('请填写名称', 'error'); return; }
+  await api(id ? `/admin/plans/${id}` : '/admin/plans', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
+  hideModal('plan-modal');
+  loadPlans();
+  toast(id ? '已更新' : '已添加');
+}
+
+function editPlan(id) {
+  const p = allPlans.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('plan-edit-id').value = id;
+  document.getElementById('plan-name').value = p.name;
+  document.getElementById('plan-days').value = p.days;
+  document.getElementById('plan-streams').value = p.max_streams;
+  document.getElementById('plan-price').value = p.price;
+  document.getElementById('plan-desc').value = p.description;
+  showModal('plan-modal');
+}
+
+async function deletePlan(id) {
+  if (!confirm('确定删除此套餐？')) return;
+  await api(`/admin/plans/${id}`, { method: 'DELETE' });
+  loadPlans();
+}
+
+async function showApproveModal(id) {
   document.getElementById('approve-client-id').value = id;
+  const plansRes = await api('/admin/plans');
+  const plans = plansRes.data || [];
+  
+  const select = document.getElementById('approve-plan-id');
+  select.innerHTML = '<option value="0">-- 自定义授权 (不绑定套餐) --</option>' + 
+    plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}">${esc(p.name)}</option>`).join('');
+  
   document.getElementById('approve-days').value = '365';
   document.getElementById('approve-streams').value = '2';
+  document.getElementById('approve-days').disabled = false;
+  document.getElementById('approve-streams').disabled = false;
+  
   hideModal('client-detail-modal');
   showModal('approve-modal');
+}
+
+function onApprovePlanChange() {
+  const select = document.getElementById('approve-plan-id');
+  const opt = select.options[select.selectedIndex];
+  if (select.value === "0") {
+    document.getElementById('approve-days').disabled = false;
+    document.getElementById('approve-streams').disabled = false;
+  } else {
+    document.getElementById('approve-days').value = opt.dataset.days;
+    document.getElementById('approve-streams').value = opt.dataset.streams;
+    document.getElementById('approve-days').disabled = true;
+    document.getElementById('approve-streams').disabled = true;
+  }
 }
 
 async function doApprove() {
   const id = +document.getElementById('approve-client-id').value;
   const d = {
+    plan_id: +document.getElementById('approve-plan-id').value,
     max_days: +document.getElementById('approve-days').value,
     max_streams: +document.getElementById('approve-streams').value
   };

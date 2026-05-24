@@ -10,8 +10,12 @@ type ChannelGroup struct {
 	Icon      string    `json:"icon,omitempty" db:"icon"`
 	SortOrder int       `json:"sort_order" db:"sort_order"`
 	IsDirect  bool      `json:"is_direct" db:"is_direct"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	Source       string    `json:"source" db:"source"`
+	ChannelCount int       `json:"channel_count" db:"channel_count"`
+	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // ── Channel ────────────────────────────────────────────
@@ -31,8 +35,12 @@ type Channel struct {
 	SortOrder   int       `json:"sort_order" db:"sort_order"`
 	Status      string    `json:"status" db:"status"` // online, offline, unknown
 	LastCheck   time.Time `json:"last_check,omitempty" db:"last_check"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	M3USourceID   int64     `json:"m3u_source_id" db:"m3u_source_id"`
+	Source        string    `json:"source" db:"source"`
+	UserAgent     string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders string    `json:"custom_headers,omitempty" db:"custom_headers"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // ── EPG (Electronic Program Guide) ─────────────────────
@@ -57,6 +65,19 @@ type PlayHistory struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
+// ── Subscription Plan (套餐) ──────────────────────────
+
+type SubscriptionPlan struct {
+	ID          int64     `json:"id" db:"id"`
+	Name        string    `json:"name" db:"name"`
+	Days        int       `json:"days" db:"days"`               // 授权天数, 0表示永久
+	MaxStreams  int       `json:"max_streams" db:"max_streams"` // 允许并发设备数
+	Price       float64   `json:"price" db:"price"`             // 展示价格
+	Description string    `json:"description" db:"description"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+}
+
 // ── User Settings ──────────────────────────────────────
 
 type UserSetting struct {
@@ -68,11 +89,14 @@ type UserSetting struct {
 
 type M3USource struct {
 	ID        int64     `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
-	URL       string    `json:"url" db:"url"`
-	AutoSync  bool      `json:"auto_sync" db:"auto_sync"`
-	LastSync  time.Time `json:"last_sync,omitempty" db:"last_sync"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	Name         string    `json:"name" db:"name"`
+	URL          string    `json:"url" db:"url"`
+	AutoSync     bool      `json:"auto_sync" db:"auto_sync"`
+	SyncInterval int       `json:"sync_interval" db:"sync_interval"` // In hours
+	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
+	LastSync     time.Time `json:"last_sync,omitempty" db:"last_sync"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 // ── API Request / Response ─────────────────────────────
@@ -124,6 +148,8 @@ type Client struct {
 	AccessToken  string    `json:"-" db:"access_token"`              // 访问令牌 (对外不暴露)
 	TokenPreview string    `json:"token_preview,omitempty" db:"-"`   // 令牌预览 (前8位...)
 	Status       string    `json:"status" db:"status"`               // pending, approved, rejected, banned, expired
+	PlanID       int64     `json:"plan_id" db:"plan_id"`             // 绑定的套餐ID
+	PlanName     string    `json:"plan_name,omitempty" db:"-"`       // 套餐名称 (展示用)
 	MaxStreams    int       `json:"max_streams" db:"max_streams"`     // 允许最大并发流数
 	ExpiresAt    time.Time `json:"expires_at,omitempty" db:"expires_at"` // 授权过期时间
 	ApprovedBy   string    `json:"approved_by,omitempty" db:"approved_by"` // 审批人
@@ -156,8 +182,9 @@ type ClientRegisterResp struct {
 
 // 客户端审批请求
 type ClientApproveReq struct {
-	MaxDays   int    `json:"max_days"`   // 授权天数, 0=永久
-	MaxStreams int   `json:"max_streams"` // 最大并发流, 0=默认2
+	PlanID    int64  `json:"plan_id"`    // 选定的套餐ID
+	MaxDays   int    `json:"max_days"`   // 授权天数 (如果未选套餐, 可自定义)
+	MaxStreams int   `json:"max_streams"` // 最大并发流 (如果未选套餐, 可自定义)
 	Note      string `json:"note"`
 }
 

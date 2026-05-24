@@ -432,11 +432,37 @@ class MainActivity : AppCompatActivity() {
         val media = Media(libVlc, Uri.parse(channel.streamUrl))
         media.setHWDecoderEnabled(true, false)
         media.addOption(":network-caching=$cacheMs")
+        applyMediaOptions(media, channel.userAgent, channel.customHeaders)
         player.media = media
         player.play()
         
         // 频道列表中高亮当前播放频道
         channelAdapter.setPlayingIndex(index)
+    }
+
+    private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
+        if (!userAgent.isNullOrEmpty()) {
+            media.addOption(":http-user-agent=$userAgent")
+        }
+        if (!customHeaders.isNullOrEmpty()) {
+            try {
+                val json = org.json.JSONObject(customHeaders)
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = json.getString(key)
+                    if (key.equals("referer", ignoreCase = true) || key.equals("referrer", ignoreCase = true)) {
+                        media.addOption(":http-referrer=$value")
+                    } else if (key.equals("origin", ignoreCase = true)) {
+                        media.addOption(":http-origin=$value")
+                    } else if (key.equals("cookie", ignoreCase = true)) {
+                        media.addOption(":http-cookies=$value")
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
     
     private fun showOsd() {
@@ -783,6 +809,8 @@ class MainActivity : AppCompatActivity() {
             putExtra("stream_url", channel.streamUrl)
             putExtra("stream_type", channel.streamType)
             putExtra("channel_index", currentChannelIndex)
+            putExtra("user_agent", channel.userAgent)
+            putExtra("custom_headers", channel.customHeaders)
         }
         startActivity(intent)
     }

@@ -109,10 +109,13 @@ func main() {
 		})
 	})
 
+	planSvc := services.NewPlanService(db)
+
 	// ── 初始化 Handler（所有路由共享同一实例）────────
 	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc)
 	ch := api.NewClientHandler(clientSvc)
-	hs := api.NewHandlers(h, ch)
+	ph := api.NewPlanHandler(planSvc)
+	hs := api.NewHandlers(h, ch, ph)
 
 	// ── 公开 API（无需认证，独立限流）───────────────
 	public := r.Group("/api/v1")
@@ -135,6 +138,9 @@ func main() {
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
 	r.StaticFile("/", "./web/index.html")
+
+	// ── 启动后台任务 ────────────────────────────────
+	importer.StartAutoSync()
 
 	// ── 启动服务 ────────────────────────────────────
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

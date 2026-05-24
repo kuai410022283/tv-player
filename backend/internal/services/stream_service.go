@@ -199,7 +199,16 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "MediaPlayer/1.0")
+	
+	// Apply inherited UA and custom headers
+	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
+	if err != nil {
+		ua = "MediaPlayer/1.0"
+	}
+	req.Header.Set("User-Agent", ua)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := sp.client.Do(req)
 	if err != nil {
@@ -266,6 +275,8 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 
 		if strings.HasPrefix(line, "#EXTINF:") {
 			current = parseExtInf(line)
+		} else if strings.HasPrefix(line, "#EXTVLCOPT:") && current != nil {
+			parseVlcOpt(line, current)
 		} else if !strings.HasPrefix(line, "#") && current != nil {
 			current["url"] = line
 			channels = append(channels, current)
@@ -273,6 +284,25 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 		}
 	}
 	return channels, scanner.Err()
+}
+
+func parseVlcOpt(line string, ch map[string]string) {
+	opt := strings.TrimPrefix(line, "#EXTVLCOPT:")
+	parts := strings.SplitN(opt, "=", 2)
+	if len(parts) != 2 {
+		return
+	}
+	key := strings.TrimSpace(parts[0])
+	val := strings.TrimSpace(parts[1])
+
+	switch key {
+	case "http-user-agent":
+		ch["user_agent"] = val
+	case "http-referrer":
+		ch["http-referrer"] = val
+	case "http-origin":
+		ch["http-origin"] = val
+	}
 }
 
 func parseExtInf(line string) map[string]string {

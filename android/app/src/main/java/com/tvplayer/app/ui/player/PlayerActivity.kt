@@ -120,9 +120,11 @@ class PlayerActivity : AppCompatActivity() {
         streamUrl = intent.getStringExtra("stream_url") ?: ""
         streamType = intent.getStringExtra("stream_type") ?: "hls"
         channelIndex = intent.getIntExtra("channel_index", 0)
+        val userAgent = intent.getStringExtra("user_agent") ?: ""
+        val customHeaders = intent.getStringExtra("custom_headers") ?: ""
 
         initPlayer()
-        playStream(streamUrl, streamType)
+        playStream(streamUrl, streamType, userAgent, customHeaders)
         loadChannels()
         showChannelInfo()
     }
@@ -315,7 +317,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun playStream(url: String, type: String) {
+    private fun playStream(url: String, type: String, userAgent: String = "", customHeaders: String = "") {
         val player = mediaPlayer ?: return
         retryCount = 0
         progressBar?.visibility = View.VISIBLE
@@ -325,11 +327,46 @@ class PlayerActivity : AppCompatActivity() {
         val media = Media(libVlc, Uri.parse(url))
         // 允许硬解
         media.setHWDecoderEnabled(true, false)
+        applyMediaOptions(media, userAgent, customHeaders)
         player.media = media
         player.play()
     }
 
-    private fun retryPlay() = playStream(streamUrl, streamType)
+    private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
+        if (!userAgent.isNullOrEmpty()) {
+            media.addOption(":http-user-agent=$userAgent")
+        }
+        if (!customHeaders.isNullOrEmpty()) {
+            try {
+                val json = org.json.JSONObject(customHeaders)
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = json.getString(key)
+                    if (key.equals("referer", ignoreCase = true) || key.equals("referrer", ignoreCase = true)) {
+                        media.addOption(":http-referrer=$value")
+                    } else if (key.equals("origin", ignoreCase = true)) {
+                        media.addOption(":http-origin=$value")
+                    } else if (key.equals("cookie", ignoreCase = true)) {
+                        media.addOption(":http-cookies=$value")
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun retryPlay() {
+        val channel = allChannels.getOrNull(channelIndex)
+        if (channel != null) {
+            playStream(channel.streamUrl, channel.streamType, channel.userAgent, channel.customHeaders)
+        } else {
+            val ua = intent.getStringExtra("user_agent") ?: ""
+            val headers = intent.getStringExtra("custom_headers") ?: ""
+            playStream(streamUrl, streamType, ua, headers)
+        }
+    }
 
     private fun loadChannels() {
         lifecycleScope.launch {
@@ -351,7 +388,7 @@ class PlayerActivity : AppCompatActivity() {
         streamUrl = channel.streamUrl
         streamType = channel.streamType
 
-        playStream(streamUrl, streamType)
+        playStream(streamUrl, streamType, channel.userAgent, channel.customHeaders)
         showChannelInfo()
     }
 

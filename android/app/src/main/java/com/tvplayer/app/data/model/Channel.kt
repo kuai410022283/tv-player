@@ -16,6 +16,8 @@ data class Channel(
     @SerializedName("sort_order") val sortOrder: Int = 0,
     @SerializedName("status") val status: String = "unknown",
     @SerializedName("last_check") val lastCheck: String = "",
+    @SerializedName("user_agent") val userAgent: String = "",
+    @SerializedName("custom_headers") val customHeaders: String = "",
     @SerializedName("created_at") val createdAt: String = "",
     @SerializedName("updated_at") val updatedAt: String = ""
 )

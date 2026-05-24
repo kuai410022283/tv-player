@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -106,6 +107,21 @@ func (h *Handler) ListGroups(c *gin.Context) {
 	ok(c, groups)
 }
 
+func (h *Handler) AdminListGroups(c *gin.Context) {
+	var p models.PageRequest
+	if err := c.ShouldBindQuery(&p); err != nil {
+		p = models.PageRequest{Page: 1, PageSize: 20}
+	}
+	search := c.Query("search")
+
+	res, err := h.channelSvc.AdminListGroups(search, &p)
+	if err != nil {
+		failInternal(c, err, "获取分组列表失败")
+		return
+	}
+	ok(c, res)
+}
+
 func (h *Handler) CreateGroup(c *gin.Context) {
 	var g models.ChannelGroup
 	if err := c.ShouldBindJSON(&g); err != nil {
@@ -143,6 +159,25 @@ func (h *Handler) DeleteGroup(c *gin.Context) {
 	ok(c, nil)
 }
 
+func (h *Handler) BatchGroup(c *gin.Context) {
+	var req struct {
+		IDs    []int64 `json:"ids" binding:"required"`
+		Action string  `json:"action" binding:"required"` // only "delete" supported for now
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	if req.Action == "delete" {
+		if err := h.channelSvc.BatchDeleteGroups(req.IDs); err != nil {
+			failInternal(c, err, "批量删除失败")
+			return
+		}
+	}
+	ok(c, nil)
+}
+
 // ── Channels ───────────────────────────────────────────
 
 func (h *Handler) ListChannels(c *gin.Context) {
@@ -163,7 +198,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 		return
 	}
 
-	// 如果未开启直连，且请求来自客户端，动态将流地址替换为代理地址
+	// 如果请求来自客户端，动态注入代理地址、解析继承防盗链头参数
 	authType, _ := c.Get("auth_type")
 	if authType == "client" {
 		if items, ok := resp.Items.([]models.Channel); ok {
@@ -182,6 +217,17 @@ func (h *Handler) ListChannels(c *gin.Context) {
 			for i := range items {
 				if !items[i].IsDirect {
 					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, items[i].ID, clientToken)
+				}
+				// 无论直连还是代理模式，客户端都拿取继承所得的 UA 与 CustomHeaders 方便统一标准播放
+				if ua, headers, err := h.channelSvc.GetInheritedHeaders(items[i].ID); err == nil {
+					items[i].UserAgent = ua
+					if len(headers) > 0 {
+						if b, err := json.Marshal(headers); err == nil {
+							items[i].CustomHeaders = string(b)
+						}
+					} else {
+						items[i].CustomHeaders = ""
+					}
 				}
 			}
 			resp.Items = items
@@ -202,6 +248,36 @@ func (h *Handler) GetChannel(c *gin.Context) {
 		fail(c, 404, "频道不存在")
 		return
 	}
+
+	authType, _ := c.Get("auth_type")
+	if authType == "client" {
+		host := c.Request.Host
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		baseURL := scheme + "://" + host
+		
+		clientToken := ""
+		if t, exists := c.Get("client_token"); exists {
+			clientToken = t.(string)
+		}
+
+		if !ch.IsDirect {
+			ch.StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, ch.ID, clientToken)
+		}
+		if ua, headers, err := h.channelSvc.GetInheritedHeaders(ch.ID); err == nil {
+			ch.UserAgent = ua
+			if len(headers) > 0 {
+				if b, err := json.Marshal(headers); err == nil {
+					ch.CustomHeaders = string(b)
+				}
+			} else {
+				ch.CustomHeaders = ""
+			}
+		}
+	}
+
 	ok(c, ch)
 }
 
@@ -237,6 +313,21 @@ func (h *Handler) DeleteChannel(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.DeleteChannel(id); err != nil {
 		failInternal(c, err, "删除频道失败")
+		return
+	}
+	ok(c, nil)
+}
+
+func (h *Handler) BatchChannel(c *gin.Context) {
+	var req struct {
+		IDs    []int64 `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.channelSvc.BatchDeleteChannels(req.IDs); err != nil {
+		failInternal(c, err, "批量删除失败")
 		return
 	}
 	ok(c, nil)
@@ -312,26 +403,51 @@ func (h *Handler) AddM3USource(c *gin.Context) {
 	ok(c, src)
 }
 
-func (h *Handler) ImportM3U(c *gin.Context) {
+func (h *Handler) UpdateM3USource(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	count, err := h.importer.ImportFromURL(id)
-	if err != nil {
-		slog.Error("M3U import failed", "source_id", id, "error", err)
-		fail(c, 500, "导入失败，请检查 M3U 源地址是否正确")
+	var src models.M3USource
+	if err := c.ShouldBindJSON(&src); err != nil {
+		fail(c, 400, "参数错误")
 		return
 	}
-	ok(c, gin.H{"imported": count})
+	src.ID = id
+	if err := h.channelSvc.UpdateM3USource(&src); err != nil {
+		failInternal(c, err, "更新 M3U 源失败")
+		return
+	}
+	ok(c, src)
+}
+
+func (h *Handler) ImportM3U(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	
+	// 异步后台执行，避免阻塞前端并触发超时
+	go func() {
+		slog.Info("开始后台同步 M3U 源", "source_id", id)
+		count, err := h.importer.ImportFromURL(id)
+		if err != nil {
+			slog.Error("后台同步 M3U 失败", "source_id", id, "error", err)
+		} else {
+			slog.Info("后台同步 M3U 完成", "source_id", id, "imported_channels", count)
+		}
+	}()
+	
+	ok(c, gin.H{"message": "已投递到后台同步中"})
 }
 
 func (h *Handler) ImportM3UString(c *gin.Context) {
 	var body struct {
+		Name    string `json:"name"`
 		Content string `json:"content"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || body.Content == "" {
 		fail(c, 400, "参数错误")
 		return
 	}
-	count, err := h.importer.ImportFromString(body.Content)
+	if body.Name == "" {
+		body.Name = "粘贴导入"
+	}
+	count, err := h.importer.ImportFromString(body.Content, body.Name)
 	if err != nil {
 		slog.Error("M3U string import failed", "error", err)
 		fail(c, 500, "导入失败，请检查 M3U 格式")

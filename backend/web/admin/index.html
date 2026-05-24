@@ -40,6 +40,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span>设备管理</span>
     </div>
+    <div class="nav-item" onclick="showSection('plans',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      <span>套餐管理</span>
+    </div>
     <div class="nav-item" onclick="showSection('client-logs',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       <span>访问日志</span>
@@ -85,11 +89,18 @@
         <h1>频道管理</h1>
         <div class="search">
           <input type="text" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
-          <button class="btn btn-primary" onclick="showModal('channel-modal')">+ 添加频道</button>
+          <button class="btn btn-danger btn-sm" onclick="showModal('channel-batch-modal')">批量操作</button>
+          <button class="btn btn-primary" onclick="showAddChannelModal()">+ 添加频道</button>
         </div>
       </div>
       <div class="card">
-        <table><thead><tr><th>ID</th><th>名称</th><th>分组</th><th>类型</th><th>状态</th><th>收藏</th><th>操作</th></tr></thead><tbody id="channels-body"></tbody></table>
+        <table>
+          <thead><tr>
+            <th width="40"><input type="checkbox" id="check-all-channels" onchange="toggleAllChannels(this)"></th>
+            <th>ID</th><th>名称</th><th>分组</th><th>来源</th><th>类型</th><th>状态</th><th>收藏</th><th>操作</th>
+          </tr></thead>
+          <tbody id="channels-body"></tbody>
+        </table>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
         <span id="channels-info" style="font-size:13px;color:var(--text2)"></span>
@@ -103,9 +114,30 @@
 
     <!-- Groups -->
     <div id="sec-groups" style="display:none">
-      <div class="header"><h1>分组管理</h1><button class="btn btn-primary" onclick="showModal('group-modal')">+ 添加分组</button></div>
+      <div class="header">
+        <h1>分组管理</h1>
+        <div class="search">
+          <input type="text" placeholder="搜索分组..." id="group-search" oninput="searchGroups()">
+          <button class="btn btn-danger btn-sm" onclick="showModal('group-batch-modal')">批量操作</button>
+          <button class="btn btn-primary" onclick="showAddGroupModal()">+ 添加分组</button>
+        </div>
+      </div>
       <div class="card">
-        <table><thead><tr><th>ID</th><th>名称</th><th>排序</th><th>操作</th></tr></thead><tbody id="groups-body"></tbody></table>
+        <table>
+          <thead><tr>
+            <th width="40"><input type="checkbox" id="check-all-groups" onchange="toggleAllGroups(this)"></th>
+            <th>ID</th><th>名称</th><th>排序</th><th>来源</th><th>直连模式</th><th>操作</th>
+          </tr></thead>
+          <tbody id="groups-body"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+        <span id="groups-info" style="font-size:13px;color:var(--text2)"></span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="groupPrevPage()">上一页</button>
+          <span id="groups-page" style="font-size:13px;line-height:32px">1</span>
+          <button class="btn btn-ghost btn-sm" onclick="groupNextPage()">下一页</button>
+        </div>
       </div>
     </div>
 
@@ -114,12 +146,12 @@
       <div class="header">
         <h1>M3U 源管理</h1>
         <div class="btn-group">
-          <button class="btn btn-primary" onclick="showModal('source-modal')">+ 添加源</button>
+          <button class="btn btn-primary" onclick="showAddSourceModal()">+ 添加源</button>
           <button class="btn btn-ghost" onclick="showModal('import-modal')">📋 粘贴导入</button>
         </div>
       </div>
       <div class="card">
-        <table><thead><tr><th>ID</th><th>名称</th><th>URL</th><th>上次同步</th><th>操作</th></tr></thead><tbody id="sources-body"></tbody></table>
+        <table><thead><tr><th>ID</th><th>名称</th><th>URL</th><th>自动同步</th><th>上次同步</th><th>操作</th></tr></thead><tbody id="sources-body"></tbody></table>
       </div>
     </div>
 
@@ -170,6 +202,17 @@
           <span id="clients-page" style="font-size:13px;line-height:32px">1</span>
           <button class="btn btn-ghost btn-sm" onclick="clientNextPage()">下一页</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Plans -->
+    <div id="sec-plans" style="display:none">
+      <div class="header">
+        <h1>套餐管理</h1>
+        <button class="btn btn-primary" onclick="showModal('plan-modal')">+ 添加套餐</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>ID</th><th>套餐名称</th><th>授权天数</th><th>并发设备</th><th>价格</th><th>描述</th><th>操作</th></tr></thead><tbody id="plans-body"></tbody></table>
       </div>
     </div>
 
@@ -227,14 +270,25 @@
     <div class="form-group"><label>名称</label><input type="text" id="ch-name"></div>
     <div class="form-group"><label>分组</label><select id="ch-group"></select></div>
     <div class="form-group"><label>流地址</label><input type="text" id="ch-url" placeholder="https://..."></div>
-    <div class="form-group"><label>流类型</label>
-      <select id="ch-type"><option value="hls">HLS</option><option value="flv">FLV</option><option value="rtmp">RTMP</option><option value="rtsp">RTSP</option><option value="mp4">MP4</option><option value="dash">DASH</option></select>
+    <div class="form-group"><label>流类型 (留空自动探测)</label>
+      <input type="text" id="ch-type" list="stream-types" placeholder="例如: hls, ts, mp4">
+      <datalist id="stream-types">
+        <option value="hls"></option>
+        <option value="ts"></option>
+        <option value="flv"></option>
+        <option value="rtmp"></option>
+        <option value="rtsp"></option>
+        <option value="mp4"></option>
+        <option value="dash"></option>
+      </datalist>
     </div>
     <div class="form-group"><label>直连模式</label>
       <select id="ch-is-direct"><option value="true">开启 (默认，省宽带)</option><option value="false">关闭 (经代理加密源)</option></select>
     </div>
     <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
     <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
+    <div class="form-group"><label>User-Agent (重写)</label><input type="text" id="ch-user-agent" placeholder="留空使用群组默认或系统默认"></div>
+    <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="ch-headers" rows="2" placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveChannel()">保存</button>
@@ -251,6 +305,8 @@
     <div class="form-group"><label>所有频道直连模式</label>
       <select id="grp-is-direct"><option value="true">开启 (默认，省宽带)</option><option value="false">关闭 (经代理加密源)</option></select>
     </div>
+    <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent" placeholder="留空使用订阅源或系统默认"></div>
+    <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2" placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveGroup()">保存</button>
@@ -260,9 +316,25 @@
 
 <div class="modal-overlay" id="source-modal">
   <div class="modal">
-    <h3>添加M3U源</h3>
+    <h3 id="src-modal-title">添加M3U源</h3>
+    <input type="hidden" id="src-edit-id">
     <div class="form-group"><label>名称</label><input type="text" id="src-name"></div>
     <div class="form-group"><label>URL</label><input type="text" id="src-url" placeholder="https://example.com/playlist.m3u"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>自动同步</label>
+        <select id="src-auto-sync">
+          <option value="false">关闭</option>
+          <option value="true">开启</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>同步间隔 (小时)</label>
+        <input type="number" id="src-sync-interval" value="12" min="1">
+      </div>
+    </div>
+    <div class="form-group"><label>User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent" placeholder="留空使用系统默认"></div>
+    <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2" placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('source-modal')">取消</button>
       <button class="btn btn-primary" onclick="saveSource()">保存</button>
@@ -273,6 +345,7 @@
 <div class="modal-overlay" id="import-modal">
   <div class="modal">
     <h3>粘贴M3U内容</h3>
+    <div class="form-group"><label>来源名称 <span style="color:var(--danger)">*</span></label><input type="text" id="import-name" placeholder="例如：本地测试源" required></div>
     <div class="form-group"><label>M3U内容</label><textarea id="import-content" rows="10" placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea></div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
@@ -295,6 +368,11 @@
   <div class="modal">
     <h3>审批设备</h3>
     <input type="hidden" id="approve-client-id">
+    <div class="form-group">
+      <label>绑定套餐</label>
+      <select id="approve-plan-id" onchange="onApprovePlanChange()"></select>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">选择套餐将自动覆盖授权天数和最大并发流</div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>授权天数</label><input type="number" id="approve-days" value="365" min="0"><div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永久</div></div>
       <div class="form-group"><label>最大并发流</label><input type="number" id="approve-streams" value="2" min="1" max="10"></div>
@@ -344,6 +422,46 @@
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="hideModal('batch-modal')">取消</button>
       <button class="btn btn-danger" onclick="doBatch()">执行</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="group-batch-modal">
+  <div class="modal">
+    <h3>分组批量操作</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('group-batch-modal')">取消</button>
+      <button class="btn btn-danger" onclick="doGroupBatchDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="channel-batch-modal">
+  <div class="modal">
+    <h3>频道批量操作</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将永久删除勾选的频道，此操作不可恢复。</p>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('channel-batch-modal')">取消</button>
+      <button class="btn btn-danger" onclick="doChannelBatchDelete()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="plan-modal">
+  <div class="modal">
+    <h3>添加/修改套餐</h3>
+    <input type="hidden" id="plan-edit-id">
+    <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
+    <div class="form-row">
+      <div class="form-group"><label>授权天数</label><input type="number" id="plan-days" value="365" min="0"></div>
+      <div class="form-group"><label>并发设备限制</label><input type="number" id="plan-streams" value="2" min="1"></div>
+    </div>
+    <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01"></div>
+    <div class="form-group"><label>描述备注</label><textarea id="plan-desc" rows="2"></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="hideModal('plan-modal')">取消</button>
+      <button class="btn btn-primary" onclick="savePlan()">保存</button>
     </div>
   </div>
 </div>

@@ -8,10 +8,11 @@ import (
 type Handlers struct {
 	*Handler
 	*ClientHandler
+	PlanHandler *PlanHandler
 }
 
-func NewHandlers(h *Handler, ch *ClientHandler) *Handlers {
-	return &Handlers{Handler: h, ClientHandler: ch}
+func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler) *Handlers {
+	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph}
 }
 
 func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
@@ -31,6 +32,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		groups.POST("", hs.Handler.CreateGroup)
 		groups.PUT("/:id", hs.Handler.UpdateGroup)
 		groups.DELETE("/:id", hs.Handler.DeleteGroup)
+		groups.POST("/batch", hs.Handler.BatchGroup)
 	}
 
 	// ── 频道 ────────────────────────────────────────
@@ -41,6 +43,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		channels.POST("", hs.Handler.CreateChannel)
 		channels.PUT("/:id", hs.Handler.UpdateChannel)
 		channels.DELETE("/:id", hs.Handler.DeleteChannel)
+		channels.DELETE("/batch", hs.Handler.BatchChannel)
 		channels.POST("/:id/favorite", hs.Handler.ToggleFavorite)
 	}
 
@@ -59,6 +62,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		m3u.POST("", hs.Handler.AddM3USource)
 		m3u.POST("/:id/import", hs.Handler.ImportM3U)
 		m3u.POST("/import-string", hs.Handler.ImportM3UString)
+		m3u.PUT("/:id", hs.Handler.UpdateM3USource)
 		m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 	}
 
@@ -88,5 +92,22 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		clients.GET("/:id/logs", hs.ClientHandler.GetLogs)
 		clients.DELETE("/:id", hs.ClientHandler.Delete)
 		clients.POST("/batch", hs.ClientHandler.Batch)
+	}
+
+	// ── 管理端：套餐管理 (需要 admin 权限) ────────────
+	plans := r.Group("/admin/plans")
+	plans.Use(middleware.RequireAdmin())
+	{
+		plans.GET("", hs.PlanHandler.GetPlans)
+		plans.POST("", hs.PlanHandler.AddPlan)
+		plans.PUT("/:id", hs.PlanHandler.UpdatePlan)
+		plans.DELETE("/:id", hs.PlanHandler.DeletePlan)
+	}
+
+	// ── 管理端：分组管理 (带分页/搜索) ────────────
+	adminGroups := r.Group("/admin/groups")
+	adminGroups.Use(middleware.RequireAdmin())
+	{
+		adminGroups.GET("", hs.Handler.AdminListGroups)
 	}
 }

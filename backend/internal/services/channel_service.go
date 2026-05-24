@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -20,7 +21,12 @@ func NewChannelService(db *sql.DB) *ChannelService {
 // ── Groups ─────────────────────────────────────────────
 
 func (s *ChannelService) ListGroups() ([]models.ChannelGroup, error) {
-	rows, err := s.db.Query(`SELECT id, name, icon, sort_order, is_direct, created_at, updated_at FROM channel_groups ORDER BY sort_order`)
+	rows, err := s.db.Query(`
+		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), g.created_at, g.updated_at,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id) AS channel_count
+		FROM channel_groups g 
+		ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +36,7 @@ func (s *ChannelService) ListGroups() ([]models.ChannelGroup, error) {
 	for rows.Next() {
 		var g models.ChannelGroup
 		var isDirect int
-		if err := rows.Scan(&g.ID, &g.Name, &g.Icon, &g.SortOrder, &isDirect, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.Icon, &g.SortOrder, &isDirect, &g.Source, &g.UserAgent, &g.CustomHeaders, &g.CreatedAt, &g.UpdatedAt, &g.ChannelCount); err != nil {
 			return nil, err
 		}
 		g.IsDirect = isDirect == 1
@@ -46,8 +52,9 @@ func (s *ChannelService) CreateGroup(g *models.ChannelGroup) error {
 	now := time.Now()
 	direct := 0
 	if g.IsDirect { direct = 1 }
-	res, err := s.db.Exec(`INSERT INTO channel_groups (name, icon, sort_order, is_direct, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		g.Name, g.Icon, g.SortOrder, direct, now, now)
+	if g.Source == "" { g.Source = "手动" }
+	res, err := s.db.Exec(`INSERT INTO channel_groups (name, icon, sort_order, is_direct, source, user_agent, custom_headers, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		g.Name, g.Icon, g.SortOrder, direct, g.Source, g.UserAgent, g.CustomHeaders, now, now)
 	if err != nil {
 		return err
 	}
@@ -65,8 +72,8 @@ func (s *ChannelService) UpdateGroup(g *models.ChannelGroup) error {
 	if err != nil { return err }
 	defer func() { _ = tx.Rollback() }()
 
-	_, err = tx.Exec(`UPDATE channel_groups SET name=?, icon=?, sort_order=?, is_direct=?, updated_at=? WHERE id=?`,
-		g.Name, g.Icon, g.SortOrder, direct, time.Now(), g.ID)
+	_, err = tx.Exec(`UPDATE channel_groups SET name=?, icon=?, sort_order=?, is_direct=?, user_agent=?, custom_headers=?, updated_at=? WHERE id=?`,
+		g.Name, g.Icon, g.SortOrder, direct, g.UserAgent, g.CustomHeaders, time.Now(), g.ID)
 	if err != nil { return err }
 
 	// 同步修改分组下所有频道的直连设置
@@ -83,17 +90,17 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var defaultGroupID int64
-	err = tx.QueryRow("SELECT id FROM channel_groups WHERE name = '未分类'").Scan(&defaultGroupID)
+	var name string
+	err = tx.QueryRow("SELECT name FROM channel_groups WHERE id = ?", id).Scan(&name)
 	if err != nil {
-		res, err := tx.Exec("INSERT INTO channel_groups (name, sort_order) VALUES ('未分类', 99)")
-		if err != nil {
-			return err
-		}
-		defaultGroupID, _ = res.LastInsertId()
+		return err
+	}
+	if name == "未分类" {
+		return fmt.Errorf("默认分组不能删除")
 	}
 
-	_, err = tx.Exec("UPDATE channels SET group_id = ?, updated_at = ? WHERE group_id = ?", defaultGroupID, time.Now(), id)
+	// 级联删除分组下的所有频道
+	_, err = tx.Exec("DELETE FROM channels WHERE group_id = ?", id)
 	if err != nil {
 		return err
 	}
@@ -104,6 +111,74 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, id := range ids {
+		var name string
+		err = tx.QueryRow("SELECT name FROM channel_groups WHERE id = ?", id).Scan(&name)
+		if err != nil || name == "未分类" {
+			continue // 忽略不存在或不能删除的默认分组
+		}
+		
+		_, err = tx.Exec("DELETE FROM channels WHERE group_id = ?", id)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec("DELETE FROM channel_groups WHERE id = ?", id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (*models.PageResponse, error) {
+	p.Normalize()
+	where := "WHERE 1=1"
+	args := []interface{}{}
+
+	if search != "" {
+		where += " AND name LIKE ?"
+		args = append(args, "%"+search+"%")
+	}
+
+	var total int64
+	if err := s.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM channel_groups %s", where), args...).Scan(&total); err != nil {
+		return nil, err
+	}
+
+	offset := (p.Page - 1) * p.PageSize
+	queryArgs := append(args, p.PageSize, offset)
+	
+	rows, err := s.db.Query(fmt.Sprintf(`
+		SELECT id, name, COALESCE(icon, ''), sort_order, is_direct, COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), created_at, updated_at,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id) AS channel_count
+		FROM channel_groups %s 
+		ORDER BY CASE WHEN name = '未分类' THEN 1 ELSE 0 END, sort_order, id 
+		LIMIT ? OFFSET ?`, where), queryArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []*models.ChannelGroup
+	for rows.Next() {
+		m := &models.ChannelGroup{}
+		if err := rows.Scan(&m.ID, &m.Name, &m.Icon, &m.SortOrder, &m.IsDirect, &m.Source, &m.UserAgent, &m.CustomHeaders, &m.CreatedAt, &m.UpdatedAt, &m.ChannelCount); err != nil {
+			return nil, err
+		}
+		items = append(items, m)
+	}
+
+	return &models.PageResponse{Total: total, Page: p.Page, PageSize: p.PageSize, Items: items}, nil
 }
 
 // ── Channels ───────────────────────────────────────────
@@ -140,10 +215,10 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs = append(queryArgs, p.PageSize, offset)
 	
-	query := `SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
-		c.stream_type, c.epg_channel_id, 
+	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
+		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
 		CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
-		c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.created_at, c.updated_at ` +
+		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at ` +
 		baseQuery + where + ` ORDER BY c.sort_order LIMIT ? OFFSET ?`
 		
 	rows, err := s.db.Query(query, queryArgs...)
@@ -157,7 +232,7 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 		var c models.Channel
 		var isFav, isHid, isDir int
 		var lastCheck sql.NullTime
-		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.IsFavorite = isFav == 1
@@ -182,11 +257,11 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 		SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 			c.stream_type, c.epg_channel_id, 
 			CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
-			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.created_at, c.updated_at 
+			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at 
 		FROM channels c 
 		LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = ?
 		WHERE c.id=?`, clientID, id).
-		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +272,45 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 		c.LastCheck = lastCheck.Time
 	}
 	return &c, nil
+}
+
+// GetInheritedHeaders computes the final user-agent and custom headers for a channel based on group inheritance.
+func (s *ChannelService) GetInheritedHeaders(channelID int64) (string, map[string]string, error) {
+	var groupID int64
+	var chUA, chHeaders string
+	err := s.db.QueryRow("SELECT group_id, COALESCE(user_agent, ''), COALESCE(custom_headers, '') FROM channels WHERE id = ?", channelID).Scan(&groupID, &chUA, &chHeaders)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var gpUA, gpHeaders string
+	if groupID > 0 {
+		_ = s.db.QueryRow("SELECT COALESCE(user_agent, ''), COALESCE(custom_headers, '') FROM channel_groups WHERE id = ?", groupID).Scan(&gpUA, &gpHeaders)
+	}
+
+	// Determine final UA
+	finalUA := "MediaPlayer/1.0" // Global default
+	if chUA != "" {
+		finalUA = chUA
+	} else if gpUA != "" {
+		finalUA = gpUA
+	}
+
+	// Merge headers: Group headers first, then Channel headers (high priority)
+	finalHeaders := make(map[string]string)
+	if gpHeaders != "" {
+		_ = json.Unmarshal([]byte(gpHeaders), &finalHeaders)
+	}
+	if chHeaders != "" {
+		chMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(chHeaders), &chMap); err == nil {
+			for k, v := range chMap {
+				finalHeaders[k] = v
+			}
+		}
+	}
+
+	return finalUA, finalHeaders, nil
 }
 
 func (s *ChannelService) CreateChannel(c *models.Channel) error {
@@ -210,8 +324,12 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	if c.IsFavorite { fav = 1 }
 	if c.IsHidden { hid = 1 }
 	if c.IsDirect { dir = 1 }
-	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, is_direct, sort_order, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, "unknown", now, now)
+	if c.Source == "" { c.Source = "手动" }
+	if c.StreamType == "" {
+		c.StreamType = detectStreamType(c.StreamURL)
+	}
+	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, now, now)
 	if err != nil {
 		return err
 	}
@@ -231,14 +349,41 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 	if c.IsFavorite { fav = 1 }
 	if c.IsHidden { hid = 1 }
 	if c.IsDirect { dir = 1 }
-	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_favorite=?, is_hidden=?, is_direct=?, sort_order=?, updated_at=? WHERE id=?`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, time.Now(), c.ID)
+	if c.StreamType == "" {
+		c.StreamType = detectStreamType(c.StreamURL)
+	}
+	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_favorite=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, updated_at=? WHERE id=?`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, time.Now(), c.ID)
 	return err
 }
 
 func (s *ChannelService) DeleteChannel(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM channels WHERE id=?`, id)
 	return err
+}
+
+func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`DELETE FROM channels WHERE id=?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *ChannelService) ToggleFavorite(id int64, clientID int64) error {
@@ -349,7 +494,7 @@ func (s *ChannelService) GetAllSettings() (map[string]string, error) {
 // ── M3U Sources ────────────────────────────────────────
 
 func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
-	rows, err := s.db.Query(`SELECT id, name, url, auto_sync, last_sync, created_at FROM m3u_sources ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, url, auto_sync, sync_interval, COALESCE(user_agent, ''), COALESCE(custom_headers, ''), last_sync, created_at FROM m3u_sources ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -359,11 +504,13 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 	for rows.Next() {
 		var m models.M3USource
 		var autoSync int
+		var syncInterval int
 		var lastSync sql.NullTime
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &lastSync, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &syncInterval, &m.UserAgent, &m.CustomHeaders, &lastSync, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		m.AutoSync = autoSync == 1
+		m.SyncInterval = syncInterval
 		if lastSync.Valid {
 			m.LastSync = lastSync.Time
 		}
@@ -379,13 +526,22 @@ func (s *ChannelService) AddM3USource(m *models.M3USource) error {
 	now := time.Now()
 	autoSyncInt := 0
 	if m.AutoSync { autoSyncInt = 1 }
-	res, err := s.db.Exec(`INSERT INTO m3u_sources (name, url, auto_sync, created_at) VALUES (?,?,?,?)`, m.Name, m.URL, autoSyncInt, now)
+	if m.SyncInterval <= 0 { m.SyncInterval = 12 }
+	res, err := s.db.Exec(`INSERT INTO m3u_sources (name, url, auto_sync, sync_interval, user_agent, custom_headers, created_at) VALUES (?,?,?,?,?,?,?)`, m.Name, m.URL, autoSyncInt, m.SyncInterval, m.UserAgent, m.CustomHeaders, now)
 	if err != nil {
 		return err
 	}
 	m.ID, _ = res.LastInsertId()
 	m.CreatedAt = now
 	return nil
+}
+
+func (s *ChannelService) UpdateM3USource(m *models.M3USource) error {
+	autoSyncInt := 0
+	if m.AutoSync { autoSyncInt = 1 }
+	if m.SyncInterval <= 0 { m.SyncInterval = 12 }
+	_, err := s.db.Exec(`UPDATE m3u_sources SET name=?, url=?, auto_sync=?, sync_interval=?, user_agent=?, custom_headers=? WHERE id=?`, m.Name, m.URL, autoSyncInt, m.SyncInterval, m.UserAgent, m.CustomHeaders, m.ID)
+	return err
 }
 
 func (s *ChannelService) DeleteM3USource(id int64) error {

@@ -44,3 +44,9 @@ backend/web/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+m3u.txt
+
+backend/mediaplayer*
+
+android/app/build/outputs/apk/release/*.apk
