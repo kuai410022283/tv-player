@@ -790,15 +790,16 @@ class MainActivity : AppCompatActivity() {
     // ── TV key events ──────────────────────────────────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // 任何时候按下菜单键，直接显示右侧设置
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+            if (isSettingsVisible) hideSettingsMenu() else showSettingsMenu()
+            return true
+        }
+
         if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
             val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
             val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
-            
-            // 任何时候按下菜单键，直接显示右侧设置
-            if (keyCode == KeyEvent.KEYCODE_MENU) {
-                if (isSettingsVisible) hideSettingsMenu() else showSettingsMenu()
-                return true
-            }
 
             // 当菜单未显示时，开始追踪 OK 键的长按事件
             if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {

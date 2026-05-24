@@ -13,6 +13,9 @@ class TVPlayerApp : Application() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
         ApiClient.init(serverUrl)
+        
+        // Restore access token
+        ApiClient.accessToken = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
     }
 
     companion object {

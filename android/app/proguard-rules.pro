@@ -8,6 +8,7 @@
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
+-keep interface com.tvplayer.app.data.api.ApiService { *; }
 -dontwarn retrofit2.**
 
 # Gson - 保留所有数据模型

@@ -57,7 +57,7 @@ func generateAdminToken(secret string) (string, error) {
 	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"role": "admin",
-		"iss":  "tvplayer",
+		"iss":  "MediaPlayer",
 		"iat":  now.Unix(),
 		"exp":  now.Add(time.Duration(jwtExpireHours) * time.Hour).Unix(),
 	})

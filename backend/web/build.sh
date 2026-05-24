@@ -1,5 +1,5 @@
 #!/bin/bash
-# TVPlayer Admin 构建脚本
+# MediaPlayer Admin 构建脚本
 # 用法: ./web/build.sh [--minify]
 #
 # 无参数: 仅检查文件完整性
@@ -10,7 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "📦 TVPlayer Admin Build"
+echo "📦 MediaPlayer Admin Build"
 echo "======================="
 
 # 检查文件完整性

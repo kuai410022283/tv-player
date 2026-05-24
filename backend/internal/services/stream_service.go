@@ -199,7 +199,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, w http.ResponseWriter, r *ht
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "TVPlayer/1.0")
+	req.Header.Set("User-Agent", "MediaPlayer/1.0")
 
 	resp, err := sp.client.Do(req)
 	if err != nil {

@@ -139,7 +139,7 @@ func main() {
 
 	// ── 启动服务 ────────────────────────────────────
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	slog.Info("TVPlayer starting",
+	slog.Info("MediaPlayer starting",
 		"addr", addr,
 		"version", Version,
 		"admin_panel", fmt.Sprintf("http://localhost:%d/admin/", cfg.Server.Port),
