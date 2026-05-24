@@ -245,13 +245,29 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initPlayer() {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+
         val options = ArrayList<String>()
         options.add("--aout=opensles")
         options.add("--audio-time-stretch")
-        options.add("-vvv")
         options.add("--drop-late-frames")
         options.add("--skip-frames")
         options.add("--network-caching=1500")
+
+        when (decoderMode) {
+            Prefs.DECODER_MODE_HARDWARE -> {
+                options.add("--avcodec-hw=any")
+                options.add("--codec=mediacodec,all")
+            }
+            Prefs.DECODER_MODE_SOFTWARE -> {
+                options.add("--avcodec-hw=none")
+            }
+            else -> { // AUTO
+                options.add("--vout=android_display")
+                options.add("--avcodec-hw=any")
+            }
+        }
 
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc)
@@ -325,8 +341,15 @@ class PlayerActivity : AppCompatActivity() {
         tvStreamType?.text = type.uppercase()
 
         val media = Media(libVlc, Uri.parse(url))
-        // 允许硬解
-        media.setHWDecoderEnabled(true, false)
+        
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        when (decoderMode) {
+            Prefs.DECODER_MODE_HARDWARE -> media.setHWDecoderEnabled(true, true)
+            Prefs.DECODER_MODE_SOFTWARE -> media.setHWDecoderEnabled(false, false)
+            else -> media.setHWDecoderEnabled(true, false) // 自动
+        }
+        
         applyMediaOptions(media, userAgent, customHeaders)
         player.media = media
         player.play()

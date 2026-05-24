@@ -286,9 +286,57 @@
             android:layout_height="wrap_content"
             android:max="45"
             android:progress="10"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="24dp"
             android:nextFocusUp="@+id/etSettingsUrl"
-            android:nextFocusDown="@+id/btnSettingsSave" />
+            android:nextFocusDown="@+id/rbDecoderAuto" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="解码模式:"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgSettingsDecoder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="32dp">
+            
+            <RadioButton
+                android:id="@+id/rbDecoderAuto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="自动识别"
+                android:textColor="#FFFFFF"
+                android:buttonTint="@color/accent"
+                android:layout_marginEnd="16dp"
+                android:nextFocusUp="@+id/sbSettingsCache"
+                android:nextFocusDown="@+id/btnSettingsSave"/>
+                
+            <RadioButton
+                android:id="@+id/rbDecoderHardware"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="强制硬解"
+                android:textColor="#FFFFFF"
+                android:buttonTint="@color/accent"
+                android:layout_marginEnd="16dp"
+                android:nextFocusUp="@+id/sbSettingsCache"
+                android:nextFocusDown="@+id/btnSettingsSave"/>
+                
+            <RadioButton
+                android:id="@+id/rbDecoderSoftware"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="强制软解"
+                android:textColor="#FFFFFF"
+                android:buttonTint="@color/accent"
+                android:nextFocusUp="@+id/sbSettingsCache"
+                android:nextFocusDown="@+id/btnSettingsSave"/>
+        </RadioGroup>
 
         <LinearLayout
             android:layout_width="match_parent"

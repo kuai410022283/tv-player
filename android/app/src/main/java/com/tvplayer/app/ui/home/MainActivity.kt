@@ -243,10 +243,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var rgSettingsDecoder: android.widget.RadioGroup? = null
+
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
+        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+
+        rgSettingsDecoder = findViewById(R.id.rgSettingsDecoder)
+        when (decoderMode) {
+            Prefs.DECODER_MODE_HARDWARE -> rgSettingsDecoder?.check(R.id.rbDecoderHardware)
+            Prefs.DECODER_MODE_SOFTWARE -> rgSettingsDecoder?.check(R.id.rbDecoderSoftware)
+            else -> rgSettingsDecoder?.check(R.id.rbDecoderAuto)
+        }
 
         etSettingsUrl?.setText(url)
         
@@ -273,13 +283,20 @@ class MainActivity : AppCompatActivity() {
             val newUrl = etSettingsUrl?.text?.toString()?.trim() ?: ""
             val newCacheMs = 500 + (sbSettingsCache?.progress ?: 0) * 100
             
+            val newDecoderMode = when (rgSettingsDecoder?.checkedRadioButtonId) {
+                R.id.rbDecoderHardware -> Prefs.DECODER_MODE_HARDWARE
+                R.id.rbDecoderSoftware -> Prefs.DECODER_MODE_SOFTWARE
+                else -> Prefs.DECODER_MODE_AUTO
+            }
+
             if (newUrl.isEmpty()) {
                 Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
-            if (newUrl != oldUrl) {
+            val oldDecoder = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+            if (newUrl != oldUrl || newDecoderMode != oldDecoder) {
                 authManager.clearAuth()
                 com.tvplayer.app.data.api.ApiClient.reset()
                 settingsChanged = true
@@ -288,6 +305,7 @@ class MainActivity : AppCompatActivity() {
             prefs.edit()
                 .putString(Prefs.KEY_SERVER_URL, newUrl)
                 .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
+                .putInt(Prefs.KEY_DECODER_MODE, newDecoderMode)
                 .apply()
                 
             com.tvplayer.app.data.api.ApiClient.init(newUrl)
