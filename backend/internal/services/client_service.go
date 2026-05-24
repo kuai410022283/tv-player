@@ -147,7 +147,15 @@ func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 
 func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, approver string) error {
 	now := time.Now()
-	token := generateToken()
+
+	var currentToken string
+	var currentStatus string
+	_ = s.db.QueryRow("SELECT access_token, status FROM clients WHERE id=?", clientID).Scan(&currentToken, &currentStatus)
+
+	token := currentToken
+	if currentStatus != "approved" || token == "" {
+		token = generateToken()
+	}
 
 	maxStreams := req.MaxStreams
 	var expiresAt *time.Time

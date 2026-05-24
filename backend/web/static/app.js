@@ -616,7 +616,7 @@ async function loadClients() {
         <div class="btn-group">
           <button class="btn btn-ghost btn-sm" onclick="showClientDetail(${c.id})">详情</button>
           ${c.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button><button class="btn btn-danger btn-sm" onclick="showRejectModal(${c.id})">拒绝</button>` : ''}
-          ${c.status === 'approved' ? `<button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">吊销</button>` : ''}
+          ${c.status === 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">改授权</button><button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">吊销</button>` : ''}
           ${c.status === 'rejected' || c.status === 'banned' ? `<button class="btn btn-info btn-sm" onclick="unbanClient(${c.id})">解封</button>` : ''}
         </div>
       </td>
@@ -755,17 +755,33 @@ async function deletePlan(id) {
 
 async function showApproveModal(id) {
   document.getElementById('approve-client-id').value = id;
-  const plansRes = await api('/admin/plans');
+  const [plansRes, clientRes] = await Promise.all([
+    api('/admin/plans'),
+    api('/admin/clients/' + id)
+  ]);
   const plans = plansRes.data || [];
+  const client = clientRes.data || {};
   
   const select = document.getElementById('approve-plan-id');
   select.innerHTML = '<option value="0">-- 自定义授权 (不绑定套餐) --</option>' + 
     plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}">${esc(p.name)}</option>`).join('');
   
-  document.getElementById('approve-days').value = '365';
-  document.getElementById('approve-streams').value = '2';
-  document.getElementById('approve-days').disabled = false;
-  document.getElementById('approve-streams').disabled = false;
+  select.value = client.plan_id || 0;
+
+  if (client.plan_id > 0) {
+    document.getElementById('approve-days').disabled = true;
+    document.getElementById('approve-streams').disabled = true;
+    const plan = plans.find(p => p.id === client.plan_id);
+    if (plan) {
+      document.getElementById('approve-days').value = plan.days;
+      document.getElementById('approve-streams').value = plan.max_streams;
+    }
+  } else {
+    document.getElementById('approve-days').disabled = false;
+    document.getElementById('approve-streams').disabled = false;
+    document.getElementById('approve-days').value = client.expires_at ? Math.max(0, Math.ceil((new Date(client.expires_at) - new Date()) / (1000 * 3600 * 24))) : 365;
+    document.getElementById('approve-streams').value = client.max_streams || 2;
+  }
   
   hideModal('client-detail-modal');
   showModal('approve-modal');
