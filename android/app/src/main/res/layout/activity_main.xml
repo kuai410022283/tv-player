@@ -166,50 +166,56 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 4. 顶层：授权/启动等待界面 -->
-    <LinearLayout
+    <ScrollView
         android:id="@+id/layoutAuthWaiting"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
         android:background="#FF000000"
-        android:padding="48dp"
-        android:visibility="visible"
-        android:clickable="true"
-        android:focusable="true">
+        android:fillViewport="true"
+        android:visibility="visible">
 
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@drawable/ic_tv"
-            android:layout_marginBottom="24dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/accent"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="32dp" />
-
-        <ProgressBar
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:indeterminateTint="@color/accent"
-            android:layout_marginBottom="24dp" />
-
-        <TextView
-            android:id="@+id/tvAuthStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="正在连接服务器..."
-            android:textColor="#AAAAAA"
-            android:textSize="16sp"
+            android:orientation="vertical"
             android:gravity="center"
-            android:lineSpacingExtra="6dp" />
+            android:padding="24dp"
+            android:clickable="true"
+            android:focusable="true">
 
-    </LinearLayout>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/ic_tv"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textColor="@color/accent"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="32dp" />
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminateTint="@color/accent"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:id="@+id/tvAuthStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="正在连接服务器..."
+                android:textColor="#AAAAAA"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:lineSpacingExtra="6dp" />
+
+        </LinearLayout>
+    </ScrollView>
 
     <!-- 5. 右侧侧滑设置菜单 (Settings Menu) -->
     <LinearLayout

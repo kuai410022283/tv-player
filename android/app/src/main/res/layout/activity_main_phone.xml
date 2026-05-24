@@ -9,46 +9,52 @@
     android:background="@color/bg_main">
 
     <!-- 授权等待界面 -->
-    <LinearLayout
+    <ScrollView
         android:id="@+id/layoutAuthWaiting"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp"
+        android:fillViewport="true"
         android:visibility="visible">
 
-        <ImageView
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:src="@drawable/ic_tv"
-            android:layout_marginBottom="20dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/accent"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="24dp" />
-
-        <ProgressBar
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:indeterminateTint="@color/accent"
-            android:layout_marginBottom="20dp" />
-
-        <TextView
-            android:id="@+id/tvAuthStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="正在连接服务器..."
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:orientation="vertical"
             android:gravity="center"
-            android:lineSpacingExtra="4dp" />
-    </LinearLayout>
+            android:padding="32dp">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:src="@drawable/ic_tv"
+                android:layout_marginBottom="20dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textColor="@color/accent"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="24dp" />
+
+            <ProgressBar
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:indeterminateTint="@color/accent"
+                android:layout_marginBottom="20dp" />
+
+            <TextView
+                android:id="@+id/tvAuthStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="正在连接服务器..."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+    </ScrollView>
 
     <!-- 主内容 -->
     <LinearLayout
