@@ -167,9 +167,21 @@ async function loadDashboard() {
 
   const body = document.getElementById('dash-logs-body');
   if (logs.data && logs.data.length) {
-    body.innerHTML = logs.data.map(l =>
-      `<tr><td>#${l.client_id}</td><td>${badge(l.action)}</td><td>${esc(l.ip)}</td><td>${fmtDate(l.created_at)}</td></tr>`
-    ).join('');
+    body.innerHTML = logs.data.map(l => {
+      let actionBadge = '';
+      if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
+      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
+      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">心跳</span>';
+      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">错误</span>';
+      else actionBadge = badge(l.action);
+
+      return `<tr>
+        <td><strong>${esc(l.client_name)}</strong> <span style="font-size:11px;color:var(--text2)">#${l.client_id}</span></td>
+        <td>${actionBadge}</td>
+        <td style="font-family:monospace;font-size:12px">${esc(l.ip)}</td>
+        <td>${fmtDate(l.created_at)}</td>
+      </tr>`;
+    }).join('');
   } else {
     body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:30px">暂无记录</td></tr>';
   }
@@ -881,15 +893,24 @@ async function loadClientLogs() {
   const r = await api('/admin/clients/logs?limit=200');
   const body = document.getElementById('client-logs-body');
   if (r.data && r.data.length) {
-    body.innerHTML = r.data.map(l => `<tr>
-      <td>${l.id}</td>
-      <td>#${l.client_id}</td>
-      <td>${badge(l.action)}</td>
-      <td>${l.channel_id || '-'}</td>
-      <td style="font-family:monospace;font-size:12px">${esc(l.ip)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(l.detail)}</td>
-      <td>${fmtDate(l.created_at)}</td>
-    </tr>`).join('');
+    body.innerHTML = r.data.map(l => {
+      let actionBadge = '';
+      if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
+      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
+      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">心跳</span>';
+      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">错误</span>';
+      else actionBadge = badge(l.action);
+
+      return `<tr>
+        <td>${l.id}</td>
+        <td><strong>${esc(l.client_name)}</strong><br><span style="font-size:11px;color:var(--text2)">ID: #${l.client_id}</span></td>
+        <td>${actionBadge}</td>
+        <td><strong>${l.channel_name ? esc(l.channel_name) : '-'}</strong><br><span style="font-size:11px;color:var(--text2)">${l.channel_id ? 'ID: ' + l.channel_id : ''}</span></td>
+        <td style="font-family:monospace;font-size:12px">${esc(l.ip)}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(l.detail)}</td>
+        <td>${fmtDate(l.created_at)}</td>
+      </tr>`;
+    }).join('');
   } else {
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:40px">暂无日志</td></tr>';
   }

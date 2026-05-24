@@ -410,7 +410,14 @@ func (s *ClientService) GetLogs(clientID int64, limit int) ([]models.AccessLog, 
 	if limit <= 0 {
 		limit = 100
 	}
-	rows, err := s.db.Query(`SELECT id, client_id, action, channel_id, ip, user_agent, detail, created_at FROM access_logs WHERE client_id=? ORDER BY created_at DESC LIMIT ?`, clientID, limit)
+	query := `
+		SELECT l.id, l.client_id, COALESCE(cl.name, ''), l.action, l.channel_id, COALESCE(ch.name, ''), l.ip, l.user_agent, l.detail, l.created_at 
+		FROM access_logs l
+		LEFT JOIN clients cl ON l.client_id = cl.id
+		LEFT JOIN channels ch ON l.channel_id = ch.id
+		WHERE l.client_id=? 
+		ORDER BY l.created_at DESC LIMIT ?`
+	rows, err := s.db.Query(query, clientID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +426,7 @@ func (s *ClientService) GetLogs(clientID int64, limit int) ([]models.AccessLog, 
 	var logs []models.AccessLog
 	for rows.Next() {
 		var l models.AccessLog
-		if err := rows.Scan(&l.ID, &l.ClientID, &l.Action, &l.ChannelID, &l.IP, &l.UserAgent, &l.Detail, &l.CreatedAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.ClientID, &l.ClientName, &l.Action, &l.ChannelID, &l.ChannelName, &l.IP, &l.UserAgent, &l.Detail, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		logs = append(logs, l)
@@ -434,7 +441,13 @@ func (s *ClientService) GetRecentLogs(limit int) ([]models.AccessLog, error) {
 	if limit <= 0 {
 		limit = 100
 	}
-	rows, err := s.db.Query(`SELECT id, client_id, action, channel_id, ip, user_agent, detail, created_at FROM access_logs ORDER BY created_at DESC LIMIT ?`, limit)
+	query := `
+		SELECT l.id, l.client_id, COALESCE(cl.name, ''), l.action, l.channel_id, COALESCE(ch.name, ''), l.ip, l.user_agent, l.detail, l.created_at 
+		FROM access_logs l
+		LEFT JOIN clients cl ON l.client_id = cl.id
+		LEFT JOIN channels ch ON l.channel_id = ch.id
+		ORDER BY l.created_at DESC LIMIT ?`
+	rows, err := s.db.Query(query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -443,11 +456,12 @@ func (s *ClientService) GetRecentLogs(limit int) ([]models.AccessLog, error) {
 	var logs []models.AccessLog
 	for rows.Next() {
 		var l models.AccessLog
-		if err := rows.Scan(&l.ID, &l.ClientID, &l.Action, &l.ChannelID, &l.IP, &l.UserAgent, &l.Detail, &l.CreatedAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.ClientID, &l.ClientName, &l.Action, &l.ChannelID, &l.ChannelName, &l.IP, &l.UserAgent, &l.Detail, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		logs = append(logs, l)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}

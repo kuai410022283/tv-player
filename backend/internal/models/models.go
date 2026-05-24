@@ -216,14 +216,16 @@ type License struct {
 // ── Access Log ─────────────────────────────────────────
 
 type AccessLog struct {
-	ID        int64     `json:"id" db:"id"`
-	ClientID  int64     `json:"client_id" db:"client_id"`
-	Action    string    `json:"action" db:"action"` // login, play, heartbeat, error
-	ChannelID int64     `json:"channel_id,omitempty" db:"channel_id"`
-	IP        string    `json:"ip" db:"ip"`
-	UserAgent string    `json:"user_agent,omitempty" db:"user_agent"`
-	Detail    string    `json:"detail,omitempty" db:"detail"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID          int64     `json:"id" db:"id"`
+	ClientID    int64     `json:"client_id" db:"client_id"`
+	ClientName  string    `json:"client_name" db:"client_name"`
+	Action      string    `json:"action" db:"action"` // login, play, heartbeat, error
+	ChannelID   int64     `json:"channel_id,omitempty" db:"channel_id"`
+	ChannelName string    `json:"channel_name,omitempty" db:"channel_name"`
+	IP          string    `json:"ip" db:"ip"`
+	UserAgent   string    `json:"user_agent,omitempty" db:"user_agent"`
+	Detail      string    `json:"detail,omitempty" db:"detail"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
 
 // ── Server Stats ───────────────────────────────────────
