@@ -117,16 +117,7 @@ func createTables(db *sql.DB) error {
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
 	);
 
-	CREATE TABLE IF NOT EXISTS epg_programs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		epg_channel_id TEXT NOT NULL,
-		title TEXT NOT NULL,
-		start_time DATETIME NOT NULL,
-		end_time DATETIME NOT NULL,
-		description TEXT DEFAULT ''
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_epg_channel_time ON epg_programs(epg_channel_id, start_time);
+	DROP TABLE IF EXISTS epg_programs;
 
 	CREATE TABLE IF NOT EXISTS play_history (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,19 +233,11 @@ func createTables(db *sql.DB) error {
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE CASCADE
 	);
 
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('央视', 1);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('卫视', 2);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('地方台', 3);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('体育', 4);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('影视', 5);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('综艺', 6);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('新闻', 7);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('少儿', 8);
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('未分类', 99);
+	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('未分类', 99999);
 	`
 
 	_, err := db.Exec(schema)
-	
+
 	// 执行自动迁移
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN is_direct INTEGER DEFAULT 1;")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN is_direct INTEGER DEFAULT 1;")
@@ -267,6 +250,6 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT '';")
-	
+
 	return err
 }

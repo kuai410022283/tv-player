@@ -59,12 +59,14 @@ func main() {
 	streamProxy := services.NewStreamProxy(&cfg.Stream, channelSvc)
 	importer := services.NewM3UImporter(channelSvc)
 	clientSvc := services.NewClientService(db)
+	epgSvc := services.NewEPGService(db)
 
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
 	go streamProxy.StartHealthCheck(stop)
 	go startClientExpiry(clientSvc, stop)
 	go middleware.StartRateLimitCleanup(stop)
+	epgSvc.StartEPGScheduler()
 
 	// ── 初始化 Gin ──────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)
@@ -112,7 +114,7 @@ func main() {
 	planSvc := services.NewPlanService(db)
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
-	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc)
+	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc)
 	ch := api.NewClientHandler(clientSvc)
 	ph := api.NewPlanHandler(planSvc)
 	hs := api.NewHandlers(h, ch, ph)

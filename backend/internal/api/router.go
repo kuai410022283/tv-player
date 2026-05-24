@@ -111,4 +111,11 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		adminGroups.GET("", hs.Handler.AdminListGroups)
 	}
+
+	// ── 管理端：EPG 管理 ──────────────────────────
+	adminEpg := r.Group("/admin/epg")
+	adminEpg.Use(middleware.RequireAdmin())
+	{
+		adminEpg.POST("/refresh", hs.Handler.RefreshEPG)
+	}
 }

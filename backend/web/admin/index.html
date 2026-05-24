@@ -420,13 +420,20 @@
             </select>
             <div style="font-size:11px;color:var(--text2);margin-top:4px">新设备注册时是否自动审批通过</div>
           </div>
+          <div class="form-group">
+            <label>自动审批默认套餐</label>
+            <select id="set-default-plan-id">
+              <option value="0">-- 自定义授权 (使用下方并发和天数) --</option>
+            </select>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">如果绑定套餐，下方的"并发流"和"授权天数"设置将被覆盖</div>
+          </div>
           <div class="form-row">
             <div class="form-group">
-              <label>默认最大并发流</label>
+              <label>自定义最大并发流</label>
               <input type="number" id="set-max-streams" value="2" min="1" max="10">
             </div>
             <div class="form-group">
-              <label>默认授权天数</label>
+              <label>自定义授权天数</label>
               <input type="number" id="set-expire-days" value="365" min="0">
               <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
             </div>
@@ -437,6 +444,21 @@
               <option value="false">否</option>
               <option value="true">是</option>
             </select>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
+            <label>EPG 数据源 URL (XMLTV)</label>
+            <input type="text" id="set-epg-source-url" placeholder="http://epg.example.com/e.xml">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持 .xml 或 .gz 格式。如果配置此项，服务端会自动拉取并在内存中构建 EPG 节目单。</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>EPG 自动刷新间隔 (小时)</label>
+              <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end">
+              <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
+            </div>
           </div>
           <div class="form-actions" style="justify-content:flex-start">
             <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>

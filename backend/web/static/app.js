@@ -133,7 +133,22 @@ function showSection(name, el) {
   document.querySelectorAll('.main > div[id^="sec-"]').forEach(e => e.style.display = 'none');
   document.getElementById('sec-' + name).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
-  if (el) el.classList.add('active');
+  
+  if (el) {
+    el.classList.add('active');
+  } else {
+    // Attempt to find and highlight the correct nav item if el is not provided
+    const navItems = document.querySelectorAll('.nav-item');
+    for (let item of navItems) {
+      if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(`'${name}'`)) {
+        item.classList.add('active');
+        break;
+      }
+    }
+  }
+
+  localStorage.setItem('last_active_section', name);
+
   const loaders = {
     dashboard: loadDashboard,
     channels: loadChannels,
@@ -932,35 +947,70 @@ async function loadClientLogs() {
   }
 }
 
-// ═══ Client Settings ══════════════════════════════════
+// ═══ Client Settings & EPG ══════════════════════════════
 async function loadClientSettings() {
-  const r = await api('/settings');
-  if (r.data) {
-    document.getElementById('set-auto-approve').value = r.data.auto_approve || 'false';
-    document.getElementById('set-max-streams').value = r.data.default_max_streams || '2';
-    document.getElementById('set-expire-days').value = r.data.default_expire_days || '365';
-    document.getElementById('set-require-note').value = r.data.require_note || 'false';
+  const [setRes, plansRes] = await Promise.all([
+    api('/settings'),
+    api('/admin/plans')
+  ]);
+
+  const select = document.getElementById('set-default-plan-id');
+  const plans = plansRes.data || [];
+  select.innerHTML = '<option value="0">-- 自定义授权 (使用下方并发和天数) --</option>' + 
+    plans.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+
+  if (setRes.data) {
+    document.getElementById('set-auto-approve').value = setRes.data.auto_approve || 'false';
+    document.getElementById('set-default-plan-id').value = setRes.data.default_plan_id || '0';
+    document.getElementById('set-max-streams').value = setRes.data.default_max_streams || '2';
+    document.getElementById('set-expire-days').value = setRes.data.default_expire_days || '365';
+    document.getElementById('set-require-note').value = setRes.data.require_note || 'false';
+    
+    // EPG 配置
+    if(document.getElementById('set-epg-source-url')) {
+      document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
+      document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
+    }
   }
 }
 
 async function saveAllClientSettings() {
   const settings = {
     auto_approve: document.getElementById('set-auto-approve').value,
+    default_plan_id: document.getElementById('set-default-plan-id').value,
     default_max_streams: document.getElementById('set-max-streams').value,
     default_expire_days: document.getElementById('set-expire-days').value,
     require_note: document.getElementById('set-require-note').value,
   };
-  for (const [k, v] of Object.entries(settings)) {
-    await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: v }) });
+  
+  if(document.getElementById('set-epg-source-url')) {
+    settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
+    settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
   }
-  toast('策略已保存');
+
+  for (const [k, v] of Object.entries(settings)) {
+    await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: String(v) }) });
+  }
+  toast('策略及 EPG 配置已保存');
+}
+
+async function refreshEPGCache() {
+  try {
+    const res = await api('/admin/epg/refresh', { method: 'POST' });
+    if(res.code === 0) {
+      toast(res.data.message || '强制刷新已触发');
+    }
+  } catch (e) {
+    toast('触发失败: ' + e.message, true);
+  }
 }
 
 async function saveClientSetting(key, value) {
-  await api('/settings', { method: 'POST', body: JSON.stringify({ key, value }) });
+  await api('/settings', { method: 'POST', body: JSON.stringify({ key, value: String(value) }) });
 }
 
 // ═══ Init ═════════════════════════════════════════════
 if (!window.location.pathname.includes('/login.html') && adminToken) {
-  loadDashboard();
+  const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
+  showSection(lastSection);
 }

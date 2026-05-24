@@ -72,23 +72,48 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	status := "pending"
 	var expiresAt *time.Time
-	if autoApprove {
-		status = "approved"
-		days := 365
-		if val, err := s.GetSettingValue("default_expire_days"); err == nil {
-			fmt.Sscanf(val, "%d", &days)
-		}
-		t := now.AddDate(0, 0, days)
-		expiresAt = &t
-	}
+	var planID int64
 
 	maxStreams := 2
 	if val, err := s.GetSettingValue("default_max_streams"); err == nil {
 		fmt.Sscanf(val, "%d", &maxStreams)
 	}
 
-	res, err := s.db.Exec(`INSERT INTO clients (name, device_id, device_model, device_os, app_version, ip, access_token, status, max_streams, expires_at, last_seen, request_note, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		req.Name, req.DeviceID, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, token, status, maxStreams, expiresAt, now, req.Note, now, now)
+	if autoApprove {
+		status = "approved"
+		
+		// 检查是否配置了默认套餐
+		if val, err := s.GetSettingValue("default_plan_id"); err == nil && val != "" && val != "0" {
+			var pid int64
+			fmt.Sscanf(val, "%d", &pid)
+			if pid > 0 {
+				var days, pStreams int
+				if err := s.db.QueryRow(`SELECT days, max_streams FROM subscription_plans WHERE id=?`, pid).Scan(&days, &pStreams); err == nil {
+					planID = pid
+					maxStreams = pStreams
+					if days > 0 {
+						t := now.AddDate(0, 0, days)
+						expiresAt = &t
+					}
+				}
+			}
+		}
+
+		// 若未匹配到套餐，则使用默认天数
+		if planID == 0 {
+			days := 365
+			if val, err := s.GetSettingValue("default_expire_days"); err == nil {
+				fmt.Sscanf(val, "%d", &days)
+			}
+			if days > 0 {
+				t := now.AddDate(0, 0, days)
+				expiresAt = &t
+			}
+		}
+	}
+
+	res, err := s.db.Exec(`INSERT INTO clients (name, device_id, device_model, device_os, app_version, ip, access_token, status, max_streams, expires_at, last_seen, request_note, created_at, updated_at, plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		req.Name, req.DeviceID, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, token, status, maxStreams, expiresAt, now, req.Note, now, now, planID)
 	if err != nil {
 		return nil, fmt.Errorf("注册失败: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -70,14 +71,16 @@ type Handler struct {
 	streamProxy *services.StreamProxy
 	importer    *services.M3UImporter
 	clientSvc   *services.ClientService
+	epgSvc      *services.EPGService
 }
 
-func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService) *Handler {
+func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService) *Handler {
 	return &Handler{
 		channelSvc:  channelSvc,
 		streamProxy: streamProxy,
 		importer:    importer,
 		clientSvc:   clientSvc,
+		epgSvc:      epgSvc,
 	}
 }
 
@@ -549,12 +552,25 @@ func (h *Handler) GetEPG(c *gin.Context) {
 		fail(c, 400, "请提供 channel_id")
 		return
 	}
-	programs, err := h.channelSvc.GetEPGPrograms(channelID)
-	if err != nil {
-		ok(c, []interface{}{})
+	
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	} else if len(dateStr) == 8 && !strings.Contains(dateStr, "-") {
+		// 兼容 YYYYMMDD 格式，将其转换为内部使用的 YYYY-MM-DD 格式
+		dateStr = dateStr[:4] + "-" + dateStr[4:6] + "-" + dateStr[6:]
+	}
+	
+	programs := h.epgSvc.GetEPG(channelID, dateStr)
+	ok(c, programs)
+}
+
+func (h *Handler) RefreshEPG(c *gin.Context) {
+	if err := h.epgSvc.ForceRefresh(); err != nil {
+		failInternal(c, err, "刷新 EPG 失败")
 		return
 	}
-	ok(c, programs)
+	ok(c, gin.H{"message": "EPG 数据已重新拉取并构建索引"})
 }
 
 // ── Admin Login ────────────────────────────────────────
