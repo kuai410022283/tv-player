@@ -99,7 +99,11 @@ func failInternal(c *gin.Context, err error, userMsg string) {
 // ── Groups ─────────────────────────────────────────────
 
 func (h *Handler) ListGroups(c *gin.Context) {
-	groups, err := h.channelSvc.ListGroups()
+	var clientID int64
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+	}
+	groups, err := h.channelSvc.ListGroups(clientID)
 	if err != nil {
 		failInternal(c, err, "获取分组列表失败")
 		return

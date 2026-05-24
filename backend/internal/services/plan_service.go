@@ -30,7 +30,23 @@ func (s *PlanService) GetPlans() ([]*models.SubscriptionPlan, error) {
 		}
 		items = append(items, m)
 	}
-	return items, rows.Err()
+
+	// Fetch group associations
+	for _, m := range items {
+		m.GroupIDs = make([]int64, 0)
+		gRows, err := s.db.Query(`SELECT group_id FROM plan_group_relations WHERE plan_id=?`, m.ID)
+		if err == nil {
+			for gRows.Next() {
+				var gID int64
+				if gRows.Scan(&gID) == nil {
+					m.GroupIDs = append(m.GroupIDs, gID)
+				}
+			}
+			gRows.Close()
+		}
+	}
+
+	return items, nil
 }
 
 func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
@@ -43,6 +59,12 @@ func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 	m.ID, _ = res.LastInsertId()
 	m.CreatedAt = now
 	m.UpdatedAt = now
+
+	// Save group relations
+	for _, gID := range m.GroupIDs {
+		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id) VALUES (?,?)`, m.ID, gID)
+	}
+
 	return nil
 }
 
@@ -54,6 +76,13 @@ func (s *PlanService) UpdatePlan(m *models.SubscriptionPlan) error {
 		return err
 	}
 	m.UpdatedAt = now
+
+	// Update group relations
+	_, _ = s.db.Exec(`DELETE FROM plan_group_relations WHERE plan_id=?`, m.ID)
+	for _, gID := range m.GroupIDs {
+		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id) VALUES (?,?)`, m.ID, gID)
+	}
+
 	return nil
 }
 

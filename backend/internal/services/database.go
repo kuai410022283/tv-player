@@ -234,6 +234,14 @@ func createTables(db *sql.DB) error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS plan_group_relations (
+		plan_id INTEGER NOT NULL,
+		group_id INTEGER NOT NULL,
+		PRIMARY KEY (plan_id, group_id),
+		FOREIGN KEY (plan_id) REFERENCES subscription_plans(id) ON DELETE CASCADE,
+		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE CASCADE
+	);
+
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('央视', 1);
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('卫视', 2);
 	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('地方台', 3);

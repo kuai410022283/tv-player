@@ -20,13 +20,26 @@ func NewChannelService(db *sql.DB) *ChannelService {
 
 // ── Groups ─────────────────────────────────────────────
 
-func (s *ChannelService) ListGroups() ([]models.ChannelGroup, error) {
-	rows, err := s.db.Query(`
+func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, error) {
+	query := `
 		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), g.created_at, g.updated_at,
 		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id) AS channel_count
-		FROM channel_groups g 
-		ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id
-	`)
+		FROM channel_groups g
+	`
+	var args []interface{}
+
+	if clientID > 0 {
+		query += `
+			JOIN plan_group_relations pgr ON g.id = pgr.group_id
+			JOIN clients cl ON pgr.plan_id = cl.plan_id
+			WHERE cl.id = ?
+		`
+		args = append(args, clientID)
+	}
+	
+	query += ` ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id`
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +204,14 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	queryArgs = append(queryArgs, clientID)
 	baseQuery := `FROM channels c LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = ? `
 
+	if clientID > 0 {
+		baseQuery += `
+		JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
+		JOIN clients cl ON pgr.plan_id = cl.plan_id AND cl.id = ?
+		`
+		queryArgs = append(queryArgs, clientID)
+	}
+
 	whereClauses = append(whereClauses, "c.is_hidden = 0")
 
 	if groupID > 0 {
@@ -253,14 +274,30 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 	var c models.Channel
 	var isFav, isHid, isDir int
 	var lastCheck sql.NullTime
-	err := s.db.QueryRow(`
+	query := `
 		SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 			c.stream_type, c.epg_channel_id, 
 			CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
 			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at 
 		FROM channels c 
 		LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = ?
-		WHERE c.id=?`, clientID, id).
+		WHERE c.id=?`
+	args := []interface{}{clientID, id}
+
+	if clientID > 0 {
+		query = `
+			SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
+				c.stream_type, c.epg_channel_id, 
+				CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
+				c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at 
+			FROM channels c 
+			JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
+			JOIN clients cl ON pgr.plan_id = cl.plan_id AND cl.id = ?
+			LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = cl.id
+			WHERE c.id=?`
+	}
+
+	err := s.db.QueryRow(query, args...).
 		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err

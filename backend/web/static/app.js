@@ -685,12 +685,18 @@ async function loadPlans() {
 
 async function savePlan() {
   const id = document.getElementById('plan-edit-id').value;
+  
+  // Collect selected groups
+  const checkboxes = document.querySelectorAll('#plan-groups-container input[type="checkbox"]:checked');
+  const groupIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
   const d = {
     name: document.getElementById('plan-name').value,
     days: +document.getElementById('plan-days').value || 0,
     max_streams: +document.getElementById('plan-streams').value || 1,
     price: parseFloat(document.getElementById('plan-price').value) || 0.0,
-    description: document.getElementById('plan-desc').value
+    description: document.getElementById('plan-desc').value,
+    group_ids: groupIds
   };
   if (!d.name) { toast('请填写名称', 'error'); return; }
   await api(id ? `/admin/plans/${id}` : '/admin/plans', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
@@ -699,10 +705,28 @@ async function savePlan() {
   toast(id ? '已更新' : '已添加');
 }
 
-function editPlan(id) {
-  const p = allPlans.find(x => x.id === id);
-  if (!p) return;
-  document.getElementById('plan-edit-id').value = id;
+async function editPlan(id) {
+  // Fetch groups if not already loaded
+  const groupsRes = await api('/admin/groups');
+  const groups = (groupsRes.data && groupsRes.data.items) ? groupsRes.data.items : [];
+
+  let p = { name: '', days: 365, max_streams: 2, price: 0, description: '', group_ids: [] };
+  if (id) {
+    const found = allPlans.find(x => x.id === id);
+    if (found) p = found;
+  }
+
+  // Render checkboxes
+  const container = document.getElementById('plan-groups-container');
+  container.innerHTML = groups.map(g => {
+    const isChecked = p.group_ids && p.group_ids.includes(g.id);
+    return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg2);padding:4px 10px;border-radius:4px;">
+      <input type="checkbox" value="${g.id}" ${isChecked ? 'checked' : ''}>
+      ${esc(g.name)}
+    </label>`;
+  }).join('');
+
+  document.getElementById('plan-edit-id').value = id || '';
   document.getElementById('plan-name').value = p.name;
   document.getElementById('plan-days').value = p.days;
   document.getElementById('plan-streams').value = p.max_streams;

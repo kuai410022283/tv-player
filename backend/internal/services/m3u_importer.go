@@ -127,7 +127,7 @@ func (imp *M3UImporter) ImportFromString(content string, sourceName string) (int
 func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string) (int, error) {
 	// 1. 预先处理所有分组，避免在开启频道的写入事务后再执行其它表写入，导致 SQLite 锁表(Deadlock)
 	groupCache := make(map[string]int64)
-	existingGroups, _ := imp.channelSvc.ListGroups()
+	existingGroups, _ := imp.channelSvc.ListGroups(0)
 	for _, g := range existingGroups {
 		if g.Source == sourceName {
 			groupCache[g.Name] = g.ID
