@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaPlayer 管理后台 - 登录</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); }
+.login-box { background: var(--bg2); padding: 32px; border-radius: var(--radius); border: 1px solid var(--border); width: 380px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.login-box h3 { margin-bottom: 24px; text-align: center; color: var(--accent); font-size: 18px; }
+.login-box .form-group { margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h3>🔑 管理后台登录</h3>
+  <div class="form-group">
+    <label>管理密码</label>
+    <input type="password" id="login-password" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <div style="font-size:11px;color:var(--text2);margin-top:8px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">登录</button>
+  </div>
+</div>
+<div class="toast" id="toast" style="display:none"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

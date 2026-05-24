@@ -131,11 +131,10 @@ func main() {
 		hs.RegisterRoutes(v1)
 	}
 
-	// ── 静态文件（管理后台）──────────────────────────
-	r.Static("/admin", "./web")
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(302, "/admin")
-	})
+	// ── 静态文件（分层结构）──────────────────────────
+	r.Static("/static", "./web/static")
+	r.Static("/admin", "./web/admin")
+	r.StaticFile("/", "./web/index.html")
 
 	// ── 启动服务 ────────────────────────────────────
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
