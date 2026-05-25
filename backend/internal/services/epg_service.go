@@ -53,8 +53,10 @@ type xmltvProgramme struct {
 // ── 内存缓存结构 ──
 
 type epgIndex struct {
-	mu       sync.RWMutex
-	programs map[string]map[string][]models.EPGProgram // channelIDLower -> date("2006-01-02") -> programs
+	mu            sync.RWMutex
+	programs      map[string]map[string][]models.EPGProgram // channelIDLower -> date("2006-01-02") -> programs
+	lastFetchTime time.Time
+	lastFetchDate string // "2006-01-02"
 }
 
 var globalEPGIndex = &epgIndex{
@@ -95,8 +97,6 @@ func (s *EPGService) StartEPGScheduler() {
 	}()
 }
 
-var lastFetchTime time.Time
-
 func (s *EPGService) FetchAndBuildIndex() {
 	var sourceURL string
 	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='epg_source_url'`).Scan(&sourceURL)
@@ -114,9 +114,26 @@ func (s *EPGService) FetchAndBuildIndex() {
 	}
 
 	// 检查是否需要刷新
-	if time.Since(lastFetchTime) < time.Duration(refreshHours)*time.Hour {
+	globalEPGIndex.mu.RLock()
+	lastTime := globalEPGIndex.lastFetchTime
+	lastDate := globalEPGIndex.lastFetchDate
+	globalEPGIndex.mu.RUnlock()
+
+	now := time.Now()
+	nowDate := now.Format("2006-01-02")
+	isCrossDay := !lastTime.IsZero() && nowDate != lastDate
+
+	// 触发刷新条件：跨天，或者距离上次刷新超过设定的小时数
+	if !isCrossDay && time.Since(lastTime) < time.Duration(refreshHours)*time.Hour {
 		return
 	}
+
+	// 为防止并发多次拉取，可以简单依赖单例背景任务或在写入时更新时间
+	// 这里更新一下最后拉取时间，避免紧接着的并发请求重复触发
+	globalEPGIndex.mu.Lock()
+	globalEPGIndex.lastFetchTime = now
+	globalEPGIndex.lastFetchDate = nowDate
+	globalEPGIndex.mu.Unlock()
 
 	slog.Info("开始拉取 EPG 数据", "url", sourceURL)
 
@@ -154,10 +171,18 @@ func (s *EPGService) FetchAndBuildIndex() {
 
 	newIndex := make(map[string]map[string][]models.EPGProgram)
 
+	nowDateStr := time.Now().Format("2006-01-02")
+
 	for _, prog := range tv.Programmes {
 		start, err1 := parseXmltvTime(prog.Start)
 		stop, err2 := parseXmltvTime(prog.Stop)
 		if err1 != nil || err2 != nil {
+			continue
+		}
+
+		dateKey := start.In(time.Local).Format("2006-01-02")
+		// 丢弃历史数据，仅保留今天及未来的 EPG
+		if dateKey < nowDateStr {
 			continue
 		}
 
@@ -166,7 +191,6 @@ func (s *EPGService) FetchAndBuildIndex() {
 			newIndex[chID] = make(map[string][]models.EPGProgram)
 		}
 
-		dateKey := start.In(time.Local).Format("2006-01-02")
 		p := models.EPGProgram{
 			ChannelID: chID,
 			Title:     prog.Title.Value,
@@ -201,10 +225,23 @@ func (s *EPGService) FetchAndBuildIndex() {
 
 	globalEPGIndex.mu.Lock()
 	globalEPGIndex.programs = newIndex
+	globalEPGIndex.lastFetchTime = time.Now()
+	globalEPGIndex.lastFetchDate = time.Now().Format("2006-01-02")
 	globalEPGIndex.mu.Unlock()
 
-	lastFetchTime = time.Now()
 	slog.Info("EPG 数据更新完成", "channels", len(newIndex))
+}
+
+// 异步检查并触发跨天刷新
+func (s *EPGService) triggerCrossDayRefresh() {
+	globalEPGIndex.mu.RLock()
+	lastDate := globalEPGIndex.lastFetchDate
+	lastTime := globalEPGIndex.lastFetchTime
+	globalEPGIndex.mu.RUnlock()
+
+	if !lastTime.IsZero() && time.Now().Format("2006-01-02") != lastDate {
+		go s.FetchAndBuildIndex()
+	}
 }
 
 // normalizeChannelName 标准化频道名称，专门处理 CCTV 频道的各种变体
@@ -302,6 +339,8 @@ func normalizeChannelName(s string) string {
 
 // GetEPG 从内存索引中获取当天的 EPG
 func (s *EPGService) GetEPG(channelID string, date string) []models.EPGProgram {
+	s.triggerCrossDayRefresh()
+
 	globalEPGIndex.mu.RLock()
 	defer globalEPGIndex.mu.RUnlock()
 
@@ -331,42 +370,49 @@ func (s *EPGService) GetEPG(channelID string, date string) []models.EPGProgram {
 
 // GetCurrentEPGWithProgress 从内存索引中获取当前正在播放的节目名称和进度百分比
 func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, int) {
+	s.triggerCrossDayRefresh()
+
 	globalEPGIndex.mu.RLock()
 	defer globalEPGIndex.mu.RUnlock()
 
+	chID := strings.ToLower(channelID)
 	chIDClean := normalizeChannelName(channelID)
 	now := time.Now()
 
-	// 找到对应的频道的所有日期 EPG
-	var targetDateMap map[string][]models.EPGProgram
-	chID := strings.ToLower(channelID)
-	if dateMap, ok := globalEPGIndex.programs[chID]; ok {
-		targetDateMap = dateMap
-	} else {
-		for key, dateMap := range globalEPGIndex.programs {
-			if normalizeChannelName(key) == chIDClean {
-				targetDateMap = dateMap
-				break
+	// 辅助函数：在一个 dateMap 中查找当前正在播放的节目
+	findProgram := func(dateMap map[string][]models.EPGProgram) (string, int, bool) {
+		for _, progs := range dateMap {
+			for _, p := range progs {
+				// 使用 >= 和 < 包含边界，避免正好压点时不匹配的情况
+				if !now.Before(p.StartTime) && now.Before(p.EndTime) {
+					total := p.EndTime.Sub(p.StartTime).Seconds()
+					elapsed := now.Sub(p.StartTime).Seconds()
+					if total > 0 {
+						pct := int((elapsed / total) * 100)
+						return p.Title, pct, true
+					}
+					return p.Title, 0, true
+				}
 			}
+		}
+		return "", 0, false
+	}
+
+	// 1. 尝试精确匹配
+	if dateMap, ok := globalEPGIndex.programs[chID]; ok {
+		if title, pct, found := findProgram(dateMap); found {
+			return title, pct
 		}
 	}
 
-	if targetDateMap == nil {
-		return "", 0
-	}
-
-	// 不再依赖 time.Now() 格式化后的 dateStr，因为如果服务器是 UTC 而 EPG 是 +0800 会导致跨天时取不到数据
-	// 直接遍历该频道的全部日期（通常只有 3-7 天），使用 UTC 绝对时间匹配
-	for _, progs := range targetDateMap {
-		for _, p := range progs {
-			if now.After(p.StartTime) && now.Before(p.EndTime) {
-				total := p.EndTime.Sub(p.StartTime).Seconds()
-				elapsed := now.Sub(p.StartTime).Seconds()
-				if total > 0 {
-					pct := int((elapsed / total) * 100)
-					return p.Title, pct
-				}
-				return p.Title, 0
+	// 2. 尝试基于统一规则的模糊匹配
+	for key, dateMap := range globalEPGIndex.programs {
+		if key == chID {
+			continue // 已经尝试过精确匹配
+		}
+		if normalizeChannelName(key) == chIDClean {
+			if title, pct, found := findProgram(dateMap); found {
+				return title, pct
 			}
 		}
 	}
@@ -376,7 +422,9 @@ func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, int) {
 
 // ForceRefresh 强制刷新
 func (s *EPGService) ForceRefresh() error {
-	lastFetchTime = time.Time{} // 重置时间
+	globalEPGIndex.mu.Lock()
+	globalEPGIndex.lastFetchTime = time.Time{} // 重置时间
+	globalEPGIndex.mu.Unlock()
 	s.FetchAndBuildIndex()
 	return nil
 }

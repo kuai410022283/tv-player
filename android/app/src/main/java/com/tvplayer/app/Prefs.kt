@@ -21,6 +21,13 @@ object Prefs {
     const val DECODER_MODE_HARDWARE = 1
     const val DECODER_MODE_SOFTWARE = 2
 
+    // 画面比例
+    const val KEY_SCALE_MODE = "scale_mode"
+    const val SCALE_MODE_DEFAULT = 0 // 自适应
+    const val SCALE_MODE_STRETCH = 1 // 16:9 强行拉伸
+    const val SCALE_MODE_CROP = 2    // 16:9 裁剪放大
+    const val SCALE_MODE_4_3 = 3     // 强制 4:3
+
     // 认证信息
     const val KEY_ACCESS_TOKEN = "access_token"
     const val KEY_CLIENT_ID = "client_id"

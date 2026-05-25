@@ -221,6 +221,10 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				clientToken = t.(string)
 			}
 
+			// 聚合后的列表
+			var groupedItems []map[string]interface{}
+			groupMap := make(map[string]int) // name -> index in groupedItems
+
 			for i := range items {
 				if !items[i].IsDirect {
 					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, items[i].ID, clientToken)
@@ -246,8 +250,40 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					items[i].CurrentEPG = title
 					items[i].EpgPercent = pct
 				}
+
+				// 开始聚合
+				nameKey := items[i].Name
+				line := map[string]interface{}{
+					"id":             items[i].ID,
+					"stream_url":     items[i].StreamURL,
+					"stream_type":    items[i].StreamType,
+					"user_agent":     items[i].UserAgent,
+					"custom_headers": items[i].CustomHeaders,
+				}
+
+				if idx, exists := groupMap[nameKey]; exists {
+					// 已存在该频道，将其作为新线路追加
+					lines := groupedItems[idx]["lines"].([]map[string]interface{})
+					groupedItems[idx]["lines"] = append(lines, line)
+				} else {
+					// 新频道
+					newGroup := map[string]interface{}{
+						"id":          items[i].ID,
+						"group_id":    items[i].GroupID,
+						"name":        items[i].Name,
+						"logo":        items[i].Logo,
+						"description": items[i].Description,
+						"current_epg": items[i].CurrentEPG,
+						"epg_percent": items[i].EpgPercent,
+						"is_favorite": items[i].IsFavorite,
+						"sort_order":  items[i].SortOrder,
+						"lines":       []map[string]interface{}{line},
+					}
+					groupedItems = append(groupedItems, newGroup)
+					groupMap[nameKey] = len(groupedItems) - 1
+				}
 			}
-			resp.Items = items
+			resp.Items = groupedItems
 		}
 	}
 

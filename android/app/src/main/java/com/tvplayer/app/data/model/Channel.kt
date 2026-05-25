@@ -2,24 +2,37 @@ package com.tvplayer.app.data.model
 
 import com.google.gson.annotations.SerializedName
 
+data class ChannelLine(
+    @SerializedName("id") val id: Long = 0,
+    @SerializedName("stream_url") val streamUrl: String = "",
+    @SerializedName("stream_type") val streamType: String = "hls",
+    @SerializedName("user_agent") val userAgent: String = "",
+    @SerializedName("custom_headers") val customHeaders: String = ""
+)
+
 data class Channel(
     @SerializedName("id") val id: Long = 0,
     @SerializedName("group_id") val groupId: Long = 0,
     @SerializedName("name") val name: String = "",
     @SerializedName("logo") val logo: String = "",
     @SerializedName("description") val description: String = "",
-    @SerializedName("stream_url") val streamUrl: String = "",
-    @SerializedName("stream_type") val streamType: String = "hls",
-    @SerializedName("epg_channel_id") val epgChannelId: String = "",
     @SerializedName("current_epg") val currentEpg: String = "",
     @SerializedName("epg_percent") val epgPercent: Int = 0,
     @SerializedName("is_favorite") val isFavorite: Boolean = false,
-    @SerializedName("is_hidden") val isHidden: Boolean = false,
     @SerializedName("sort_order") val sortOrder: Int = 0,
-    @SerializedName("status") val status: String = "unknown",
-    @SerializedName("last_check") val lastCheck: String = "",
-    @SerializedName("user_agent") val userAgent: String = "",
-    @SerializedName("custom_headers") val customHeaders: String = "",
-    @SerializedName("created_at") val createdAt: String = "",
-    @SerializedName("updated_at") val updatedAt: String = ""
-)
+    @SerializedName("lines") val lines: List<ChannelLine> = emptyList(),
+    
+    // 兼容旧接口的冗余字段（避免崩溃）
+    @SerializedName("stream_url") val legacyStreamUrl: String = "",
+    @SerializedName("stream_type") val legacyStreamType: String = "hls",
+    @SerializedName("user_agent") val legacyUserAgent: String = "",
+    @SerializedName("custom_headers") val legacyCustomHeaders: String = ""
+) {
+    fun getLinesSafely(): List<ChannelLine> {
+        if (lines.isNotEmpty()) return lines
+        if (legacyStreamUrl.isNotEmpty()) {
+            return listOf(ChannelLine(id, legacyStreamUrl, legacyStreamType, legacyUserAgent, legacyCustomHeaders))
+        }
+        return emptyList()
+    }
+}

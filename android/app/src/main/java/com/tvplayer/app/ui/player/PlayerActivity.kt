@@ -25,6 +25,7 @@ import com.tvplayer.app.R
 import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
 import com.tvplayer.app.data.model.Channel
+import com.tvplayer.app.data.model.ChannelLine
 import com.tvplayer.app.data.repository.ChannelRepository
 import com.tvplayer.app.service.PlaybackService
 import com.tvplayer.app.util.DeviceUtils
@@ -79,6 +80,7 @@ class PlayerActivity : AppCompatActivity() {
     private var streamUrl = ""
     private var streamType = "hls"
     private var channelIndex = 0
+    private var lineIndex = 0
     private var allChannels = listOf<Channel>()
 
     private val handler = Handler(Looper.getMainLooper())
@@ -319,18 +321,42 @@ class PlayerActivity : AppCompatActivity() {
                 MediaPlayer.Event.EncounteredError -> {
                     tvStatus?.text = "播放失败"
                     progressBar?.visibility = View.GONE
-                    if (retryCount < maxRetries) {
+                    
+                    val channel = allChannels.getOrNull(channelIndex)
+                    val lines = channel?.getLinesSafely() ?: emptyList()
+                    
+                    if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
+                        // 如果有下一条线路，自动切换
+                        lineIndex++
+                        retryCount = 0
+                        Toast.makeText(this@PlayerActivity, "当前线路失效，自动切换线路 ${lineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                        playCurrentLine()
+                    } else if (retryCount < maxRetries) {
                         retryCount++
                         val delayMs = (3000L * (1 shl (retryCount - 1)))
                         Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
                         handler.postDelayed({ retryPlay() }, delayMs)
                     } else {
-                        Toast.makeText(this@PlayerActivity, "播放失败，已重试${maxRetries}次", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@PlayerActivity, "播放失败，所有线路均不可用", Toast.LENGTH_LONG).show()
                         retryCount = 0
                     }
                 }
             }
         }
+    }
+
+    private fun playCurrentLine() {
+        val channel = allChannels.getOrNull(channelIndex) ?: return
+        val lines = channel.getLinesSafely()
+        if (lines.isEmpty()) return
+
+        if (lineIndex >= lines.size) lineIndex = 0
+        
+        val line = lines[lineIndex]
+        streamUrl = line.streamUrl
+        streamType = line.streamType
+
+        playStream(streamUrl, streamType, line.userAgent, line.customHeaders)
     }
 
     private fun playStream(url: String, type: String, userAgent: String = "", customHeaders: String = "") {
@@ -340,9 +366,29 @@ class PlayerActivity : AppCompatActivity() {
         tvChannelName?.text = channelName
         tvStreamType?.text = type.uppercase()
 
-        val media = Media(libVlc, Uri.parse(url))
-        
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        
+        when (scaleMode) {
+            Prefs.SCALE_MODE_STRETCH -> {
+                player.aspectRatio = "16:9"
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                player.aspectRatio = null
+            }
+            Prefs.SCALE_MODE_4_3 -> {
+                player.aspectRatio = "4:3"
+            }
+            else -> {
+                player.aspectRatio = null
+            }
+        }
+        
+        val media = Media(libVlc, Uri.parse(url))
+        if (scaleMode == Prefs.SCALE_MODE_CROP) {
+            media.addOption(":crop=16:9")
+        }
+        
         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         when (decoderMode) {
             Prefs.DECODER_MODE_HARDWARE -> media.setHWDecoderEnabled(true, true)
@@ -383,7 +429,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun retryPlay() {
         val channel = allChannels.getOrNull(channelIndex)
         if (channel != null) {
-            playStream(channel.streamUrl, channel.streamType, channel.userAgent, channel.customHeaders)
+            playCurrentLine()
         } else {
             val ua = intent.getStringExtra("user_agent") ?: ""
             val headers = intent.getStringExtra("custom_headers") ?: ""
@@ -405,13 +451,12 @@ class PlayerActivity : AppCompatActivity() {
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
 
         channelIndex = index
+        lineIndex = 0 // 重置为第一条线路
         val channel = allChannels[index]
         channelId = channel.id
         channelName = channel.name
-        streamUrl = channel.streamUrl
-        streamType = channel.streamType
 
-        playStream(streamUrl, streamType, channel.userAgent, channel.customHeaders)
+        playCurrentLine()
         showChannelInfo()
     }
 

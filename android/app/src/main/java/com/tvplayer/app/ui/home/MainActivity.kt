@@ -27,6 +27,7 @@ import com.tvplayer.app.data.api.ApiClient
 import com.tvplayer.app.data.api.ClientAuthManager
 import com.tvplayer.app.data.model.Channel
 import com.tvplayer.app.data.model.ChannelGroup
+import com.tvplayer.app.data.model.ChannelLine
 import com.tvplayer.app.data.repository.ChannelRepository
 import com.tvplayer.app.ui.player.PlayerActivity
 import com.tvplayer.app.ui.settings.SettingsActivity
@@ -91,6 +92,7 @@ class MainActivity : AppCompatActivity() {
     private var filteredChannels = listOf<Channel>()
     private var currentGroupId = 0L
     private var currentChannelIndex = 0
+    private var currentLineIndex = 0
 
     private lateinit var groupAdapter: GroupAdapter
     private lateinit var channelAdapter: ChannelAdapter
@@ -244,18 +246,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var rgSettingsDecoder: android.widget.RadioGroup? = null
+    private var rgSettingsScale: android.widget.RadioGroup? = null
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
 
         rgSettingsDecoder = findViewById(R.id.rgSettingsDecoder)
         when (decoderMode) {
             Prefs.DECODER_MODE_HARDWARE -> rgSettingsDecoder?.check(R.id.rbDecoderHardware)
             Prefs.DECODER_MODE_SOFTWARE -> rgSettingsDecoder?.check(R.id.rbDecoderSoftware)
             else -> rgSettingsDecoder?.check(R.id.rbDecoderAuto)
+        }
+        
+        rgSettingsScale = findViewById(R.id.rgSettingsScale)
+        when (scaleMode) {
+            Prefs.SCALE_MODE_STRETCH -> rgSettingsScale?.check(R.id.rbScaleStretch)
+            Prefs.SCALE_MODE_CROP -> rgSettingsScale?.check(R.id.rbScaleCrop)
+            Prefs.SCALE_MODE_4_3 -> rgSettingsScale?.check(R.id.rbScale43)
+            else -> rgSettingsScale?.check(R.id.rbScaleDefault)
         }
 
         etSettingsUrl?.setText(url)
@@ -288,6 +300,13 @@ class MainActivity : AppCompatActivity() {
                 R.id.rbDecoderSoftware -> Prefs.DECODER_MODE_SOFTWARE
                 else -> Prefs.DECODER_MODE_AUTO
             }
+            
+            val newScaleMode = when (rgSettingsScale?.checkedRadioButtonId) {
+                R.id.rbScaleStretch -> Prefs.SCALE_MODE_STRETCH
+                R.id.rbScaleCrop -> Prefs.SCALE_MODE_CROP
+                R.id.rbScale43 -> Prefs.SCALE_MODE_4_3
+                else -> Prefs.SCALE_MODE_DEFAULT
+            }
 
             if (newUrl.isEmpty()) {
                 Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
@@ -296,6 +315,7 @@ class MainActivity : AppCompatActivity() {
 
             val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
             val oldDecoder = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+            val oldScale = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
             if (newUrl != oldUrl || newDecoderMode != oldDecoder) {
                 authManager.clearAuth()
                 com.tvplayer.app.data.api.ApiClient.reset()
@@ -306,6 +326,7 @@ class MainActivity : AppCompatActivity() {
                 .putString(Prefs.KEY_SERVER_URL, newUrl)
                 .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
                 .putInt(Prefs.KEY_DECODER_MODE, newDecoderMode)
+                .putInt(Prefs.KEY_SCALE_MODE, newScaleMode)
                 .apply()
                 
             com.tvplayer.app.data.api.ApiClient.init(newUrl)
@@ -409,15 +430,24 @@ class MainActivity : AppCompatActivity() {
                 }
                 MediaPlayer.Event.EncounteredError -> {
                     progressBuffering?.visibility = View.GONE
-                    if (retryCount < maxRetries) {
+                    
+                    val channel = allChannels.getOrNull(currentChannelIndex)
+                    val lines = channel?.getLinesSafely() ?: emptyList()
+                    
+                    if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
+                        currentLineIndex++
+                        retryCount = 0
+                        Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                        playCurrentLineInTv()
+                    } else if (retryCount < maxRetries) {
                         retryCount++
                         val delayMs = (3000L * (1 shl (retryCount - 1)))
                         Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
                         uiHandler.postDelayed({ 
-                            if (allChannels.isNotEmpty()) playTvChannel(currentChannelIndex)
+                            if (allChannels.isNotEmpty()) playCurrentLineInTv()
                         }, delayMs)
                     } else {
-                        Toast.makeText(this@MainActivity, "当前频道无法播放", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
                         retryCount = 0
                     }
                 }
@@ -427,12 +457,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun playTvChannel(index: Int) {
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
+        if (currentChannelIndex != index) {
+            currentLineIndex = 0
+        }
         currentChannelIndex = index
-        val channel = allChannels[index]
+        playCurrentLineInTv()
+    }
+    
+    private fun playCurrentLineInTv() {
+        val channel = allChannels.getOrNull(currentChannelIndex) ?: return
         
-        tvOsdChannelNum?.text = String.format("%03d", index + 1)
+        tvOsdChannelNum?.text = String.format("%03d", currentChannelIndex + 1)
         tvOsdChannelName?.text = channel.name
-        tvOsdInfo?.text = "连接中..."
+        
+        val lines = channel.getLinesSafely()
+        if (lines.isEmpty()) return
+        if (currentLineIndex >= lines.size) currentLineIndex = 0
+        val line = lines[currentLineIndex]
+        
+        tvOsdInfo?.text = if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中..."
         
         // 记忆功能：保存最后播放的频道 ID
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -446,16 +489,35 @@ class MainActivity : AppCompatActivity() {
         progressBuffering?.visibility = View.VISIBLE
 
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
+        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         
-        val media = Media(libVlc, Uri.parse(channel.streamUrl))
+        when (scaleMode) {
+            Prefs.SCALE_MODE_STRETCH -> {
+                player.aspectRatio = "16:9"
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                player.aspectRatio = null
+            }
+            Prefs.SCALE_MODE_4_3 -> {
+                player.aspectRatio = "4:3"
+            }
+            else -> {
+                player.aspectRatio = null
+            }
+        }
+        
+        val media = Media(libVlc, Uri.parse(line.streamUrl))
         media.setHWDecoderEnabled(true, false)
         media.addOption(":network-caching=$cacheMs")
-        applyMediaOptions(media, channel.userAgent, channel.customHeaders)
+        if (scaleMode == Prefs.SCALE_MODE_CROP) {
+            media.addOption(":crop=16:9")
+        }
+        applyMediaOptions(media, line.userAgent, line.customHeaders)
         player.media = media
         player.play()
         
         // 频道列表中高亮当前播放频道
-        channelAdapter.setPlayingIndex(index)
+        channelAdapter.setPlayingIndex(currentChannelIndex)
     }
 
     private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
@@ -786,14 +848,17 @@ class MainActivity : AppCompatActivity() {
     // ── Play channel (Phone) ───────────────────────────
 
     private fun playChannelPhone(channel: Channel) {
+        val lines = channel.getLinesSafely()
+        val firstLine = if (lines.isNotEmpty()) lines[0] else ChannelLine()
+        
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra("channel_id", channel.id)
             putExtra("channel_name", channel.name)
-            putExtra("stream_url", channel.streamUrl)
-            putExtra("stream_type", channel.streamType)
+            putExtra("stream_url", firstLine.streamUrl)
+            putExtra("stream_type", firstLine.streamType)
             putExtra("channel_index", currentChannelIndex)
-            putExtra("user_agent", channel.userAgent)
-            putExtra("custom_headers", channel.customHeaders)
+            putExtra("user_agent", firstLine.userAgent)
+            putExtra("custom_headers", firstLine.customHeaders)
         }
         startActivity(intent)
     }
