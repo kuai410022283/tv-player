@@ -224,10 +224,8 @@ async function loadChannels(search = '') {
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
       <td><span class="badge badge-${c.stream_type}">${c.stream_type.toUpperCase()}</span></td>
       <td>${badge(c.status)}</td>
-      <td>${c.is_favorite ? '⭐' : '-'}</td>
       <td><div class="btn-group">
         <button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">编辑</button>
-        <button class="btn btn-ghost btn-sm" onclick="toggleFav(${c.id})">${c.is_favorite ? '取消' : '⭐'}</button>
         <button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">删除</button>
       </div></td>
     </tr>`).join('');
@@ -336,10 +334,7 @@ async function deleteChannel(id) {
   loadChannels();
 }
 
-async function toggleFav(id) {
-  await api(`/channels/${id}/favorite`, { method: 'POST' });
-  loadChannels();
-}
+
 
 // ═══ Groups ═══════════════════════════════════════════
 let groupTotal = 0;

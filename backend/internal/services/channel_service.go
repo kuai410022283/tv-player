@@ -159,8 +159,17 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 	args := []interface{}{}
 
 	if search != "" {
-		where += " AND name LIKE ?"
-		args = append(args, "%"+search+"%")
+		switch search {
+		case "直连", "直连模式":
+			where += " AND (name LIKE ? OR source LIKE ? OR is_direct = 1)"
+			args = append(args, "%"+search+"%", "%"+search+"%")
+		case "代理", "代理模式":
+			where += " AND (name LIKE ? OR source LIKE ? OR is_direct = 0)"
+			args = append(args, "%"+search+"%", "%"+search+"%")
+		default:
+			where += " AND (name LIKE ? OR source LIKE ?)"
+			args = append(args, "%"+search+"%", "%"+search+"%")
+		}
 	}
 
 	var total int64
@@ -196,13 +205,12 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 
 // ── Channels ───────────────────────────────────────────
 
-func (s *ChannelService) ListChannels(groupID int64, favorite bool, search string, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
+func (s *ChannelService) ListChannels(groupID int64, search string, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
 	p.Normalize()
 	var whereClauses []string
 	var queryArgs []interface{}
 
-	queryArgs = append(queryArgs, clientID)
-	baseQuery := `FROM channels c LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = ? `
+	baseQuery := `FROM channels c LEFT JOIN channel_groups cg ON c.group_id = cg.id `
 
 	if clientID > 0 {
 		baseQuery += `
@@ -218,12 +226,9 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 		whereClauses = append(whereClauses, "c.group_id = ?")
 		queryArgs = append(queryArgs, groupID)
 	}
-	if favorite {
-		whereClauses = append(whereClauses, "f.channel_id IS NOT NULL")
-	}
 	if search != "" {
-		whereClauses = append(whereClauses, "c.name LIKE ?")
-		queryArgs = append(queryArgs, "%"+search+"%")
+		whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ?)")
+		queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
 	where := "WHERE " + strings.Join(whereClauses, " AND ")
@@ -238,8 +243,7 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	
 	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
 		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
-		CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
-		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at ` +
+		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at ` +
 		baseQuery + where + ` ORDER BY c.sort_order LIMIT ? OFFSET ?`
 		
 	rows, err := s.db.Query(query, queryArgs...)
@@ -251,14 +255,14 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		var isFav, isHid, isDir int
+		var isHid, isDir, supportCatchup int
 		var lastCheck sql.NullTime
-		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
-		c.IsFavorite = isFav == 1
 		c.IsHidden = isHid == 1
 		c.IsDirect = isDir == 1
+		c.SupportCatchup = supportCatchup == 1
 		if lastCheck.Valid {
 			c.LastCheck = lastCheck.Time
 		}
@@ -272,39 +276,36 @@ func (s *ChannelService) ListChannels(groupID int64, favorite bool, search strin
 
 func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, error) {
 	var c models.Channel
-	var isFav, isHid, isDir int
+	var isHid, isDir, supportCatchup int
 	var lastCheck sql.NullTime
 	query := `
 		SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 			c.stream_type, c.epg_channel_id, 
-			CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
-			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at 
+			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at 
 		FROM channels c 
-		LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = ?
 		WHERE c.id=?`
-	args := []interface{}{clientID, id}
+	args := []interface{}{id}
 
 	if clientID > 0 {
 		query = `
 			SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 				c.stream_type, c.epg_channel_id, 
-				CASE WHEN f.channel_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite, 
-				c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.created_at, c.updated_at 
+				c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at 
 			FROM channels c 
 			JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
 			JOIN clients cl ON pgr.plan_id = cl.plan_id AND cl.id = ?
-			LEFT JOIN client_channel_favorites f ON c.id = f.channel_id AND f.client_id = cl.id
 			WHERE c.id=?`
+		args = []interface{}{clientID, id}
 	}
 
 	err := s.db.QueryRow(query, args...).
-		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isFav, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
-	c.IsFavorite = isFav == 1
 	c.IsHidden = isHid == 1
 	c.IsDirect = isDir == 1
+	c.SupportCatchup = supportCatchup == 1
 	if lastCheck.Valid {
 		c.LastCheck = lastCheck.Time
 	}
@@ -357,16 +358,16 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	}
 
 	now := time.Now()
-	fav, hid, dir := 0, 0, 0
-	if c.IsFavorite { fav = 1 }
+	hid, dir, catchup := 0, 0, 0
 	if c.IsHidden { hid = 1 }
 	if c.IsDirect { dir = 1 }
+	if c.SupportCatchup { catchup = 1 }
 	if c.Source == "" { c.Source = "手动" }
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_favorite, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, now, now)
+	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, now, now)
 	if err != nil {
 		return err
 	}
@@ -382,15 +383,15 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 		return fmt.Errorf("流地址不安全: %w", err)
 	}
 
-	fav, hid, dir := 0, 0, 0
-	if c.IsFavorite { fav = 1 }
+	hid, dir, catchup := 0, 0, 0
 	if c.IsHidden { hid = 1 }
 	if c.IsDirect { dir = 1 }
+	if c.SupportCatchup { catchup = 1 }
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_favorite=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, updated_at=? WHERE id=?`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, fav, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, time.Now(), c.ID)
+	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, support_catchup=?, catchup_type=?, catchup_source=?, catchup_days=?, updated_at=? WHERE id=?`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, time.Now(), c.ID)
 	return err
 }
 
@@ -421,19 +422,6 @@ func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
 		}
 	}
 	return tx.Commit()
-}
-
-func (s *ChannelService) ToggleFavorite(id int64, clientID int64) error {
-	res, err := s.db.Exec(`DELETE FROM client_channel_favorites WHERE client_id=? AND channel_id=?`, clientID, id)
-	if err != nil {
-		return err
-	}
-	affected, _ := res.RowsAffected()
-	if affected == 0 {
-		_, err = s.db.Exec(`INSERT INTO client_channel_favorites (client_id, channel_id) VALUES (?,?)`, clientID, id)
-		return err
-	}
-	return nil
 }
 
 func (s *ChannelService) UpdateStatus(id int64, status string) error {

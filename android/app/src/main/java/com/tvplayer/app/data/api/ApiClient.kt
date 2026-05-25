@@ -80,4 +80,10 @@ object ApiClient {
         val token = accessToken ?: ""
         return "$serverUrl/api/v1/stream/proxy/$channelId?token=$token"
     }
+
+    /** 获取回看流 URL */
+    fun getCatchupUrl(channelId: Long, startTimeUnix: Long, endTimeUnix: Long): String {
+        val token = accessToken ?: ""
+        return "$serverUrl/api/v1/stream/catchup/$channelId?start=$startTimeUnix&end=$endTimeUnix&token=$token"
+    }
 }

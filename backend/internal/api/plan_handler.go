@@ -18,7 +18,8 @@ func NewPlanHandler(svc *services.PlanService) *PlanHandler {
 }
 
 func (h *PlanHandler) GetPlans(c *gin.Context) {
-	items, err := h.svc.GetPlans()
+	search := c.Query("search")
+	items, err := h.svc.GetPlans(search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{Code: -1, Message: err.Error()})
 		return

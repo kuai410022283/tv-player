@@ -37,7 +37,6 @@ interface ApiService {
     @GET("channels")
     suspend fun getChannels(
         @Query("group_id") groupId: Long? = null,
-        @Query("favorite") favorite: String? = null,
         @Query("search") search: String? = null,
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 200
@@ -46,8 +45,6 @@ interface ApiService {
     @GET("channels/{id}")
     suspend fun getChannel(@Path("id") id: Long): Response<APIResponse<Channel>>
 
-    @POST("channels/{id}/favorite")
-    suspend fun toggleFavorite(@Path("id") id: Long): Response<APIResponse<JsonElement>>
 
     // ── EPG ────────────────────────────────────────────
 

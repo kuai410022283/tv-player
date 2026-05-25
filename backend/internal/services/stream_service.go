@@ -120,7 +120,7 @@ func (sp *StreamProxy) checkAllChannels() {
 	maxPages := 10
 	for page <= maxPages {
 		p := &models.PageRequest{Page: page, PageSize: pageSize}
-		resp, err := sp.channelSvc.ListChannels(0, false, "", p, 0)
+		resp, err := sp.channelSvc.ListChannels(0, "", p, 0)
 		if err != nil || resp == nil {
 			break
 		}
@@ -151,8 +151,8 @@ func (sp *StreamProxy) GetProxyURL(channelID int64, baseURL string) string {
 	return fmt.Sprintf("%s/api/v1/stream/proxy/%d", baseURL, channelID)
 }
 
-// ServeStream proxies the actual stream data
-func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request) error {
+// ServeStream proxies the actual stream data. If targetURL is provided, it proxies that URL instead of the channel's default StreamURL.
+func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, targetURL string) error {
 	// 并发控制
 	select {
 	case sp.sem <- struct{}{}:
@@ -166,8 +166,13 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		return fmt.Errorf("channel not found: %w", err)
 	}
 
+	streamToProxy := ch.StreamURL
+	if targetURL != "" {
+		streamToProxy = targetURL
+	}
+
 	// 校验流地址，防止 SSRF
-	if err := ValidateStreamURL(ch.StreamURL); err != nil {
+	if err := ValidateStreamURL(streamToProxy); err != nil {
 		return fmt.Errorf("流地址不安全: %w", err)
 	}
 
@@ -184,7 +189,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		ClientID:    clientID,
 		ClientName:  clientName,
 		ClientIP:    clientIP,
-		URL:         ch.StreamURL,
+		URL:         streamToProxy,
 		Status:      "playing",
 		StartedAt:   time.Now(),
 		LastActive:  time.Now(),
@@ -201,7 +206,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	}()
 
 	// Proxy the stream
-	req, err := http.NewRequestWithContext(ctx, "GET", ch.StreamURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", streamToProxy, nil)
 	if err != nil {
 		return err
 	}
@@ -290,6 +295,17 @@ func (sp *StreamProxy) GetActiveStreams() []models.ActiveStream {
 }
 
 // M3U parsing
+func extractAttr(line, attr string) string {
+	prefix := attr + "=\""
+	if start := strings.Index(line, prefix); start >= 0 {
+		start += len(prefix)
+		if end := strings.Index(line[start:], "\""); end >= 0 {
+			return line[start : start+end]
+		}
+	}
+	return ""
+}
+
 func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 	scanner := bufio.NewScanner(reader)
 	// 增加 buffer 限制，防止某些 M3U 文件单行过长（如带有大尺寸 base64 logo url 时）超过 64KB
@@ -298,12 +314,29 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 	var channels []map[string]string
 	var current map[string]string
 
+	var globalCatchupType string
+	var globalCatchupSource string
+	var globalCatchupDays string
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" { continue }
 
-		if strings.HasPrefix(line, "#EXTINF:") {
+		if strings.HasPrefix(line, "#EXTM3U") {
+			globalCatchupType = extractAttr(line, "catchup")
+			globalCatchupSource = extractAttr(line, "catchup-source")
+			globalCatchupDays = extractAttr(line, "catchup-days")
+		} else if strings.HasPrefix(line, "#EXTINF:") {
 			current = parseExtInf(line)
+			if current["catchup"] == "" && globalCatchupType != "" {
+				current["catchup"] = globalCatchupType
+			}
+			if current["catchup-source"] == "" && globalCatchupSource != "" {
+				current["catchup-source"] = globalCatchupSource
+			}
+			if current["catchup-days"] == "" && globalCatchupDays != "" {
+				current["catchup-days"] = globalCatchupDays
+			}
 		} else if strings.HasPrefix(line, "#EXTVLCOPT:") && current != nil {
 			parseVlcOpt(line, current)
 		} else if !strings.HasPrefix(line, "#") && current != nil {
@@ -344,14 +377,11 @@ func parseExtInf(line string) map[string]string {
 	}
 
 	// Extract attributes
-	attrs := []string{"tvg-id", "tvg-name", "tvg-logo", "group-title", "tvg-chno"}
+	attrs := []string{"tvg-id", "tvg-name", "tvg-logo", "group-title", "tvg-chno", "catchup", "catchup-source", "catchup-days"}
 	for _, attr := range attrs {
-		prefix := attr + "=\""
-		if start := strings.Index(line, prefix); start >= 0 {
-			start += len(prefix)
-			if end := strings.Index(line[start:], "\""); end >= 0 {
-				ch[attr] = line[start : start+end]
-			}
+		val := extractAttr(line, attr)
+		if val != "" {
+			ch[attr] = val
 		}
 	}
 	return ch

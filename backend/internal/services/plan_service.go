@@ -15,8 +15,15 @@ func NewPlanService(db *sql.DB) *PlanService {
 	return &PlanService{db: db}
 }
 
-func (s *PlanService) GetPlans() ([]*models.SubscriptionPlan, error) {
-	rows, err := s.db.Query(`SELECT id, name, days, max_streams, price, description, created_at, updated_at FROM subscription_plans ORDER BY id ASC`)
+func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {
+	query := `SELECT id, name, days, max_streams, price, description, created_at, updated_at FROM subscription_plans`
+	var args []interface{}
+	if search != "" {
+		query += ` WHERE name LIKE ?`
+		args = append(args, "%"+search+"%")
+	}
+	query += ` ORDER BY id ASC`
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

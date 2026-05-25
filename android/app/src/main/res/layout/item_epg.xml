@@ -29,4 +29,14 @@
         android:marqueeRepeatLimit="marquee_forever"
         android:scrollHorizontally="true"
         android:singleLine="true" />
+        
+    <ImageView
+        android:id="@+id/ivCatchup"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_replay"
+        android:visibility="gone" />
+        
 </LinearLayout>

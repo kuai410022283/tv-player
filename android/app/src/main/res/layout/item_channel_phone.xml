@@ -48,23 +48,27 @@
 
         <TextView
             android:id="@+id/tvChannelName"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_primary"
             android:textSize="14sp"
             android:singleLine="true"
-            android:ellipsize="end"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:scrollHorizontally="true"
             tools:text="CCTV-1 综合" />
 
         <TextView
             android:id="@+id/tvCurrentEpg"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_secondary"
             android:textSize="10sp"
             android:layout_marginTop="1dp"
             android:singleLine="true"
-            android:ellipsize="end"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:scrollHorizontally="true"
             tools:text="精彩节目" />
 
         <ProgressBar

@@ -31,7 +31,7 @@ type Channel struct {
 	EPGChannelID string   `json:"epg_channel_id,omitempty" db:"epg_channel_id"`
 	CurrentEPG   string   `json:"current_epg,omitempty" db:"-"`
 	EpgPercent   int      `json:"epg_percent,omitempty" db:"-"`
-	IsFavorite  bool      `json:"is_favorite" db:"is_favorite"`
+
 	IsHidden    bool      `json:"is_hidden" db:"is_hidden"`
 	IsDirect    bool      `json:"is_direct" db:"is_direct"`
 	SortOrder   int       `json:"sort_order" db:"sort_order"`
@@ -41,6 +41,10 @@ type Channel struct {
 	Source        string    `json:"source" db:"source"`
 	UserAgent     string    `json:"user_agent,omitempty" db:"user_agent"`
 	CustomHeaders string    `json:"custom_headers,omitempty" db:"custom_headers"`
+	SupportCatchup bool     `json:"support_catchup" db:"support_catchup"`
+	CatchupType    string   `json:"catchup_type,omitempty" db:"catchup_type"`
+	CatchupSource  string   `json:"catchup_source,omitempty" db:"catchup_source"`
+	CatchupDays    int      `json:"catchup_days,omitempty" db:"catchup_days"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -54,6 +58,8 @@ type EPGProgram struct {
 	StartTime time.Time `json:"start_time" db:"start_time"`
 	EndTime   time.Time `json:"end_time" db:"end_time"`
 	Desc      string    `json:"description,omitempty" db:"description"`
+	CanReplay bool      `json:"can_replay,omitempty" db:"-"`
+	ReplayURL string    `json:"replay_url,omitempty" db:"-"`
 }
 
 // ── Playback History ───────────────────────────────────

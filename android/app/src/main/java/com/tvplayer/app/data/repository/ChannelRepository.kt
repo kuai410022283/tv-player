@@ -29,13 +29,11 @@ class ChannelRepository {
     /** 获取所有频道（自动分页拉取） */
     suspend fun getChannels(
         groupId: Long? = null,
-        favorite: Boolean = false,
         search: String? = null
     ): Result<List<Channel>> = withContext(Dispatchers.IO) {
         try {
             val resp = ApiClient.getService().getChannels(
                 groupId = if (groupId == 0L) null else groupId,
-                favorite = if (favorite) "true" else null,
                 search = search,
                 page = 1,
                 pageSize = 1000 // 限制最大拉取数量，防止电视盒子 OOM 卡死

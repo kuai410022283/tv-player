@@ -439,18 +439,26 @@ func (s *ClientService) AddLog(clientID int64, action string, channelID int64, i
 		clientID, action, channelID, ip, userAgent, detail, time.Now())
 }
 
-func (s *ClientService) GetLogs(clientID int64, limit int) ([]models.AccessLog, error) {
+func (s *ClientService) GetLogs(clientID int64, limit int, search string) ([]models.AccessLog, error) {
 	if limit <= 0 {
 		limit = 100
+	}
+	where := "l.client_id=?"
+	args := []interface{}{clientID}
+	if search != "" {
+		where += " AND (cl.name LIKE ? OR ch.name LIKE ? OR l.ip LIKE ? OR l.action LIKE ?)"
+		sTerm := "%" + search + "%"
+		args = append(args, sTerm, sTerm, sTerm, sTerm)
 	}
 	query := `
 		SELECT l.id, l.client_id, COALESCE(cl.name, ''), l.action, l.channel_id, COALESCE(ch.name, ''), l.ip, l.user_agent, l.detail, l.created_at 
 		FROM access_logs l
 		LEFT JOIN clients cl ON l.client_id = cl.id
 		LEFT JOIN channels ch ON l.channel_id = ch.id
-		WHERE l.client_id=? 
+		WHERE ` + where + ` 
 		ORDER BY l.created_at DESC LIMIT ?`
-	rows, err := s.db.Query(query, clientID, limit)
+	args = append(args, limit)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -470,17 +478,26 @@ func (s *ClientService) GetLogs(clientID int64, limit int) ([]models.AccessLog, 
 	return logs, nil
 }
 
-func (s *ClientService) GetRecentLogs(limit int) ([]models.AccessLog, error) {
+func (s *ClientService) GetRecentLogs(limit int, search string) ([]models.AccessLog, error) {
 	if limit <= 0 {
 		limit = 100
+	}
+	where := "1=1"
+	var args []interface{}
+	if search != "" {
+		where += " AND (cl.name LIKE ? OR ch.name LIKE ? OR l.ip LIKE ? OR l.action LIKE ?)"
+		sTerm := "%" + search + "%"
+		args = append(args, sTerm, sTerm, sTerm, sTerm)
 	}
 	query := `
 		SELECT l.id, l.client_id, COALESCE(cl.name, ''), l.action, l.channel_id, COALESCE(ch.name, ''), l.ip, l.user_agent, l.detail, l.created_at 
 		FROM access_logs l
 		LEFT JOIN clients cl ON l.client_id = cl.id
 		LEFT JOIN channels ch ON l.channel_id = ch.id
+		WHERE ` + where + `
 		ORDER BY l.created_at DESC LIMIT ?`
-	rows, err := s.db.Query(query, limit)
+	args = append(args, limit)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

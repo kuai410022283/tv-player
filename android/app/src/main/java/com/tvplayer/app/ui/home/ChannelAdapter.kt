@@ -46,6 +46,8 @@ class ChannelAdapter(
             // TV 模式: D-pad 焦点处理，并且防止触控模式下的双击问题
             holder.itemView.isFocusable = true
             holder.itemView.isFocusableInTouchMode = false
+            holder.itemView.findViewById<TextView>(R.id.tvCurrentEpg)?.isSelected = holder.itemView.hasFocus()
+            holder.itemView.findViewById<TextView>(R.id.tvChannelName)?.isSelected = holder.itemView.hasFocus()
             holder.itemView.setOnFocusChangeListener { v, hasFocus ->
                 v.animate()
                     .scaleX(if (hasFocus) 1.03f else 1.0f)
@@ -53,6 +55,9 @@ class ChannelAdapter(
                     .alpha(if (hasFocus) 1.0f else 0.85f)
                     .setDuration(120)
                     .start()
+                
+                v.findViewById<TextView>(R.id.tvCurrentEpg)?.isSelected = hasFocus
+                v.findViewById<TextView>(R.id.tvChannelName)?.isSelected = hasFocus
             }
         } else {
             // 手机模式: 触控反馈
@@ -118,7 +123,7 @@ class ChannelAdapter(
                 ivLogo.visibility = View.GONE
             }
 
-            ivFav.visibility = if (item.isFavorite) View.VISIBLE else View.GONE
+            ivFav.visibility = View.GONE
 
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
         }

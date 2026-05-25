@@ -44,13 +44,14 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		channels.PUT("/:id", hs.Handler.UpdateChannel)
 		channels.DELETE("/:id", hs.Handler.DeleteChannel)
 		channels.DELETE("/batch", hs.Handler.BatchChannel)
-		channels.POST("/:id/favorite", hs.Handler.ToggleFavorite)
 	}
 
 	// ── 流媒体 ──────────────────────────────────────
 	stream := r.Group("/stream")
 	{
 		stream.GET("/proxy/:id", hs.Handler.ProxyStream)
+		stream.GET("/proxy/:id/*path", hs.Handler.ProxyStream)
+		stream.GET("/catchup/:id", hs.Handler.CatchupStream)
 		stream.GET("/check/:id", hs.Handler.CheckStream)
 		stream.GET("/active", hs.Handler.GetActiveStreams)
 		stream.DELETE("/active/:id", hs.Handler.KillStream)

@@ -100,6 +100,10 @@ class MainActivity : AppCompatActivity() {
     private var layoutEmpty: View? = null
     private var tvEmptyText: TextView? = null
 
+    // ── Catchup State ──
+    private var currentCatchupStartTime: String? = null
+    private var currentCatchupChannelIndex: Int = -1
+
     // ── Data ──
     private var groups = listOf<ChannelGroup>()
     private var allChannels = listOf<Channel>()
@@ -279,6 +283,40 @@ class MainActivity : AppCompatActivity() {
         tvEpgMenuTitle = findViewById(R.id.tvEpgMenuTitle)
         
         epgAdapter = EpgAdapter()
+        epgAdapter.setOnItemClickListener { prog ->
+            val channel = allChannels.getOrNull(currentChannelIndex) ?: return@setOnItemClickListener
+            try {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                val startUnix = sdf.parse(prog.startTime)?.time?.div(1000) ?: 0L
+                val endUnix = sdf.parse(prog.endTime)?.time?.div(1000) ?: 0L
+                if (startUnix > 0 && endUnix > 0) {
+                    val url = ApiClient.getCatchupUrl(channel.id, startUnix, endUnix)
+                    val lines = channel.getLinesSafely()
+                    val ua = if (lines.isNotEmpty()) lines[0].userAgent else ""
+                    val headers = if (lines.isNotEmpty()) lines[0].customHeaders else ""
+                    
+                    if (isTvMode) {
+                        currentCatchupStartTime = prog.startTime
+                        currentCatchupChannelIndex = currentChannelIndex
+                        tvOsdInfo?.text = "回看: ${prog.title}"
+                        playerHelper?.play(url, ua, headers)
+                        hideEpgMenu()
+                    } else {
+                        val intent = android.content.Intent(this, com.tvplayer.app.ui.player.PlayerActivity::class.java).apply {
+                            putExtra("channel_id", channel.id)
+                            putExtra("channel_name", channel.name)
+                            putExtra("stream_url", url)
+                            putExtra("stream_type", "hls") // Catchup is usually HLS
+                            putExtra("user_agent", ua)
+                            putExtra("custom_headers", headers)
+                        }
+                        startActivity(intent)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         rvEpgList?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         rvEpgList?.adapter = epgAdapter
         
@@ -494,6 +532,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun playTvChannel(index: Int) {
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
+        
+        currentCatchupStartTime = null
+        currentCatchupChannelIndex = -1
+        
         if (currentChannelIndex != index) {
             currentLineIndex = 0
         }
@@ -937,6 +979,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 tvEpgEmptyText?.visibility = View.GONE
                 rvEpgList?.visibility = View.VISIBLE
+                epgAdapter.setSupportCatchup(channel.supportCatchup)
+                if (currentChannelIndex == currentCatchupChannelIndex) {
+                    epgAdapter.setActiveProgramStartTime(currentCatchupStartTime)
+                } else {
+                    epgAdapter.setActiveProgramStartTime(null)
+                }
                 epgAdapter.setData(cached)
                 val pIndex = epgAdapter.getPlayingIndex()
                 if (pIndex >= 0) {
@@ -970,6 +1018,12 @@ class MainActivity : AppCompatActivity() {
                             tvEpgEmptyText?.visibility = View.VISIBLE
                         } else {
                             rvEpgList?.visibility = View.VISIBLE
+                            epgAdapter.setSupportCatchup(channel.supportCatchup)
+                            if (currentChannelIndex == currentCatchupChannelIndex) {
+                                epgAdapter.setActiveProgramStartTime(currentCatchupStartTime)
+                            } else {
+                                epgAdapter.setActiveProgramStartTime(null)
+                            }
                             epgAdapter.setData(programs)
                             
                             // Scroll to playing index

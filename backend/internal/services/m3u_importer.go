@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,18 +127,21 @@ func (imp *M3UImporter) ImportFromString(content string, sourceName string) (int
 
 func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string) (int, error) {
 	// 1. 预先处理所有分组，避免在开启频道的写入事务后再执行其它表写入，导致 SQLite 锁表(Deadlock)
+	// 取消按 Source 严格过滤，允许不同来源但同名的分组进行合并复用，防止产生大量同名分组
 	groupCache := make(map[string]int64)
 	existingGroups, _ := imp.channelSvc.ListGroups(0)
 	for _, g := range existingGroups {
-		if g.Source == sourceName {
-			groupCache[g.Name] = g.ID
-		}
+		groupCache[g.Name] = g.ID
 	}
 
 	for _, ch := range channels {
 		groupName := ch["group-title"]
-		if groupName == "" {
-			groupName = "未分类"
+		if groupName == "" || groupName == "-" {
+			if sourceName != "" {
+				groupName = sourceName
+			} else {
+				groupName = "未分类"
+			}
 		}
 		if _, ok := groupCache[groupName]; !ok {
 			newGroup := &models.ChannelGroup{
@@ -175,13 +179,13 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?)`)
+	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return 0, err
 	}
 	defer stmtInsert.Close()
 
-	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, updated_at = CURRENT_TIMESTAMP WHERE stream_url = ? AND source = ?`)
+	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, updated_at = CURRENT_TIMESTAMP WHERE stream_url = ? AND source = ?`)
 	if err != nil {
 		return 0, err
 	}
@@ -189,8 +193,12 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 
 	for i, ch := range channels {
 		groupName := ch["group-title"]
-		if groupName == "" {
-			groupName = "未分类"
+		if groupName == "" || groupName == "-" {
+			if sourceName != "" {
+				groupName = sourceName
+			} else {
+				groupName = "未分类"
+			}
 		}
 		groupID := groupCache[groupName]
 
@@ -214,12 +222,26 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		
 		userAgent := ch["user_agent"]
 
+		supportCatchup := 0
+		catchupType := ch["catchup"]
+		if catchupType != "" {
+			supportCatchup = 1
+		}
+		catchupSource := ch["catchup-source"]
+		
+		catchupDays := 0
+		if days, err := strconv.Atoi(ch["catchup-days"]); err == nil && days > 0 {
+			catchupDays = days
+		} else if supportCatchup == 1 {
+			catchupDays = 7 // Default 7 days
+		}
+
 		if existingURLs[ch["url"]] {
 			// 更新已存在的频道
-			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, ch["url"], sourceName)
+			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, ch["url"], sourceName)
 		} else {
 			// 插入新频道
-			_, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], ch["url"], streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON)
+			_, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], ch["url"], streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays)
 			if err == nil {
 				imported++
 				existingURLs[ch["url"]] = true // 防止同一个 M3U 里有重复 URL 导致后续插入失败

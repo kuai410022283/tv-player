@@ -266,8 +266,9 @@ func (h *ClientHandler) Delete(c *gin.Context) {
 func (h *ClientHandler) GetLogs(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	search := c.Query("search")
 
-	logs, err := h.clientSvc.GetLogs(id, limit)
+	logs, err := h.clientSvc.GetLogs(id, limit, search)
 	if err != nil {
 		slog.Error("get logs failed", "client_id", id, "error", err)
 		fail(c, 500, "获取日志失败")
@@ -278,7 +279,8 @@ func (h *ClientHandler) GetLogs(c *gin.Context) {
 
 func (h *ClientHandler) GetRecentLogs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	logs, err := h.clientSvc.GetRecentLogs(limit)
+	search := c.Query("search")
+	logs, err := h.clientSvc.GetRecentLogs(limit, search)
 	if err != nil {
 		slog.Error("get recent logs failed", "error", err)
 		fail(c, 500, "获取日志失败")

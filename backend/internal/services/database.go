@@ -44,6 +44,10 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN support_catchup INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0`)
 
 	// 移除 channel_groups.name 的 UNIQUE 约束
 	var sqlStmt string
@@ -102,7 +106,6 @@ func createTables(db *sql.DB) error {
 		stream_url TEXT NOT NULL,
 		stream_type TEXT NOT NULL DEFAULT 'hls',
 		epg_channel_id TEXT DEFAULT '',
-		is_favorite INTEGER DEFAULT 0,
 		is_hidden INTEGER DEFAULT 0,
 		is_direct INTEGER DEFAULT 1,
 		sort_order INTEGER DEFAULT 0,
@@ -112,6 +115,10 @@ func createTables(db *sql.DB) error {
 		source TEXT DEFAULT '手动',
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
+		support_catchup INTEGER DEFAULT 0,
+		catchup_type TEXT DEFAULT '',
+		catchup_source TEXT DEFAULT '',
+		catchup_days INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -134,13 +141,7 @@ func createTables(db *sql.DB) error {
 		value TEXT NOT NULL
 	);
 
-	CREATE TABLE IF NOT EXISTS client_channel_favorites (
-		client_id INTEGER NOT NULL,
-		channel_id INTEGER NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (client_id, channel_id),
-		FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
-	);
+	DROP TABLE IF EXISTS client_channel_favorites;
 
 	CREATE TABLE IF NOT EXISTS m3u_sources (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -233,7 +234,9 @@ func createTables(db *sql.DB) error {
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE CASCADE
 	);
 
-	INSERT OR IGNORE INTO channel_groups (name, sort_order) VALUES ('未分类', 99999);
+	INSERT INTO channel_groups (name, sort_order)
+	SELECT '未分类', 99999
+	WHERE NOT EXISTS (SELECT 1 FROM channel_groups WHERE name = '未分类');
 	`
 
 	_, err := db.Exec(schema)
@@ -250,6 +253,10 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN support_catchup INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0;")
 
 	return err
 }

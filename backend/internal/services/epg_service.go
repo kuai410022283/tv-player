@@ -171,7 +171,6 @@ func (s *EPGService) FetchAndBuildIndex() {
 
 	newIndex := make(map[string]map[string][]models.EPGProgram)
 
-	nowDateStr := time.Now().Format("2006-01-02")
 
 	for _, prog := range tv.Programmes {
 		start, err1 := parseXmltvTime(prog.Start)
@@ -181,8 +180,9 @@ func (s *EPGService) FetchAndBuildIndex() {
 		}
 
 		dateKey := start.In(time.Local).Format("2006-01-02")
-		// 丢弃历史数据，仅保留今天及未来的 EPG
-		if dateKey < nowDateStr {
+		// 为支持回看，保留最近 7 天的历史数据
+		sevenDaysAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+		if dateKey < sevenDaysAgo {
 			continue
 		}
 

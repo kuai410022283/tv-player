@@ -46,6 +46,7 @@ backend/web/dist/
 Thumbs.db
 
 m3u.txt
+m3u_回看.txt
 
 backend/mediaplayer*
 

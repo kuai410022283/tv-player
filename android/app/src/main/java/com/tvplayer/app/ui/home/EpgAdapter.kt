@@ -16,27 +16,47 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
     private val programs = mutableListOf<EPGProgram>()
     private var playingIndex = -1
 
+    private var supportCatchup = false
+    private var itemClickListener: ((EPGProgram) -> Unit)? = null
+    private var activeProgramStartTime: String? = null
+
+    fun setSupportCatchup(support: Boolean) {
+        this.supportCatchup = support
+    }
+    
+    fun setActiveProgramStartTime(startTime: String?) {
+        this.activeProgramStartTime = startTime
+    }
+
+    fun setOnItemClickListener(listener: (EPGProgram) -> Unit) {
+        this.itemClickListener = listener
+    }
+
     fun setData(newPrograms: List<EPGProgram>) {
         programs.clear()
         programs.addAll(newPrograms)
         
-        // 查找当前正在播放的节目
+        // 查找当前应该高亮的节目 (优先判断是否有主动选中的回看节目)
         playingIndex = -1
-        val now = Date()
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-        try {
-            for (i in programs.indices) {
-                val start = sdf.parse(programs[i].startTime)
-                val end = sdf.parse(programs[i].endTime)
-                if (start != null && end != null && now.after(start) && now.before(end)) {
-                    playingIndex = i
-                    break
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (activeProgramStartTime != null) {
+            playingIndex = programs.indexOfFirst { it.startTime == activeProgramStartTime }
         }
         
+        // 如果没有选中的回看节目，或者没找到，则使用当前时间判断直播节目
+        val now = Date()
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        val liveIndex = programs.indexOfFirst {
+            try {
+                val start = sdf.parse(it.startTime)
+                val end = sdf.parse(it.endTime)
+                start != null && end != null && now.after(start) && now.before(end)
+            } catch (e: Exception) { false }
+        }
+        
+        if (playingIndex == -1) {
+            playingIndex = liveIndex
+        }
+
         notifyDataSetChanged()
     }
     
@@ -66,13 +86,69 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         holder.tvTime.text = timeStr
         holder.tvTitle.text = prog.title
         
+        val isLiveProgram = position == programs.indexOfFirst {
+            val now = Date()
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+            try {
+                val start = sdf.parse(it.startTime)
+                val end = sdf.parse(it.endTime)
+                start != null && end != null && now.after(start) && now.before(end)
+            } catch (e: Exception) { false }
+        }
+        
         if (position == playingIndex) {
             holder.tvTime.setTextColor(Color.parseColor("#FFC107")) // accent color
             holder.tvTitle.setTextColor(Color.parseColor("#FFC107"))
-            holder.tvTitle.text = "${prog.title} (正在播出)"
+            if (activeProgramStartTime != null) {
+                holder.tvTitle.text = "${prog.title} (回看中)"
+            } else {
+                holder.tvTitle.text = "${prog.title} (正在播出)"
+            }
+            holder.ivCatchup.visibility = View.GONE
+        } else if (position < (if (activeProgramStartTime != null) programs.size else playingIndex) && supportCatchup && !isLiveProgram) {
+            // 这里判断是否是往期节目。如果是回看模式，且位置在当前直播节目前面，就显示回看图标
+            val liveIdx = programs.indexOfFirst {
+                val now = Date()
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                try {
+                    val start = sdf.parse(it.startTime)
+                    val end = sdf.parse(it.endTime)
+                    start != null && end != null && now.after(start) && now.before(end)
+                } catch (e: Exception) { false }
+            }
+            
+            if (position < liveIdx || (liveIdx == -1 && position < programs.size)) {
+                holder.tvTime.setTextColor(Color.WHITE)
+                holder.tvTitle.setTextColor(Color.parseColor("#DDDDDD"))
+                holder.tvTitle.text = prog.title
+                holder.ivCatchup.visibility = View.VISIBLE
+            } else {
+                holder.tvTime.setTextColor(Color.WHITE)
+                holder.tvTitle.setTextColor(Color.parseColor("#DDDDDD"))
+                holder.tvTitle.text = prog.title
+                holder.ivCatchup.visibility = View.GONE
+            }
         } else {
             holder.tvTime.setTextColor(Color.WHITE)
             holder.tvTitle.setTextColor(Color.parseColor("#DDDDDD"))
+            holder.tvTitle.text = prog.title
+            holder.ivCatchup.visibility = View.GONE
+        }
+        
+        // 点击事件
+        holder.itemView.setOnClickListener {
+            val liveIdx = programs.indexOfFirst {
+                val now = Date()
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                try {
+                    val start = sdf.parse(it.startTime)
+                    val end = sdf.parse(it.endTime)
+                    start != null && end != null && now.after(start) && now.before(end)
+                } catch (e: Exception) { false }
+            }
+            if ((position < liveIdx || (liveIdx == -1 && position < programs.size)) && supportCatchup) {
+                itemClickListener?.invoke(prog)
+            }
         }
         
         // 初始化当前状态
@@ -89,5 +165,6 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvTime: TextView = view.findViewById(R.id.tvEpgTime)
         val tvTitle: TextView = view.findViewById(R.id.tvEpgTitle)
+        val ivCatchup: android.widget.ImageView = view.findViewById(R.id.ivCatchup)
     }
 }

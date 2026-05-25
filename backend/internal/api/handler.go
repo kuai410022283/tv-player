@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -189,7 +190,6 @@ func (h *Handler) BatchGroup(c *gin.Context) {
 
 func (h *Handler) ListChannels(c *gin.Context) {
 	groupID, _ := strconv.ParseInt(c.Query("group_id"), 10, 64)
-	favorite := c.Query("favorite") == "true"
 	search := c.Query("search")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -199,7 +199,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	if id, exists := c.Get("client_id"); exists {
 		clientID = id.(int64)
 	}
-	resp, err := h.channelSvc.ListChannels(groupID, favorite, search, p, clientID)
+	resp, err := h.channelSvc.ListChannels(groupID, search, p, clientID)
 	if err != nil {
 		failInternal(c, err, "获取频道列表失败")
 		return
@@ -227,7 +227,14 @@ func (h *Handler) ListChannels(c *gin.Context) {
 
 			for i := range items {
 				if !items[i].IsDirect {
-					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, items[i].ID, clientToken)
+					ext := "ts"
+					switch items[i].StreamType {
+					case "hls", "":
+						ext = "m3u8"
+					case "mp4", "flv", "mkv", "mpd":
+						ext = items[i].StreamType
+					}
+					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?token=%s", baseURL, items[i].ID, ext, clientToken)
 				}
 				// 无论直连还是代理模式，客户端都拿取继承所得的 UA 与 CustomHeaders 方便统一标准播放
 				if ua, headers, err := h.channelSvc.GetInheritedHeaders(items[i].ID); err == nil {
@@ -259,6 +266,8 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					"stream_type":    items[i].StreamType,
 					"user_agent":     items[i].UserAgent,
 					"custom_headers": items[i].CustomHeaders,
+					"support_catchup": items[i].SupportCatchup,
+					"catchup_days":    items[i].CatchupDays,
 				}
 
 				if idx, exists := groupMap[nameKey]; exists {
@@ -275,8 +284,10 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"description": items[i].Description,
 						"current_epg": items[i].CurrentEPG,
 						"epg_percent": items[i].EpgPercent,
-						"is_favorite": items[i].IsFavorite,
+
 						"sort_order":  items[i].SortOrder,
+						"support_catchup": items[i].SupportCatchup,
+						"catchup_days":    items[i].CatchupDays,
 						"lines":       []map[string]interface{}{line},
 					}
 					groupedItems = append(groupedItems, newGroup)
@@ -386,27 +397,112 @@ func (h *Handler) BatchChannel(c *gin.Context) {
 	ok(c, nil)
 }
 
-func (h *Handler) ToggleFavorite(c *gin.Context) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	var clientID int64
-	if cid, exists := c.Get("client_id"); exists {
-		clientID = cid.(int64)
-	}
-	if clientID == 0 {
-		fail(c, 403, "缺少客户端授权")
-		return
-	}
-	if err := h.channelSvc.ToggleFavorite(id, clientID); err != nil {
-		failInternal(c, err, "操作失败")
-		return
-	}
-	ok(c, nil)
-}
-
 // ── Stream ─────────────────────────────────────────────
 
 func (h *Handler) ProxyStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	subPath := c.Param("path")
+	
+	var clientID int64
+	var clientName string
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+	}
+	if cname, exists := c.Get("client_name"); exists {
+		clientName = cname.(string)
+	}
+	clientIP := c.ClientIP()
+	
+	var targetURL string
+	if subPath != "" && subPath != "/" && !strings.HasPrefix(subPath, "/play.") {
+		ch, err := h.channelSvc.GetChannel(id, 0)
+		if err == nil && ch.StreamURL != "" {
+			base, err1 := url.Parse(ch.StreamURL)
+			rel, err2 := url.Parse(strings.TrimPrefix(subPath, "/"))
+			if err1 == nil && err2 == nil {
+				resolved := base.ResolveReference(rel)
+				// Remove our proxy token before forwarding query params to upstream
+				q := c.Request.URL.Query()
+				q.Del("token")
+				
+				// Keep the original upstream query params if this is just resolving a relative path
+				// Note: if the upstream URL already has query params, they might get overwritten if not careful,
+				// but ResolveReference replaces the query if rel has one.
+				if len(q) > 0 {
+				    // Combine with resolved query
+				    resolvedQuery := resolved.Query()
+				    for k, v := range q {
+				        resolvedQuery[k] = v
+				    }
+				    resolved.RawQuery = resolvedQuery.Encode()
+				}
+				targetURL = resolved.String()
+			}
+		}
+	}
+
+	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request, targetURL); err != nil {
+		slog.Error("stream proxy failed", "channel_id", id, "subPath", subPath, "error", err)
+		// 流代理失败时 Writer 可能已经写入了 header，不能再写 JSON
+		if !c.Writer.Written() {
+			fail(c, 502, "流媒体代理失败")
+		}
+	}
+}
+
+func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
+	if catchupSource == "" {
+		return streamURL
+	}
+	
+	start := time.Unix(startUnix, 0).In(time.Local)
+	end := time.Unix(endUnix, 0).In(time.Local)
+	
+	source := catchupSource
+	source = strings.ReplaceAll(source, "${(b)yyyyMMddHHmmss}", start.Format("20060102150405"))
+	source = strings.ReplaceAll(source, "${(e)yyyyMMddHHmmss}", end.Format("20060102150405"))
+	source = strings.ReplaceAll(source, "${b}", fmt.Sprintf("%d", startUnix))
+	source = strings.ReplaceAll(source, "${e}", fmt.Sprintf("%d", endUnix))
+	
+	separator := ""
+	if !strings.HasPrefix(source, "?") && !strings.HasPrefix(source, "&") {
+		if strings.Contains(streamURL, "?") {
+			separator = "&"
+		} else {
+			separator = "?"
+		}
+	} else if strings.HasPrefix(source, "?") && strings.Contains(streamURL, "?") {
+		source = "&" + source[1:]
+	}
+	
+	return streamURL + separator + source
+}
+
+func (h *Handler) CatchupStream(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	startStr := c.Query("start")
+	endStr := c.Query("end")
+	
+	startUnix, _ := strconv.ParseInt(startStr, 10, 64)
+	endUnix, _ := strconv.ParseInt(endStr, 10, 64)
+	
+	ch, err := h.channelSvc.GetChannel(id, 0)
+	if err != nil {
+		fail(c, 404, "频道不存在")
+		return
+	}
+	
+	if !ch.SupportCatchup {
+		fail(c, 400, "该频道不支持回看")
+		return
+	}
+	
+	targetURL := generateCatchupURL(ch.StreamURL, ch.CatchupSource, startUnix, endUnix)
+	
+	if ch.IsDirect {
+		c.Redirect(http.StatusFound, targetURL)
+		return
+	}
 	
 	var clientID int64
 	var clientName string
@@ -418,11 +514,10 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 	}
 	clientIP := c.ClientIP()
 
-	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request); err != nil {
-		slog.Error("stream proxy failed", "channel_id", id, "error", err)
-		// 流代理失败时 Writer 可能已经写入了 header，不能再写 JSON
+	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request, targetURL); err != nil {
+		slog.Error("catchup stream proxy failed", "channel_id", id, "error", err)
 		if !c.Writer.Written() {
-			fail(c, 502, "流媒体代理失败")
+			fail(c, 502, "回看流代理失败")
 		}
 	}
 }
@@ -650,7 +745,7 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 
 func (h *Handler) GetStats(c *gin.Context) {
 	p := &models.PageRequest{Page: 1, PageSize: 1}
-	totalResp, _ := h.channelSvc.ListChannels(0, false, "", p, 0)
+	totalResp, _ := h.channelSvc.ListChannels(0, "", p, 0)
 	totalChannels := int64(0)
 	if totalResp != nil {
 		totalChannels = totalResp.Total
