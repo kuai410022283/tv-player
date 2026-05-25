@@ -608,7 +608,7 @@ class MainActivity : AppCompatActivity() {
         layoutSettingsMenu?.visibility = View.GONE
         layoutEpgMenu?.visibility = View.GONE
         
-        tvLineMenuTitle?.text = "切换线路 - ${channel.name}"
+        tvLineMenuTitle?.text = "线路"
         containerLines?.removeAllViews()
         
         var firstFocusableView: View? = null
@@ -651,7 +651,10 @@ class MainActivity : AppCompatActivity() {
         }
         
         layoutLineMenu?.visibility = View.VISIBLE
-        firstFocusableView?.requestFocus() ?: containerLines?.getChildAt(0)?.requestFocus()
+        layoutLineMenu?.post {
+            val target = firstFocusableView ?: containerLines?.getChildAt(0)
+            target?.requestFocus()
+        }
     }
 
     private fun hideLineSelectionMenu() {
@@ -1107,7 +1110,11 @@ class MainActivity : AppCompatActivity() {
                         hideEpgMenu()
                         return true
                     }
-                    if (!isMenuVisible && !isLineVisible) {
+                    if (isLineVisible) {
+                        hideLineSelectionMenu()
+                        return true
+                    }
+                    if (!isMenuVisible) {
                         layoutZappingMenu?.visibility = View.VISIBLE
                         tvGroupsRv?.requestFocus()
                         uiHandler.removeCallbacks(hideZappingRunnable)
@@ -1117,7 +1124,11 @@ class MainActivity : AppCompatActivity() {
                     // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (isSettingsVisible || isEpgVisible || isLineVisible) {
+                    if (isSettingsVisible || isEpgVisible) {
+                        return true
+                    }
+                    if (isLineVisible) {
+                        hideLineSelectionMenu()
                         return true
                     }
                     if (isMenuVisible) {

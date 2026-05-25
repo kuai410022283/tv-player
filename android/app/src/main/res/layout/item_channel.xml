@@ -33,9 +33,9 @@
     <!-- Logo -->
     <ImageView
         android:id="@+id/ivChannelLogo"
-        android:layout_width="36dp"
+        android:layout_width="48dp"
         android:layout_height="36dp"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         android:layout_marginEnd="10dp"
         android:visibility="gone" />
 
