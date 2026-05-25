@@ -11,11 +11,12 @@ import (
 )
 
 type ClientHandler struct {
-	clientSvc *services.ClientService
+	clientSvc  *services.ClientService
+	channelSvc *services.ChannelService
 }
 
-func NewClientHandler(clientSvc *services.ClientService) *ClientHandler {
-	return &ClientHandler{clientSvc: clientSvc}
+func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService) *ClientHandler {
+	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc}
 }
 
 // ── 客户端：注册 ───────────────────────────────────────
@@ -37,11 +38,29 @@ func (h *ClientHandler) Register(c *gin.Context) {
 
 	h.clientSvc.AddLog(resp.ClientID, "register", 0, ip, c.GetHeader("User-Agent"), "")
 
+	announcement, _ := h.channelSvc.GetSetting("system_announcement")
+	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
+	announcementInterval, _ := strconv.Atoi(announcementIntervalStr)
+
 	if resp.Status == "approved" {
-		ok(c, resp)
+		ok(c, gin.H{
+			"status":       resp.Status,
+			"client_id":    resp.ClientID,
+			"access_token": resp.AccessToken,
+			"message":      resp.Message,
+			"announcement": announcement,
+			"announcement_interval": announcementInterval,
+		})
 	} else {
 		// pending 状态返回 202
-		c.JSON(http.StatusAccepted, models.APIResponse{Code: 202, Message: resp.Message, Data: resp})
+		c.JSON(http.StatusAccepted, models.APIResponse{Code: 202, Message: resp.Message, Data: gin.H{
+			"status":       resp.Status,
+			"client_id":    resp.ClientID,
+			"access_token": resp.AccessToken,
+			"message":      resp.Message,
+			"announcement": announcement,
+			"announcement_interval": announcementInterval,
+		}})
 	}
 }
 
@@ -68,11 +87,17 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		return
 	}
 
+	announcement, _ := h.channelSvc.GetSetting("system_announcement")
+	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
+	announcementInterval, _ := strconv.Atoi(announcementIntervalStr)
+
 	ok(c, gin.H{
 		"client_id":    client.ID,
 		"name":         client.Name,
 		"max_streams":  client.MaxStreams,
 		"expires_at":   client.ExpiresAt,
+		"announcement": announcement,
+		"announcement_interval": announcementInterval,
 	})
 }
 

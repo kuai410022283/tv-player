@@ -23,6 +23,40 @@
         android:indeterminateTint="@color/accent"
         android:visibility="gone" />
 
+    <!-- 系统公告跑马灯 -->
+    <LinearLayout
+        android:id="@+id/layoutAnnouncement"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#B3000000"
+        android:paddingVertical="8dp"
+        android:paddingHorizontal="24dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/ic_dialog_info"
+            android:layout_marginEnd="8dp"
+            app:tint="@color/accent" />
+
+        <TextView
+            android:id="@+id/tvAnnouncement"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            tools:text="这是一条系统跑马灯公告..." />
+    </LinearLayout>
+
     <!-- 2. OSD 底栏 (切换频道时显示的信息) -->
     <LinearLayout
         android:id="@+id/layoutOsd"

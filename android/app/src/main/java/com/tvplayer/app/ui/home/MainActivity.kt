@@ -131,6 +131,20 @@ class MainActivity : AppCompatActivity() {
         videoLayout?.requestFocus()
     }
 
+    // System Announcement state
+    private var sysAnnouncement: String? = null
+    private var sysAnnouncementInterval: Int = 0
+    private var marqueeIsVisible = false
+    private val marqueeRunnable = Runnable { triggerMarquee() }
+    private val hideMarqueeRunnable = Runnable { 
+        findViewById<android.view.View>(R.id.layoutAnnouncement)?.visibility = View.GONE
+        findViewById<android.widget.TextView>(R.id.tvAnnouncement)?.isSelected = false
+        marqueeIsVisible = false
+        if (sysAnnouncementInterval > 0) {
+            uiHandler.postDelayed(marqueeRunnable, sysAnnouncementInterval * 60 * 1000L)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -696,6 +710,11 @@ class MainActivity : AppCompatActivity() {
         layoutOsd?.visibility = View.VISIBLE
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.postDelayed(hideOsdRunnable, 5000)
+        
+        // 换台时同步触发跑马灯
+        if (!sysAnnouncement.isNullOrEmpty() && !marqueeIsVisible) {
+            triggerMarquee()
+        }
     }
     
 
@@ -819,8 +838,12 @@ class MainActivity : AppCompatActivity() {
     private fun checkAuthAndLoad() {
         lifecycleScope.launch {
             if (authManager.isApproved()) {
-                authManager.verify().onSuccess { valid ->
-                    if (valid) showContent() else doRegister()
+                authManager.verify().onSuccess { resp ->
+                    if (resp != null) {
+                        sysAnnouncement = resp.announcement
+                        sysAnnouncementInterval = resp.announcementInterval
+                        showContent()
+                    } else doRegister()
                 }.onFailure { doRegister() }
             } else {
                 doRegister()
@@ -833,7 +856,11 @@ class MainActivity : AppCompatActivity() {
             showAuthWaiting("正在注册设备...")
             authManager.register().onSuccess { result ->
                 when (result.status) {
-                    "approved" -> showContent()
+                    "approved" -> {
+                        sysAnnouncement = result.announcement
+                        sysAnnouncementInterval = result.announcementInterval
+                        showContent()
+                    }
                     "pending" -> {
                         showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
                         startAuthPolling()
@@ -852,7 +879,16 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 lifecycleScope.launch {
                     authManager.checkStatus().onSuccess { status ->
-                        if (status == "approved") { showContent(); return@launch }
+                        if (status == "approved") { 
+                            authManager.verify().onSuccess { resp ->
+                                if (resp != null) {
+                                    sysAnnouncement = resp.announcement
+                                    sysAnnouncementInterval = resp.announcementInterval
+                                }
+                                showContent()
+                            }
+                            return@launch 
+                        }
                         authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
                     }.onFailure { authPollRunnable?.let { authPollHandler.postDelayed(it, 15000) } }
                 }
@@ -880,8 +916,64 @@ class MainActivity : AppCompatActivity() {
             phoneAuthWaiting?.visibility = View.GONE
             phoneContent?.visibility = View.VISIBLE
         }
+
+        // 初始触发跑马灯
+        if (!sysAnnouncement.isNullOrEmpty()) {
+            triggerMarquee()
+        }
+
         loadData()
         startHeartbeat()
+    }
+
+    private fun triggerMarquee() {
+        uiHandler.removeCallbacks(marqueeRunnable)
+        uiHandler.removeCallbacks(hideMarqueeRunnable)
+        
+        val layoutAnnouncement = findViewById<android.view.View>(R.id.layoutAnnouncement) ?: return
+        val tvAnnouncement = findViewById<android.widget.TextView>(R.id.tvAnnouncement) ?: return
+        
+        if (sysAnnouncement.isNullOrEmpty()) {
+            layoutAnnouncement.visibility = View.GONE
+            marqueeIsVisible = false
+            return
+        }
+
+        layoutAnnouncement.visibility = View.VISIBLE
+        marqueeIsVisible = true
+        
+        // 强制原生跑马灯滚动：如果文字太短，补齐空格直到超过屏幕宽度
+        var text = sysAnnouncement!!
+        tvAnnouncement.text = text
+        
+        layoutAnnouncement.post {
+            tvAnnouncement.measure(0, 0)
+            val screenWidth = layoutAnnouncement.width
+            val textWidth = tvAnnouncement.measuredWidth
+            
+            if (textWidth < screenWidth && textWidth > 0) {
+                val spaceWidth = tvAnnouncement.paint.measureText(" ")
+                if (spaceWidth > 0) {
+                    val spacesNeeded = ((screenWidth - textWidth) / spaceWidth).toInt() + 10
+                    text = text + " ".repeat(spacesNeeded) + text
+                    tvAnnouncement.text = text
+                }
+            }
+            tvAnnouncement.isSelected = true
+            
+            // 计算原生跑马灯需要多长时间才能跑完一遍
+            // Android 底层源码设定的跑马灯速度固定为 30dp/秒
+            val density = resources.displayMetrics.density
+            val speedPxPerSec = 30f * density
+            // 跑完一整圈需要走过的总距离 = 屏幕宽度 + 文字总长度
+            val requiredTimeMs = ((screenWidth + textWidth) / speedPxPerSec * 1000f).toLong()
+            
+            // 取 25 秒和实际需要时间中的最大值，确保哪怕是超长文本也能至少被完整看完一遍
+            val displayDuration = maxOf(25000L, requiredTimeMs)
+            
+            // 原生跑马灯运行完毕后自动隐藏，并进入下一轮间隔排期
+            uiHandler.postDelayed(hideMarqueeRunnable, displayDuration)
+        }
     }
 
     private fun startHeartbeat() {

@@ -69,14 +69,14 @@ class ClientAuthManager(private val context: Context) {
     }
 
     /** 验证当前 token 是否有效 */
-    suspend fun verify(): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun verify(): Result<com.tvplayer.app.data.model.VerifyResponse?> = withContext(Dispatchers.IO) {
         try {
             val token = getToken() ?: return@withContext Result.failure(Exception("无令牌"))
             val response = ApiClient.getService().clientVerify("Bearer $token")
             if (response.isSuccessful && response.body()?.code == 0) {
-                Result.success(true)
+                Result.success(response.body()?.data)
             } else {
-                Result.success(false)
+                Result.success(null)
             }
         } catch (e: Exception) {
             Result.failure(e)

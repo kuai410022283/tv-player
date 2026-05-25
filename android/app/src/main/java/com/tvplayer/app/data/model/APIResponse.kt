@@ -20,5 +20,7 @@ data class ClientRegisterResp(
     @SerializedName("status") val status: String = "",
     @SerializedName("access_token") val accessToken: String = "",
     @SerializedName("expires_at") val expiresAt: String = "",
-    @SerializedName("message") val message: String = ""
+    @SerializedName("message") val message: String = "",
+    @SerializedName("announcement") val announcement: String? = null,
+    @SerializedName("announcement_interval") val announcementInterval: Int = 0
 )

@@ -22,7 +22,7 @@ interface ApiService {
     suspend fun clientRegister(@Body body: Map<String, String>): Response<APIResponse<ClientRegisterResp>>
 
     @GET("client/verify")
-    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<JsonElement>>
+    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<VerifyResponse>>
 
     @GET("client/me")
     suspend fun clientMe(): Response<APIResponse<JsonElement>>

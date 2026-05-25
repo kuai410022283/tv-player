@@ -14,17 +14,17 @@ import (
 	"github.com/tvplayer/backend/internal/services"
 )
 
-func setupTestDB(t *testing.T) *services.ClientService {
+func setupTestDB(t *testing.T) (*services.ClientService, *services.ChannelService) {
 	t.Helper()
 	db, err := services.InitDB(":memory:")
 	if err != nil {
 		t.Fatalf("init db: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	return services.NewClientService(db)
+	return services.NewClientService(db), services.NewChannelService(db)
 }
 
-func setupRouter(clientSvc *services.ClientService) *gin.Engine {
+func setupRouter(clientSvc *services.ClientService, channelSvc *services.ChannelService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 
@@ -37,11 +37,11 @@ func setupRouter(clientSvc *services.ClientService) *gin.Engine {
 		h.AdminLogin(c)
 	})
 	r.POST("/api/v1/client/register", func(c *gin.Context) {
-		ch := NewClientHandler(clientSvc)
+		ch := NewClientHandler(clientSvc, channelSvc)
 		ch.Register(c)
 	})
 	r.GET("/api/v1/client/verify", func(c *gin.Context) {
-		ch := NewClientHandler(clientSvc)
+		ch := NewClientHandler(clientSvc, channelSvc)
 		ch.Verify(c)
 	})
 
@@ -50,7 +50,7 @@ func setupRouter(clientSvc *services.ClientService) *gin.Engine {
 	auth.Use(middleware.AuthMiddleware("test-secret-key-for-unit-tests", nil))
 	{
 		auth.GET("/client/me", func(c *gin.Context) {
-			ch := NewClientHandler(clientSvc)
+			ch := NewClientHandler(clientSvc, channelSvc)
 			ch.Me(c)
 		})
 		auth.POST("/groups", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
@@ -61,7 +61,7 @@ func setupRouter(clientSvc *services.ClientService) *gin.Engine {
 }
 
 func TestAdminLogin_Success(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 
 	body, _ := json.Marshal(map[string]string{"password": "testpassword"})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
@@ -82,7 +82,7 @@ func TestAdminLogin_Success(t *testing.T) {
 }
 
 func TestAdminLogin_WrongPassword(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 
 	body, _ := json.Marshal(map[string]string{"password": "wrongpassword"})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
@@ -97,7 +97,7 @@ func TestAdminLogin_WrongPassword(t *testing.T) {
 }
 
 func TestAdminLogin_MissingPassword(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 
 	body, _ := json.Marshal(map[string]string{})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
@@ -112,8 +112,8 @@ func TestAdminLogin_MissingPassword(t *testing.T) {
 }
 
 func TestClientRegister_Success(t *testing.T) {
-	clientSvc := setupTestDB(t)
-	r := setupRouter(clientSvc)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{
 		"name":      "Test Device",
@@ -142,8 +142,8 @@ func TestClientRegister_Success(t *testing.T) {
 }
 
 func TestClientRegister_MissingFields(t *testing.T) {
-	clientSvc := setupTestDB(t)
-	r := setupRouter(clientSvc)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{
 		"name": "Test Device",
@@ -161,8 +161,8 @@ func TestClientRegister_MissingFields(t *testing.T) {
 }
 
 func TestAuthRequired_GetProtectedEndpoint(t *testing.T) {
-	clientSvc := setupTestDB(t)
-	r := setupRouter(clientSvc)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	// 无 token 访问 /client/me — 应该被拒绝（非公开只读路径）
 	req := httptest.NewRequest("GET", "/api/v1/client/me", nil)
@@ -176,8 +176,8 @@ func TestAuthRequired_GetProtectedEndpoint(t *testing.T) {
 }
 
 func TestAuthRequired_WriteWithoutToken(t *testing.T) {
-	clientSvc := setupTestDB(t)
-	r := setupRouter(clientSvc)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{
 		"name": "Test Group",
@@ -194,8 +194,8 @@ func TestAuthRequired_WriteWithoutToken(t *testing.T) {
 }
 
 func TestAdminTokenAccess(t *testing.T) {
-	clientSvc := setupTestDB(t)
-	r := setupRouter(clientSvc)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	// 先登录获取 token
 	body, _ := json.Marshal(map[string]string{"password": "testpassword"})

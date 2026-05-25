@@ -961,6 +961,11 @@ async function loadClientSettings() {
     document.getElementById('set-expire-days').value = setRes.data.default_expire_days || '365';
     document.getElementById('set-require-note').value = setRes.data.require_note || 'false';
     
+    if(document.getElementById('set-system-announcement')) {
+      document.getElementById('set-system-announcement').value = setRes.data.system_announcement || '';
+      document.getElementById('set-system-announcement-interval').value = setRes.data.system_announcement_interval || '0';
+    }
+    
     // EPG 配置
     if(document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
@@ -977,6 +982,11 @@ async function saveAllClientSettings() {
     default_expire_days: document.getElementById('set-expire-days').value,
     require_note: document.getElementById('set-require-note').value,
   };
+  
+  if(document.getElementById('set-system-announcement')) {
+    settings.system_announcement = document.getElementById('set-system-announcement').value.trim();
+    settings.system_announcement_interval = document.getElementById('set-system-announcement-interval').value;
+  }
   
   if(document.getElementById('set-epg-source-url')) {
     settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
