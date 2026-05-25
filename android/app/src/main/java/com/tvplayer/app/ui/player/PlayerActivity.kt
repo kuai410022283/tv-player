@@ -15,10 +15,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import android.net.Uri
-import org.videolan.libvlc.LibVLC
-import org.videolan.libvlc.Media
-import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
 import com.tvplayer.app.Prefs
 import com.tvplayer.app.R
@@ -30,6 +26,7 @@ import com.tvplayer.app.data.repository.ChannelRepository
 import com.tvplayer.app.service.PlaybackService
 import com.tvplayer.app.util.DeviceUtils
 import com.tvplayer.app.util.PlayerGestureController
+import com.tvplayer.app.util.VlcPlayerHelper
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -38,8 +35,7 @@ import kotlin.math.min
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
 
-    private var libVlc: LibVLC? = null
-    private var mediaPlayer: MediaPlayer? = null
+    private var playerHelper: VlcPlayerHelper? = null
     private val repo = ChannelRepository()
     private lateinit var authManager: ClientAuthManager
     private var isTvMode = false
@@ -175,7 +171,7 @@ class PlayerActivity : AppCompatActivity() {
             override fun onChannelPrev() = prevChannel()
             override fun onToggleInfo() = toggleChannelInfo()
             override fun onTogglePlayPause() {
-                mediaPlayer?.let { if (it.isPlaying) it.pause() else it.play() }
+                playerHelper?.let { if (it.isPlaying()) it.pause() else it.resume() }
             }
 
             override fun onVolumeChange(delta: Float) {
@@ -195,21 +191,21 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onSeekDelta(deltaMs: Long) {
-                mediaPlayer?.let { p ->
-                    val newPos = max(0, p.time + deltaMs)
-                    p.time = newPos
+                playerHelper?.let { p ->
+                    val newPos = max(0, p.getTime() + deltaMs)
+                    p.setTime(newPos)
                 }
             }
 
             override fun onLongPressStart() {
                 isLongPressingSpeed = true
-                mediaPlayer?.rate = 2.0f
+                playerHelper?.setRate(2.0f)
                 showSpeedIndicator("2.0x ▶▶")
             }
 
             override fun onLongPressEnd() {
                 isLongPressingSpeed = false
-                mediaPlayer?.rate = 1.0f
+                playerHelper?.setRate(1.0f)
                 showSpeedIndicator("1.0x ▶")
             }
         })
@@ -247,102 +243,52 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initPlayer() {
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-
-        val options = ArrayList<String>()
-        options.add("--aout=opensles")
-        options.add("--audio-time-stretch")
-        options.add("--drop-late-frames")
-        options.add("--skip-frames")
-        options.add("--network-caching=1500")
-
-        when (decoderMode) {
-            Prefs.DECODER_MODE_HARDWARE -> {
-                options.add("--avcodec-hw=any")
-                options.add("--codec=mediacodec,all")
-            }
-            Prefs.DECODER_MODE_SOFTWARE -> {
-                options.add("--avcodec-hw=none")
-            }
-            else -> { // AUTO
-                options.add("--vout=android_display")
-                options.add("--avcodec-hw=any")
-            }
-        }
-
-        libVlc = LibVLC(this, options)
-        mediaPlayer = MediaPlayer(libVlc)
-        mediaPlayer?.attachViews(videoLayout, null, false, false)
-
-        mediaPlayer?.setEventListener { event ->
-            when (event.type) {
-                MediaPlayer.Event.Buffering -> {
-                    if (event.buffering == 100f) {
-                        progressBar?.visibility = View.GONE
-                        tvStatus?.text = "播放中"
-                        retryCount = 0
-                        handler.postDelayed({ hideChannelInfo() }, 3000)
-                    } else {
-                        progressBar?.visibility = View.VISIBLE
-                        tvStatus?.text = "缓冲中... ${event.buffering.toInt()}%"
-                    }
-                }
-                MediaPlayer.Event.Playing -> {
+        playerHelper = VlcPlayerHelper(this, videoLayout, object : VlcPlayerHelper.PlayerListener {
+            override fun onBuffering(percent: Float) {
+                if (percent == 100f) {
                     progressBar?.visibility = View.GONE
                     tvStatus?.text = "播放中"
                     retryCount = 0
-                    
-                    var videoRes = ""
-                    var audioCodec = ""
-                    mediaPlayer?.media?.let { media ->
-                        for (i in 0 until media.trackCount) {
-                            val track = media.getTrack(i)
-                            if (track.type == IMedia.Track.Type.Video) {
-                                val vt = track as IMedia.VideoTrack
-                                if (vt.width > 0 && vt.height > 0) {
-                                    videoRes = "${vt.width}x${vt.height}"
-                                }
-                            } else if (track.type == IMedia.Track.Type.Audio) {
-                                val at = track as IMedia.AudioTrack
-                                audioCodec = at.codec?.trim()?.uppercase() ?: ""
-                            }
-                        }
-                    }
-                    val info = buildString {
-                        if (videoRes.isNotEmpty()) append(videoRes)
-                        if (videoRes.isNotEmpty() && audioCodec.isNotEmpty()) append(" | ")
-                        if (audioCodec.isNotEmpty()) append(audioCodec)
-                    }
-                    if (info.isNotEmpty()) {
-                        tvResolution?.text = info
-                    }
-                }
-                MediaPlayer.Event.EncounteredError -> {
-                    tvStatus?.text = "播放失败"
-                    progressBar?.visibility = View.GONE
-                    
-                    val channel = allChannels.getOrNull(channelIndex)
-                    val lines = channel?.getLinesSafely() ?: emptyList()
-                    
-                    if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
-                        // 如果有下一条线路，自动切换
-                        lineIndex++
-                        retryCount = 0
-                        Toast.makeText(this@PlayerActivity, "当前线路失效，自动切换线路 ${lineIndex + 1}...", Toast.LENGTH_SHORT).show()
-                        playCurrentLine()
-                    } else if (retryCount < maxRetries) {
-                        retryCount++
-                        val delayMs = (3000L * (1 shl (retryCount - 1)))
-                        Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
-                        handler.postDelayed({ retryPlay() }, delayMs)
-                    } else {
-                        Toast.makeText(this@PlayerActivity, "播放失败，所有线路均不可用", Toast.LENGTH_LONG).show()
-                        retryCount = 0
-                    }
+                    handler.postDelayed({ hideChannelInfo() }, 3000)
+                } else {
+                    progressBar?.visibility = View.VISIBLE
+                    tvStatus?.text = "缓冲中... ${percent.toInt()}%"
                 }
             }
-        }
+
+            override fun onPlaying(resolution: String) {
+                progressBar?.visibility = View.GONE
+                tvStatus?.text = "播放中"
+                retryCount = 0
+                if (resolution.isNotEmpty()) {
+                    tvResolution?.text = resolution
+                }
+            }
+
+            override fun onError() {
+                tvStatus?.text = "播放失败"
+                progressBar?.visibility = View.GONE
+                
+                val channel = allChannels.getOrNull(channelIndex)
+                val lines = channel?.getLinesSafely() ?: emptyList()
+                
+                if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
+                    // 如果有下一条线路，自动切换
+                    lineIndex++
+                    retryCount = 0
+                    Toast.makeText(this@PlayerActivity, "当前线路失效，自动切换线路 ${lineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                    playCurrentLine()
+                } else if (retryCount < maxRetries) {
+                    retryCount++
+                    val delayMs = (3000L * (1 shl (retryCount - 1)))
+                    Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
+                    handler.postDelayed({ retryPlay() }, delayMs)
+                } else {
+                    Toast.makeText(this@PlayerActivity, "播放失败，所有线路均不可用", Toast.LENGTH_LONG).show()
+                    retryCount = 0
+                }
+            }
+        })
     }
 
     private fun playCurrentLine() {
@@ -360,70 +306,12 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun playStream(url: String, type: String, userAgent: String = "", customHeaders: String = "") {
-        val player = mediaPlayer ?: return
         retryCount = 0
         progressBar?.visibility = View.VISIBLE
         tvChannelName?.text = channelName
         tvStreamType?.text = type.uppercase()
 
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-        
-        when (scaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> {
-                player.aspectRatio = "16:9"
-            }
-            Prefs.SCALE_MODE_CROP -> {
-                player.aspectRatio = null
-            }
-            Prefs.SCALE_MODE_4_3 -> {
-                player.aspectRatio = "4:3"
-            }
-            else -> {
-                player.aspectRatio = null
-            }
-        }
-        
-        val media = Media(libVlc, Uri.parse(url))
-        if (scaleMode == Prefs.SCALE_MODE_CROP) {
-            media.addOption(":crop=16:9")
-        }
-        
-        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-        when (decoderMode) {
-            Prefs.DECODER_MODE_HARDWARE -> media.setHWDecoderEnabled(true, true)
-            Prefs.DECODER_MODE_SOFTWARE -> media.setHWDecoderEnabled(false, false)
-            else -> media.setHWDecoderEnabled(true, false) // 自动
-        }
-        
-        applyMediaOptions(media, userAgent, customHeaders)
-        player.media = media
-        player.play()
-    }
-
-    private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
-        if (!userAgent.isNullOrEmpty()) {
-            media.addOption(":http-user-agent=$userAgent")
-        }
-        if (!customHeaders.isNullOrEmpty()) {
-            try {
-                val json = org.json.JSONObject(customHeaders)
-                val keys = json.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    val value = json.getString(key)
-                    if (key.equals("referer", ignoreCase = true) || key.equals("referrer", ignoreCase = true)) {
-                        media.addOption(":http-referrer=$value")
-                    } else if (key.equals("origin", ignoreCase = true)) {
-                        media.addOption(":http-origin=$value")
-                    } else if (key.equals("cookie", ignoreCase = true)) {
-                        media.addOption(":http-cookies=$value")
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        playerHelper?.play(url, userAgent, customHeaders)
     }
 
     private fun retryPlay() {
@@ -533,7 +421,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun saveProgress() {
-        val pos = mediaPlayer?.time?.div(1000)?.toInt() ?: 0
+        val pos = playerHelper?.getTime()?.div(1000)?.toInt() ?: 0
         val clientId = authManager.getClientId()
         lifecycleScope.launch { repo.addHistory(channelId, pos, pos, clientId) }
     }
@@ -596,7 +484,7 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                mediaPlayer?.let { if (it.isPlaying) it.pause() else it.play() }; return true
+                playerHelper?.let { if (it.isPlaying()) it.pause() else it.resume() }; return true
             }
             KeyEvent.KEYCODE_MEDIA_STOP -> { finish(); return true }
             KeyEvent.KEYCODE_BACK -> {
@@ -637,7 +525,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onResume()
         // 停止保活服务
         stopService(Intent(this, PlaybackService::class.java))
-        mediaPlayer?.play()
+        playerHelper?.resume()
         hideSystemUI()
     }
 
@@ -645,9 +533,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         stopService(Intent(this, PlaybackService::class.java))
         handler.removeCallbacksAndMessages(null)
-        mediaPlayer?.release()
-        libVlc?.release()
-        mediaPlayer = null
-        libVlc = null
+        playerHelper?.release()
+        playerHelper = null
     }
 }

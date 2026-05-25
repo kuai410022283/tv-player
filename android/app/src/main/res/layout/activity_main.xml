@@ -233,7 +233,7 @@
         android:background="#99000000"
         android:visibility="gone"
         android:clickable="true"
-        android:focusable="true">
+        android:focusable="false">
         
         <LinearLayout
             android:layout_width="400dp"

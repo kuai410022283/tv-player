@@ -38,10 +38,7 @@ import com.tvplayer.app.util.FocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.videolan.libvlc.LibVLC
-import org.videolan.libvlc.Media
-import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.interfaces.IMedia
+import com.tvplayer.app.util.VlcPlayerHelper
 import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.math.max
 
@@ -120,8 +117,7 @@ class MainActivity : AppCompatActivity() {
     private var heartbeatRunnable: Runnable? = null
 
     // ── VLC Player (TV Only) ──
-    private var libVlc: LibVLC? = null
-    private var mediaPlayer: MediaPlayer? = null
+    private var playerHelper: VlcPlayerHelper? = null
     private var retryCount = 0
     private val maxRetries = 3
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -451,84 +447,49 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initVlcPlayer() {
-        val prefs = getSharedPreferences(com.tvplayer.app.Prefs.FILE, MODE_PRIVATE)
-        val cacheMs = prefs.getInt(com.tvplayer.app.Prefs.KEY_NETWORK_CACHE, com.tvplayer.app.Prefs.DEFAULT_NETWORK_CACHE)
-
-        val options = ArrayList<String>()
-        options.add("--aout=opensles")
-        options.add("--audio-time-stretch")
-        options.add("-vvv")
-        options.add("--drop-late-frames")
-        options.add("--skip-frames")
-        options.add("--network-caching=$cacheMs")
-
-        libVlc = LibVLC(this, options)
-        mediaPlayer = MediaPlayer(libVlc)
-        videoLayout?.let { mediaPlayer?.attachViews(it, null, false, false) }
-
-        mediaPlayer?.setEventListener { event ->
-            when (event.type) {
-                MediaPlayer.Event.Buffering -> {
-                    if (event.buffering == 100f) {
-                        progressBuffering?.visibility = View.GONE
-                        retryCount = 0
-                    } else {
-                        progressBuffering?.visibility = View.VISIBLE
-                    }
-                }
-                MediaPlayer.Event.Playing -> {
+        val layout = videoLayout ?: return
+        playerHelper = VlcPlayerHelper(this, layout, object : VlcPlayerHelper.PlayerListener {
+            override fun onBuffering(percent: Float) {
+                if (percent == 100f) {
                     progressBuffering?.visibility = View.GONE
                     retryCount = 0
-                    var videoRes = ""
-                    var audioCodec = ""
-                    mediaPlayer?.media?.let { media ->
-                        for (i in 0 until media.trackCount) {
-                            val track = media.getTrack(i)
-                            if (track.type == IMedia.Track.Type.Video) {
-                                val vt = track as IMedia.VideoTrack
-                                if (vt.width > 0 && vt.height > 0) {
-                                    videoRes = "${vt.width}x${vt.height}"
-                                }
-                            } else if (track.type == IMedia.Track.Type.Audio) {
-                                val at = track as IMedia.AudioTrack
-                                audioCodec = at.codec?.trim()?.uppercase() ?: ""
-                            }
-                        }
-                    }
-                    val info = buildString {
-                        if (videoRes.isNotEmpty()) append(videoRes)
-                        if (videoRes.isNotEmpty() && audioCodec.isNotEmpty()) append(" | ")
-                        if (audioCodec.isNotEmpty()) append(audioCodec)
-                    }
-                    if (info.isNotEmpty()) {
-                        tvOsdInfo?.text = info
-                    }
-                }
-                MediaPlayer.Event.EncounteredError -> {
-                    progressBuffering?.visibility = View.GONE
-                    
-                    val channel = allChannels.getOrNull(currentChannelIndex)
-                    val lines = channel?.getLinesSafely() ?: emptyList()
-                    
-                    if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
-                        currentLineIndex++
-                        retryCount = 0
-                        Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
-                        playCurrentLineInTv()
-                    } else if (retryCount < maxRetries) {
-                        retryCount++
-                        val delayMs = (3000L * (1 shl (retryCount - 1)))
-                        Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
-                        uiHandler.postDelayed({ 
-                            if (allChannels.isNotEmpty()) playCurrentLineInTv()
-                        }, delayMs)
-                    } else {
-                        Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
-                        retryCount = 0
-                    }
+                } else {
+                    progressBuffering?.visibility = View.VISIBLE
                 }
             }
-        }
+
+            override fun onPlaying(resolution: String) {
+                progressBuffering?.visibility = View.GONE
+                retryCount = 0
+                if (resolution.isNotEmpty()) {
+                    tvOsdInfo?.text = resolution
+                }
+            }
+
+            override fun onError() {
+                progressBuffering?.visibility = View.GONE
+                
+                val channel = allChannels.getOrNull(currentChannelIndex)
+                val lines = channel?.getLinesSafely() ?: emptyList()
+                
+                if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
+                    currentLineIndex++
+                    retryCount = 0
+                    Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                    playCurrentLineInTv()
+                } else if (retryCount < maxRetries) {
+                    retryCount++
+                    val delayMs = (3000L * (1 shl (retryCount - 1)))
+                    Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
+                    uiHandler.postDelayed({ 
+                        if (allChannels.isNotEmpty()) playCurrentLineInTv()
+                    }, delayMs)
+                } else {
+                    Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
+                    retryCount = 0
+                }
+            }
+        })
     }
 
     private fun playTvChannel(index: Int) {
@@ -560,37 +521,13 @@ class MainActivity : AppCompatActivity() {
         loadEpgForChannel(channel)
         showOsd()
 
-        val player = mediaPlayer ?: return
+        if (playerHelper == null) {
+            initVlcPlayer()
+        }
         retryCount = 0
         progressBuffering?.visibility = View.VISIBLE
 
-        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
-        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-        
-        when (scaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> {
-                player.aspectRatio = "16:9"
-            }
-            Prefs.SCALE_MODE_CROP -> {
-                player.aspectRatio = null
-            }
-            Prefs.SCALE_MODE_4_3 -> {
-                player.aspectRatio = "4:3"
-            }
-            else -> {
-                player.aspectRatio = null
-            }
-        }
-        
-        val media = Media(libVlc, Uri.parse(line.streamUrl))
-        media.setHWDecoderEnabled(true, false)
-        media.addOption(":network-caching=$cacheMs")
-        if (scaleMode == Prefs.SCALE_MODE_CROP) {
-            media.addOption(":crop=16:9")
-        }
-        applyMediaOptions(media, line.userAgent, line.customHeaders)
-        player.media = media
-        player.play()
+        playerHelper?.play(line.streamUrl, line.userAgent, line.customHeaders)
         
         // 频道列表中高亮当前播放频道
         channelAdapter.setPlayingIndex(currentChannelIndex)
@@ -626,6 +563,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(32, 24, 32, 24)
                 isFocusable = true
                 isClickable = true
+                isFocusableInTouchMode = true
                 setBackgroundResource(R.drawable.selector_channel_item)
                 
                 if (index == currentLineIndex) {
@@ -662,31 +600,6 @@ class MainActivity : AppCompatActivity() {
         videoLayout?.requestFocus()
     }
 
-    private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
-        if (!userAgent.isNullOrEmpty()) {
-            media.addOption(":http-user-agent=$userAgent")
-        }
-        if (!customHeaders.isNullOrEmpty()) {
-            try {
-                val json = org.json.JSONObject(customHeaders)
-                val keys = json.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    val value = json.getString(key)
-                    if (key.equals("referer", ignoreCase = true) || key.equals("referrer", ignoreCase = true)) {
-                        media.addOption(":http-referrer=$value")
-                    } else if (key.equals("origin", ignoreCase = true)) {
-                        media.addOption(":http-origin=$value")
-                    } else if (key.equals("cookie", ignoreCase = true)) {
-                        media.addOption(":http-cookies=$value")
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-    
     private fun showOsd() {
         layoutOsd?.visibility = View.VISIBLE
         uiHandler.removeCallbacks(hideOsdRunnable)
@@ -1014,10 +927,33 @@ class MainActivity : AppCompatActivity() {
         layoutEpgMenu?.visibility = View.VISIBLE
         
         tvEpgMenuTitle?.text = "节目单"
+        
+        val cached = com.tvplayer.app.util.EpgCacheManager.get(channel.name)
+        if (cached != null) {
+            progressEpgLoading?.visibility = View.GONE
+            if (cached.isEmpty()) {
+                tvEpgEmptyText?.visibility = View.VISIBLE
+                rvEpgList?.visibility = View.GONE
+            } else {
+                tvEpgEmptyText?.visibility = View.GONE
+                rvEpgList?.visibility = View.VISIBLE
+                epgAdapter.setData(cached)
+                val pIndex = epgAdapter.getPlayingIndex()
+                if (pIndex >= 0) {
+                    rvEpgList?.scrollToPosition(pIndex)
+                    rvEpgList?.post {
+                        rvEpgList?.layoutManager?.findViewByPosition(pIndex)?.requestFocus()
+                    }
+                } else {
+                    rvEpgList?.requestFocus()
+                }
+            }
+            return
+        }
+
         rvEpgList?.visibility = View.GONE
         tvEpgEmptyText?.visibility = View.GONE
         progressEpgLoading?.visibility = View.VISIBLE
-        
         rvEpgList?.requestFocus()
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -1029,6 +965,7 @@ class MainActivity : AppCompatActivity() {
                     progressEpgLoading?.visibility = View.GONE
                     if (response.isSuccessful && response.body()?.code == 0) {
                         val programs = response.body()?.data ?: emptyList()
+                        com.tvplayer.app.util.EpgCacheManager.put(channel.name, programs)
                         if (programs.isEmpty()) {
                             tvEpgEmptyText?.visibility = View.VISIBLE
                         } else {
@@ -1235,8 +1172,8 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         if (isTvMode) {
             // 直播流切后台直接彻底停止，释放硬件解码器和网络连接
-            mediaPlayer?.stop()
-            mediaPlayer?.vlcVout?.detachViews()
+            playerHelper?.release()
+            playerHelper = null
         }
     }
 
@@ -1246,7 +1183,7 @@ class MainActivity : AppCompatActivity() {
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.removeCallbacks(hideZappingRunnable)
-        mediaPlayer?.release()
-        libVlc?.release()
+        playerHelper?.release()
+        playerHelper = null
     }
 }
