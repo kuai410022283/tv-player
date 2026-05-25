@@ -165,6 +165,108 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- 3.5 右侧侧滑 EPG 菜单 (Full EPG Grid) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutEpgMenu"
+        android:layout_width="320dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="#DD000000"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/tvEpgMenuTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="节目单"
+            android:textColor="@color/accent"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:padding="32dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvEpgList"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:clipToPadding="false"
+            android:paddingBottom="32dp"
+            android:paddingHorizontal="32dp"
+            app:layout_constraintTop_toBottomOf="@id/tvEpgMenuTitle"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <ProgressBar
+            android:id="@+id/progressEpgLoading"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:indeterminateTint="@color/accent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:visibility="gone"/>
+
+        <TextView
+            android:id="@+id/tvEpgEmptyText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="暂无节目单数据"
+            android:textColor="#888888"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:visibility="gone"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 3.6 居中弹出的线路选择菜单 (Line Selection) -->
+    <FrameLayout
+        android:id="@+id/layoutLineMenu"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+        
+        <LinearLayout
+            android:layout_width="400dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/bg_channel_info"
+            android:padding="24dp">
+            
+            <TextView
+                android:id="@+id/tvLineMenuTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="切换线路"
+                android:textColor="@color/accent"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_horizontal"/>
+                
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+                <LinearLayout
+                    android:id="@+id/containerLines"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+        </LinearLayout>
+    </FrameLayout>
+
     <!-- 4. 顶层：授权/启动等待界面 -->
     <ScrollView
         android:id="@+id/layoutAuthWaiting"
@@ -220,7 +322,7 @@
     <!-- 5. 右侧侧滑设置菜单 (Settings Menu) -->
     <ScrollView
         android:id="@+id/layoutSettingsMenu"
-        android:layout_width="400dp"
+        android:layout_width="320dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
         android:background="#CC000000"
@@ -250,7 +352,8 @@
                 android:text="服务器地址"
                 android:textColor="#AAAAAA"
                 android:textSize="12sp"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="8dp"
+                android:visibility="gone" />
 
             <EditText
                 android:id="@+id/etSettingsUrl"
@@ -262,7 +365,7 @@
                 android:inputType="textUri"
                 android:singleLine="true"
                 android:layout_marginBottom="24dp"
-                android:nextFocusDown="@+id/sbSettingsCache" />
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -291,8 +394,7 @@
                 android:max="45"
                 android:progress="10"
                 android:layout_marginBottom="24dp"
-                android:nextFocusUp="@+id/etSettingsUrl"
-                android:nextFocusDown="@+id/rbDecoderAuto" />
+                android:nextFocusDown="@+id/btnSettingsScale" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -302,47 +404,20 @@
                 android:textSize="12sp"
                 android:layout_marginBottom="8dp"/>
 
-            <RadioGroup
-                android:id="@+id/rgSettingsScale"
+            <Button
+                android:id="@+id/btnSettingsScale"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="24dp">
-                
-                <RadioButton
-                    android:id="@+id/rbScaleDefault"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="原始比例 (自适应屏幕)"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent"
-                    android:nextFocusUp="@+id/sbSettingsCache"/>
-                    
-                <RadioButton
-                    android:id="@+id/rbScaleStretch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="拉伸满屏 (强制 16:9)"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent" />
-
-                <RadioButton
-                    android:id="@+id/rbScaleCrop"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="放大裁剪 (去黑边满屏)"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent" />
-                    
-                <RadioButton
-                    android:id="@+id/rbScale43"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="强制 4:3"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent"
-                    android:nextFocusDown="@+id/rbDecoderAuto" />
-            </RadioGroup>
+                android:text="原始比例 (自适应屏幕)"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/selector_channel_item"
+                android:gravity="start|center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:textAllCaps="false"
+                android:layout_marginBottom="24dp"
+                android:nextFocusUp="@+id/sbSettingsCache"
+                android:nextFocusDown="@+id/btnSettingsDecoder" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -352,45 +427,20 @@
                 android:textSize="12sp"
                 android:layout_marginBottom="8dp"/>
 
-            <RadioGroup
-                android:id="@+id/rgSettingsDecoder"
+            <Button
+                android:id="@+id/btnSettingsDecoder"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="32dp">
-                
-                <RadioButton
-                    android:id="@+id/rbDecoderAuto"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="自动识别"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent"
-                    android:layout_marginEnd="16dp"
-                    android:nextFocusUp="@+id/rbScale43"
-                    android:nextFocusDown="@+id/btnSettingsSave"/>
-                    
-                <RadioButton
-                    android:id="@+id/rbDecoderHardware"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="强制硬解"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent"
-                    android:layout_marginEnd="16dp"
-                    android:nextFocusUp="@+id/rbScale43"
-                    android:nextFocusDown="@+id/btnSettingsSave"/>
-                    
-                <RadioButton
-                    android:id="@+id/rbDecoderSoftware"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="强制软解"
-                    android:textColor="#FFFFFF"
-                    android:buttonTint="@color/accent"
-                    android:nextFocusUp="@+id/rbScale43"
-                    android:nextFocusDown="@+id/btnSettingsSave"/>
-            </RadioGroup>
+                android:text="自动识别"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/selector_channel_item"
+                android:gravity="start|center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:textAllCaps="false"
+                android:layout_marginBottom="32dp"
+                android:nextFocusUp="@+id/btnSettingsScale"
+                android:nextFocusDown="@+id/btnSettingsSave" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -404,19 +454,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="取消"
-                    android:textColor="#AAAAAA"
-                    android:background="@android:color/transparent"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/selector_channel_item"
                     android:layout_marginEnd="16dp"
-                    android:nextFocusUp="@+id/rbDecoderAuto" />
+                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusRight="@+id/btnSettingsSave" />
 
                 <Button
                     android:id="@+id/btnSettingsSave"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
                     android:text="保存"
-                    android:backgroundTint="@color/accent"
-                    android:textColor="#000000"
-                    android:nextFocusUp="@+id/rbDecoderAuto" />
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/selector_channel_item"
+                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusLeft="@+id/btnSettingsCancel" />
             </LinearLayout>
             
             <View android:layout_width="match_parent" android:layout_height="24dp" />

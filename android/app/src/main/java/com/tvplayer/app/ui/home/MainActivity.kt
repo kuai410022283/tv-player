@@ -10,8 +10,10 @@ import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.Button
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.SeekBar
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -33,7 +35,9 @@ import com.tvplayer.app.ui.player.PlayerActivity
 import com.tvplayer.app.ui.settings.SettingsActivity
 import com.tvplayer.app.util.DeviceUtils
 import com.tvplayer.app.util.FocusHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -61,6 +65,19 @@ class MainActivity : AppCompatActivity() {
     private var progressBuffering: ProgressBar? = null
     private var videoLayout: VLCVideoLayout? = null
     
+    // EPG Menu
+    private var layoutEpgMenu: View? = null
+    private var rvEpgList: androidx.recyclerview.widget.RecyclerView? = null
+    private var progressEpgLoading: View? = null
+    private var tvEpgEmptyText: TextView? = null
+    private var tvEpgMenuTitle: TextView? = null
+    private lateinit var epgAdapter: EpgAdapter
+    
+    // Line Selection Menu
+    private var layoutLineMenu: View? = null
+    private var tvLineMenuTitle: TextView? = null
+    private var containerLines: LinearLayout? = null
+
     // ── Settings Sidebar ──
     private var layoutSettingsMenu: View? = null
     private var etSettingsUrl: EditText? = null
@@ -169,16 +186,25 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onLongPress(e: android.view.MotionEvent) {
-                // 长按屏幕直接呼出右侧设置菜单
-                showSettingsMenu()
+                // 手机端：长按屏幕呼出“手动切换线路”
+                showLineSelectionMenu()
+            }
+
+            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                // 手机端：双击屏幕呼出“设置菜单”
+                val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+                if (isSettingsVisible) hideSettingsMenu() else showSettingsMenu()
+                return true
             }
 
             override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
                 val deltaY = e2.y - e1.y
                 val deltaX = e2.x - e1.x
+                
+                // 上下滑动：切台
                 if (kotlin.math.abs(deltaY) > kotlin.math.abs(deltaX) && kotlin.math.abs(deltaY) > 100) {
-                    if (layoutZappingMenu?.visibility == View.VISIBLE) return false
+                    if (layoutZappingMenu?.visibility == View.VISIBLE || layoutEpgMenu?.visibility == View.VISIBLE) return false
                     if (deltaY > 0) {
                         // 向下滑动：上一个频道
                         val prev = if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
@@ -189,6 +215,22 @@ class MainActivity : AppCompatActivity() {
                         playTvChannel(next)
                     }
                     return true
+                } 
+                // 左右滑动
+                else if (kotlin.math.abs(deltaX) > kotlin.math.abs(deltaY) && kotlin.math.abs(deltaX) > 100) {
+                    if (deltaX < 0) {
+                        // 向左滑动：呼出右侧的 EPG 菜单
+                        if (layoutZappingMenu?.visibility != View.VISIBLE && layoutSettingsMenu?.visibility != View.VISIBLE) {
+                            showEpgMenu()
+                            return true
+                        }
+                    } else {
+                        // 向右滑动：如果是 EPG 面板，则关闭它
+                        if (layoutEpgMenu?.visibility == View.VISIBLE) {
+                            hideEpgMenu()
+                            return true
+                        }
+                    }
                 }
                 return false
             }
@@ -233,6 +275,22 @@ class MainActivity : AppCompatActivity() {
         btnSettingsSave = findViewById(R.id.btnSettingsSave)
         tvSettingsInfo = findViewById(R.id.tvSettingsInfo)
 
+        // EPG Menu
+        layoutEpgMenu = findViewById(R.id.layoutEpgMenu)
+        rvEpgList = findViewById(R.id.rvEpgList)
+        progressEpgLoading = findViewById(R.id.progressEpgLoading)
+        tvEpgEmptyText = findViewById(R.id.tvEpgEmptyText)
+        tvEpgMenuTitle = findViewById(R.id.tvEpgMenuTitle)
+        
+        epgAdapter = EpgAdapter()
+        rvEpgList?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rvEpgList?.adapter = epgAdapter
+        
+        // Line Menu
+        layoutLineMenu = findViewById(R.id.layoutLineMenu)
+        tvLineMenuTitle = findViewById(R.id.tvLineMenuTitle)
+        containerLines = findViewById(R.id.containerLines)
+
         setupSettingsViews()
 
         tvGroupsRv?.let { FocusHelper.setupTvRecyclerView(it) }
@@ -245,29 +303,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private var rgSettingsDecoder: android.widget.RadioGroup? = null
-    private var rgSettingsScale: android.widget.RadioGroup? = null
+    private var btnSettingsScale: Button? = null
+    private var btnSettingsDecoder: Button? = null
+    
+    // 临时存储设置状态，点保存时才写入
+    private var tempDecoderMode = Prefs.DECODER_MODE_AUTO
+    private var tempScaleMode = Prefs.SCALE_MODE_DEFAULT
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
-        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        
+        tempDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        tempScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
 
-        rgSettingsDecoder = findViewById(R.id.rgSettingsDecoder)
-        when (decoderMode) {
-            Prefs.DECODER_MODE_HARDWARE -> rgSettingsDecoder?.check(R.id.rbDecoderHardware)
-            Prefs.DECODER_MODE_SOFTWARE -> rgSettingsDecoder?.check(R.id.rbDecoderSoftware)
-            else -> rgSettingsDecoder?.check(R.id.rbDecoderAuto)
+        btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
+        btnSettingsScale = findViewById(R.id.btnSettingsScale)
+        
+        fun updateDecoderText() {
+            btnSettingsDecoder?.text = when (tempDecoderMode) {
+                Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
+                Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
+                else -> "自动识别"
+            }
         }
         
-        rgSettingsScale = findViewById(R.id.rgSettingsScale)
-        when (scaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> rgSettingsScale?.check(R.id.rbScaleStretch)
-            Prefs.SCALE_MODE_CROP -> rgSettingsScale?.check(R.id.rbScaleCrop)
-            Prefs.SCALE_MODE_4_3 -> rgSettingsScale?.check(R.id.rbScale43)
-            else -> rgSettingsScale?.check(R.id.rbScaleDefault)
+        fun updateScaleText() {
+            btnSettingsScale?.text = when (tempScaleMode) {
+                Prefs.SCALE_MODE_STRETCH -> "拉伸满屏 (强制 16:9)"
+                Prefs.SCALE_MODE_CROP -> "放大裁剪 (去黑边满屏)"
+                Prefs.SCALE_MODE_4_3 -> "强制 4:3"
+                else -> "原始比例 (自适应屏幕)"
+            }
+        }
+        
+        updateDecoderText()
+        updateScaleText()
+        
+        btnSettingsDecoder?.setOnClickListener {
+            tempDecoderMode = when (tempDecoderMode) {
+                Prefs.DECODER_MODE_AUTO -> Prefs.DECODER_MODE_HARDWARE
+                Prefs.DECODER_MODE_HARDWARE -> Prefs.DECODER_MODE_SOFTWARE
+                else -> Prefs.DECODER_MODE_AUTO
+            }
+            updateDecoderText()
+        }
+        
+        btnSettingsScale?.setOnClickListener {
+            tempScaleMode = when (tempScaleMode) {
+                Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_STRETCH
+                Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_CROP
+                Prefs.SCALE_MODE_CROP -> Prefs.SCALE_MODE_4_3
+                else -> Prefs.SCALE_MODE_DEFAULT
+            }
+            updateScaleText()
         }
 
         etSettingsUrl?.setText(url)
@@ -295,19 +385,6 @@ class MainActivity : AppCompatActivity() {
             val newUrl = etSettingsUrl?.text?.toString()?.trim() ?: ""
             val newCacheMs = 500 + (sbSettingsCache?.progress ?: 0) * 100
             
-            val newDecoderMode = when (rgSettingsDecoder?.checkedRadioButtonId) {
-                R.id.rbDecoderHardware -> Prefs.DECODER_MODE_HARDWARE
-                R.id.rbDecoderSoftware -> Prefs.DECODER_MODE_SOFTWARE
-                else -> Prefs.DECODER_MODE_AUTO
-            }
-            
-            val newScaleMode = when (rgSettingsScale?.checkedRadioButtonId) {
-                R.id.rbScaleStretch -> Prefs.SCALE_MODE_STRETCH
-                R.id.rbScaleCrop -> Prefs.SCALE_MODE_CROP
-                R.id.rbScale43 -> Prefs.SCALE_MODE_4_3
-                else -> Prefs.SCALE_MODE_DEFAULT
-            }
-
             if (newUrl.isEmpty()) {
                 Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -315,8 +392,7 @@ class MainActivity : AppCompatActivity() {
 
             val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
             val oldDecoder = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-            val oldScale = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-            if (newUrl != oldUrl || newDecoderMode != oldDecoder) {
+            if (newUrl != oldUrl || tempDecoderMode != oldDecoder) {
                 authManager.clearAuth()
                 com.tvplayer.app.data.api.ApiClient.reset()
                 settingsChanged = true
@@ -325,8 +401,8 @@ class MainActivity : AppCompatActivity() {
             prefs.edit()
                 .putString(Prefs.KEY_SERVER_URL, newUrl)
                 .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
-                .putInt(Prefs.KEY_DECODER_MODE, newDecoderMode)
-                .putInt(Prefs.KEY_SCALE_MODE, newScaleMode)
+                .putInt(Prefs.KEY_DECODER_MODE, tempDecoderMode)
+                .putInt(Prefs.KEY_SCALE_MODE, tempScaleMode)
                 .apply()
                 
             com.tvplayer.app.data.api.ApiClient.init(newUrl)
@@ -364,7 +440,7 @@ class MainActivity : AppCompatActivity() {
             "expired" -> "已过期"
             else -> "未注册"
         }
-        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId().take(16)}...\n授权状态: $authStatus"
+        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId()}\n授权状态: $authStatus"
         
         sbSettingsCache?.requestFocus()
     }
@@ -518,6 +594,69 @@ class MainActivity : AppCompatActivity() {
         
         // 频道列表中高亮当前播放频道
         channelAdapter.setPlayingIndex(currentChannelIndex)
+    }
+
+    private fun showLineSelectionMenu() {
+        val channel = allChannels.getOrNull(currentChannelIndex) ?: return
+        val lines = channel.getLinesSafely()
+        if (lines.size <= 1) {
+            Toast.makeText(this, "当前频道只有一条线路", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        layoutZappingMenu?.visibility = View.GONE
+        layoutSettingsMenu?.visibility = View.GONE
+        layoutEpgMenu?.visibility = View.GONE
+        
+        tvLineMenuTitle?.text = "切换线路 - ${channel.name}"
+        containerLines?.removeAllViews()
+        
+        var firstFocusableView: View? = null
+        
+        lines.forEachIndexed { index, line ->
+            val tv = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 8, 0, 8)
+                }
+                text = "线路 ${index + 1} (${line.streamType.uppercase()})"
+                textSize = 18f
+                setPadding(32, 24, 32, 24)
+                isFocusable = true
+                isClickable = true
+                setBackgroundResource(R.drawable.selector_channel_item)
+                
+                if (index == currentLineIndex) {
+                    setTextColor(android.graphics.Color.parseColor("#FFC107"))
+                    text = "线路 ${index + 1} (${line.streamType.uppercase()}) - 当前"
+                } else {
+                    setTextColor(android.graphics.Color.WHITE)
+                }
+                
+                setOnClickListener {
+                    if (currentLineIndex != index) {
+                        currentLineIndex = index
+                        Toast.makeText(this@MainActivity, "已手动切换至线路 ${index + 1}", Toast.LENGTH_SHORT).show()
+                        playCurrentLineInTv()
+                    }
+                    hideLineSelectionMenu()
+                }
+            }
+            containerLines?.addView(tv)
+            if (index == currentLineIndex) {
+                firstFocusableView = tv
+            }
+        }
+        
+        layoutLineMenu?.visibility = View.VISIBLE
+        firstFocusableView?.requestFocus() ?: containerLines?.getChildAt(0)?.requestFocus()
+    }
+
+    private fun hideLineSelectionMenu() {
+        layoutLineMenu?.visibility = View.GONE
+        videoLayout?.requestFocus()
     }
 
     private fun applyMediaOptions(media: org.videolan.libvlc.Media, userAgent: String?, customHeaders: String?) {
@@ -863,6 +1002,63 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    private fun showEpgMenu() {
+        if (currentChannelIndex < 0 || currentChannelIndex >= allChannels.size) return
+        val channel = allChannels[currentChannelIndex]
+        
+        layoutZappingMenu?.visibility = View.GONE
+        layoutSettingsMenu?.visibility = View.GONE
+        layoutEpgMenu?.visibility = View.VISIBLE
+        
+        tvEpgMenuTitle?.text = "节目单"
+        rvEpgList?.visibility = View.GONE
+        tvEpgEmptyText?.visibility = View.GONE
+        progressEpgLoading?.visibility = View.VISIBLE
+        
+        rvEpgList?.requestFocus()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // Backend uses channel_id as string, pass channel.name for fuzzy match
+                val epgId = channel.name
+                val response = ApiClient.getService().getEPG(epgId)
+                withContext(Dispatchers.Main) {
+                    progressEpgLoading?.visibility = View.GONE
+                    if (response.isSuccessful && response.body()?.code == 0) {
+                        val programs = response.body()?.data ?: emptyList()
+                        if (programs.isEmpty()) {
+                            tvEpgEmptyText?.visibility = View.VISIBLE
+                        } else {
+                            rvEpgList?.visibility = View.VISIBLE
+                            epgAdapter.setData(programs)
+                            
+                            // Scroll to playing index
+                            val pIndex = epgAdapter.getPlayingIndex()
+                            if (pIndex >= 0) {
+                                rvEpgList?.scrollToPosition(pIndex)
+                                rvEpgList?.post {
+                                    rvEpgList?.layoutManager?.findViewByPosition(pIndex)?.requestFocus()
+                                }
+                            }
+                        }
+                    } else {
+                        tvEpgEmptyText?.visibility = View.VISIBLE
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressEpgLoading?.visibility = View.GONE
+                    tvEpgEmptyText?.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+
+    private fun hideEpgMenu() {
+        layoutEpgMenu?.visibility = View.GONE
+        videoLayout?.requestFocus()
+    }
+
     // ── TV key events ──────────────────────────────────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -876,23 +1072,27 @@ class MainActivity : AppCompatActivity() {
         if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
             val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
             val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+            val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
+            val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
 
-            // 当菜单未显示时，开始追踪 OK 键的长按事件
-            if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+            val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible
+
+            // 当任何面板未显示时，开始追踪 OK 键的长按事件
+            if (!anyPanelOpen && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 event?.startTracking()
                 return true
             }
 
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (!isMenuVisible) {
+                    if (!anyPanelOpen) {
                         val prev = if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
                         playTvChannel(prev)
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (!isMenuVisible) {
+                    if (!anyPanelOpen) {
                         val next = if (currentChannelIndex < allChannels.size - 1) currentChannelIndex + 1 else 0
                         playTvChannel(next)
                         return true
@@ -900,28 +1100,48 @@ class MainActivity : AppCompatActivity() {
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (isSettingsVisible) {
-                        return true // 防止设置面板里左方向键触发别的
+                        hideSettingsMenu()
+                        return true
                     }
-                    if (!isMenuVisible) {
+                    if (isEpgVisible) {
+                        hideEpgMenu()
+                        return true
+                    }
+                    if (!isMenuVisible && !isLineVisible) {
                         layoutZappingMenu?.visibility = View.VISIBLE
                         tvGroupsRv?.requestFocus()
                         uiHandler.removeCallbacks(hideZappingRunnable)
                         uiHandler.postDelayed(hideZappingRunnable, 10000)
                         return true
                     }
+                    // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (isSettingsVisible) {
+                    if (isSettingsVisible || isEpgVisible || isLineVisible) {
                         return true
                     }
                     if (isMenuVisible) {
-                        uiHandler.removeCallbacks(hideZappingRunnable)
-                        hideZappingRunnable.run()
+                        if (tvChannelsRv?.hasFocus() == true) {
+                            // 如果已经在频道列表（最右侧），再按右键则关闭菜单
+                            uiHandler.removeCallbacks(hideZappingRunnable)
+                            hideZappingRunnable.run()
+                            return true
+                        }
+                        // 如果焦点在分组列表，不拦截，让焦点能向右移动到频道列表
+                    } else {
+                        // 如果菜单未显示，按右键呼出完整 EPG 节目单
+                        showEpgMenu()
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_BACK -> {
-                    if (isSettingsVisible) {
+                    if (layoutLineMenu?.visibility == View.VISIBLE) {
+                        hideLineSelectionMenu()
+                        return true
+                    } else if (layoutEpgMenu?.visibility == View.VISIBLE) {
+                        hideEpgMenu()
+                        return true
+                    } else if (isSettingsVisible) {
                         hideSettingsMenu()
                         return true
                     } else if (isMenuVisible) {
@@ -945,8 +1165,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
         if (isTvMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
-            // 长按 OK 键呼出右侧设置
-            showSettingsMenu()
+            // 长按 OK 键呼出手动切源菜单
+            showLineSelectionMenu()
             return true
         }
         return super.onKeyLongPress(keyCode, event)
