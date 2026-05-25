@@ -226,6 +226,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 			groupMap := make(map[string]int) // name -> index in groupedItems
 
 			for i := range items {
+				proxyURL := ""
 				if !items[i].IsDirect {
 					ext := "ts"
 					switch items[i].StreamType {
@@ -234,7 +235,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					case "mp4", "flv", "mkv", "mpd":
 						ext = items[i].StreamType
 					}
-					items[i].StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?token=%s", baseURL, items[i].ID, ext, clientToken)
+					proxyURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?token=%s", baseURL, items[i].ID, ext, clientToken)
 				}
 				// 无论直连还是代理模式，客户端都拿取继承所得的 UA 与 CustomHeaders 方便统一标准播放
 				if ua, headers, err := h.channelSvc.GetInheritedHeaders(items[i].ID); err == nil {
@@ -260,20 +261,40 @@ func (h *Handler) ListChannels(c *gin.Context) {
 
 				// 开始聚合
 				nameKey := items[i].Name
-				line := map[string]interface{}{
-					"id":             items[i].ID,
-					"stream_url":     items[i].StreamURL,
-					"stream_type":    items[i].StreamType,
-					"user_agent":     items[i].UserAgent,
-					"custom_headers": items[i].CustomHeaders,
-					"support_catchup": items[i].SupportCatchup,
-					"catchup_days":    items[i].CatchupDays,
+				var linesForThisItem []map[string]interface{}
+
+				if !items[i].IsDirect {
+					// 代理模式下，下发一条指向服务端的代理地址即可（服务端自动实现多线路容灾换线）
+					linesForThisItem = append(linesForThisItem, map[string]interface{}{
+						"id":             items[i].ID,
+						"stream_url":     proxyURL,
+						"stream_type":    items[i].StreamType,
+						"user_agent":     items[i].UserAgent,
+						"custom_headers": items[i].CustomHeaders,
+						"support_catchup": items[i].SupportCatchup,
+						"catchup_days":    items[i].CatchupDays,
+					})
+				} else {
+					// 直连模式下，把 "#" 拼接的多线路拆开下发给客户端，由客户端实现多线路容灾换线
+					rawURLs := strings.Split(items[i].StreamURL, "#")
+					for _, u := range rawURLs {
+						if strings.TrimSpace(u) == "" { continue }
+						linesForThisItem = append(linesForThisItem, map[string]interface{}{
+							"id":             items[i].ID,
+							"stream_url":     strings.TrimSpace(u),
+							"stream_type":    items[i].StreamType,
+							"user_agent":     items[i].UserAgent,
+							"custom_headers": items[i].CustomHeaders,
+							"support_catchup": items[i].SupportCatchup,
+							"catchup_days":    items[i].CatchupDays,
+						})
+					}
 				}
 
 				if idx, exists := groupMap[nameKey]; exists {
 					// 已存在该频道，将其作为新线路追加
 					lines := groupedItems[idx]["lines"].([]map[string]interface{})
-					groupedItems[idx]["lines"] = append(lines, line)
+					groupedItems[idx]["lines"] = append(lines, linesForThisItem...)
 				} else {
 					// 新频道
 					newGroup := map[string]interface{}{
@@ -288,7 +309,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"sort_order":  items[i].SortOrder,
 						"support_catchup": items[i].SupportCatchup,
 						"catchup_days":    items[i].CatchupDays,
-						"lines":       []map[string]interface{}{line},
+						"lines":       linesForThisItem,
 					}
 					groupedItems = append(groupedItems, newGroup)
 					groupMap[nameKey] = len(groupedItems) - 1
@@ -529,7 +550,7 @@ func (h *Handler) CheckStream(c *gin.Context) {
 		fail(c, 404, "频道不存在")
 		return
 	}
-	status, _ := h.streamProxy.CheckHealth(ch.StreamURL, ch.StreamType)
+	status, _ := h.streamProxy.CheckHealth(ch.ID, ch.StreamURL, ch.StreamType)
 	ok(c, status)
 }
 

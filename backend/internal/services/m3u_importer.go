@@ -147,6 +147,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			newGroup := &models.ChannelGroup{
 				Name: groupName, 
 				SortOrder: len(groupCache), 
+				IsDirect: true,
 				Source: sourceName,
 				UserAgent: sourceUA,
 				CustomHeaders: sourceHeaders,
@@ -158,21 +159,72 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 
 	imported := 0
-	existingURLs := make(map[string]bool)
 
-	// 2. 使用数据库查询去重，仅检查当前来源下的频道
-	rows, err := imp.channelSvc.db.Query("SELECT stream_url FROM channels WHERE source = ?", sourceName)
+	// 2. 预处理 M3U 频道，按 "分组ID+频道名称" 合并流地址
+	type mergedChannel struct {
+		ch      map[string]string
+		groupID int64
+		urls    []string
+	}
+	mergedMap := make(map[string]*mergedChannel)
+	// 用切片保持顺序，避免 map 遍历乱序
+	var mergedKeys []string
+
+	for _, ch := range channels {
+		groupName := ch["group-title"]
+		if groupName == "" || groupName == "-" {
+			if sourceName != "" {
+				groupName = sourceName
+			} else {
+				groupName = "未分类"
+			}
+		}
+		groupID := groupCache[groupName]
+		name := strings.TrimSpace(ch["name"])
+		if name == "" {
+			name = "未命名频道"
+		}
+
+		key := fmt.Sprintf("%d|%s", groupID, name)
+		if existing, ok := mergedMap[key]; ok {
+			// 避免重复追加相同 URL
+			found := false
+			for _, u := range existing.urls {
+				if u == ch["url"] {
+					found = true
+					break
+				}
+			}
+			if !found {
+				existing.urls = append(existing.urls, ch["url"])
+			}
+		} else {
+			mergedMap[key] = &mergedChannel{
+				ch:      ch,
+				groupID: groupID,
+				urls:    []string{ch["url"]},
+			}
+			mergedKeys = append(mergedKeys, key)
+		}
+	}
+
+	// 3. 读取数据库中该来源下已有的频道信息（用于匹配和镜像清理）
+	existingDB := make(map[string]int64) // key -> channel_id
+	keptIDs := make(map[int64]bool)
+	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name FROM channels WHERE source = ?", sourceName)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
-			var url string
-			if rows.Scan(&url) == nil {
-				existingURLs[url] = true
+			var id, groupID int64
+			var name string
+			if rows.Scan(&id, &groupID, &name) == nil {
+				key := fmt.Sprintf("%d|%s", groupID, name)
+				existingDB[key] = id
 			}
 		}
 	}
 
-	// 3. 开启事务进行批量更新和插入
+	// 4. 开启事务进行批量更新和插入
 	tx, err := imp.channelSvc.db.Begin()
 	if err != nil {
 		return 0, err
@@ -185,43 +237,41 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer stmtInsert.Close()
 
-	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, updated_at = CURRENT_TIMESTAMP WHERE stream_url = ? AND source = ?`)
+	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_url = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
 	if err != nil {
 		return 0, err
 	}
 	defer stmtUpdate.Close()
 
-	for i, ch := range channels {
-		groupName := ch["group-title"]
-		if groupName == "" || groupName == "-" {
-			if sourceName != "" {
-				groupName = sourceName
-			} else {
-				groupName = "未分类"
-			}
-		}
-		groupID := groupCache[groupName]
-
-		streamType := detectStreamType(ch["url"])
+	for i, key := range mergedKeys {
+		mc := mergedMap[key]
+		ch := mc.ch
+		groupID := mc.groupID
+		mergedURLStr := strings.Join(mc.urls, "#")
+		streamType := detectStreamType(mc.urls[0]) // 以第一条线路的类型为准
 
 		// Build custom headers map
 		headersMap := make(map[string]string)
+		if sourceHeaders != "" {
+			_ = json.Unmarshal([]byte(sourceHeaders), &headersMap)
+		}
 		if ref, ok := ch["http-referrer"]; ok && ref != "" {
 			headersMap["Referer"] = ref
 		}
 		if orig, ok := ch["http-origin"]; ok && orig != "" {
 			headersMap["Origin"] = orig
 		}
-		
 		customHeadersJSON := ""
 		if len(headersMap) > 0 {
 			if b, err := json.Marshal(headersMap); err == nil {
 				customHeadersJSON = string(b)
 			}
 		}
-		
-		userAgent := ch["user_agent"]
 
+		userAgent := ch["user_agent"]
+		if userAgent == "" {
+			userAgent = sourceUA
+		}
 		supportCatchup := 0
 		catchupType := ch["catchup"]
 		if catchupType != "" {
@@ -233,32 +283,45 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		if days, err := strconv.Atoi(ch["catchup-days"]); err == nil && days > 0 {
 			catchupDays = days
 		} else if supportCatchup == 1 {
-			catchupDays = 7 // Default 7 days
+			catchupDays = 7
 		}
 
-		if existingURLs[ch["url"]] {
+		if channelID, exists := existingDB[key]; exists {
 			// 更新已存在的频道
-			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, ch["url"], sourceName)
+			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, channelID)
+			keptIDs[channelID] = true
 		} else {
 			// 插入新频道
-			_, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], ch["url"], streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays)
+			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays)
 			if err == nil {
 				imported++
-				existingURLs[ch["url"]] = true // 防止同一个 M3U 里有重复 URL 导致后续插入失败
+				if newID, err := res.LastInsertId(); err == nil {
+					keptIDs[newID] = true
+				}
 			}
 		}
-		
-		// 打印进度日志 (每 100 个打印一次，或最后一个打印一次)
-		if (i+1)%100 == 0 || i == len(channels)-1 {
-			slog.Info("M3U解析进度", "parsed", i+1, "total", len(channels), "imported", imported)
+
+		// 打印进度日志
+		if (i+1)%100 == 0 || i == len(mergedKeys)-1 {
+			slog.Info("M3U解析进度", "processed", i+1, "total", len(mergedKeys), "imported_new", imported)
 		}
 	}
+
+	// 5. 镜像清理 (Purge) - 删除已在此次同步中消失的旧频道
+	for _, channelID := range existingDB {
+		if !keptIDs[channelID] {
+			_, _ = tx.Exec("DELETE FROM channels WHERE id = ?", channelID)
+		}
+	}
+
+	// 6. 镜像清理 - 删除名下没有频道的空分组 (保留 '未分类' 防呆)
+	_, _ = tx.Exec("DELETE FROM channel_groups WHERE name != '未分类' AND (SELECT COUNT(*) FROM channels WHERE group_id = channel_groups.id) = 0")
 
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 
-	return imported, nil
+	return len(mergedKeys), nil
 }
 
 func detectStreamType(url string) string {

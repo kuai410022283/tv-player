@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 主色调 - 电视家风格深色主题 -->
+    <!-- 主色调 - 深色主题 -->
     <color name="bg_main">#FF0A1628</color>
     <color name="bg_sidebar">#FF0D1B2A</color>
     <color name="bg_header">#FF0D1B2A</color>

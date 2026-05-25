@@ -55,7 +55,14 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 }
 
 // CheckHealth verifies a stream URL is reachable and returns stream info
-func (sp *StreamProxy) CheckHealth(url, streamType string) (*models.StreamStatus, error) {
+func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (*models.StreamStatus, error) {
+	// 如果是多源合并（#拼接），取第一条线路进行探测
+	urls := strings.Split(rawURL, "#")
+	if len(urls) == 0 || urls[0] == "" {
+		return &models.StreamStatus{URL: rawURL, Status: "error", ErrorMsg: "空地址"}, nil
+	}
+	url := strings.TrimSpace(urls[0])
+
 	status := &models.StreamStatus{
 		URL:    url,
 		Status: "unknown",
@@ -68,12 +75,36 @@ func (sp *StreamProxy) CheckHealth(url, streamType string) (*models.StreamStatus
 		return status, err
 	}
 
-	// 健康检查用独立短超时 client
-	healthClient := &http.Client{Timeout: 10 * time.Second}
+	// 获取自定义的 User-Agent 和 Headers
+	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
+	if ua == "" {
+		ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	}
 
+	// 健康检查用独立短超时 client，禁用 KeepAlive 避免关闭未读完的响应体导致闲置连接接收到乱码
+	healthClient := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+		},
+	}
 	switch streamType {
-	case "hls", "mp4", "dash", "flv":
-		resp, err := healthClient.Head(url)
+	case "hls", "mp4", "dash", "flv", "ts":
+		// 很多 IPTV 服务端会拦截 HEAD 请求 (返回 405/403)，因此改用 GET，并加入基础 UA 伪装
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			status.Status = "error"
+			status.ErrorMsg = err.Error()
+			return status, err
+		}
+		req.Header.Set("User-Agent", ua)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		// 显式告诉服务端不保持连接，配合 DisableKeepAlives 彻底断开
+		req.Close = true
+		
+		resp, err := healthClient.Do(req)
 		if err != nil {
 			status.Status = "error"
 			status.ErrorMsg = err.Error()
@@ -131,7 +162,7 @@ func (sp *StreamProxy) checkAllChannels() {
 		}
 
 		for _, ch := range channels {
-			status, _ := sp.CheckHealth(ch.StreamURL, ch.StreamType)
+			status, _ := sp.CheckHealth(ch.ID, ch.StreamURL, ch.StreamType)
 			newStatus := "offline"
 			if status.Status == "online" {
 				newStatus = "online"
@@ -171,14 +202,64 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		streamToProxy = targetURL
 	}
 
-	// 校验流地址，防止 SSRF
-	if err := ValidateStreamURL(streamToProxy); err != nil {
-		return fmt.Errorf("流地址不安全: %w", err)
+	rawURLs := strings.Split(streamToProxy, "#")
+	var resp *http.Response
+	var finalURL string
+	var lastErr error
+
+	ctx, cancel := context.WithCancel(r.Context())
+
+	// Apply inherited UA and custom headers
+	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
+	if err != nil {
+		ua = "MediaPlayer/1.0"
+	}
+
+	for _, u := range rawURLs {
+		u = strings.TrimSpace(u)
+		if u == "" { continue }
+
+		// 校验流地址，防止 SSRF
+		if err := ValidateStreamURL(u); err != nil {
+			lastErr = err
+			continue
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		
+		req.Header.Set("User-Agent", ua)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		resp, err = sp.client.Do(req)
+		if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 400 {
+			finalURL = u
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("status code %d", resp.StatusCode)
+		}
+	}
+
+	if finalURL == "" {
+		cancel()
+		if lastErr != nil {
+			return fmt.Errorf("所有线路均失效, 最后错误: %w", lastErr)
+		}
+		return fmt.Errorf("无有效播放线路")
 	}
 
 	sessionID := fmt.Sprintf("%d-%d-%d", channelID, clientID, time.Now().UnixNano())
-
-	ctx, cancel := context.WithCancel(r.Context())
 
 	// Update stream state
 	sp.mu.Lock()
@@ -189,7 +270,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		ClientID:    clientID,
 		ClientName:  clientName,
 		ClientIP:    clientIP,
-		URL:         streamToProxy,
+		URL:         finalURL,
 		Status:      "playing",
 		StartedAt:   time.Now(),
 		LastActive:  time.Now(),
@@ -205,26 +286,6 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		sp.mu.Unlock()
 	}()
 
-	// Proxy the stream
-	req, err := http.NewRequestWithContext(ctx, "GET", streamToProxy, nil)
-	if err != nil {
-		return err
-	}
-	
-	// Apply inherited UA and custom headers
-	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
-	if err != nil {
-		ua = "MediaPlayer/1.0"
-	}
-	req.Header.Set("User-Agent", ua)
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := sp.client.Do(req)
-	if err != nil {
-		return err
-	}
 	defer resp.Body.Close()
 
 	// Copy headers

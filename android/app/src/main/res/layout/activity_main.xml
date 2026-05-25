@@ -417,6 +417,44 @@
                 android:textAllCaps="false"
                 android:layout_marginBottom="24dp"
                 android:nextFocusUp="@+id/sbSettingsCache"
+                android:nextFocusDown="@+id/sbSettingsVolume" />
+
+            <!-- 音量设置 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="系统音量:"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp"/>
+
+            <SeekBar
+                android:id="@+id/sbSettingsVolume"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:progress="50"
+                android:layout_marginBottom="24dp"
+                android:nextFocusUp="@+id/btnSettingsScale"
+                android:nextFocusDown="@+id/sbSettingsBrightness" />
+
+            <!-- 亮度设置 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="画面亮度:"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp"/>
+
+            <SeekBar
+                android:id="@+id/sbSettingsBrightness"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:progress="50"
+                android:layout_marginBottom="24dp"
+                android:nextFocusUp="@+id/sbSettingsVolume"
                 android:nextFocusDown="@+id/btnSettingsDecoder" />
 
             <TextView
@@ -438,8 +476,31 @@
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="12dp"
                 android:textAllCaps="false"
+                android:layout_marginBottom="24dp"
+                android:nextFocusUp="@+id/sbSettingsBrightness"
+                android:nextFocusDown="@+id/btnSettingsAutoStart" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="启动设置:"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp"/>
+
+            <Button
+                android:id="@+id/btnSettingsAutoStart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="开机自动启动: 开"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/selector_channel_item"
+                android:gravity="start|center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:textAllCaps="false"
                 android:layout_marginBottom="32dp"
-                android:nextFocusUp="@+id/btnSettingsScale"
+                android:nextFocusUp="@+id/btnSettingsDecoder"
                 android:nextFocusDown="@+id/btnSettingsSave" />
 
             <LinearLayout
@@ -457,7 +518,7 @@
                     android:textColor="#FFFFFF"
                     android:background="@drawable/selector_channel_item"
                     android:layout_marginEnd="16dp"
-                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusUp="@+id/btnSettingsAutoStart"
                     android:nextFocusRight="@+id/btnSettingsSave" />
 
                 <Button
@@ -467,7 +528,7 @@
                     android:text="保存"
                     android:textColor="#FFFFFF"
                     android:background="@drawable/selector_channel_item"
-                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusUp="@+id/btnSettingsAutoStart"
                     android:nextFocusLeft="@+id/btnSettingsCancel" />
             </LinearLayout>
             

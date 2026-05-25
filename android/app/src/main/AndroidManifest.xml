@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- TV 支持 (非必须，允许手机安装) -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -22,6 +23,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TVPlayer"
         android:usesCleartextTraffic="true">
+
+        <!-- 开机自启接收器 -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
 
         <!-- 主界面: 强制横屏，沉浸式大一统体验 -->
         <activity

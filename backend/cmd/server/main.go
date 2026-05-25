@@ -31,6 +31,11 @@ func main() {
 		Level: logLevel,
 	})))
 
+	fmt.Println("项目名称：MediaPlayer")
+	fmt.Println("作者：laok")
+	fmt.Println("邮箱：kuai410022283@qq.com")
+	fmt.Println("版本：v1.0.0")
+
 	// ── 加载配置 ─────────────────────────────────────
 	cfgPath := "config.yaml"
 	if p := os.Getenv("CONFIG_PATH"); p != "" {

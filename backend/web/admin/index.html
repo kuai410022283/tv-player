@@ -15,10 +15,8 @@
   <div class="app">
     <div class="sidebar">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
+        <svg viewBox="0 0 1024 1024">
+          <path fill="#1296db" d="M867.530667 172.330667A71.157333 71.157333 0 0 1 938.666667 243.477333v423.018667a71.146667 71.146667 0 0 1-71.136 71.168H167.146667A71.125333 71.125333 0 0 1 96 666.496V243.509333a71.157333 71.157333 0 0 1 71.146667-71.178666z m-360.853334 163.2c-34.016-19.648-76.533333 4.917333-76.533333 44.192v150.506666c0 39.296 42.517333 63.861333 76.533333 44.213334l130.272-75.264c34.016-19.626667 34.016-68.757333 0-88.405334zM360.202667 790.997333H685.12c19.690667 0 29.536 10.666667 29.536 32s-9.845333 32-29.536 32H360.213333c-19.690667 0-29.536-10.666667-29.536-32s9.845333-32 29.536-32z"/>
         </svg>
         <span>MediaPlayer</span>
       </div>
@@ -430,7 +428,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>自定义最大并发流</label>
-              <input type="number" id="set-max-streams" value="2" min="1" max="10">
+              <input type="number" id="set-max-streams" value="100" min="1" max="10000">
             </div>
             <div class="form-group">
               <label>自定义授权天数</label>
@@ -449,7 +447,8 @@
           <div class="form-group">
             <label>EPG 数据源 URL (XMLTV)</label>
             <input type="text" id="set-epg-source-url" placeholder="http://epg.example.com/e.xml">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持 .xml 或 .gz 格式。如果配置此项，服务端会自动拉取并在内存中构建 EPG 节目单。</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持 .xml 或 .gz 格式。如果配置此项，服务端会自动拉取并在内存中构建 EPG
+              节目单。</div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -534,7 +533,7 @@
     <div class="modal">
       <h3 id="src-modal-title">添加M3U源</h3>
       <input type="hidden" id="src-edit-id">
-      <div class="form-group"><label>名称</label><input type="text" id="src-name"></div>
+      <div class="form-group"><label>来源名称</label><input type="text" id="src-name"></div>
       <div class="form-group"><label>URL</label><input type="text" id="src-url"
           placeholder="https://example.com/playlist.m3u"></div>
       <div class="form-row">
@@ -680,7 +679,7 @@
       <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
       <div class="form-row">
         <div class="form-group"><label>授权天数</label><input type="number" id="plan-days" value="365" min="0"></div>
-        <div class="form-group"><label>并发设备限制</label><input type="number" id="plan-streams" value="2" min="1"></div>
+        <div class="form-group"><label>并发设备限制</label><input type="number" id="plan-streams" value="100" min="1"></div>
       </div>
       <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01"></div>
       <div class="form-group"><label>描述</label><textarea id="plan-desc" rows="2"></textarea></div>

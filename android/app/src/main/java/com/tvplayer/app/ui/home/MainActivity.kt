@@ -136,6 +136,9 @@ class MainActivity : AppCompatActivity() {
 
         // 强制所有设备使用 TV 的沉浸式界面大一统！
         isTvMode = true
+        
+        // 保持屏幕常亮，防止手机/Pad自动锁屏
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContentView(R.layout.activity_main)
         setupTvViews()
@@ -343,6 +346,7 @@ class MainActivity : AppCompatActivity() {
     // 临时存储设置状态，点保存时才写入
     private var tempDecoderMode = Prefs.DECODER_MODE_AUTO
     private var tempScaleMode = Prefs.SCALE_MODE_DEFAULT
+    private var tempAutoStart = true
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -351,9 +355,11 @@ class MainActivity : AppCompatActivity() {
         
         tempDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         tempScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        tempAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
 
         btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
+        val btnSettingsAutoStart = findViewById<Button>(R.id.btnSettingsAutoStart)
         
         fun updateDecoderText() {
             btnSettingsDecoder?.text = when (tempDecoderMode) {
@@ -371,9 +377,14 @@ class MainActivity : AppCompatActivity() {
                 else -> "原始比例 (自适应屏幕)"
             }
         }
+
+        fun updateAutoStartText() {
+            btnSettingsAutoStart?.text = if (tempAutoStart) "开机自动启动: 开" else "开机自动启动: 关"
+        }
         
         updateDecoderText()
         updateScaleText()
+        updateAutoStartText()
         
         btnSettingsDecoder?.setOnClickListener {
             tempDecoderMode = when (tempDecoderMode) {
@@ -394,6 +405,11 @@ class MainActivity : AppCompatActivity() {
             updateScaleText()
         }
 
+        btnSettingsAutoStart?.setOnClickListener {
+            tempAutoStart = !tempAutoStart
+            updateAutoStartText()
+        }
+
         etSettingsUrl?.setText(url)
         
         // cacheMs: 500 to 5000, step 100.
@@ -406,6 +422,39 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 val newCacheMs = 500 + progress * 100
                 tvSettingsCacheValue?.text = " ${newCacheMs / 1000f} 秒"
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        // 音量设置
+        val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        val sbVolume = findViewById<SeekBar>(R.id.sbSettingsVolume)
+        sbVolume?.max = maxVolume
+        sbVolume?.progress = currentVolume
+        sbVolume?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, progress, 0)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        // 亮度设置
+        val sbBrightness = findViewById<SeekBar>(R.id.sbSettingsBrightness)
+        sbBrightness?.max = 100
+        sbBrightness?.progress = ((window.attributes.screenBrightness.coerceAtLeast(0.01f)) * 100).toInt().coerceIn(1, 100)
+        sbBrightness?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val lp = window.attributes
+                    lp.screenBrightness = max(0.01f, progress / 100f)
+                    window.attributes = lp
+                }
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
@@ -437,6 +486,7 @@ class MainActivity : AppCompatActivity() {
                 .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
                 .putInt(Prefs.KEY_DECODER_MODE, tempDecoderMode)
                 .putInt(Prefs.KEY_SCALE_MODE, tempScaleMode)
+                .putBoolean(Prefs.KEY_AUTO_START, tempAutoStart)
                 .apply()
                 
             com.tvplayer.app.data.api.ApiClient.init(newUrl)

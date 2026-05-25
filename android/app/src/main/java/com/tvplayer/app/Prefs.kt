@@ -20,6 +20,9 @@ object Prefs {
     const val DECODER_MODE_AUTO = 0
     const val DECODER_MODE_HARDWARE = 1
     const val DECODER_MODE_SOFTWARE = 2
+    
+    // 开机自启
+    const val KEY_AUTO_START = "auto_start"
 
     // 画面比例
     const val KEY_SCALE_MODE = "scale_mode"

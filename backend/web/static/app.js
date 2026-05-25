@@ -728,9 +728,9 @@ async function savePlan() {
 }
 
 async function editPlan(id) {
-  // Fetch groups if not already loaded
-  const groupsRes = await api('/admin/groups');
-  const groups = (groupsRes.data && groupsRes.data.items) ? groupsRes.data.items : [];
+  // Fetch all groups via the unpaginated frontend API
+  const groupsRes = await api('/groups');
+  const groups = groupsRes.data || [];
 
   let p = { name: '', days: 365, max_streams: 2, price: 0, description: '', group_ids: [] };
   if (id) {
