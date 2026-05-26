@@ -15,8 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/tvplayer/backend/internal/models"
-	"github.com/tvplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/services"
 )
 
 // Version 由编译时注入: go build -ldflags "-X main.Version=v1.0.0"

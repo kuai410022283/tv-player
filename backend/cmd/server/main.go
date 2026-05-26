@@ -12,10 +12,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/tvplayer/backend/internal/api"
-	"github.com/tvplayer/backend/internal/config"
-	"github.com/tvplayer/backend/internal/middleware"
-	"github.com/tvplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/api"
+	"github.com/mediaplayer/backend/internal/config"
+	"github.com/mediaplayer/backend/internal/middleware"
+	"github.com/mediaplayer/backend/internal/services"
 )
 
 // Version 由编译时注入: go build -ldflags "-X main.Version=v1.0.0"
@@ -196,7 +196,7 @@ func main() {
 func checkSecurityDefaults(cfg *config.Config) {
 	warnings := []string{}
 
-	if cfg.Auth.Secret == "" || cfg.Auth.Secret == "tvplayer-secret-key-change-me" || cfg.Auth.Secret == "tvplayer-change-this-secret-key" {
+	if cfg.Auth.Secret == "" || cfg.Auth.Secret == "mediaplayer-secret-key-change-me" || cfg.Auth.Secret == "mediaplayer-change-this-secret-key" {
 		warnings = append(warnings, "JWT secret 使用了默认值，请在 config.yaml 中修改 auth.secret")
 	}
 

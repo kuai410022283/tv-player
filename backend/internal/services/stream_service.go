@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tvplayer/backend/internal/config"
-	"github.com/tvplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/config"
+	"github.com/mediaplayer/backend/internal/models"
 )
 
 // StreamProxy manages proxied streams with health checking

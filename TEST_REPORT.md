@@ -1,4 +1,4 @@
-# TVPlayer 全生命周期交付测试报告
+# MediaPlayer 全生命周期交付测试报告
 
 **测试日期**: 2026-04-28  
 **测试范围**: Go 后端 + Web 管理面板 + Android 客户端  
@@ -64,8 +64,8 @@
 - **风险等级**: 低，实际运行中不太可能触发
 
 #### ⚠️ 警告 2: SharedPreferences 文件名不一致
-- `tvplayer` - 存储 server_url, gesture_hint_shown
-- `tvplayer_auth` - 存储 access_token, client_id, device_id
+- `mediaplayer` - 存储 server_url, gesture_hint_shown
+- `mediaplayer_auth` - 存储 access_token, client_id, device_id
 - **风险等级**: 无，这是有意的数据隔离设计
 
 ### 5. 安全性检查
@@ -78,7 +78,7 @@
 
 #### ⚠️ 警告 3: 硬编码默认密码
 - `handler.go:43` 默认 admin 密码 `admin123`
-- `config.yaml` 默认 JWT secret `tvplayer-change-this-secret-key`
+- `config.yaml` 默认 JWT secret `mediaplayer-change-this-secret-key`
 - **建议**: 首次部署时强制修改，或在启动日志中提醒
 
 #### ⚠️ 警告 4: 明文 HTTP 传输

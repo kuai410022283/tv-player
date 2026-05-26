@@ -1,0 +1,87 @@
+package com.mediaplayer.app.data.repository
+
+import com.mediaplayer.app.data.api.ApiClient
+import com.mediaplayer.app.data.model.Channel
+import com.mediaplayer.app.data.model.ChannelGroup
+import com.mediaplayer.app.data.model.EPGProgram
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * 频道数据仓库 —— 封装 API 调用，返回 Result。
+ */
+class ChannelRepository {
+
+    /** 获取所有分组 */
+    suspend fun getGroups(): Result<List<ChannelGroup>> = withContext(Dispatchers.IO) {
+        try {
+            val resp = ApiClient.getService().getGroups()
+            if (resp.isSuccessful && resp.body()?.code == 0) {
+                Result.success(resp.body()!!.data ?: emptyList())
+            } else {
+                Result.failure(Exception(resp.body()?.message ?: "获取分组失败"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** 获取所有频道（自动分页拉取） */
+    suspend fun getChannels(
+        groupId: Long? = null,
+        search: String? = null
+    ): Result<List<Channel>> = withContext(Dispatchers.IO) {
+        try {
+            val resp = ApiClient.getService().getChannels(
+                groupId = if (groupId == 0L) null else groupId,
+                search = search,
+                page = 1,
+                pageSize = 1000 // 限制最大拉取数量，防止电视盒子 OOM 卡死
+            )
+
+            if (resp.isSuccessful && resp.body()?.code == 0) {
+                val pageData = resp.body()!!.data
+                Result.success(pageData?.items ?: emptyList())
+            } else {
+                Result.failure(Exception(resp.body()?.message ?: "获取频道失败"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** 获取 EPG 节目单 */
+    suspend fun getEPG(channelId: String): Result<List<EPGProgram>> = withContext(Dispatchers.IO) {
+        try {
+            val resp = ApiClient.getService().getEPG(channelId)
+            if (resp.isSuccessful && resp.body()?.code == 0) {
+                Result.success(resp.body()!!.data ?: emptyList())
+            } else {
+                Result.success(emptyList())
+            }
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
+    }
+
+    /** 记录播放历史 */
+    suspend fun addHistory(
+        channelId: Long,
+        duration: Int,
+        lastPos: Int,
+        clientId: Long
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val body = mapOf(
+                "channel_id" to channelId,
+                "duration" to duration,
+                "last_pos" to lastPos,
+                "client_id" to clientId
+            )
+            ApiClient.getService().addHistory(body)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}

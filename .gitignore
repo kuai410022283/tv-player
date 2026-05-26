@@ -47,7 +47,7 @@ Thumbs.db
 
 m3u.txt
 m3u_回看.txt
-
+iptv.m3u
 backend/mediaplayer*
 
 android/app/build/outputs/apk/release/*.apk

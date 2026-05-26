@@ -1,4 +1,4 @@
-# TVPlayer v1.0.0配置文件
+# MediaPlayer v1.0.0配置文件
 # ⚠️ 部署前必须修改 auth.secret 和 auth.admin_password
 
 server:
@@ -6,7 +6,7 @@ server:
   port: 9527
 
 database:
-  path: "./data/tvplayer.db"
+  path: "./data/mediaplayer.db"
 
 stream:
   cache_dir: "./data/cache"
@@ -17,7 +17,7 @@ stream:
 auth:
   # ⚠️ 必须修改！使用随机生成的长字符串
   # 生成方法: openssl rand -hex 32
-  secret: "tvplayer-change-this-secret-key"
+  secret: "mediaplayer-change-this-secret-key"
   expire_hours: 720        # JWT Token 有效期 (小时)
   # ⚠️ 必须修改！设置强密码
   admin_password: "admin123"

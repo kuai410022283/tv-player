@@ -44,7 +44,7 @@ type CORSConfig struct {
 func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{Port: 9527, Host: "0.0.0.0"},
-		Database: DatabaseConfig{Path: "./data/tvplayer.db"},
+		Database: DatabaseConfig{Path: "./data/mediaplayer.db"},
 		Stream: StreamConfig{
 			CacheDir:       "./data/cache",
 			MaxConcurrent:  50,

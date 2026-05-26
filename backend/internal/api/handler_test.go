@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tvplayer/backend/internal/middleware"
-	"github.com/tvplayer/backend/internal/models"
-	"github.com/tvplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/middleware"
+	"github.com/mediaplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/services"
 )
 
 func setupTestDB(t *testing.T) (*services.ClientService, *services.ChannelService) {

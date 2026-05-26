@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tvplayer/backend/internal/models"
-	"github.com/tvplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/services"
 )
 
 type PlanHandler struct {

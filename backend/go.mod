@@ -1,4 +1,4 @@
-module github.com/tvplayer/backend
+module github.com/mediaplayer/backend
 
 go 1.21
 

@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/tvplayer/backend/internal/middleware"
+	"github.com/mediaplayer/backend/internal/middleware"
 )
 
 type Handlers struct {

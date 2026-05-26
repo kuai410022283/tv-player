@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TVPlayer"
+rootProject.name = "MediaPlayer"
 include ':app'

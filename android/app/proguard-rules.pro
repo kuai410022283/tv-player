@@ -1,4 +1,4 @@
-# Proguard rules for TVPlayer
+# Proguard rules for MediaPlayer
 
 # Retrofit
 -keepattributes Signature
@@ -8,14 +8,14 @@
 -keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
--keep interface com.tvplayer.app.data.api.ApiService { *; }
+-keep interface com.mediaplayer.app.data.api.ApiService { *; }
 -dontwarn retrofit2.**
 
 # Gson - 保留所有数据模型
 -keep class com.google.gson.** { *; }
--keep class com.tvplayer.app.data.model.** { *; }
--keepclassmembers class com.tvplayer.app.data.model.** { *; }
--keep class com.tvplayer.app.data.api.ClientAuthManager$Companion { *; }
+-keep class com.mediaplayer.app.data.model.** { *; }
+-keepclassmembers class com.mediaplayer.app.data.model.** { *; }
+-keep class com.mediaplayer.app.data.api.ClientAuthManager$Companion { *; }
 
 # Gson TypeToken
 -keep class com.google.gson.reflect.TypeToken { *; }
@@ -39,12 +39,12 @@
 -keepclassmembers class kotlinx.coroutines.** { volatile <fields>; }
 
 # Keep Application class
--keep class com.tvplayer.app.TVPlayerApp { *; }
+-keep class com.mediaplayer.app.MediaPlayerApp { *; }
 
 # Keep Activities & Services
--keep class com.tvplayer.app.ui.** { *; }
--keep class com.tvplayer.app.service.** { *; }
+-keep class com.mediaplayer.app.ui.** { *; }
+-keep class com.mediaplayer.app.service.** { *; }
 
 # Keep API response wrapper
--keep class com.tvplayer.app.data.model.ApiResponse { *; }
--keep class com.tvplayer.app.data.model.PageResponse { *; }
+-keep class com.mediaplayer.app.data.model.ApiResponse { *; }
+-keep class com.mediaplayer.app.data.model.PageResponse { *; }

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.tvplayer.app'
+    namespace 'com.mediaplayer.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.tvplayer.app"
+        applicationId "com.mediaplayer.app"
         minSdk 21
         targetSdk 34
         versionCode 1
@@ -60,6 +60,15 @@ android {
 
     buildFeatures {
         viewBinding true
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def abi = output.getFilter(com.android.build.VariantOutput.ABI) ?: "all"
+            def version = variant.versionName
+            def buildType = variant.buildType.name
+            outputFileName = "mediaplayer-v${version}-${abi}-${buildType}.apk"
+        }
     }
 }
 

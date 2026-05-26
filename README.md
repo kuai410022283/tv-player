@@ -1,4 +1,4 @@
-# TVPlayer - Android TV 媒体播放器
+# MediaPlayer - Android TV 媒体播放器
 
 模仿电视家风格的 Android TV 媒体播放器，前后端完全分离架构。
 
@@ -34,10 +34,10 @@ cd backend
 go mod tidy
 
 # 编译
-go build -o tvplayer ./cmd/server
+go build -o mediaplayer ./cmd/server
 
 # 运行
-./tvplayer
+./mediaplayer
 
 # 或直接运行
 go run ./cmd/server
@@ -251,8 +251,8 @@ go run ./cmd/server
 
 ```bash
 cd backend
-docker build -t tvplayer .
-docker run -p 9527:9527 -v tvplayer-data:/app/data tvplayer
+docker build -t mediaplayer .
+docker run -p 9527:9527 -v mediaplayer-data:/app/data mediaplayer
 ```
 
 ### 生产环境建议
@@ -281,7 +281,7 @@ server:
   port: 9527                 # 监听端口
 
 database:
-  path: "./data/tvplayer.db" # SQLite 数据库路径
+  path: "./data/mediaplayer.db" # SQLite 数据库路径
 
 stream:
   cache_dir: "./data/cache"  # 缓存目录
@@ -290,7 +290,7 @@ stream:
   health_check_sec: 30       # 健康检查间隔(秒)
 
 auth:
-  secret: "tvplayer-change-this-secret-key"  # JWT 密钥（必须修改）
+  secret: "mediaplayer-change-this-secret-key"  # JWT 密钥（必须修改）
   expire_hours: 720                          # Token 有效期(小时)
   admin_password: "admin123"                 # 管理员密码（必须修改）
 ```
@@ -325,11 +325,11 @@ tv-player/
 │   └── Dockerfile
 ├── android/                         # Android 客户端
 │   └── app/src/main/
-│       ├── java/com/tvplayer/app/
+│       ├── java/com/mediaplayer/app/
 │       │   ├── data/
 │       │   │   ├── api/
 │       │   │   │   ├── ApiClient.kt         # Retrofit 单例 + 拦截器
-│       │   │   │   ├── TVPlayerApi.kt       # API 接口定义
+│       │   │   │   ├── ApiClient.kt       # API 接口定义
 │       │   │   │   └── ClientAuthManager.kt # 设备注册/验证/令牌管理
 │       │   │   ├── model/Models.kt          # 数据模型
 │       │   │   └── repository/ChannelRepository.kt  # 数据仓库
@@ -346,7 +346,7 @@ tv-player/
 │       │   │   ├── FocusHelper.kt           # TV 焦点导航
 │       │   │   └── PlayerGestureController.kt # 手势控制
 │       │   ├── Prefs.kt                     # SharedPreferences 常量
-│       │   └── TVPlayerApp.kt               # Application
+│       │   └── MediaPlayerApp.kt               # Application
 │       ├── res/                    # 布局、drawable、values
 │       └── AndroidManifest.xml
 ├── README.md

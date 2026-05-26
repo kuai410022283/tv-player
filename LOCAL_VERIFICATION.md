@@ -14,8 +14,8 @@ go mod tidy
 # ✅ 确认 go.sum 已生成
 
 # 1.2 编译
-go build -o tvplayer ./cmd/server
-# ✅ 确认无编译错误，tvplayer 二进制文件生成
+go build -o mediaplayer ./cmd/server
+# ✅ 确认无编译错误，mediaplayer 二进制文件生成
 
 # 1.3 静态检查 (可选)
 go vet ./...
@@ -26,8 +26,8 @@ go vet ./...
 
 ```bash
 # 2.1 启动服务
-./tvplayer
-# ✅ 确认输出: "🚀 TVPlayer Backend starting on 0.0.0.0:9527"
+./mediaplayer
+# ✅ 确认输出: "🚀 MediaPlayer Backend starting on 0.0.0.0:9527"
 
 # 2.2 健康检查
 curl http://localhost:9527/ping
@@ -92,7 +92,7 @@ cd android
 # 3.1 编译 Debug APK
 ./gradlew assembleDebug
 # ✅ 确认 BUILD SUCCESSFUL
-# ✅ 确认 app/build/outputs/apk/debug/app-debug.apk 生成
+# ✅ 确认 app/build/outputs/apk/debug/mediaplayer-*.apk 生成
 
 # 3.2 Lint 检查 (可选)
 ./gradlew lint
@@ -103,11 +103,11 @@ cd android
 
 ```bash
 # 4.1 安装到设备
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/debug/mediaplayer-*.apk
 # ✅ 确认安装成功
 
 # 4.2 启动应用
-adb shell am start -n com.tvplayer.app/.ui.home.MainActivity
+adb shell am start -n com.mediaplayer.app/.ui.home.MainActivity
 # ✅ 确认应用启动，显示授权等待界面
 
 # 4.3 修改服务器地址

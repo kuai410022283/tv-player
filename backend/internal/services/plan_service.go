@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/tvplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/models"
 )
 
 type PlanService struct {
