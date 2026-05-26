@@ -9,7 +9,7 @@ export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
 chmod +x ./gradlew
 
 # 是否自动追加版本号？（可通过 --bump 参数开启）
-BUMP_VERSION=false
+BUMP_VERSION=true
 for arg in "$@"; do
     if [ "$arg" == "--bump" ] || [ "$arg" == "-b" ]; then
         BUMP_VERSION=true
@@ -34,7 +34,8 @@ if [ "$BUMP_VERSION" = true ]; then
             # 拆分版本号，如 1.0.0 拆成 1 0 0
             IFS='.' read -r v1 v2 v3 <<< "$OLD_VN"
             if [ -n "$v3" ]; then
-                NEW_VN="$v1.$v2.$((v3 + 1))"
+                # 如果自动追加0修改为1
+                NEW_VN="$v1.$v2.$((v3 + 0))"
                 echo "🔄 自动升级 versionName: $OLD_VN -> $NEW_VN"
                 sed -i -E "s/versionName \"[^\"]+\"/versionName \"$NEW_VN\"/" "$GRADLE_FILE"
             fi
