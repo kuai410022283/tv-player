@@ -231,7 +231,7 @@ async function loadChannels(search = '') {
     </tr>`).join('');
   }
   document.getElementById('check-all-channels').checked = false;
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   document.getElementById('channels-page').textContent = channelPage;
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
 }
@@ -742,9 +742,10 @@ async function editPlan(id) {
   const container = document.getElementById('plan-groups-container');
   container.innerHTML = groups.map(g => {
     const isChecked = p.group_ids && p.group_ids.includes(g.id);
+    const sourceTag = g.source && g.source !== '手动' ? ` <span style="font-size:11px;color:var(--text2)">(${esc(g.source)})</span>` : '';
     return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg2);padding:4px 10px;border-radius:4px;">
       <input type="checkbox" value="${g.id}" ${isChecked ? 'checked' : ''}>
-      ${esc(g.name)}
+      ${esc(g.name)}${sourceTag}
     </label>`;
   }).join('');
 
@@ -944,9 +945,10 @@ async function loadClientLogs() {
 
 // ═══ Client Settings & EPG ══════════════════════════════
 async function loadClientSettings() {
-  const [setRes, plansRes] = await Promise.all([
+  const [setRes, plansRes, updateRes] = await Promise.all([
     api('/settings'),
-    api('/admin/plans')
+    api('/admin/plans'),
+    api('/update').catch(() => ({ data: {} })) // ignore error if /update fails
   ]);
 
   const select = document.getElementById('set-default-plan-id');
@@ -970,6 +972,17 @@ async function loadClientSettings() {
     if(document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
+    }
+  }
+
+  // Update 配置
+  if (updateRes && updateRes.data) {
+    if(document.getElementById('set-update-version-code')) {
+      document.getElementById('set-update-version-code').value = updateRes.data.version_code || '';
+      document.getElementById('set-update-version-name').value = updateRes.data.version_name || '';
+      document.getElementById('set-update-download-url').value = updateRes.data.download_url || '';
+      document.getElementById('set-update-log').value = updateRes.data.update_log || '';
+      document.getElementById('set-update-force').value = updateRes.data.force_update ? 'true' : 'false';
     }
   }
 }
@@ -997,6 +1010,26 @@ async function saveAllClientSettings() {
     await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: String(v) }) });
   }
   toast('策略及 EPG 配置已保存');
+}
+
+async function saveAppUpdateSettings() {
+  const updateConf = {
+    version_code: parseInt(document.getElementById('set-update-version-code').value) || 0,
+    version_name: document.getElementById('set-update-version-name').value.trim(),
+    download_url: document.getElementById('set-update-download-url').value.trim(),
+    update_log: document.getElementById('set-update-log').value.trim(),
+    force_update: document.getElementById('set-update-force').value === 'true'
+  };
+
+  try {
+    await api('/admin/settings/update', { 
+      method: 'POST', 
+      body: JSON.stringify(updateConf) 
+    });
+    toast('升级配置已独立保存', 'success');
+  } catch (e) {
+    toast('保存升级配置失败: ' + e.message, 'error');
+  }
 }
 
 async function refreshEPGCache() {

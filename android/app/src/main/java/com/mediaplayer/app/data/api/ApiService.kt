@@ -55,4 +55,9 @@ interface ApiService {
 
     @POST("history")
     suspend fun addHistory(@Body body: @JvmSuppressWildcards Map<String, Any>): Response<APIResponse<JsonElement>>
+
+    // ── 检查更新 ───────────────────────────────────────
+
+    @GET("update")
+    suspend fun checkUpdate(): Response<APIResponse<AppUpdateConfig>>
 }

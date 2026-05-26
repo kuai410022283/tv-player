@@ -53,9 +53,9 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	var sqlStmt string
 	err = db.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name='channel_groups'").Scan(&sqlStmt)
 	if err == nil && strings.Contains(sqlStmt, "UNIQUE") {
-		_, _ = db.Exec(`
-			PRAGMA foreign_keys=off;
-			CREATE TABLE channel_groups_new (
+		queries := []string{
+			"PRAGMA foreign_keys=off;",
+			`CREATE TABLE channel_groups_new (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				name TEXT NOT NULL,
 				icon TEXT DEFAULT '',
@@ -66,13 +66,20 @@ func InitDB(dbPath string) (*sql.DB, error) {
 				custom_headers TEXT DEFAULT '',
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			);
-			INSERT INTO channel_groups_new (id, name, icon, sort_order, is_direct, source, created_at, updated_at)
-			SELECT id, name, icon, sort_order, is_direct, COALESCE(source, '手动'), created_at, updated_at FROM channel_groups;
-			DROP TABLE channel_groups;
-			ALTER TABLE channel_groups_new RENAME TO channel_groups;
-			PRAGMA foreign_keys=on;
-		`)
+			);`,
+			`INSERT INTO channel_groups_new (id, name, icon, sort_order, source, created_at, updated_at)
+			SELECT id, name, icon, sort_order, COALESCE(source, '手动'), created_at, updated_at FROM channel_groups;`,
+			"DROP TABLE channel_groups;",
+			"ALTER TABLE channel_groups_new RENAME TO channel_groups;",
+			"PRAGMA foreign_keys=on;",
+		}
+		
+		for _, q := range queries {
+			if _, errMigrate := db.Exec(q); errMigrate != nil {
+				fmt.Println("Warning: channel_groups migration failed on query:", q, "Error:", errMigrate)
+				break
+			}
+		}
 	}
 
 	if err := createTables(db); err != nil {

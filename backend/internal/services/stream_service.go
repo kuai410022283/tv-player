@@ -379,8 +379,15 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 	var globalCatchupSource string
 	var globalCatchupDays string
 
+	isFirstLine := true
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		if isFirstLine {
+			// 移除 UTF-8 BOM，防止 strings.HasPrefix("#EXTM3U") 匹配失败
+			line = strings.TrimPrefix(line, "\xef\xbb\xbf")
+			isFirstLine = false
+		}
 		if line == "" { continue }
 
 		if strings.HasPrefix(line, "#EXTM3U") {

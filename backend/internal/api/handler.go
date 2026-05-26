@@ -706,6 +706,56 @@ func (h *Handler) SetSetting(c *gin.Context) {
 	ok(c, nil)
 }
 
+// ── App Update ─────────────────────────────────────────
+
+func (h *Handler) GetAppUpdate(c *gin.Context) {
+	settings, err := h.channelSvc.GetAllSettings()
+	if err != nil {
+		failInternal(c, err, "获取配置失败")
+		return
+	}
+	
+	update := models.AppUpdateConfig{}
+	if val, ok := settings["update_version_code"]; ok {
+		update.VersionCode, _ = strconv.Atoi(val)
+	}
+	if val, ok := settings["update_version_name"]; ok {
+		update.VersionName = val
+	}
+	if val, ok := settings["update_download_url"]; ok {
+		update.DownloadURL = val
+	}
+	if val, ok := settings["update_log"]; ok {
+		update.UpdateLog = val
+	}
+	if val, ok := settings["update_force"]; ok {
+		update.ForceUpdate = val == "true"
+	}
+	
+	ok(c, update)
+}
+
+func (h *Handler) SetAppUpdate(c *gin.Context) {
+	var body models.AppUpdateConfig
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	
+	_ = h.channelSvc.SetSetting("update_version_code", strconv.Itoa(body.VersionCode))
+	_ = h.channelSvc.SetSetting("update_version_name", body.VersionName)
+	_ = h.channelSvc.SetSetting("update_download_url", body.DownloadURL)
+	_ = h.channelSvc.SetSetting("update_log", body.UpdateLog)
+	
+	forceVal := "false"
+	if body.ForceUpdate {
+		forceVal = "true"
+	}
+	_ = h.channelSvc.SetSetting("update_force", forceVal)
+	
+	ok(c, body)
+}
+
 // ── EPG ────────────────────────────────────────────────
 
 func (h *Handler) GetEPG(c *gin.Context) {

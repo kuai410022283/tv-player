@@ -126,12 +126,13 @@ func (imp *M3UImporter) ImportFromString(content string, sourceName string) (int
 }
 
 func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string) (int, error) {
-	// 1. 预先处理所有分组，避免在开启频道的写入事务后再执行其它表写入，导致 SQLite 锁表(Deadlock)
-	// 取消按 Source 严格过滤，允许不同来源但同名的分组进行合并复用，防止产生大量同名分组
+	// 1. 预先处理所有分组，按 "来源+分组名" 作为复合键隔离，不同来源的同名分组各自独立
+	// 格式: "source|name" -> groupID
 	groupCache := make(map[string]int64)
 	existingGroups, _ := imp.channelSvc.ListGroups(0)
 	for _, g := range existingGroups {
-		groupCache[g.Name] = g.ID
+		cacheKey := g.Source + "|" + g.Name
+		groupCache[cacheKey] = g.ID
 	}
 
 	for _, ch := range channels {
@@ -143,7 +144,8 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 				groupName = "未分类"
 			}
 		}
-		if _, ok := groupCache[groupName]; !ok {
+		cacheKey := sourceName + "|" + groupName
+		if _, ok := groupCache[cacheKey]; !ok {
 			newGroup := &models.ChannelGroup{
 				Name: groupName, 
 				SortOrder: len(groupCache), 
@@ -153,7 +155,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 				CustomHeaders: sourceHeaders,
 			}
 			if err := imp.channelSvc.CreateGroup(newGroup); err == nil {
-				groupCache[groupName] = newGroup.ID
+				groupCache[cacheKey] = newGroup.ID
 			}
 		}
 	}
@@ -179,7 +181,8 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 				groupName = "未分类"
 			}
 		}
-		groupID := groupCache[groupName]
+		cacheKey := sourceName + "|" + groupName
+		groupID := groupCache[cacheKey]
 		name := strings.TrimSpace(ch["name"])
 		if name == "" {
 			name = "未命名频道"
@@ -307,15 +310,15 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		}
 	}
 
-	// 5. 镜像清理 (Purge) - 删除已在此次同步中消失的旧频道
+	// 5. 镜像清理 (Purge) - 删除已在此次同步中消失的旧频道（仅限当前来源）
 	for _, channelID := range existingDB {
 		if !keptIDs[channelID] {
 			_, _ = tx.Exec("DELETE FROM channels WHERE id = ?", channelID)
 		}
 	}
 
-	// 6. 镜像清理 - 删除名下没有频道的空分组 (保留 '未分类' 防呆)
-	_, _ = tx.Exec("DELETE FROM channel_groups WHERE name != '未分类' AND (SELECT COUNT(*) FROM channels WHERE group_id = channel_groups.id) = 0")
+	// 6. 镜像清理 - 仅删除属于当前来源且名下没有频道的空分组 (保留 '未分类' 防呆，不误删其他来源的分组)
+	_, _ = tx.Exec("DELETE FROM channel_groups WHERE name != '未分类' AND source = ? AND (SELECT COUNT(*) FROM channels WHERE group_id = channel_groups.id) = 0", sourceName)
 
 	if err := tx.Commit(); err != nil {
 		return 0, err

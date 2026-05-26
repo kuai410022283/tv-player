@@ -94,6 +94,16 @@ type UserSetting struct {
 	Value string `json:"value" db:"value"`
 }
 
+// ── App Update ─────────────────────────────────────────
+
+type AppUpdateConfig struct {
+	VersionCode int    `json:"version_code"`
+	VersionName string `json:"version_name"`
+	DownloadURL string `json:"download_url"`
+	UpdateLog   string `json:"update_log"`
+	ForceUpdate bool   `json:"force_update"`
+}
+
 // ── Source M3U ─────────────────────────────────────────
 
 type M3USource struct {

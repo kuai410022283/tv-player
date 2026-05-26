@@ -167,6 +167,9 @@ class MainActivity : AppCompatActivity() {
 
         setupAdapters()
         checkAuthAndLoad()
+        
+        // 检查版本更新
+        com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
     }
 
     // ── Touch Gestures for Mobile/Tablet ──
