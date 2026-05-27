@@ -88,7 +88,7 @@ class ChannelAdapter(
         private val playingIndicator: View = itemView.findViewById(R.id.viewPlaying)
 
         fun bind(item: Channel, isPlaying: Boolean) {
-            tvIndex.text = String.format("%02d", bindingAdapterPosition + 1)
+            tvIndex.text = String.format("%03d", item.globalIndex + 1)
             tvName.text = item.name
             
             // 下方显示当前 EPG，如果没有则占位
@@ -126,6 +126,7 @@ class ChannelAdapter(
             ivFav.visibility = View.GONE
 
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
+            itemView.isActivated = isPlaying
         }
     }
 

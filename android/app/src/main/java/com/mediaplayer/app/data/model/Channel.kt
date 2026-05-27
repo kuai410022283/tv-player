@@ -34,6 +34,8 @@ data class Channel(
     @SerializedName("catchup_source") val catchupSource: String = "",
     @SerializedName("catchup_days") val catchupDays: Int = 0
 ) {
+    @Transient var globalIndex: Int = -1
+
     fun getLinesSafely(): List<ChannelLine> {
         if (lines.isNotEmpty()) return lines
         if (legacyStreamUrl.isNotEmpty()) {

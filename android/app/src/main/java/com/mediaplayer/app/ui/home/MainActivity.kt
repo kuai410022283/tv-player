@@ -188,10 +188,10 @@ class MainActivity : AppCompatActivity() {
                     val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
                     if (indexInFiltered >= 0) {
                         tvChannelsRv?.scrollToPosition(indexInFiltered)
-                        tvChannelsRv?.post {
+                        tvChannelsRv?.postDelayed({
                             val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
                             lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
-                        }
+                        }, 50)
                     } else {
                         tvChannelsRv?.requestFocus()
                     }
@@ -618,7 +618,7 @@ class MainActivity : AppCompatActivity() {
     private fun playCurrentLineInTv() {
         val channel = allChannels.getOrNull(currentChannelIndex) ?: return
         
-        tvOsdChannelNum?.text = String.format("%03d", currentChannelIndex + 1)
+        tvOsdChannelNum?.text = String.format("%03d", channel.globalIndex + 1)
         tvOsdChannelName?.text = channel.name
         
         val lines = channel.getLinesSafely()
@@ -814,7 +814,7 @@ class MainActivity : AppCompatActivity() {
 
         channelAdapter = ChannelAdapter(
             isTvMode = isTvMode,
-            onClick = { channel, index ->
+            onClick = { channel, _ ->
                 if (isTvMode) {
                     val realIndex = allChannels.indexOf(channel)
                     playTvChannel(realIndex)
@@ -1011,6 +1011,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             repo.getChannels().onSuccess { list ->
+                list.forEachIndexed { index, channel ->
+                    channel.globalIndex = index
+                }
                 allChannels = list
                 filteredChannels = list
                 channelAdapter.submitList(list)
@@ -1203,6 +1206,82 @@ class MainActivity : AppCompatActivity() {
         videoLayout?.requestFocus()
     }
 
+    // ── Number Input State ──
+    private var channelInputBuffer = java.lang.StringBuilder()
+    private var isInputtingChannel = false
+    private val channelInputRunnable = Runnable {
+        isInputtingChannel = false
+        val inputNum = channelInputBuffer.toString().toIntOrNull()
+        channelInputBuffer.clear()
+        
+        if (inputNum != null && inputNum > 0 && allChannels.isNotEmpty()) {
+            val targetIndex = allChannels.indexOfFirst { it.globalIndex + 1 == inputNum }
+            if (targetIndex != -1) {
+                playTvChannel(targetIndex)
+            } else {
+                Toast.makeText(this@MainActivity, "未找到频道: $inputNum", Toast.LENGTH_SHORT).show()
+                // Restore OSD to current playing channel info
+                if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
+                    val currentChannel = allChannels[currentChannelIndex]
+                    tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
+                    tvOsdChannelName?.text = currentChannel.name
+                }
+            }
+        } else {
+             // Restore OSD
+             if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
+                 val currentChannel = allChannels[currentChannelIndex]
+                 tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
+                 tvOsdChannelName?.text = currentChannel.name
+             }
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_DOWN || ev.action == android.view.MotionEvent.ACTION_MOVE) {
+            if (layoutZappingMenu?.visibility == View.VISIBLE) {
+                uiHandler.removeCallbacks(hideZappingRunnable)
+                uiHandler.postDelayed(hideZappingRunnable, 15000)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            if (layoutZappingMenu?.visibility == View.VISIBLE) {
+                uiHandler.removeCallbacks(hideZappingRunnable)
+                uiHandler.postDelayed(hideZappingRunnable, 15000)
+            }
+            
+            // 遥控器数字键换台
+            if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
+                val keyCode = event.keyCode
+                if (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 || keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9) {
+                    val digit = if (keyCode >= KeyEvent.KEYCODE_NUMPAD_0) {
+                        keyCode - KeyEvent.KEYCODE_NUMPAD_0
+                    } else {
+                        keyCode - KeyEvent.KEYCODE_0
+                    }
+                    
+                    isInputtingChannel = true
+                    if (channelInputBuffer.length < 4) {
+                        channelInputBuffer.append(digit)
+                    }
+                    
+                    showOsd()
+                    tvOsdChannelNum?.text = channelInputBuffer.toString()
+                    tvOsdChannelName?.text = "输入频道号..."
+                    
+                    uiHandler.removeCallbacks(channelInputRunnable)
+                    uiHandler.postDelayed(channelInputRunnable, 1500)
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     // ── TV key events ──────────────────────────────────
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -1356,10 +1435,10 @@ class MainActivity : AppCompatActivity() {
                     val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
                     if (indexInFiltered >= 0) {
                         tvChannelsRv?.scrollToPosition(indexInFiltered)
-                        tvChannelsRv?.post {
+                        tvChannelsRv?.postDelayed({
                             val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
                             lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
-                        }
+                        }, 50)
                     } else {
                         tvChannelsRv?.requestFocus()
                     }
@@ -1406,6 +1485,7 @@ class MainActivity : AppCompatActivity() {
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.removeCallbacks(hideZappingRunnable)
+        uiHandler.removeCallbacks(channelInputRunnable)
         playerHelper?.release()
         playerHelper = null
     }

@@ -23,12 +23,14 @@
     <!-- 序号 -->
     <TextView
         android:id="@+id/tvChannelIndex"
-        android:layout_width="32dp"
+        android:layout_width="40dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
         android:textColor="@color/text_secondary"
         android:textSize="12sp"
+        android:textStyle="bold"
         android:fontFamily="monospace"
-        tools:text="01" />
+        tools:text="001" />
 
     <!-- Logo -->
     <ImageView
