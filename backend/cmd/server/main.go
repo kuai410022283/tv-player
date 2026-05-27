@@ -131,6 +131,7 @@ func main() {
 		public.POST("/client/register", ch.Register)
 		public.GET("/client/verify", ch.Verify)
 		public.POST("/client/verify", ch.Verify)
+		public.GET("/update", h.GetAppUpdate)
 	}
 
 	// ── 受保护 API（全局限流 + 认证）───────────────
@@ -144,6 +145,7 @@ func main() {
 	// ── 静态文件（分层结构）──────────────────────────
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
+	r.Static("/download", "./web/download")
 	r.StaticFile("/", "./web/index.html")
 
 	// ── 启动后台任务 ────────────────────────────────

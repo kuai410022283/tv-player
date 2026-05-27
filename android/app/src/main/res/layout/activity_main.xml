@@ -359,7 +359,7 @@
         android:layout_width="320dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:background="#CC000000"
+        android:background="#E6000000"
         android:visibility="gone"
         tools:visibility="visible"
         android:clickable="true"
@@ -376,207 +376,321 @@
                 android:layout_height="wrap_content"
                 android:text="设置"
                 android:textColor="@color/accent"
-                android:textSize="24sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="32dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="服务器地址"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"
-                android:visibility="gone" />
 
             <EditText
                 android:id="@+id/etSettingsUrl"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="#33FFFFFF"
-                android:textColor="#FFFFFF"
-                android:paddingHorizontal="16dp"
-                android:inputType="textUri"
-                android:singleLine="true"
-                android:layout_marginBottom="24dp"
+                android:layout_height="wrap_content"
                 android:visibility="gone" />
 
+            <!-- Group: 播放与画面 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="播放与画面"
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp"
+                android:layout_marginStart="8dp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:layout_marginBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="网络缓存时长:"
-                    android:textColor="#AAAAAA"
-                    android:textSize="12sp" />
-                <TextView
-                    android:id="@+id/tvSettingsCacheValue"
-                    android:layout_width="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="网络缓存时长"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsCacheValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1.5 秒"
+                        android:textColor="@color/accent"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/sbSettingsCache"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text=" 1.5 秒"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:max="45"
+                    android:progress="10"
+                    android:layout_marginBottom="16dp"
+                    android:nextFocusDown="@+id/btnSettingsScale" />
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsScale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/sbSettingsCache"
+                    android:nextFocusDown="@+id/btnSettingsDecoder">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="画面比例"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsScaleValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="原始比例"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsDecoder"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsScale"
+                    android:nextFocusDown="@+id/sbSettingsVolume">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="解码模式"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsDecoderValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="自动识别"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
             </LinearLayout>
 
-            <SeekBar
-                android:id="@+id/sbSettingsCache"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="45"
-                android:progress="10"
-                android:layout_marginBottom="24dp"
-                android:nextFocusDown="@+id/btnSettingsScale" />
-
+            <!-- Group: 设备与系统 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="画面比例:"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"/>
+                android:text="设备与系统"
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp"
+                android:layout_marginStart="8dp" />
 
-            <Button
-                android:id="@+id/btnSettingsScale"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="原始比例 (自适应屏幕)"
-                android:textColor="#FFFFFF"
-                android:background="@drawable/selector_channel_item"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
-                android:textAllCaps="false"
-                android:layout_marginBottom="24dp"
-                android:nextFocusUp="@+id/sbSettingsCache"
-                android:nextFocusDown="@+id/sbSettingsVolume" />
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:layout_marginBottom="24dp">
 
-            <!-- 音量设置 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="系统音量"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="8dp"/>
+                <SeekBar
+                    android:id="@+id/sbSettingsVolume"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="50"
+                    android:layout_marginBottom="16dp"
+                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusDown="@+id/sbSettingsBrightness" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="画面亮度"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="8dp"/>
+                <SeekBar
+                    android:id="@+id/sbSettingsBrightness"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="50"
+                    android:nextFocusUp="@+id/sbSettingsVolume"
+                    android:nextFocusDown="@+id/btnSettingsAutoStart" />
+            </LinearLayout>
+
+            <!-- Group: 应用管理 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="系统音量:"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"/>
+                android:text="应用管理"
+                android:textColor="#88FFFFFF"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp"
+                android:layout_marginStart="8dp" />
 
-            <SeekBar
-                android:id="@+id/sbSettingsVolume"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:max="100"
-                android:progress="50"
-                android:layout_marginBottom="24dp"
-                android:nextFocusUp="@+id/btnSettingsScale"
-                android:nextFocusDown="@+id/sbSettingsBrightness" />
+                android:orientation="vertical"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:layout_marginBottom="32dp">
 
-            <!-- 亮度设置 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="画面亮度:"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"/>
+                <LinearLayout
+                    android:id="@+id/btnSettingsAutoStart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/sbSettingsBrightness"
+                    android:nextFocusDown="@+id/btnSettingsCheckUpdate">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="开机自动启动"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsAutoStartValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="开"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
 
-            <SeekBar
-                android:id="@+id/sbSettingsBrightness"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="100"
-                android:progress="50"
-                android:layout_marginBottom="24dp"
-                android:nextFocusUp="@+id/sbSettingsVolume"
-                android:nextFocusDown="@+id/btnSettingsDecoder" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="解码模式:"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"/>
-
-            <Button
-                android:id="@+id/btnSettingsDecoder"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="自动识别"
-                android:textColor="#FFFFFF"
-                android:background="@drawable/selector_channel_item"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
-                android:textAllCaps="false"
-                android:layout_marginBottom="24dp"
-                android:nextFocusUp="@+id/sbSettingsBrightness"
-                android:nextFocusDown="@+id/btnSettingsAutoStart" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="启动设置:"
-                android:textColor="#AAAAAA"
-                android:textSize="12sp"
-                android:layout_marginBottom="8dp"/>
-
-            <Button
-                android:id="@+id/btnSettingsAutoStart"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="开机自动启动: 开"
-                android:textColor="#FFFFFF"
-                android:background="@drawable/selector_channel_item"
-                android:gravity="start|center_vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
-                android:textAllCaps="false"
-                android:layout_marginBottom="32dp"
-                android:nextFocusUp="@+id/btnSettingsDecoder"
-                android:nextFocusDown="@+id/btnSettingsSave" />
+                <LinearLayout
+                    android:id="@+id/btnSettingsCheckUpdate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsAutoStart"
+                    android:nextFocusDown="@+id/btnSettingsCancel">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="检查更新"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@android:drawable/ic_popup_sync"
+                        app:tint="#AAAAAA"/>
+                </LinearLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="end"
-                android:layout_marginBottom="16dp">
-                
-                <Button
+                android:gravity="center"
+                android:layout_marginBottom="24dp">
+
+                <TextView
                     android:id="@+id/btnSettingsCancel"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:text="取消"
                     android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:gravity="center"
+                    android:paddingVertical="12dp"
                     android:background="@drawable/selector_channel_item"
                     android:layout_marginEnd="16dp"
-                    android:nextFocusUp="@+id/btnSettingsAutoStart"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsCheckUpdate"
                     android:nextFocusRight="@+id/btnSettingsSave" />
 
-                <Button
+                <TextView
                     android:id="@+id/btnSettingsSave"
-                    android:layout_width="100dp"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:text="保存"
                     android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:gravity="center"
+                    android:paddingVertical="12dp"
                     android:background="@drawable/selector_channel_item"
-                    android:nextFocusUp="@+id/btnSettingsAutoStart"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsCheckUpdate"
                     android:nextFocusLeft="@+id/btnSettingsCancel" />
             </LinearLayout>
-            
-            <View android:layout_width="match_parent" android:layout_height="24dp" />
-            
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#33FFFFFF" android:layout_marginBottom="16dp"/>
+
             <!-- 关于信息 -->
             <TextView
                 android:id="@+id/tvSettingsInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#888888"
-                android:textSize="12sp"
-                android:lineSpacingExtra="4dp" />
-                
+                android:textColor="#AAAAAA"
+                android:textSize="14sp"
+                android:lineSpacingExtra="6dp" />
+
         </LinearLayout>
     </ScrollView>
 

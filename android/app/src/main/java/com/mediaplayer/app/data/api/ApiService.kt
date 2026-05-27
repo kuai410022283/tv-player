@@ -59,5 +59,5 @@ interface ApiService {
     // ── 检查更新 ───────────────────────────────────────
 
     @GET("update")
-    suspend fun checkUpdate(): Response<APIResponse<AppUpdateConfig>>
+    suspend fun checkUpdate(@Query("arch") arch: String): Response<APIResponse<AppUpdateConfig>>
 }

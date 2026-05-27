@@ -357,8 +357,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private var btnSettingsScale: Button? = null
-    private var btnSettingsDecoder: Button? = null
+    private var btnSettingsScale: View? = null
+    private var btnSettingsDecoder: View? = null
     
     // 临时存储设置状态，点保存时才写入
     private var tempDecoderMode = Prefs.DECODER_MODE_AUTO
@@ -376,10 +376,10 @@ class MainActivity : AppCompatActivity() {
 
         btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
-        val btnSettingsAutoStart = findViewById<Button>(R.id.btnSettingsAutoStart)
+        val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
         
         fun updateDecoderText() {
-            btnSettingsDecoder?.text = when (tempDecoderMode) {
+            findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (tempDecoderMode) {
                 Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
                 Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
                 else -> "自动识别"
@@ -387,16 +387,16 @@ class MainActivity : AppCompatActivity() {
         }
         
         fun updateScaleText() {
-            btnSettingsScale?.text = when (tempScaleMode) {
-                Prefs.SCALE_MODE_STRETCH -> "拉伸满屏 (强制 16:9)"
-                Prefs.SCALE_MODE_CROP -> "放大裁剪 (去黑边满屏)"
+            findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (tempScaleMode) {
+                Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
+                Prefs.SCALE_MODE_CROP -> "放大裁剪"
                 Prefs.SCALE_MODE_4_3 -> "强制 4:3"
-                else -> "原始比例 (自适应屏幕)"
+                else -> "原始比例"
             }
         }
 
         fun updateAutoStartText() {
-            btnSettingsAutoStart?.text = if (tempAutoStart) "开机自动启动: 开" else "开机自动启动: 关"
+            findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (tempAutoStart) "开" else "关"
         }
         
         updateDecoderText()
@@ -425,6 +425,11 @@ class MainActivity : AppCompatActivity() {
         btnSettingsAutoStart?.setOnClickListener {
             tempAutoStart = !tempAutoStart
             updateAutoStartText()
+        }
+
+        val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
+        btnSettingsCheckUpdate?.setOnClickListener {
+            com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, true)
         }
 
         etSettingsUrl?.setText(url)
@@ -1239,6 +1244,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (isSettingsVisible) {
+                        val focus = currentFocus
+                        if (focus is android.widget.SeekBar || focus is android.widget.EditText) {
+                            return false
+                        }
+                        if (focus?.id == R.id.btnSettingsSave) {
+                            findViewById<View>(R.id.btnSettingsCancel)?.requestFocus()
+                            return true
+                        }
                         hideSettingsMenu()
                         return true
                     }
@@ -1260,7 +1273,18 @@ class MainActivity : AppCompatActivity() {
                     // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (isSettingsVisible || isEpgVisible) {
+                    if (isSettingsVisible) {
+                        val focus = currentFocus
+                        if (focus is android.widget.SeekBar || focus is android.widget.EditText) {
+                            return false
+                        }
+                        if (focus?.id == R.id.btnSettingsCancel) {
+                            findViewById<View>(R.id.btnSettingsSave)?.requestFocus()
+                            return true
+                        }
+                        return true
+                    }
+                    if (isEpgVisible) {
                         return true
                     }
                     if (isLineVisible) {

@@ -1009,10 +1009,14 @@ async function saveAllClientSettings() {
   for (const [k, v] of Object.entries(settings)) {
     await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: String(v) }) });
   }
-  toast('策略及 EPG 配置已保存');
+  
+  // 同时保存升级配置
+  await saveAppUpdateSettings(true); // 传参 true 以便不重复弹 toast，或者就让它弹
+  
+  toast('所有全局设置和 EPG 配置已保存');
 }
 
-async function saveAppUpdateSettings() {
+async function saveAppUpdateSettings(silent = false) {
   const updateConf = {
     version_code: parseInt(document.getElementById('set-update-version-code').value) || 0,
     version_name: document.getElementById('set-update-version-name').value.trim(),
@@ -1026,9 +1030,9 @@ async function saveAppUpdateSettings() {
       method: 'POST', 
       body: JSON.stringify(updateConf) 
     });
-    toast('升级配置已独立保存', 'success');
+    if (!silent) toast('升级配置已独立保存', 'success');
   } catch (e) {
-    toast('保存升级配置失败: ' + e.message, 'error');
+    if (!silent) toast('保存升级配置失败: ' + e.message, 'error');
   }
 }
 

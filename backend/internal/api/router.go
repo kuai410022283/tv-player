@@ -76,7 +76,6 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/stats", hs.Handler.GetStats)
 	r.GET("/epg", hs.Handler.GetEPG)
 	r.GET("/version", hs.Handler.GetVersion)
-	r.GET("/update", hs.Handler.GetAppUpdate)
 
 	// ── 管理端：客户端管理 (需要 admin 权限) ────────
 	clients := r.Group("/admin/clients")

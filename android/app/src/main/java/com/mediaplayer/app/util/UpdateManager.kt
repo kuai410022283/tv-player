@@ -26,7 +26,8 @@ object UpdateManager {
     fun checkUpdate(context: Context, scope: CoroutineScope, showUpToDateToast: Boolean = false) {
         scope.launch(Dispatchers.IO) {
             try {
-                val response = ApiClient.getService().checkUpdate()
+                val arch = Build.SUPPORTED_ABIS.firstOrNull() ?: "all"
+                val response = ApiClient.getService().checkUpdate(arch)
                 if (response.isSuccessful) {
                     val updateConfig = response.body()?.data
                     val currentVersionCode = try {

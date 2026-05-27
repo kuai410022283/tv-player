@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"regexp"
+	"path/filepath"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mediaplayer/backend/internal/models"
@@ -715,24 +717,112 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 		return
 	}
 	
-	update := models.AppUpdateConfig{}
+	manualUpdate := models.AppUpdateConfig{}
 	if val, ok := settings["update_version_code"]; ok {
-		update.VersionCode, _ = strconv.Atoi(val)
+		manualUpdate.VersionCode, _ = strconv.Atoi(val)
 	}
 	if val, ok := settings["update_version_name"]; ok {
-		update.VersionName = val
+		manualUpdate.VersionName = val
 	}
 	if val, ok := settings["update_download_url"]; ok {
-		update.DownloadURL = val
+		manualUpdate.DownloadURL = val
 	}
 	if val, ok := settings["update_log"]; ok {
-		update.UpdateLog = val
+		manualUpdate.UpdateLog = val
 	}
 	if val, ok := settings["update_force"]; ok {
-		update.ForceUpdate = val == "true"
+		manualUpdate.ForceUpdate = val == "true"
 	}
 	
-	ok(c, update)
+	// Scan local filesystem
+	requestedArch := c.Query("arch")
+	if requestedArch == "" {
+		requestedArch = "all"
+	}
+
+	downloadDir := "./web/download"
+	entries, err := os.ReadDir(downloadDir)
+	
+	var maxLocalVersionCode int
+	var maxLocalVersionName string
+	var maxLocalFolderName string
+	
+	// Format: {versionCode}_{versionName} e.g. 10_v1.0.3
+	re := regexp.MustCompile(`^(\d+)_(.+)$`)
+	
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				matches := re.FindStringSubmatch(entry.Name())
+				if len(matches) == 3 {
+					vCode, _ := strconv.Atoi(matches[1])
+					vName := matches[2]
+					if vCode > maxLocalVersionCode {
+						maxLocalVersionCode = vCode
+						maxLocalVersionName = vName
+						maxLocalFolderName = entry.Name()
+					}
+				}
+			}
+		}
+	}
+
+	// Compare and select
+	if maxLocalVersionCode > 0 && maxLocalVersionCode >= manualUpdate.VersionCode {
+		// Use local filesystem
+		localUpdate := models.AppUpdateConfig{
+			VersionCode: maxLocalVersionCode,
+			VersionName: maxLocalVersionName,
+			ForceUpdate: false, // Default for local files
+		}
+		
+		// Find best APK match
+		apkDir := filepath.Join(downloadDir, maxLocalFolderName)
+		apkEntries, _ := os.ReadDir(apkDir)
+		
+		var bestApk string
+		var fallbackApk string
+		var anyApk string
+		
+		for _, f := range apkEntries {
+			if !f.IsDir() && strings.HasSuffix(f.Name(), ".apk") {
+				anyApk = f.Name()
+				if strings.Contains(f.Name(), requestedArch) {
+					bestApk = f.Name()
+				} else if strings.Contains(f.Name(), "all") || strings.Contains(f.Name(), "universal") {
+					fallbackApk = f.Name()
+				}
+			}
+		}
+		
+		selectedApk := bestApk
+		if selectedApk == "" {
+			selectedApk = fallbackApk
+		}
+		if selectedApk == "" {
+			selectedApk = anyApk
+		}
+		
+		if selectedApk != "" {
+			scheme := "http"
+			if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
+				scheme = "https"
+			}
+			baseURL := scheme + "://" + c.Request.Host
+			localUpdate.DownloadURL = baseURL + "/download/" + maxLocalFolderName + "/" + selectedApk
+		}
+		
+		// Read version.txt for update log
+		logPath := filepath.Join(apkDir, "version.txt")
+		if logBytes, err := os.ReadFile(logPath); err == nil {
+			localUpdate.UpdateLog = string(logBytes)
+		}
+		
+		ok(c, localUpdate)
+		return
+	}
+	
+	ok(c, manualUpdate)
 }
 
 func (h *Handler) SetAppUpdate(c *gin.Context) {
