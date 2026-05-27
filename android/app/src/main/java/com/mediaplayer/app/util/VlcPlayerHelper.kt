@@ -89,7 +89,8 @@ class VlcPlayerHelper(
                     }
                     listener.onPlaying(info)
                 }
-                MediaPlayer.Event.EncounteredError -> {
+                MediaPlayer.Event.EncounteredError,
+                MediaPlayer.Event.EndReached -> {
                     listener.onError()
                 }
             }
@@ -119,6 +120,7 @@ class VlcPlayerHelper(
 
         val media = Media(libVlc, Uri.parse(url))
         media.addOption(":network-caching=$cacheMs")
+        media.addOption(":http-reconnect=true")
         if (scaleMode == Prefs.SCALE_MODE_CROP) {
             media.addOption(":crop=16:9")
         }

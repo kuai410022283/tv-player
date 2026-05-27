@@ -125,6 +125,32 @@ class MainActivity : AppCompatActivity() {
     private var retryCount = 0
     private val maxRetries = 3
     private val uiHandler = Handler(Looper.getMainLooper())
+    
+    // Watchdog State
+    private var isPlayerBuffering = false
+    private var lastPlaybackTime = 0L
+    private var frozenTimeCounter = 0
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (isTvMode && playerHelper?.isPlaying() == true && !isPlayerBuffering) {
+                val currentTime = playerHelper?.getTime() ?: 0L
+                if (currentTime > 0 && currentTime == lastPlaybackTime) {
+                    frozenTimeCounter++
+                    if (frozenTimeCounter >= 2) {
+                        Toast.makeText(this@MainActivity, "检测到流卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                        playCurrentLineInTv()
+                        frozenTimeCounter = 0
+                        return
+                    }
+                } else {
+                    lastPlaybackTime = currentTime
+                    frozenTimeCounter = 0
+                }
+            }
+            uiHandler.postDelayed(this, 5000)
+        }
+    }
+
     private val hideOsdRunnable = Runnable { layoutOsd?.visibility = View.GONE }
     private val hideZappingRunnable = Runnable { 
         layoutZappingMenu?.visibility = View.GONE 
@@ -561,14 +587,17 @@ class MainActivity : AppCompatActivity() {
         playerHelper = VlcPlayerHelper(this, layout, object : VlcPlayerHelper.PlayerListener {
             override fun onBuffering(percent: Float) {
                 if (percent == 100f) {
+                    isPlayerBuffering = false
                     progressBuffering?.visibility = View.GONE
                     retryCount = 0
                 } else {
+                    isPlayerBuffering = true
                     progressBuffering?.visibility = View.VISIBLE
                 }
             }
 
             override fun onPlaying(resolution: String) {
+                isPlayerBuffering = false
                 progressBuffering?.visibility = View.GONE
                 retryCount = 0
                 if (resolution.isNotEmpty()) {
@@ -577,6 +606,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onError() {
+                isPlayerBuffering = false
                 progressBuffering?.visibility = View.GONE
                 
                 val channel = allChannels.getOrNull(currentChannelIndex)
@@ -642,6 +672,12 @@ class MainActivity : AppCompatActivity() {
         progressBuffering?.visibility = View.VISIBLE
 
         playerHelper?.play(line.streamUrl, line.userAgent, line.customHeaders)
+        
+        // 启动/重置看门狗
+        lastPlaybackTime = 0L
+        frozenTimeCounter = 0
+        uiHandler.removeCallbacks(watchdogRunnable)
+        uiHandler.postDelayed(watchdogRunnable, 5000)
         
         // 频道列表中高亮当前播放频道
         channelAdapter.setPlayingIndex(currentChannelIndex)
@@ -1472,6 +1508,7 @@ class MainActivity : AppCompatActivity() {
     
     override fun onPause() {
         super.onPause()
+        uiHandler.removeCallbacks(watchdogRunnable)
         if (isTvMode) {
             // 直播流切后台直接彻底停止，释放硬件解码器和网络连接
             playerHelper?.release()
@@ -1486,6 +1523,7 @@ class MainActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.removeCallbacks(channelInputRunnable)
+        uiHandler.removeCallbacks(watchdogRunnable)
         playerHelper?.release()
         playerHelper = null
     }
