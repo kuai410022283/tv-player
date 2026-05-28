@@ -84,6 +84,16 @@ class MainActivity : AppCompatActivity() {
     private var btnSettingsSave: View? = null
     private var tvSettingsInfo: TextView? = null
 
+    // QR Code Config
+    private var configWebServer: com.mediaplayer.app.server.ConfigWebServer? = null
+    private var layoutQrConfig: View? = null
+    private var ivQrCode: android.widget.ImageView? = null
+    private var tvQrConfigHint: TextView? = null
+    
+    private var layoutAuthQrConfig: View? = null
+    private var ivAuthQrCode: android.widget.ImageView? = null
+    private var tvAuthQrConfigHint: TextView? = null
+
     // ── Views (Phone mode) ──
     private var phoneGroupTabs: LinearLayout? = null
     private var phoneChannelsRv: RecyclerView? = null
@@ -320,6 +330,14 @@ class MainActivity : AppCompatActivity() {
         btnSettingsCancel = findViewById(R.id.btnSettingsCancel)
         btnSettingsSave = findViewById(R.id.btnSettingsSave)
         tvSettingsInfo = findViewById(R.id.tvSettingsInfo)
+
+        layoutQrConfig = findViewById(R.id.layoutQrConfig)
+        ivQrCode = findViewById(R.id.ivQrCode)
+        tvQrConfigHint = findViewById(R.id.tvQrConfigHint)
+        
+        layoutAuthQrConfig = findViewById(R.id.layoutAuthQrConfig)
+        ivAuthQrCode = findViewById(R.id.ivAuthQrCode)
+        tvAuthQrConfigHint = findViewById(R.id.tvAuthQrConfigHint)
 
         // EPG Menu
         layoutEpgMenu = findViewById(R.id.layoutEpgMenu)
@@ -574,7 +592,43 @@ class MainActivity : AppCompatActivity() {
         }
         tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId()}\n授权状态: $authStatus"
         
+        // --- QR Code Logic ---
+        val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
+        if (ip != null) {
+            setupQrConfigServer {
+                hideSettingsMenu()
+                Toast.makeText(this@MainActivity, "配置已保存，重新加载中...", Toast.LENGTH_LONG).show()
+                checkAuthAndLoad()
+            }
+            val qrUrl = "http://$ip:9528/"
+            val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+            ivQrCode?.setImageBitmap(bitmap)
+            tvQrConfigHint?.text = "手机扫码快速配置服务器\n或者访问: $qrUrl"
+            layoutQrConfig?.visibility = View.VISIBLE
+        } else {
+            layoutQrConfig?.visibility = View.GONE
+        }
+        
         sbSettingsCache?.requestFocus()
+    }
+
+    private fun setupQrConfigServer(onUrlUpdated: () -> Unit) {
+        if (configWebServer == null) {
+            configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 9528) { newUrl ->
+                runOnUiThread {
+                    val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                    prefs.edit().putString(Prefs.KEY_SERVER_URL, newUrl).apply()
+                    com.mediaplayer.app.data.api.ApiClient.init(newUrl)
+                    authManager.clearAuth()
+                    onUrlUpdated()
+                }
+            }
+            try {
+                configWebServer?.start()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun hideSettingsMenu() {
@@ -913,7 +967,8 @@ class MainActivity : AppCompatActivity() {
                     "banned" -> showAuthWaiting("设备已被封禁\n请联系管理员")
                 }
             }.onFailure { e ->
-                showAuthWaiting("注册失败: ${e.message}\n\n请检查服务器地址")
+                val showQr = e.message?.contains("Failed to connect") == true || e.message?.contains("timeout") == true
+                showAuthWaiting("注册失败: ${e.message}\n\n请检查服务器地址", showQr)
             }
         }
     }
@@ -942,7 +997,7 @@ class MainActivity : AppCompatActivity() {
         authPollHandler.postDelayed(runnable, 10000)
     }
 
-    private fun showAuthWaiting(message: String) {
+    private fun showAuthWaiting(message: String, showQr: Boolean = false) {
         if (isTvMode) {
             tvAuthWaiting?.visibility = View.VISIBLE
             findViewById<TextView>(R.id.tvAuthStatus)?.text = message
@@ -950,6 +1005,23 @@ class MainActivity : AppCompatActivity() {
             phoneAuthWaiting?.visibility = View.VISIBLE
             phoneContent?.visibility = View.GONE
             findViewById<TextView>(R.id.tvAuthStatus)?.text = message
+        }
+        
+        if (showQr) {
+            val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
+            if (ip != null) {
+                setupQrConfigServer {
+                    Toast.makeText(this@MainActivity, "配置已保存，正在重试...", Toast.LENGTH_LONG).show()
+                    checkAuthAndLoad()
+                }
+                val qrUrl = "http://$ip:9528/"
+                val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+                ivAuthQrCode?.setImageBitmap(bitmap)
+                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
+                layoutAuthQrConfig?.visibility = View.VISIBLE
+            }
+        } else {
+            layoutAuthQrConfig?.visibility = View.GONE
         }
     }
 
@@ -1518,6 +1590,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        configWebServer?.stop()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         uiHandler.removeCallbacks(hideOsdRunnable)
