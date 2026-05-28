@@ -44,7 +44,7 @@ backend/web/dist/
 # OS
 .DS_Store
 Thumbs.db
-
+512/
 m3u.txt
 m3u_回看.txt
 iptv.m3u
