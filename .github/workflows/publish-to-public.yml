@@ -156,10 +156,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: [go-release, android-release, docker-release]
     steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Sync README to public repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git clone https://x-access-token:${{ secrets.mediaplayer }}@github.com/kuai410022283/mediaplayer.git public-repo
+          cp README.md public-repo/
+          cd public-repo
+          # If there are changes, commit and push
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            git add README.md
+            git commit -m "docs: sync README from private repo [skip ci]"
+            git push origin main
+          else
+            echo "README.md is up to date."
+          fi
 
       - name: Create Release in mediaplayer repo
         uses: softprops/action-gh-release@v2
