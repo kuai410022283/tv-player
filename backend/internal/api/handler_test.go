@@ -33,7 +33,7 @@ func setupRouter(clientSvc *services.ClientService, channelSvc *services.Channel
 
 	// 公开路由（无需认证）
 	r.POST("/api/v1/admin/login", func(c *gin.Context) {
-		h := &Handler{}
+		h := &Handler{channelSvc: channelSvc}
 		h.AdminLogin(c)
 	})
 	r.POST("/api/v1/client/register", func(c *gin.Context) {
@@ -61,7 +61,8 @@ func setupRouter(clientSvc *services.ClientService, channelSvc *services.Channel
 }
 
 func TestAdminLogin_Success(t *testing.T) {
-	r := setupRouter(nil, nil)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{"password": "testpassword"})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
@@ -82,7 +83,8 @@ func TestAdminLogin_Success(t *testing.T) {
 }
 
 func TestAdminLogin_WrongPassword(t *testing.T) {
-	r := setupRouter(nil, nil)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{"password": "wrongpassword"})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
@@ -97,7 +99,8 @@ func TestAdminLogin_WrongPassword(t *testing.T) {
 }
 
 func TestAdminLogin_MissingPassword(t *testing.T) {
-	r := setupRouter(nil, nil)
+	clientSvc, channelSvc := setupTestDB(t)
+	r := setupRouter(clientSvc, channelSvc)
 
 	body, _ := json.Marshal(map[string]string{})
 	req := httptest.NewRequest("POST", "/api/v1/admin/login", bytes.NewReader(body))
