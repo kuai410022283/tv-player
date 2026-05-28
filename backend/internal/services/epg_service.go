@@ -57,6 +57,7 @@ type epgIndex struct {
 	programs      map[string]map[string][]models.EPGProgram // channelIDLower -> date("2006-01-02") -> programs
 	lastFetchTime time.Time
 	lastFetchDate string // "2006-01-02"
+	isFetching    bool
 }
 
 var globalEPGIndex = &epgIndex{
@@ -117,7 +118,13 @@ func (s *EPGService) FetchAndBuildIndex() {
 	globalEPGIndex.mu.RLock()
 	lastTime := globalEPGIndex.lastFetchTime
 	lastDate := globalEPGIndex.lastFetchDate
+	isFetching := globalEPGIndex.isFetching
 	globalEPGIndex.mu.RUnlock()
+
+	// 如果当前正在拉取，直接返回避免并发
+	if isFetching {
+		return
+	}
 
 	now := time.Now()
 	nowDate := now.Format("2006-01-02")
@@ -128,12 +135,17 @@ func (s *EPGService) FetchAndBuildIndex() {
 		return
 	}
 
-	// 为防止并发多次拉取，可以简单依赖单例背景任务或在写入时更新时间
-	// 这里更新一下最后拉取时间，避免紧接着的并发请求重复触发
+	// 标记开始拉取
 	globalEPGIndex.mu.Lock()
-	globalEPGIndex.lastFetchTime = now
-	globalEPGIndex.lastFetchDate = nowDate
+	globalEPGIndex.isFetching = true
 	globalEPGIndex.mu.Unlock()
+
+	// 无论成功失败，保证拉取结束后重置状态
+	defer func() {
+		globalEPGIndex.mu.Lock()
+		globalEPGIndex.isFetching = false
+		globalEPGIndex.mu.Unlock()
+	}()
 
 	slog.Info("开始拉取 EPG 数据", "url", sourceURL)
 
