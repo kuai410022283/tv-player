@@ -18,11 +18,11 @@
         android:name=".MediaPlayerApp"
         android:allowBackup="true"
         android:banner="@drawable/banner"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MediaPlayer"
+        android:theme="@style/Theme.App.Starting"
         android:usesCleartextTraffic="true">
 
         <!-- 开机自启接收器 -->
