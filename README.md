@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="backend/web/static/icon.svg" width="120" alt="MediaPlayer Logo" />
+  <img src="images/icon.svg" width="120" alt="MediaPlayer Logo" />
   <h1>MediaPlayer 智能电视流媒体中心</h1>
   <p><b>专为 Android TV 与机顶盒打造的专业级私有化 IPTV 客户端</b></p>
 </div>

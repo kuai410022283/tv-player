@@ -125,5 +125,6 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	adminSettings.Use(middleware.RequireAdmin())
 	{
 		adminSettings.POST("/update", hs.Handler.SetAppUpdate)
+		adminSettings.PUT("/password", hs.Handler.UpdateAdminPassword)
 	}
 }

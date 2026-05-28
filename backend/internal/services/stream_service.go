@@ -380,6 +380,7 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 	var globalCatchupDays string
 
 	isFirstLine := true
+	currentTxtGroup := ""
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -407,10 +408,30 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 			}
 		} else if strings.HasPrefix(line, "#EXTVLCOPT:") && current != nil {
 			parseVlcOpt(line, current)
-		} else if !strings.HasPrefix(line, "#") && current != nil {
-			current["url"] = line
-			channels = append(channels, current)
-			current = nil
+		} else if !strings.HasPrefix(line, "#") {
+			if current != nil {
+				current["url"] = line
+				channels = append(channels, current)
+				current = nil
+			} else {
+				// 兼容 TXT 格式解析 (Name,URL 或 GroupName,#genre#)
+				parts := strings.SplitN(line, ",", 2)
+				if len(parts) == 2 {
+					name := strings.TrimSpace(parts[0])
+					url := strings.TrimSpace(parts[1])
+					if url == "#genre#" {
+						currentTxtGroup = name
+					} else if name != "" && url != "" {
+						ch := make(map[string]string)
+						ch["name"] = name
+						ch["url"] = url
+						if currentTxtGroup != "" {
+							ch["group-title"] = currentTxtGroup
+						}
+						channels = append(channels, ch)
+					}
+				}
+			}
 		}
 	}
 	return channels, scanner.Err()

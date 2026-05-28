@@ -1,7 +1,7 @@
 package api
 
 import (
-	"crypto/subtle"
+	"golang.org/x/crypto/bcrypt"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -48,14 +48,25 @@ func getJWTSecret() string {
 	return ""
 }
 
-func getAdminPassword() string {
-	if adminPassword != "" {
-		return adminPassword
+func (h *Handler) getAdminPasswordHash() (string, error) {
+	settings, err := h.channelSvc.GetAllSettings()
+	if err != nil {
+		return "", err
 	}
-	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
-		return p
+	hash, exists := settings["admin_password_hash"]
+	if !exists {
+		defaultPwd := adminPassword
+		if defaultPwd == "" {
+			defaultPwd = "admin123"
+		}
+		hashedBytes, err := bcrypt.GenerateFromPassword([]byte(defaultPwd), bcrypt.DefaultCost)
+		if err != nil {
+			return "", err
+		}
+		hash = string(hashedBytes)
+		_ = h.channelSvc.SetSetting("admin_password_hash", hash)
 	}
-	return ""
+	return hash, nil
 }
 
 func generateAdminToken(secret string) (string, error) {
@@ -886,9 +897,14 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 		return
 	}
 
-	pwd := getAdminPassword()
-	if subtle.ConstantTimeCompare([]byte(body.Password), []byte(pwd)) != 1 {
-		slog.Warn("admin login failed", "ip", c.ClientIP())
+	hash, err := h.getAdminPasswordHash()
+	if err != nil {
+		failInternal(c, err, "获取管理员凭证失败")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.Password)); err != nil {
+		slog.Warn("admin login failed", "ip", c.ClientIP(), "err", err)
 		fail(c, 401, "密码错误")
 		return
 	}
@@ -900,6 +916,41 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 	}
 
 	ok(c, gin.H{"token": token, "message": "登录成功"})
+}
+
+func (h *Handler) UpdateAdminPassword(c *gin.Context) {
+	var body struct {
+		OldPassword string `json:"old_password" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	hash, err := h.getAdminPasswordHash()
+	if err != nil {
+		failInternal(c, err, "获取旧密码哈希失败")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.OldPassword)); err != nil {
+		fail(c, 401, "原密码错误")
+		return
+	}
+
+	newHashedBytes, err := bcrypt.GenerateFromPassword([]byte(body.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		failInternal(c, err, "密码加密失败")
+		return
+	}
+
+	if err := h.channelSvc.SetSetting("admin_password_hash", string(newHashedBytes)); err != nil {
+		failInternal(c, err, "更新密码失败")
+		return
+	}
+
+	ok(c, gin.H{"message": "密码修改成功"})
 }
 
 // ── Server Stats ───────────────────────────────────────

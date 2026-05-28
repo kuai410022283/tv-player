@@ -125,6 +125,27 @@ function logout() {
   toast('已退出登录');
 }
 
+async function updateAdminPassword() {
+  const oldPwd = document.getElementById('pwd-old').value;
+  const newPwd = document.getElementById('pwd-new').value;
+  const confirmPwd = document.getElementById('pwd-confirm').value;
+
+  if (!oldPwd || !newPwd || !confirmPwd) { toast('请填写所有密码字段', 'error'); return; }
+  if (newPwd !== confirmPwd) { toast('两次输入的新密码不一致', 'error'); return; }
+
+  await api('/admin/settings/password', {
+    method: 'PUT',
+    body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+  });
+  
+  hideModal('password-modal');
+  document.getElementById('pwd-old').value = '';
+  document.getElementById('pwd-new').value = '';
+  document.getElementById('pwd-confirm').value = '';
+  toast('密码修改成功，请重新登录');
+  setTimeout(() => logout(), 1500);
+}
+
 // 检查登录状态
 if (!adminToken) { showLogin(); }
 
