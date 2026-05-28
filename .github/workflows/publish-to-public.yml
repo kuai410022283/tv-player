@@ -24,6 +24,9 @@ jobs:
           - goos: darwin
             goarch: arm64
             suffix: ""
+          - goos: windows
+            goarch: amd64
+            suffix: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +52,10 @@ jobs:
           fi
           
           BINARY_NAME="mediaplayer"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="mediaplayer.exe"
+          fi
+          
           CC=$CC go build \
             -ldflags "-s -w -X main.Version=$VERSION" \
             -o $BINARY_NAME \
@@ -63,15 +70,22 @@ jobs:
           
           # Clean up any residual local data before packaging
           rm -rf $PKG_NAME/web/download/*.apk || true
+          rm -f $PKG_NAME/web/build.sh || true
           
           # Create archive
-          tar -czvf ${PKG_NAME}.tar.gz $PKG_NAME/
+          if [ "$GOOS" = "windows" ]; then
+            zip -r ${PKG_NAME}.zip $PKG_NAME/
+          else
+            tar -czvf ${PKG_NAME}.tar.gz $PKG_NAME/
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mediaplayer-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: backend/*.tar.gz
+          path: |
+            backend/*.tar.gz
+            backend/*.zip
 
   # ── Android APK ────────────────────────────────────────
   android-release:
@@ -164,20 +178,21 @@ jobs:
         with:
           path: artifacts
 
-      - name: Sync README to public repo
+      - name: Sync README and images to public repo
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git clone https://x-access-token:${{ secrets.mediaplayer }}@github.com/kuai410022283/mediaplayer.git public-repo
           cp README.md public-repo/
+          cp -r images public-repo/ || true
           cd public-repo
+          git add README.md images/
           # If there are changes, commit and push
           if ! git diff --quiet || ! git diff --staged --quiet; then
-            git add README.md
-            git commit -m "docs: sync README from private repo [skip ci]"
+            git commit -m "docs: sync README and images from private repo [skip ci]"
             git push origin main
           else
-            echo "README.md is up to date."
+            echo "README.md and images are up to date."
           fi
 
       - name: Create Release in mediaplayer repo
@@ -189,4 +204,5 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/**/*.tar.gz
+            artifacts/**/*.zip
             artifacts/**/*.apk
