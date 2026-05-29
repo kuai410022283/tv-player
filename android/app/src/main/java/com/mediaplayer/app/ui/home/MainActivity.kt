@@ -81,8 +81,7 @@ class MainActivity : AppCompatActivity() {
     private var etSettingsUrl: EditText? = null
     private var sbSettingsCache: android.widget.SeekBar? = null
     private var tvSettingsCacheValue: TextView? = null
-    private var btnSettingsCancel: View? = null
-    private var btnSettingsSave: View? = null
+
     private var tvSettingsInfo: TextView? = null
 
     // QR Code Config
@@ -329,8 +328,7 @@ class MainActivity : AppCompatActivity() {
         etSettingsUrl = findViewById(R.id.etSettingsUrl)
         sbSettingsCache = findViewById(R.id.sbSettingsCache)
         tvSettingsCacheValue = findViewById(R.id.tvSettingsCacheValue)
-        btnSettingsCancel = findViewById(R.id.btnSettingsCancel)
-        btnSettingsSave = findViewById(R.id.btnSettingsSave)
+
         tvSettingsInfo = findViewById(R.id.tvSettingsInfo)
 
         layoutQrConfig = findViewById(R.id.layoutQrConfig)
@@ -405,35 +403,25 @@ class MainActivity : AppCompatActivity() {
 
     private var btnSettingsScale: View? = null
     private var btnSettingsDecoder: View? = null
-    
-    // 临时存储设置状态，点保存时才写入
-    private var tempDecoderMode = Prefs.DECODER_MODE_AUTO
-    private var tempScaleMode = Prefs.SCALE_MODE_DEFAULT
-    private var tempAutoStart = true
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
-        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
         
-        tempDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-        tempScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-        tempAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
-
         btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
         
-        fun updateDecoderText() {
-            findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (tempDecoderMode) {
+        fun updateDecoderText(mode: Int) {
+            findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
                 Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
                 Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
                 else -> "自动识别"
             }
         }
         
-        fun updateScaleText() {
-            findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (tempScaleMode) {
+        fun updateScaleText(mode: Int) {
+            findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
                 Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
                 Prefs.SCALE_MODE_CROP -> "放大裁剪"
                 Prefs.SCALE_MODE_4_3 -> "强制 4:3"
@@ -441,36 +429,55 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun updateAutoStartText() {
-            findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (tempAutoStart) "开" else "关"
+        fun updateAutoStartText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (enabled) "开" else "关"
         }
         
-        updateDecoderText()
-        updateScaleText()
-        updateAutoStartText()
+        var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
+
+        updateDecoderText(currentDecoderMode)
+        updateScaleText(currentScaleMode)
+        updateAutoStartText(currentAutoStart)
         
         btnSettingsDecoder?.setOnClickListener {
-            tempDecoderMode = when (tempDecoderMode) {
+            currentDecoderMode = when (currentDecoderMode) {
                 Prefs.DECODER_MODE_AUTO -> Prefs.DECODER_MODE_HARDWARE
                 Prefs.DECODER_MODE_HARDWARE -> Prefs.DECODER_MODE_SOFTWARE
                 else -> Prefs.DECODER_MODE_AUTO
             }
-            updateDecoderText()
+            updateDecoderText(currentDecoderMode)
+            prefs.edit().putInt(Prefs.KEY_DECODER_MODE, currentDecoderMode).apply()
+            Toast.makeText(this, "解码模式已保存，下次播放生效", Toast.LENGTH_SHORT).show()
         }
         
         btnSettingsScale?.setOnClickListener {
-            tempScaleMode = when (tempScaleMode) {
+            currentScaleMode = when (currentScaleMode) {
                 Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_STRETCH
                 Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_CROP
                 Prefs.SCALE_MODE_CROP -> Prefs.SCALE_MODE_4_3
                 else -> Prefs.SCALE_MODE_DEFAULT
             }
-            updateScaleText()
+            updateScaleText(currentScaleMode)
+            prefs.edit().putInt(Prefs.KEY_SCALE_MODE, currentScaleMode).apply()
+            
+            // 立即生效部分
+            when (currentScaleMode) {
+                Prefs.SCALE_MODE_STRETCH -> playerHelper?.setAspectRatio("16:9")
+                Prefs.SCALE_MODE_4_3 -> playerHelper?.setAspectRatio("4:3")
+                Prefs.SCALE_MODE_DEFAULT -> playerHelper?.setAspectRatio(null)
+                Prefs.SCALE_MODE_CROP -> {
+                    playerHelper?.setAspectRatio(null)
+                    Toast.makeText(this, "画面比例已保存，裁剪模式需重新播放生效", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         btnSettingsAutoStart?.setOnClickListener {
-            tempAutoStart = !tempAutoStart
-            updateAutoStartText()
+            currentAutoStart = !currentAutoStart
+            updateAutoStartText(currentAutoStart)
+            prefs.edit().putBoolean(Prefs.KEY_AUTO_START, currentAutoStart).apply()
         }
 
         val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
@@ -480,8 +487,7 @@ class MainActivity : AppCompatActivity() {
 
         etSettingsUrl?.setText(url)
         
-        // cacheMs: 0 (Auto), or 100 to 5000, step 100.
-        // progress: 0 (Auto), 1 to 50
+        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
         val progress = if (cacheMs == 0) 0 else ((cacheMs - 100) / 100 + 1).coerceIn(1, 50)
         sbSettingsCache?.progress = progress
         tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${cacheMs / 1000f} 秒"
@@ -492,7 +498,12 @@ class MainActivity : AppCompatActivity() {
                 tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${newCacheMs / 1000f} 秒"
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
+                val p = seekBar?.progress ?: 0
+                val newCacheMs = if (p == 0) 0 else 100 + (p - 1) * 100
+                prefs.edit().putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs).apply()
+                Toast.makeText(this@MainActivity, "网络缓存已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            }
         })
 
         // 音量设置
@@ -527,44 +538,19 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
-
-        btnSettingsCancel?.setOnClickListener {
-            hideSettingsMenu()
-        }
-
-        btnSettingsSave?.setOnClickListener {
-            val newUrl = com.mediaplayer.app.data.api.ApiClient.formatUrl(etSettingsUrl?.text?.toString() ?: "")
-            val progress = sbSettingsCache?.progress ?: 0
-            val newCacheMs = if (progress == 0) 0 else 100 + (progress - 1) * 100
-            
-            if (newUrl.isEmpty()) {
-                Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val oldUrl = prefs.getString(Prefs.KEY_SERVER_URL, "")
-            val oldDecoder = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-            if (newUrl != oldUrl || tempDecoderMode != oldDecoder) {
-                authManager.clearAuth()
-                com.mediaplayer.app.data.api.ApiClient.reset()
-                settingsChanged = true
-            }
-
-            prefs.edit()
-                .putString(Prefs.KEY_SERVER_URL, newUrl)
-                .putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs)
-                .putInt(Prefs.KEY_DECODER_MODE, tempDecoderMode)
-                .putInt(Prefs.KEY_SCALE_MODE, tempScaleMode)
-                .putBoolean(Prefs.KEY_AUTO_START, tempAutoStart)
-                .apply()
-                
-            com.mediaplayer.app.data.api.ApiClient.init(newUrl)
-            Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
-            hideSettingsMenu()
-            
-            // 如果缓存变了或者服务器变了，立刻重新连接流
-            if (allChannels.isNotEmpty() && currentChannelIndex >= 0) {
-                playTvChannel(currentChannelIndex)
+        
+        findViewById<TextView>(R.id.tvQQGroup)?.setOnClickListener {
+            try {
+                // 使用 mqqapi 协议直接唤起手机 QQ 加群页面
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("mqqapi://card/show_pslcard?src_type=internal&version=1&uin=864744268&card_type=group&source=qrcode"))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+            } catch (e: Exception) {
+                // 未安装 QQ 或拉起失败，复制群号到剪贴板
+                val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("QQ群", "864744268")
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this@MainActivity, "未检测到QQ应用，已复制群号: 864744268", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -607,6 +593,15 @@ class MainActivity : AppCompatActivity() {
             val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
             ivQrCode?.setImageBitmap(bitmap)
             tvQrConfigHint?.text = "手机扫码快速配置服务器\n或者访问: $qrUrl"
+            tvQrConfigHint?.setOnClickListener {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             layoutQrConfig?.visibility = View.VISIBLE
         } else {
             layoutQrConfig?.visibility = View.GONE
@@ -1029,6 +1024,15 @@ class MainActivity : AppCompatActivity() {
                 val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
                 ivAuthQrCode?.setImageBitmap(bitmap)
                 tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
+                tvAuthQrConfigHint?.setOnClickListener {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
                 layoutAuthQrConfig?.visibility = View.VISIBLE
             }
         } else {
@@ -1446,10 +1450,7 @@ class MainActivity : AppCompatActivity() {
                         if (focus is android.widget.SeekBar || focus is android.widget.EditText) {
                             return false
                         }
-                        if (focus?.id == R.id.btnSettingsSave) {
-                            findViewById<View>(R.id.btnSettingsCancel)?.requestFocus()
-                            return true
-                        }
+
                         hideSettingsMenu()
                         return true
                     }
@@ -1476,10 +1477,7 @@ class MainActivity : AppCompatActivity() {
                         if (focus is android.widget.SeekBar || focus is android.widget.EditText) {
                             return false
                         }
-                        if (focus?.id == R.id.btnSettingsCancel) {
-                            findViewById<View>(R.id.btnSettingsSave)?.requestFocus()
-                            return true
-                        }
+
                         return true
                     }
                     if (isEpgVisible) {

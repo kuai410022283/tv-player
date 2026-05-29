@@ -61,7 +61,7 @@ class ConfigWebServer(
                     <h2>播放器服务器配置</h2>
                     <p style="color:#666; font-size:14px;">请输入您的后端服务器地址 (例如 http://192.168.1.100:9527)</p>
                     <form action="/save" method="post">
-                        <input type="url" name="server_url" placeholder="http://..." required>
+                        <input type="text" name="server_url" placeholder="例如: 192.168.1.100:9527 或 http://..." required>
                         <button type="submit">保存配置</button>
                     </form>
                 </div>
