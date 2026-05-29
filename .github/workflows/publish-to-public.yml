@@ -3,7 +3,7 @@ name: Publish to Public Repo
 on:
   push:
     branches: ["main", "master"]
-  tags: ["v*"]
+    tags: ["v*"]
 
 permissions:
   contents: read

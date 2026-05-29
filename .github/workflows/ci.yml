@@ -89,13 +89,6 @@ jobs:
         working-directory: backend
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: go-coverage
-          path: backend/coverage.out
-          retention-days: 3
-
   go-build:
     name: Go Build
     runs-on: ubuntu-latest
@@ -160,11 +153,3 @@ jobs:
       - name: Lint
         working-directory: android
         run: ./gradlew lint --no-daemon
-
-      - name: Upload lint report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: lint-report
-          path: android/app/build/reports/lint-results-*.html
-          retention-days: 3
