@@ -690,6 +690,8 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private var resolveJob: kotlinx.coroutines.Job? = null
+
     private fun playTvChannel(index: Int) {
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
         
@@ -729,7 +731,11 @@ class MainActivity : AppCompatActivity() {
         retryCount = 0
         progressBuffering?.visibility = View.VISIBLE
 
-        playerHelper?.play(line.streamUrl, line.userAgent, line.customHeaders)
+        resolveJob?.cancel()
+        resolveJob = lifecycleScope.launch {
+            val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
+        }
         
         // 启动/重置看门狗
         lastPlaybackTime = 0L

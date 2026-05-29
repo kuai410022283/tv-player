@@ -1,0 +1,83 @@
+package com.mediaplayer.app.util
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+object StreamResolver {
+
+    // 使用不自动跟随重定向的客户端，手动接管重定向逻辑，支持 HTTPS <-> HTTP 的跨协议降级/升级
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+
+    suspend fun resolve(originalUrl: String, userAgent: String?, customHeaders: String?): String {
+        return withContext(Dispatchers.IO) {
+            var currentUrl = originalUrl
+            var redirects = 0
+            val maxRedirects = 5
+
+            while (redirects < maxRedirects) {
+                try {
+                    val requestBuilder = Request.Builder().url(currentUrl)
+
+                    val ua = if (userAgent.isNullOrEmpty()) "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player" else userAgent
+                    requestBuilder.header("User-Agent", ua)
+
+                    if (!customHeaders.isNullOrEmpty()) {
+                        try {
+                            val json = JSONObject(customHeaders)
+                            val keys = json.keys()
+                            while (keys.hasNext()) {
+                                val key = keys.next()
+                                val value = json.getString(key)
+                                requestBuilder.header(key, value)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+
+                    // 使用 GET 请求，因为有些服务端会拦截 HEAD 请求。
+                    // 只要在读取到响应头后立即调用 response.close()，就不会下载响应体，不会浪费带宽。
+                    requestBuilder.get()
+
+                    val response = client.newCall(requestBuilder.build()).execute()
+                    val code = response.code
+                    val isRedirect = code in 300..399
+
+                    if (isRedirect) {
+                        val location = response.header("Location")
+                        response.close()
+                        if (!location.isNullOrEmpty()) {
+                            currentUrl = if (location.startsWith("http://", ignoreCase = true) || location.startsWith("https://", ignoreCase = true)) {
+                                location
+                            } else {
+                                val baseUri = java.net.URI(currentUrl)
+                                baseUri.resolve(location).toString()
+                            }
+                            redirects++
+                            continue
+                        } else {
+                            break
+                        }
+                    } else {
+                        // 遇到非重定向状态（如 200 OK），说明这就是真实的流地址
+                        response.close()
+                        break
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    break // 发生异常时直接中断，返回目前获取到的地址
+                }
+            }
+            currentUrl
+        }
+    }
+}

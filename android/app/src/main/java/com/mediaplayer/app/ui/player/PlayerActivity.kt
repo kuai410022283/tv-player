@@ -78,6 +78,7 @@ class PlayerActivity : AppCompatActivity() {
     private var channelIndex = 0
     private var lineIndex = 0
     private var allChannels = listOf<Channel>()
+    private var resolveJob: kotlinx.coroutines.Job? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideInfoRunnable = Runnable { hideChannelInfo() }
@@ -311,7 +312,11 @@ class PlayerActivity : AppCompatActivity() {
         tvChannelName?.text = channelName
         tvStreamType?.text = type.uppercase()
 
-        playerHelper?.play(url, userAgent, customHeaders)
+        resolveJob?.cancel()
+        resolveJob = lifecycleScope.launch {
+            val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(url, userAgent, customHeaders)
+            playerHelper?.play(finalUrl, userAgent, customHeaders)
+        }
     }
 
     private fun retryPlay() {
