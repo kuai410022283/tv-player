@@ -128,7 +128,7 @@ type PageRequest struct {
 func (p *PageRequest) Normalize() {
 	if p.Page < 1 { p.Page = 1 }
 	if p.PageSize < 1 { p.PageSize = 20 }
-	if p.PageSize > 200 { p.PageSize = 200 }
+	if p.PageSize > 500 { p.PageSize = 500 }
 }
 
 type PageResponse struct {

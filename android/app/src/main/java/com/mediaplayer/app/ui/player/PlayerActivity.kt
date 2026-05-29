@@ -332,7 +332,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun loadChannels() {
         lifecycleScope.launch {
-            repo.getChannels().onSuccess { allChannels = it }
+            val realGroups = repo.getGroups().getOrElse { emptyList() }
+            repo.getAllChannelsByGroups(realGroups).onSuccess { allChannels = it }
         }
     }
 

@@ -11,7 +11,7 @@ android {
         applicationId "com.mediaplayer.app"
         minSdk 21
         targetSdk 34
-        versionCode 32
+        versionCode 36
         versionName "1.0.24"
     }
 

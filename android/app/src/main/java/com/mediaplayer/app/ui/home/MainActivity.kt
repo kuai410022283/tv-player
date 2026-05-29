@@ -1126,14 +1126,15 @@ class MainActivity : AppCompatActivity() {
     private fun loadData() {
         if (!isTvMode) showLoading(true)
         lifecycleScope.launch {
-            repo.getGroups().onSuccess { list ->
-                groups = listOf(ChannelGroup(id = 0, name = "全部")) + list
-                groupAdapter.submitList(groups)
-                groupAdapter.setSelected(0)
-                if (!isTvMode) buildPhoneGroupTabs()
-            }
+            // 1. 先拉分组列表
+            val realGroups = repo.getGroups().getOrElse { emptyList() }
+            groups = listOf(ChannelGroup(id = 0, name = "全部")) + realGroups
+            groupAdapter.submitList(groups)
+            groupAdapter.setSelected(0)
+            if (!isTvMode) buildPhoneGroupTabs()
 
-            repo.getChannels().onSuccess { list ->
+            // 2. 按分组并行拉取全量频道（彻底绕过全局 page_size 上限）
+            repo.getAllChannelsByGroups(realGroups).onSuccess { list ->
                 list.forEachIndexed { index, channel ->
                     channel.globalIndex = index
                 }
@@ -1142,7 +1143,7 @@ class MainActivity : AppCompatActivity() {
                 channelAdapter.submitList(list)
                 if (!isTvMode) updateChannelCount()
                 if (!isTvMode) showEmpty(list.isEmpty())
-                
+
                 if (list.isNotEmpty()) {
                     if (isTvMode) {
                         // 尝试恢复上次播放的频道
@@ -1168,6 +1169,7 @@ class MainActivity : AppCompatActivity() {
             phoneSwipeRefresh?.isRefreshing = false
         }
     }
+
 
     private fun showLoading(show: Boolean) {
         progressLoading?.visibility = if (show) View.VISIBLE else View.GONE

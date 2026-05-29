@@ -226,10 +226,17 @@ async function loadDashboard() {
 // ═══ Channels ═════════════════════════════════════════
 let channelTotal = 0;
 
-async function loadChannels(search = '') {
-  const q = search
-    ? `?search=${encodeURIComponent(search)}&page=${channelPage}&page_size=${PAGE_SIZE}`
-    : `?page=${channelPage}&page_size=${PAGE_SIZE}`;
+let currentChannelSearch = '';
+let currentChannelGroupId = 0;
+
+async function loadChannels(search = currentChannelSearch, groupId = currentChannelGroupId) {
+  currentChannelSearch = search;
+  currentChannelGroupId = groupId;
+  
+  let q = `?page=${channelPage}&page_size=${PAGE_SIZE}`;
+  if (search) q += `&search=${encodeURIComponent(search)}`;
+  if (groupId > 0) q += `&group_id=${groupId}`;
+  
   const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups')]);
   groups = grpRes.data || [];
   const gm = {};
@@ -271,19 +278,31 @@ async function doChannelBatchDelete() {
 }
 
 function channelPrevPage() {
-  if (channelPage > 1) { channelPage--; loadChannels(document.getElementById('channel-search').value); }
+  if (channelPage > 1) { channelPage--; loadChannels(); }
 }
 
 function channelNextPage() {
-  if (channelPage * PAGE_SIZE < channelTotal) { channelPage++; loadChannels(document.getElementById('channel-search').value); }
+  if (channelPage * PAGE_SIZE < channelTotal) { channelPage++; loadChannels(); }
 }
 
 function searchChannels() {
   clearTimeout(window._st);
   window._st = setTimeout(() => {
     channelPage = 1;
+    currentChannelGroupId = 0; // Reset group filter on new text search
     loadChannels(document.getElementById('channel-search').value);
   }, 300);
+}
+
+function filterChannelsByGroup(groupId, groupName, sourceName) {
+  channelPage = 1;
+  currentChannelGroupId = groupId;
+  currentChannelSearch = '';
+  document.getElementById('channel-search').value = '';
+  showSection('channels');
+  // Highlight the group name in search bar placeholder or show a toast
+  document.getElementById('channel-search').placeholder = `已过滤: [${sourceName}] ${groupName} ...`;
+  loadChannels();
 }
 
 function showAddChannelModal() {
@@ -387,6 +406,7 @@ async function loadGroups() {
     <td>${g.id}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
     <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
     <td>${g.is_direct ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-warn">关闭</span>'}</td>
+    <td><a href="javascript:void(0)" onclick="filterChannelsByGroup(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}')" style="font-weight:bold;color:var(--primary);text-decoration:underline;">${g.channel_count || 0}</a></td>
     <td>
       ${isDefault ? '<span style="color:var(--text3);font-size:12px;user-select:none">系统内置</span>' : `<div class="btn-group">
         <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id})">编辑</button>
