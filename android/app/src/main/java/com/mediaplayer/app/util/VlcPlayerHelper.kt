@@ -37,6 +37,9 @@ class VlcPlayerHelper(
         options.add("--audio-time-stretch")
         options.add("--drop-late-frames")
         options.add("--skip-frames")
+        // 强制 RTSP 使用 TCP 传输，解决 UDP 在 Android/TV 盒子环境下容易丢包或被 NAT 拦截导致无法播放的问题
+        // 针对运营商 IPTV (如电信 PLTV)，服务器通常不支持 RTSP over TCP，因此先注释掉，让其走默认的 UDP
+        // options.add("--rtsp-tcp")
 
         // Initial caching option, will be dynamically overriden in Media options
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
