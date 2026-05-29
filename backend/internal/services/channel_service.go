@@ -327,7 +327,7 @@ func (s *ChannelService) GetInheritedHeaders(channelID int64) (string, map[strin
 	}
 
 	// Determine final UA
-	finalUA := "MediaPlayer/1.0" // Global default
+	finalUA := "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player" // Global default
 	if chUA != "" {
 		finalUA = chUA
 	} else if gpUA != "" {

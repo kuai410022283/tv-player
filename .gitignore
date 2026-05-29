@@ -52,3 +52,5 @@ iptv.m3u
 backend/mediaplayer*
 backend/web/download/*/*.apk
 android/app/build/outputs/apk/release/*.apk
+test.txt
+*.m3u

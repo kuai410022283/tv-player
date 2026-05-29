@@ -94,7 +94,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 	// 获取自定义的 User-Agent 和 Headers
 	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
 	if ua == "" {
-		ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
 	}
 
 	// 健康检查用独立短超时 client，禁用 KeepAlive 避免关闭未读完的响应体导致闲置连接接收到乱码
@@ -228,7 +228,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	// Apply inherited UA and custom headers
 	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
 	if err != nil {
-		ua = "MediaPlayer/1.0"
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
 	}
 
 	for _, u := range rawURLs {
