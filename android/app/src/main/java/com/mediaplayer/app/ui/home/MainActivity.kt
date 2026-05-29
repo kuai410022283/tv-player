@@ -533,7 +533,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnSettingsSave?.setOnClickListener {
-            val newUrl = etSettingsUrl?.text?.toString()?.trim() ?: ""
+            val newUrl = com.mediaplayer.app.data.api.ApiClient.formatUrl(etSettingsUrl?.text?.toString() ?: "")
             val newCacheMs = 500 + (sbSettingsCache?.progress ?: 0) * 100
             
             if (newUrl.isEmpty()) {
@@ -616,8 +616,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupQrConfigServer(onUrlUpdated: () -> Unit) {
         if (configWebServer == null) {
-            configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 9528) { newUrl ->
+            configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 9528) { rawUrl ->
                 runOnUiThread {
+                    val newUrl = com.mediaplayer.app.data.api.ApiClient.formatUrl(rawUrl)
                     val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                     prefs.edit().putString(Prefs.KEY_SERVER_URL, newUrl).apply()
                     com.mediaplayer.app.data.api.ApiClient.init(newUrl)
@@ -969,7 +970,8 @@ class MainActivity : AppCompatActivity() {
                     "banned" -> showAuthWaiting("设备已被封禁\n请联系管理员")
                 }
             }.onFailure { e ->
-                val showQr = e.message?.contains("Failed to connect") == true || e.message?.contains("timeout") == true
+                // 无论遇到什么错误（DNS解析失败、404、类型转换错误等），都显示配置二维码和地址，防止用户卡死
+                val showQr = true
                 showAuthWaiting("注册失败: ${e.message}\n\n请检查服务器地址", showQr)
             }
         }

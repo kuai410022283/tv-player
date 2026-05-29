@@ -20,8 +20,16 @@ object ApiClient {
     /** 当前使用的 token（由 ClientAuthManager 设置） */
     var accessToken: String? = null
 
+    fun formatUrl(url: String): String {
+        var clean = url.trim().trimEnd('/')
+        if (clean.isNotEmpty() && !clean.startsWith("http://", ignoreCase = true) && !clean.startsWith("https://", ignoreCase = true)) {
+            clean = "http://$clean"
+        }
+        return clean
+    }
+
     fun init(url: String) {
-        val normalized = url.trimEnd('/')
+        val normalized = formatUrl(url)
         if (normalized == serverUrl && retrofit != null) return
         serverUrl = normalized
         retrofit = null
