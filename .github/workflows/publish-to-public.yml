@@ -116,6 +116,7 @@ jobs:
           path: |
             backend/*.tar.gz
             backend/*.zip
+          retention-days: 3
 
   # ── Android APK ────────────────────────────────────────
   android-release:
@@ -156,6 +157,7 @@ jobs:
         with:
           name: mediaplayer-android
           path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 3
 
   # ── Docker 镜像 ────────────────────────────────────────
   docker-release:
@@ -242,3 +244,37 @@ jobs:
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
             artifacts/**/*.apk
+
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    needs: [prepare-release, go-release, android-release, docker-release, github-release]
+    if: always()
+    steps:
+      - name: Delete artifacts older than 6 hours
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+            const { owner, repo } = context.repo;
+            
+            for await (const response of github.paginate.iterator(
+              github.rest.actions.listArtifactsForRepo,
+              { owner, repo, per_page: 100 }
+            )) {
+              for (const artifact of response.data) {
+                const createdAt = new Date(artifact.created_at);
+                if (createdAt < sixHoursAgo) {
+                  try {
+                    await github.rest.actions.deleteArtifact({
+                      owner,
+                      repo,
+                      artifact_id: artifact.id,
+                    });
+                    console.log(`Deleted ${artifact.name} (${artifact.id}) created at ${artifact.created_at}`);
+                  } catch (e) {
+                    console.error(`Failed to delete ${artifact.id}: ${e.message}`);
+                  }
+                }
+              }
+            }
