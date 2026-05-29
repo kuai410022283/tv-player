@@ -451,7 +451,11 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 	if subPath != "" && subPath != "/" && !strings.HasPrefix(subPath, "/play.") {
 		ch, err := h.channelSvc.GetChannel(id, 0)
 		if err == nil && ch.StreamURL != "" {
-			base, err1 := url.Parse(ch.StreamURL)
+			baseURLStr := h.streamProxy.GetRedirectedURL(id)
+			if baseURLStr == "" {
+				baseURLStr = ch.StreamURL
+			}
+			base, err1 := url.Parse(baseURLStr)
 			rel, err2 := url.Parse(strings.TrimPrefix(subPath, "/"))
 			if err1 == nil && err2 == nil {
 				resolved := base.ResolveReference(rel)

@@ -18,13 +18,14 @@ import (
 
 // StreamProxy manages proxied streams with health checking
 type StreamProxy struct {
-	cfg       *config.StreamConfig
-	mu        sync.RWMutex
-	streams   map[string]*models.ActiveStream
-	cancels   map[string]context.CancelFunc
-	client    *http.Client
-	channelSvc *ChannelService
-	sem       chan struct{} // 并发控制
+	cfg            *config.StreamConfig
+	mu             sync.RWMutex
+	streams        map[string]*models.ActiveStream
+	cancels        map[string]context.CancelFunc
+	redirectedURLs map[int64]string // 存储每个频道的重定向后基础 URL
+	client         *http.Client
+	channelSvc     *ChannelService
+	sem            chan struct{} // 并发控制
 }
 
 // removed streamState
@@ -35,10 +36,11 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		maxConcurrent = 50
 	}
 	sp := &StreamProxy{
-		cfg:        cfg,
-		streams:    make(map[string]*models.ActiveStream),
-		cancels:    make(map[string]context.CancelFunc),
-		channelSvc: channelSvc,
+		cfg:            cfg,
+		streams:        make(map[string]*models.ActiveStream),
+		cancels:        make(map[string]context.CancelFunc),
+		redirectedURLs: make(map[int64]string),
+		channelSvc:     channelSvc,
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
 			Transport: &http.Transport{
@@ -52,6 +54,20 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 	}
 	os.MkdirAll(cfg.CacheDir, 0755)
 	return sp
+}
+
+// SetRedirectedURL 存储频道的重定向 URL
+func (sp *StreamProxy) SetRedirectedURL(channelID int64, url string) {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	sp.redirectedURLs[channelID] = url
+}
+
+// GetRedirectedURL 获取频道重定向后的基础 URL
+func (sp *StreamProxy) GetRedirectedURL(channelID int64) string {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	return sp.redirectedURLs[channelID]
 }
 
 // CheckHealth verifies a stream URL is reachable and returns stream info
@@ -239,6 +255,16 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		resp, err = sp.client.Do(req)
 		if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			finalURL = u
+			if resp.Request != nil && resp.Request.URL != nil {
+				finalURL = resp.Request.URL.String()
+			}
+			contentType := resp.Header.Get("Content-Type")
+			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
+				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
+				strings.Contains(strings.ToLower(u), ".m3u8")
+			if isM3U8 {
+				sp.SetRedirectedURL(channelID, finalURL)
+			}
 			break
 		}
 		if resp != nil {
