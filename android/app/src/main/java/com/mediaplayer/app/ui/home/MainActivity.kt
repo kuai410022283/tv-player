@@ -480,16 +480,16 @@ class MainActivity : AppCompatActivity() {
 
         etSettingsUrl?.setText(url)
         
-        // cacheMs: 500 to 5000, step 100.
-        // progress: 0 to 45
-        val progress = ((cacheMs - 500) / 100).coerceIn(0, 45)
+        // cacheMs: 0 (Auto), or 100 to 5000, step 100.
+        // progress: 0 (Auto), 1 to 50
+        val progress = if (cacheMs == 0) 0 else ((cacheMs - 100) / 100 + 1).coerceIn(1, 50)
         sbSettingsCache?.progress = progress
-        tvSettingsCacheValue?.text = " ${cacheMs / 1000f} 秒"
+        tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${cacheMs / 1000f} 秒"
 
         sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
-                val newCacheMs = 500 + progress * 100
-                tvSettingsCacheValue?.text = " ${newCacheMs / 1000f} 秒"
+                val newCacheMs = if (progress == 0) 0 else 100 + (progress - 1) * 100
+                tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${newCacheMs / 1000f} 秒"
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
@@ -534,7 +534,8 @@ class MainActivity : AppCompatActivity() {
 
         btnSettingsSave?.setOnClickListener {
             val newUrl = com.mediaplayer.app.data.api.ApiClient.formatUrl(etSettingsUrl?.text?.toString() ?: "")
-            val newCacheMs = 500 + (sbSettingsCache?.progress ?: 0) * 100
+            val progress = sbSettingsCache?.progress ?: 0
+            val newCacheMs = if (progress == 0) 0 else 100 + (progress - 1) * 100
             
             if (newUrl.isEmpty()) {
                 Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show()

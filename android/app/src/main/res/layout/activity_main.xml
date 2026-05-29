@@ -467,8 +467,8 @@
                     android:id="@+id/sbSettingsCache"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="45"
-                    android:progress="10"
+                    android:max="50"
+                    android:progress="0"
                     android:layout_marginBottom="16dp"
                     android:nextFocusDown="@+id/btnSettingsScale" />
 

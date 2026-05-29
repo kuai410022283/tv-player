@@ -41,9 +41,10 @@ class VlcPlayerHelper(
         // 针对运营商 IPTV (如电信 PLTV)，服务器通常不支持 RTSP over TCP，因此先注释掉，让其走默认的 UDP
         // options.add("--rtsp-tcp")
 
-        // Initial caching option, will be dynamically overriden in Media options
-        val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
-        options.add("--network-caching=$cacheMs")
+        // We no longer add caching or jitter options globally here because they are applied per-Media based on URL in play().
+        // options.add("--network-caching=$cacheMs")
+        // options.add("--clock-jitter=0")
+        // options.add("--clock-synchro=0")
 
         when (decoderMode) {
             Prefs.DECODER_MODE_HARDWARE -> {
@@ -122,7 +123,37 @@ class VlcPlayerHelper(
         }
 
         val media = Media(libVlc, Uri.parse(url))
-        media.addOption(":network-caching=$cacheMs")
+        
+        // 智能缓存判断逻辑
+        var finalCacheMs = cacheMs
+        var useAggressiveLatency = false
+        if (cacheMs == 0) { // 自动模式
+            val lowerUrl = url.lowercase()
+            val isLocalOrMulticast = lowerUrl.startsWith("udp://") || 
+                                     lowerUrl.startsWith("rtp://") || 
+                                     lowerUrl.contains("://192.168.") || 
+                                     lowerUrl.contains("://10.") || 
+                                     lowerUrl.contains("://172.") || 
+                                     lowerUrl.contains("://180.141.") || // 典型电信IPTV
+                                     lowerUrl.contains("://127.0.")
+            if (isLocalOrMulticast) {
+                finalCacheMs = 200 // 内网 200ms 秒切
+                useAggressiveLatency = true
+            } else {
+                finalCacheMs = 1500 // 公网 1500ms 安全防卡
+            }
+        } else {
+            // 如果用户手动设置了很低的缓存（<= 300ms），我们也默认开启激进模式
+            useAggressiveLatency = cacheMs <= 300
+        }
+
+        media.addOption(":network-caching=$finalCacheMs")
+        media.addOption(":live-caching=$finalCacheMs")
+        if (useAggressiveLatency) {
+            media.addOption(":clock-jitter=0")
+            media.addOption(":clock-synchro=0")
+        }
+        
         media.addOption(":http-reconnect=true")
         if (scaleMode == Prefs.SCALE_MODE_CROP) {
             media.addOption(":crop=16:9")

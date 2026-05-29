@@ -13,7 +13,7 @@ object Prefs {
     
     // 播放器设置
     const val KEY_NETWORK_CACHE = "network_cache_ms"
-    const val DEFAULT_NETWORK_CACHE = 1500
+    const val DEFAULT_NETWORK_CACHE = 0
     
     // 解码模式：0=自动, 1=强制硬解, 2=强制软解
     const val KEY_DECODER_MODE = "decoder_mode"
