@@ -99,10 +99,22 @@ func (s *EPGService) StartEPGScheduler() {
 }
 
 func (s *EPGService) FetchAndBuildIndex() {
-	var sourceURL string
-	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='epg_source_url'`).Scan(&sourceURL)
-	if err != nil || sourceURL == "" {
+	var sourceURLRaw string
+	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='epg_source_url'`).Scan(&sourceURLRaw)
+	if err != nil || sourceURLRaw == "" {
 		return // 未配置 EPG
+	}
+
+	rawUrls := strings.Split(strings.ReplaceAll(sourceURLRaw, "\r", "\n"), "\n")
+	var urls []string
+	for _, u := range rawUrls {
+		u = strings.TrimSpace(u)
+		if u != "" {
+			urls = append(urls, u)
+		}
+	}
+	if len(urls) == 0 {
+		return
 	}
 
 	refreshHours := 12
@@ -140,77 +152,158 @@ func (s *EPGService) FetchAndBuildIndex() {
 	globalEPGIndex.isFetching = true
 	globalEPGIndex.mu.Unlock()
 
-	// 无论成功失败，保证拉取结束后重置状态
+	// 无论成功失败，保证拉取结束后重置状态，并捕获可能的 panic 保证后台任务存活
 	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("EPG 抓取过程发生异常 (Panic)", "panic", r)
+		}
 		globalEPGIndex.mu.Lock()
 		globalEPGIndex.isFetching = false
 		globalEPGIndex.mu.Unlock()
 	}()
 
-	slog.Info("开始拉取 EPG 数据", "url", sourceURL)
+	slog.Info("开始拉取 EPG 数据", "urls_count", len(urls))
 
-	client := &http.Client{Timeout: 300 * time.Second}
-	resp, err := client.Get(sourceURL)
-	if err != nil {
-		slog.Error("EPG 拉取失败", "error", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		slog.Error("EPG 拉取失败", "status", resp.StatusCode)
-		return
-	}
-
-	var reader io.Reader = resp.Body
-	isGz := strings.HasSuffix(strings.ToLower(sourceURL), ".gz") || strings.Contains(resp.Header.Get("Content-Encoding"), "gzip")
-	if isGz {
-		gr, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			slog.Error("EPG Gzip 解压失败", "error", err)
-			return
+	// 获取所有需要的频道，用于过滤，极大降低内存消耗
+	neededChannels := make(map[string]bool)
+	rows, dbErr := s.db.Query("SELECT epg_channel_id, name FROM channels")
+	if dbErr == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var epgID, name string
+			if rows.Scan(&epgID, &name) == nil {
+				if epgID != "" {
+					neededChannels[strings.ToLower(epgID)] = true
+					neededChannels[normalizeChannelName(epgID)] = true
+				}
+				if name != "" {
+					neededChannels[strings.ToLower(name)] = true
+					neededChannels[normalizeChannelName(name)] = true
+				}
+			}
 		}
-		defer gr.Close()
-		reader = gr
-	}
-
-	decoder := xml.NewDecoder(reader)
-	var tv xmltvTV
-	if err := decoder.Decode(&tv); err != nil {
-		slog.Error("EPG XML 解析失败", "error", err)
-		return
+	} else {
+		slog.Error("获取本地频道列表失败", "error", dbErr)
 	}
 
 	newIndex := make(map[string]map[string][]models.EPGProgram)
+	channelSourceIdx := make(map[string]int)
+	allDisplayNames := make(map[string][]string)
 
+	client := &http.Client{Timeout: 60 * time.Second}
 
-	for _, prog := range tv.Programmes {
-		start, err1 := parseXmltvTime(prog.Start)
-		stop, err2 := parseXmltvTime(prog.Stop)
-		if err1 != nil || err2 != nil {
+	for srcIdx, sourceURL := range urls {
+		slog.Info("正在拉取 EPG 源", "url", sourceURL, "priority", srcIdx)
+
+		resp, err := client.Get(sourceURL)
+		if err != nil {
+			slog.Error("EPG 拉取失败", "url", sourceURL, "error", err)
 			continue
 		}
 
-		dateKey := start.In(time.Local).Format("2006-01-02")
-		// 为支持回看，保留最近 7 天的历史数据
-		sevenDaysAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-		if dateKey < sevenDaysAgo {
+		if resp.StatusCode != http.StatusOK {
+			slog.Error("EPG 拉取失败", "url", sourceURL, "status", resp.StatusCode)
+			resp.Body.Close()
 			continue
 		}
 
-		chID := strings.ToLower(prog.Channel)
-		if _, ok := newIndex[chID]; !ok {
-			newIndex[chID] = make(map[string][]models.EPGProgram)
+		var reader io.Reader = resp.Body
+		isGz := strings.HasSuffix(strings.ToLower(sourceURL), ".gz") || strings.Contains(resp.Header.Get("Content-Encoding"), "gzip")
+		if isGz {
+			gr, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				slog.Error("EPG Gzip 解压失败", "url", sourceURL, "error", err)
+				resp.Body.Close()
+				continue
+			}
+			reader = gr
 		}
 
-		p := models.EPGProgram{
-			ChannelID: chID,
-			Title:     prog.Title.Value,
-			StartTime: start,
-			EndTime:   stop,
-			Desc:      prog.Desc.Value,
+		decoder := xml.NewDecoder(reader)
+		var tv xmltvTV
+		if err := decoder.Decode(&tv); err != nil {
+			slog.Error("EPG XML 解析失败", "url", sourceURL, "error", err)
+			if isGz {
+				reader.(*gzip.Reader).Close()
+			}
+			resp.Body.Close()
+			continue
 		}
-		newIndex[chID][dateKey] = append(newIndex[chID][dateKey], p)
+
+		if isGz {
+			reader.(*gzip.Reader).Close()
+		}
+		resp.Body.Close()
+
+		neededXMLIDs := make(map[string]bool)
+
+		for _, ch := range tv.Channels {
+			chIDLower := strings.ToLower(ch.ID)
+			allDisplayNames[chIDLower] = append(allDisplayNames[chIDLower], ch.DisplayName...)
+			
+			isNeeded := false
+			if neededChannels[chIDLower] || neededChannels[normalizeChannelName(chIDLower)] {
+				isNeeded = true
+			} else {
+				for _, dn := range ch.DisplayName {
+					dnLower := strings.ToLower(dn)
+					if neededChannels[dnLower] || neededChannels[normalizeChannelName(dnLower)] {
+						isNeeded = true
+						break
+					}
+				}
+			}
+			if isNeeded {
+				neededXMLIDs[chIDLower] = true
+			}
+		}
+
+		addedProgramsCount := 0
+
+		for _, prog := range tv.Programmes {
+			chID := strings.ToLower(prog.Channel)
+			
+			if !neededXMLIDs[chID] {
+				continue
+			}
+			if prevIdx, exists := channelSourceIdx[chID]; exists && prevIdx < srcIdx {
+				continue
+			}
+
+			start, err1 := parseXmltvTime(prog.Start)
+			stop, err2 := parseXmltvTime(prog.Stop)
+			if err1 != nil || err2 != nil {
+				continue
+			}
+
+			dateKey := start.In(time.Local).Format("2006-01-02")
+			sevenDaysAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+			if dateKey < sevenDaysAgo {
+				continue
+			}
+
+			if _, ok := newIndex[chID]; !ok {
+				newIndex[chID] = make(map[string][]models.EPGProgram)
+			}
+
+			p := models.EPGProgram{
+				ChannelID: chID,
+				Title:     prog.Title.Value,
+				StartTime: start,
+				EndTime:   stop,
+				Desc:      prog.Desc.Value,
+			}
+			newIndex[chID][dateKey] = append(newIndex[chID][dateKey], p)
+			addedProgramsCount++
+		}
+		
+		for chID := range newIndex {
+			if _, exists := channelSourceIdx[chID]; !exists {
+				channelSourceIdx[chID] = srcIdx
+			}
+		}
+
+		slog.Info("EPG 源解析完成", "url", sourceURL, "added_programs", addedProgramsCount)
 	}
 
 	// 排序
@@ -224,11 +317,11 @@ func (s *EPGService) FetchAndBuildIndex() {
 	}
 
 	// 建立 channel display-name 到 id 的额外映射，提升模糊匹配成功率
-	for _, ch := range tv.Channels {
-		for _, dn := range ch.DisplayName {
-			dnLower := strings.ToLower(dn)
-			if _, ok := newIndex[dnLower]; !ok {
-				if progs, exists := newIndex[strings.ToLower(ch.ID)]; exists {
+	for chID, displayNames := range allDisplayNames {
+		if progs, exists := newIndex[chID]; exists {
+			for _, dn := range displayNames {
+				dnLower := strings.ToLower(dn)
+				if _, ok := newIndex[dnLower]; !ok {
 					newIndex[dnLower] = progs
 				}
 			}

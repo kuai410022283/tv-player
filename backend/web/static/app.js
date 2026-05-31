@@ -5,7 +5,7 @@
 const API = '/api/v1';
 let groups = [], selectedClientIds = new Set(), selectedGroupIds = new Set();
 let adminToken = localStorage.getItem('admin_token') || '';
-let channelPage = 1, clientPage = 1, groupPage = 1;
+let channelPage = 1, clientPage = 1, groupPage = 1, sourcePage = 1, streamPage = 1, planPage = 1, clientLogPage = 1;
 const PAGE_SIZE = 20;
 
 // ═══ API helpers ══════════════════════════════════════
@@ -260,7 +260,8 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   }
   document.getElementById('check-all-channels').checked = false;
   document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
-  document.getElementById('channels-page').textContent = channelPage;
+  const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
+  renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage');
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
 }
 
@@ -277,12 +278,9 @@ async function doChannelBatchDelete() {
   loadChannels(document.getElementById('channel-search').value);
 }
 
-function channelPrevPage() {
-  if (channelPage > 1) { channelPage--; loadChannels(); }
-}
-
-function channelNextPage() {
-  if (channelPage * PAGE_SIZE < channelTotal) { channelPage++; loadChannels(); }
+function channelGoToPage(p) {
+  const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
+  if (p >= 1 && p <= chTotalPages) { channelPage = p; loadChannels(); }
 }
 
 function searchChannels() {
@@ -415,12 +413,15 @@ async function loadGroups() {
     </td>
   </tr>`}).join('');
 
-  document.getElementById('groups-page').textContent = groupPage;
+  const grpTotalPages = Math.max(1, Math.ceil(groupTotal / PAGE_SIZE));
+  renderPagination('groups-pagination', groupPage, grpTotalPages, 'groupGoToPage');
   document.getElementById('groups-info').textContent = `共 ${groupTotal} 个分组`;
 }
 
-function groupPrevPage() { if (groupPage > 1) { groupPage--; loadGroups(); } }
-function groupNextPage() { if (groupPage * PAGE_SIZE < groupTotal) { groupPage++; loadGroups(); } }
+function groupGoToPage(p) {
+  const grpTotalPages = Math.max(1, Math.ceil(groupTotal / PAGE_SIZE));
+  if (p >= 1 && p <= grpTotalPages) { groupPage = p; loadGroups(); }
+}
 function searchGroups() { clearTimeout(window._gt); window._gt = setTimeout(() => { groupPage = 1; loadGroups(); }, 300); }
 
 function toggleAllGroups(el) {
@@ -500,18 +501,40 @@ let sourcesList = [];
 async function loadSources() {
   const r = await api('/m3u');
   sourcesList = r.data || [];
-  document.getElementById('sources-body').innerHTML = sourcesList.map(s => `<tr>
-    <td>${s.id}</td>
-    <td><strong>${esc(s.name)}</strong></td>
-    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
-    <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
-    <td>${fmtDate(s.last_sync)}</td>
-    <td><div class="btn-group">
-      <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">同步</button>
-      <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">编辑</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">删除</button>
-    </div></td>
-  </tr>`).join('');
+  renderSourcesTable();
+}
+
+function renderSourcesTable() {
+  const total = sourcesList.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (sourcePage > totalPages) sourcePage = Math.max(1, totalPages);
+  const start = (sourcePage - 1) * PAGE_SIZE;
+  const pageData = sourcesList.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('sources-body');
+  if (pageData.length) {
+    tbody.innerHTML = pageData.map(s => `<tr>
+      <td>${s.id}</td>
+      <td><strong>${esc(s.name)}</strong></td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
+      <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
+      <td>${fmtDate(s.last_sync)}</td>
+      <td><div class="btn-group">
+        <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">同步</button>
+        <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">删除</button>
+      </div></td>
+    </tr>`).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">暂无源</td></tr>';
+  }
+  renderPagination('sources-pagination', sourcePage, totalPages, 'sourceGoToPage');
+  document.getElementById('sources-info').textContent = `共 ${total} 个源`;
+}
+
+function sourceGoToPage(p) {
+  const totalPages = Math.max(1, Math.ceil(sourcesList.length / PAGE_SIZE));
+  if (p >= 1 && p <= totalPages) { sourcePage = p; renderSourcesTable(); }
 }
 
 function showAddSourceModal() {
@@ -601,11 +624,23 @@ function formatSpeed(bytesPerSec) {
   return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
 }
 
+let streamsList = [];
 async function loadStreams() {
   const r = await api('/stream/active');
+  streamsList = r.data || [];
+  renderStreamsTable();
+}
+
+function renderStreamsTable() {
+  const total = streamsList.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (streamPage > totalPages) streamPage = Math.max(1, totalPages);
+  const start = (streamPage - 1) * PAGE_SIZE;
+  const pageData = streamsList.slice(start, start + PAGE_SIZE);
+
   const body = document.getElementById('streams-body');
-  if (r.data && r.data.length) {
-    body.innerHTML = r.data.map(s => `<tr>
+  if (pageData.length) {
+    body.innerHTML = pageData.map(s => `<tr>
       <td><div style="font-size:12px;color:var(--text2)">${s.session_id.substring(0, 15)}...</div>
           <strong>${esc(s.client_name) || ('设备ID: ' + s.client_id)}</strong><br>
           <span style="font-size:11px;color:var(--text2)">IP: ${s.client_ip}</span></td>
@@ -618,6 +653,13 @@ async function loadStreams() {
   } else {
     body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">暂无活跃流</td></tr>';
   }
+  renderPagination('streams-pagination', streamPage, totalPages, 'streamGoToPage');
+  document.getElementById('streams-info').textContent = `共 ${total} 个活跃流`;
+}
+
+function streamGoToPage(p) {
+  const totalPages = Math.max(1, Math.ceil(streamsList.length / PAGE_SIZE));
+  if (p >= 1 && p <= totalPages) { streamPage = p; renderStreamsTable(); }
 }
 
 async function killStream(sessionId) {
@@ -673,12 +715,15 @@ async function loadClients() {
       </td>
     </tr>`).join('');
   }
-  document.getElementById('clients-page').textContent = clientPage;
+  const cliTotalPages = Math.max(1, Math.ceil(clientTotal / PAGE_SIZE));
+  renderPagination('clients-pagination', clientPage, cliTotalPages, 'clientGoToPage');
   document.getElementById('clients-info').textContent = `共 ${clientTotal} 台设备`;
 }
 
-function clientPrevPage() { if (clientPage > 1) { clientPage--; loadClients(); } }
-function clientNextPage() { if (clientPage * PAGE_SIZE < clientTotal) { clientPage++; loadClients(); } }
+function clientGoToPage(p) {
+  const cliTotalPages = Math.max(1, Math.ceil(clientTotal / PAGE_SIZE));
+  if (p >= 1 && p <= cliTotalPages) { clientPage = p; loadClients(); }
+}
 function searchClients() { clearTimeout(window._ct); window._ct = setTimeout(loadClients, 300); }
 
 function toggleAllClients(el) {
@@ -732,7 +777,17 @@ let allPlans = [];
 async function loadPlans() {
   const r = await api('/admin/plans');
   allPlans = r.data || [];
-  document.getElementById('plans-body').innerHTML = allPlans.map(p => `<tr>
+  renderPlansTable();
+}
+
+function renderPlansTable() {
+  const total = allPlans.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (planPage > totalPages) planPage = Math.max(1, totalPages);
+  const start = (planPage - 1) * PAGE_SIZE;
+  const pageData = allPlans.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('plans-body').innerHTML = pageData.map(p => `<tr>
     <td>${p.id}</td>
     <td><strong>${esc(p.name)}</strong></td>
     <td>${p.days > 0 ? p.days + ' 天' : '永久'}</td>
@@ -744,6 +799,13 @@ async function loadPlans() {
       <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
     </div></td>
   </tr>`).join('');
+  renderPagination('plans-pagination', planPage, totalPages, 'planGoToPage');
+  document.getElementById('plans-info').textContent = `共 ${total} 个套餐`;
+}
+
+function planGoToPage(p) {
+  const totalPages = Math.max(1, Math.ceil(allPlans.length / PAGE_SIZE));
+  if (p >= 1 && p <= totalPages) { planPage = p; renderPlansTable(); }
 }
 
 async function savePlan() {
@@ -957,11 +1019,23 @@ async function doBatch() {
 }
 
 // ═══ Client Logs ══════════════════════════════════════
+let clientLogsList = [];
 async function loadClientLogs() {
   const r = await api('/admin/clients/logs?limit=200');
+  clientLogsList = r.data || [];
+  renderClientLogsTable();
+}
+
+function renderClientLogsTable() {
+  const total = clientLogsList.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (clientLogPage > totalPages) clientLogPage = Math.max(1, totalPages);
+  const start = (clientLogPage - 1) * PAGE_SIZE;
+  const pageData = clientLogsList.slice(start, start + PAGE_SIZE);
+
   const body = document.getElementById('client-logs-body');
-  if (r.data && r.data.length) {
-    body.innerHTML = r.data.map(l => {
+  if (pageData.length) {
+    body.innerHTML = pageData.map(l => {
       let actionBadge = '';
       if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
       else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
@@ -982,6 +1056,13 @@ async function loadClientLogs() {
   } else {
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:40px">暂无日志</td></tr>';
   }
+  renderPagination('client-logs-pagination', clientLogPage, totalPages, 'clientLogGoToPage');
+  document.getElementById('client-logs-info').textContent = `共 ${total} 条访问日志`;
+}
+
+function clientLogGoToPage(p) {
+  const totalPages = Math.max(1, Math.ceil(clientLogsList.length / PAGE_SIZE));
+  if (p >= 1 && p <= totalPages) { clientLogPage = p; renderClientLogsTable(); }
 }
 
 // ═══ Client Settings & EPG ══════════════════════════════
@@ -1092,7 +1173,48 @@ async function saveClientSetting(key, value) {
   await api('/settings', { method: 'POST', body: JSON.stringify({ key, value: String(value) }) });
 }
 
-// ═══ Init ═════════════════════════════════════════════
+// ════ Pagination Helper ═════════════════════════════════════════════
+function renderPagination(containerId, currentPage, totalPages, changePageFuncName) {
+  let html = '';
+  const prevDisabled = currentPage <= 1 ? 'disabled' : '';
+  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage - 1})" ${prevDisabled}>上一页</button>`;
+
+  const maxPages = 5;
+  let start = Math.max(1, currentPage - Math.floor(maxPages / 2));
+  let end = Math.min(totalPages, start + maxPages - 1);
+  if (end - start + 1 < maxPages) {
+    start = Math.max(1, end - maxPages + 1);
+  }
+
+  if (start > 1) {
+    html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(1)">1</button>`;
+    if (start > 2) {
+      html += `<span style="padding:0 8px;line-height:32px;color:var(--text3)">...</span>`;
+    }
+  }
+
+  for (let i = start; i <= end; i++) {
+    if (i === currentPage) {
+      html += `<button class="btn btn-primary btn-sm">${i}</button>`;
+    } else {
+      html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${i})">${i}</button>`;
+    }
+  }
+
+  if (end < totalPages) {
+    if (end < totalPages - 1) {
+      html += `<span style="padding:0 8px;line-height:32px;color:var(--text3)">...</span>`;
+    }
+    html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${totalPages})">${totalPages}</button>`;
+  }
+
+  const nextDisabled = currentPage >= totalPages ? 'disabled' : '';
+  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage + 1})" ${nextDisabled}>下一页</button>`;
+
+  document.getElementById(containerId).innerHTML = `<div class="btn-group">${html}</div>`;
+}
+
+// ════ Init ═════════════════════════════════════════════
 if (!window.location.pathname.includes('/login.html') && adminToken) {
   const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
   showSection(lastSection);

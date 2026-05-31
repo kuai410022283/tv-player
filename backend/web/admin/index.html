@@ -16,7 +16,8 @@
     <div class="sidebar">
       <div class="logo">
         <svg viewBox="0 0 1024 1024">
-          <path fill="#1296db" d="M867.530667 172.330667A71.157333 71.157333 0 0 1 938.666667 243.477333v423.018667a71.146667 71.146667 0 0 1-71.136 71.168H167.146667A71.125333 71.125333 0 0 1 96 666.496V243.509333a71.157333 71.157333 0 0 1 71.146667-71.178666z m-360.853334 163.2c-34.016-19.648-76.533333 4.917333-76.533333 44.192v150.506666c0 39.296 42.517333 63.861333 76.533333 44.213334l130.272-75.264c34.016-19.626667 34.016-68.757333 0-88.405334zM360.202667 790.997333H685.12c19.690667 0 29.536 10.666667 29.536 32s-9.845333 32-29.536 32H360.213333c-19.690667 0-29.536-10.666667-29.536-32s9.845333-32 29.536-32z"/>
+          <path fill="#1296db"
+            d="M867.530667 172.330667A71.157333 71.157333 0 0 1 938.666667 243.477333v423.018667a71.146667 71.146667 0 0 1-71.136 71.168H167.146667A71.125333 71.125333 0 0 1 96 666.496V243.509333a71.157333 71.157333 0 0 1 71.146667-71.178666z m-360.853334 163.2c-34.016-19.648-76.533333 4.917333-76.533333 44.192v150.506666c0 39.296 42.517333 63.861333 76.533333 44.213334l130.272-75.264c34.016-19.626667 34.016-68.757333 0-88.405334zM360.202667 790.997333H685.12c19.690667 0 29.536 10.666667 29.536 32s-9.845333 32-29.536 32H360.213333c-19.690667 0-29.536-10.666667-29.536-32s9.845333-32 29.536-32z" />
         </svg>
         <span>MediaPlayer</span>
       </div>
@@ -209,11 +210,7 @@
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
           <span id="channels-info" style="font-size:13px;color:var(--text2)"></span>
-          <div class="btn-group">
-            <button class="btn btn-ghost btn-sm" onclick="channelPrevPage()">上一页</button>
-            <span id="channels-page" style="font-size:13px;line-height:32px">1</span>
-            <button class="btn btn-ghost btn-sm" onclick="channelNextPage()">下一页</button>
-          </div>
+          <div id="channels-pagination"></div>
         </div>
       </div>
 
@@ -246,11 +243,7 @@
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
           <span id="groups-info" style="font-size:13px;color:var(--text2)"></span>
-          <div class="btn-group">
-            <button class="btn btn-ghost btn-sm" onclick="groupPrevPage()">上一页</button>
-            <span id="groups-page" style="font-size:13px;line-height:32px">1</span>
-            <button class="btn btn-ghost btn-sm" onclick="groupNextPage()">下一页</button>
-          </div>
+          <div id="groups-pagination"></div>
         </div>
       </div>
 
@@ -278,6 +271,10 @@
             <tbody id="sources-body"></tbody>
           </table>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+          <span id="sources-info" style="font-size:13px;color:var(--text2)"></span>
+          <div id="sources-pagination"></div>
+        </div>
       </div>
 
       <!-- Active Streams -->
@@ -299,6 +296,10 @@
             </thead>
             <tbody id="streams-body"></tbody>
           </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+          <span id="streams-info" style="font-size:13px;color:var(--text2)"></span>
+          <div id="streams-pagination"></div>
         </div>
       </div>
 
@@ -357,11 +358,7 @@
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
           <span id="clients-info" style="font-size:13px;color:var(--text2)"></span>
-          <div class="btn-group">
-            <button class="btn btn-ghost btn-sm" onclick="clientPrevPage()">上一页</button>
-            <span id="clients-page" style="font-size:13px;line-height:32px">1</span>
-            <button class="btn btn-ghost btn-sm" onclick="clientNextPage()">下一页</button>
-          </div>
+          <div id="clients-pagination"></div>
         </div>
       </div>
 
@@ -387,6 +384,10 @@
             <tbody id="plans-body"></tbody>
           </table>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+          <span id="plans-info" style="font-size:13px;color:var(--text2)"></span>
+          <div id="plans-pagination"></div>
+        </div>
       </div>
 
       <!-- Client Logs -->
@@ -410,6 +411,10 @@
             <tbody id="client-logs-body"></tbody>
           </table>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0">
+          <span id="client-logs-info" style="font-size:13px;color:var(--text2)"></span>
+          <div id="client-logs-pagination"></div>
+        </div>
       </div>
 
       <!-- Client Settings -->
@@ -418,6 +423,9 @@
           <h1>全局设置</h1>
         </div>
         <div class="card" style="padding:24px">
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">设备授权配置</h3>
+          </div>
           <div class="form-group">
             <label>自动审批</label>
             <select id="set-auto-approve" onchange="saveClientSetting('auto_approve', this.value)">
@@ -453,20 +461,26 @@
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
+            <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
+          </div>
+          <div class="form-group">
             <label>系统公告 (跑马灯)</label>
             <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
           </div>
           <div class="form-group">
             <label>跑马灯显示间隔 (分钟)</label>
             <input type="number" id="set-system-announcement-interval" value="0" min="0">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
+            </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
+            <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
+          </div>
+          <div class="form-group">
             <label>EPG 数据源 URL (XMLTV)</label>
-            <input type="text" id="set-epg-source-url" placeholder="http://epg.example.com/e.xml">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持 .xml 或 .gz 格式。如果配置此项，服务端会自动拉取并在内存中构建 EPG
-              节目单。</div>
+            <textarea id="set-epg-source-url" rows="3" placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或 .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -509,7 +523,8 @@
           </div>
           <div class="form-actions" style="justify-content:flex-start">
             <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
-            <button class="btn btn-ghost" onclick="saveAppUpdateSettings()" style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
+            <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
+              style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
           </div>
         </div>
       </div>
