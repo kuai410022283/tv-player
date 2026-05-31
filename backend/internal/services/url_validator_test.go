@@ -14,8 +14,8 @@ func TestValidateStreamURL(t *testing.T) {
 		{"file 协议", "file:///etc/passwd", true},
 		{"localhost", "http://localhost:8080/stream", true},
 		{"127.0.0.1", "http://127.0.0.1:9527/stream", true},
-		{"10.x.x.x", "http://10.0.0.1/stream", true},
-		{"192.168.x.x", "http://192.168.1.100/stream", true},
+		{"10.x.x.x", "http://10.0.0.1/stream", false},
+		{"192.168.x.x", "http://192.168.1.100/stream", false},
 		{"云元数据", "http://169.254.169.254/latest/meta-data/", true},
 	}
 

@@ -75,9 +75,10 @@ func isInternalIP(ip net.IP) bool {
 	if ip.IsLinkLocalUnicast() {
 		return true
 	}
-	if ip.IsPrivate() {
-		return true
-	}
+	// 允许使用局域网 IP（IPTV 常常位于内网，如 192.168.x.x 或 10.x.x.x）
+	// if ip.IsPrivate() {
+	// 	return true
+	// }
 	if ip.IsUnspecified() {
 		return true
 	}
