@@ -322,25 +322,103 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	}
 	w.WriteHeader(resp.StatusCode)
 
-	// Stream with buffering
-	buf := make([]byte, sp.cfg.BufferSize)
-	reader := bufio.NewReaderSize(resp.Body, sp.cfg.BufferSize)
+	// Asynchronous buffering to prevent UDP drops
+	// buffer capacity 1024 chunks. With a 32KB buffer size, this gives 32MB tolerance per client.
+	chunkChan := make(chan []byte, 1024)
+	errChan := make(chan error, 1)
 	
+	// Reader goroutine
+	go func() {
+		defer close(chunkChan)
+		// Use a much larger read buffer (64KB) to reduce context switches and ensure TCP efficiency
+		bufferSize := 64 * 1024
+		if sp.cfg.BufferSize > bufferSize {
+			bufferSize = sp.cfg.BufferSize
+		}
+		buf := make([]byte, bufferSize)
+		reader := bufio.NewReaderSize(resp.Body, bufferSize)
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				chunkData := make([]byte, n)
+				copy(chunkData, buf[:n])
+				select {
+				case chunkChan <- chunkData:
+				default:
+					// Downstream client is too slow (buffer full).
+					// To protect the server memory, we must abort this client's connection.
+					select {
+					case errChan <- fmt.Errorf("client buffer full, connection too slow"):
+					default:
+					}
+					return
+				}
+			}
+			if err != nil {
+				select {
+				case errChan <- err:
+				default:
+				}
+				return
+			}
+		}
+	}()
+
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64 = 0
-
+	
+	writeBuf := make([]byte, 0, 128*1024)
+	
+	// Writer loop
 	for {
-		n, err := reader.Read(buf)
-		if n > 0 {
-			w.Write(buf[:n])
-			if f, ok := w.(http.Flusher); ok {
-				f.Flush()
+		select {
+		case <-ctx.Done(): // Client disconnected
+			return nil
+		case err := <-errChan:
+			if err == io.EOF { return nil }
+			return err
+		case chunk, ok := <-chunkChan:
+			if !ok {
+				if len(writeBuf) > 0 {
+					w.Write(writeBuf)
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+				}
+				return nil
 			}
 			
-			bytesSinceLastUpdate += int64(n)
-			now := time.Now()
+			writeBuf = append(writeBuf, chunk...)
 			
+			// Flush strategically: exactly 128KB. 
+			// Go's http.ResponseWriter auto-flushes every 4KB, which causes Wi-Fi micro-stutters.
+			// By buffering locally, we force large TCP writes.
+			if len(writeBuf) >= 128*1024 {
+				n, err := w.Write(writeBuf)
+				if err != nil {
+					return err
+				}
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				bytesSinceLastUpdate += int64(n)
+				writeBuf = writeBuf[:0]
+			}
+			
+			now := time.Now()
 			if now.Sub(lastUpdate) >= time.Second {
+				if len(writeBuf) > 0 {
+					n, err := w.Write(writeBuf)
+					if err != nil {
+						return err
+					}
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					bytesSinceLastUpdate += int64(n)
+					writeBuf = writeBuf[:0]
+				}
+				
 				sp.mu.Lock()
 				if s, ok := sp.streams[sessionID]; ok {
 					s.LastActive = now
@@ -350,10 +428,6 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 				bytesSinceLastUpdate = 0
 				lastUpdate = now
 			}
-		}
-		if err != nil {
-			if err == io.EOF { return nil }
-			return err
 		}
 	}
 }
