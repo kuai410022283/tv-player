@@ -16,6 +16,9 @@ class MediaPlayerApp : Application() {
         
         // Restore access token
         ApiClient.accessToken = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
+        
+        // Initialize Tencent X5 Web Core (starts background download)
+        com.mediaplayer.app.util.WebX5Manager.init(this)
     }
 
     companion object {

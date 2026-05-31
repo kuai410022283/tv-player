@@ -13,13 +13,8 @@ import com.mediaplayer.app.Prefs
 class VlcPlayerHelper(
     private val context: Context,
     private val videoLayout: VLCVideoLayout,
-    private val listener: PlayerListener
-) {
-    interface PlayerListener {
-        fun onBuffering(percent: Float)
-        fun onPlaying(resolution: String)
-        fun onError()
-    }
+    private val listener: IPlayerHelper.PlayerListener
+) : IPlayerHelper {
 
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -70,28 +65,36 @@ class VlcPlayerHelper(
                     listener.onBuffering(event.buffering)
                 }
                 MediaPlayer.Event.Playing -> {
-                    var videoRes = ""
-                    var audioCodec = ""
-                    mediaPlayer?.media?.let { media ->
-                        for (i in 0 until media.trackCount) {
-                            val track = media.getTrack(i)
-                            if (track.type == IMedia.Track.Type.Video) {
-                                val vt = track as IMedia.VideoTrack
-                                if (vt.width > 0 && vt.height > 0) {
-                                    videoRes = "${vt.width}x${vt.height}"
+                    // 先发送一个基础状态
+                    listener.onPlaying("VLC")
+                    
+                    // VLC 在刚触发 Playing 时可能还未完全解析出轨道信息，延迟 1000ms 再次读取
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        var videoRes = ""
+                        var audioCodec = ""
+                        mediaPlayer?.media?.let { media ->
+                            for (i in 0 until media.trackCount) {
+                                val track = media.getTrack(i)
+                                if (track.type == IMedia.Track.Type.Video) {
+                                    val vt = track as IMedia.VideoTrack
+                                    if (vt.width > 0 && vt.height > 0) {
+                                        videoRes = "${vt.width}x${vt.height}"
+                                    }
+                                } else if (track.type == IMedia.Track.Type.Audio) {
+                                    val at = track as IMedia.AudioTrack
+                                    audioCodec = at.codec?.trim()?.uppercase() ?: ""
                                 }
-                            } else if (track.type == IMedia.Track.Type.Audio) {
-                                val at = track as IMedia.AudioTrack
-                                audioCodec = at.codec?.trim()?.uppercase() ?: ""
                             }
                         }
-                    }
-                    val info = buildString {
-                        if (videoRes.isNotEmpty()) append(videoRes)
-                        if (videoRes.isNotEmpty() && audioCodec.isNotEmpty()) append(" | ")
-                        if (audioCodec.isNotEmpty()) append(audioCodec)
-                    }
-                    listener.onPlaying(info)
+                        val info = buildString {
+                            if (videoRes.isNotEmpty()) append(videoRes)
+                            if (videoRes.isNotEmpty() && audioCodec.isNotEmpty()) append(" | ")
+                            if (audioCodec.isNotEmpty()) append(audioCodec)
+                        }
+                        if (info.isNotEmpty()) {
+                            listener.onPlaying(info) // 再次更新包含分辨率的状态
+                        }
+                    }, 1000)
                 }
                 MediaPlayer.Event.EncounteredError,
                 MediaPlayer.Event.EndReached -> {
@@ -101,7 +104,7 @@ class VlcPlayerHelper(
         }
     }
 
-    fun play(url: String, userAgent: String?, customHeaders: String?) {
+    override fun play(url: String, userAgent: String, customHeaders: String) {
         val player = mediaPlayer ?: return
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
         val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
@@ -196,27 +199,39 @@ class VlcPlayerHelper(
         }
     }
 
-    fun setAspectRatio(ratio: String?) {
-        mediaPlayer?.aspectRatio = ratio
+    override fun setAspectRatio(scaleMode: Int) {
+        when (scaleMode) {
+            Prefs.SCALE_MODE_STRETCH -> mediaPlayer?.aspectRatio = "16:9"
+            Prefs.SCALE_MODE_CROP -> mediaPlayer?.aspectRatio = null
+            Prefs.SCALE_MODE_4_3 -> mediaPlayer?.aspectRatio = "4:3"
+            else -> mediaPlayer?.aspectRatio = null
+        }
     }
 
-    fun isPlaying(): Boolean {
+    override fun setDecoderMode(mode: Int) {}
+    override fun setCacheDuration(cacheMs: Int) {}
+
+    override fun isPlaying(): Boolean {
         return mediaPlayer?.isPlaying ?: false
     }
 
-    fun pause() {
+    override fun pause() {
         mediaPlayer?.pause()
     }
 
-    fun resume() {
+    override fun resume() {
         mediaPlayer?.play()
     }
+    
+    override fun stop() {
+        mediaPlayer?.stop()
+    }
 
-    fun getTime(): Long {
+    override fun getTime(): Long {
         return mediaPlayer?.time ?: 0L
     }
 
-    fun setTime(timeMs: Long) {
+    override fun setTime(timeMs: Long) {
         mediaPlayer?.time = timeMs
     }
 
@@ -224,11 +239,11 @@ class VlcPlayerHelper(
         return mediaPlayer?.rate ?: 1.0f
     }
 
-    fun setRate(rate: Float) {
+    override fun setRate(rate: Float) {
         mediaPlayer?.rate = rate
     }
 
-    fun release() {
+    override fun release() {
         mediaPlayer?.release()
         libVlc?.release()
         mediaPlayer = null

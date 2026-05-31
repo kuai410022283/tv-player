@@ -8,7 +8,7 @@
     android:background="#000000">
 
     <!-- 1. 底层：视频播放器 -->
-    <org.videolan.libvlc.util.VLCVideoLayout
+    <FrameLayout
         android:id="@+id/videoLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -488,7 +488,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsScale"
-                    android:nextFocusDown="@+id/sbSettingsCache">
+                    android:nextFocusDown="@+id/btnSettingsCore">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -501,6 +501,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="自动识别"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsCore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusDown="@+id/sbSettingsCache">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="播放内核"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsCoreValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="智能切换"
                         android:textColor="#AAAAAA"
                         android:textSize="16sp"
                         android:layout_marginEnd="8dp"/>
@@ -538,9 +573,9 @@
                     android:id="@+id/sbSettingsCache"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="50"
+                    android:max="500"
                     android:progress="0"
-                    android:nextFocusUp="@+id/btnSettingsDecoder"
+                    android:nextFocusUp="@+id/btnSettingsCore"
                     android:nextFocusDown="@+id/sbSettingsVolume" />
             </LinearLayout>
 

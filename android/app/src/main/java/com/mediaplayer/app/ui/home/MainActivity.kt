@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
     private var tvOsdEpg: TextView? = null
     private var progressEpg: ProgressBar? = null
     private var progressBuffering: ProgressBar? = null
-    private var videoLayout: VLCVideoLayout? = null
+    private var videoLayout: android.widget.FrameLayout? = null
     
     // EPG Menu
     private var layoutEpgMenu: View? = null
@@ -131,7 +131,7 @@ class MainActivity : AppCompatActivity() {
     private var heartbeatRunnable: Runnable? = null
 
     // ── VLC Player (TV Only) ──
-    private var playerHelper: VlcPlayerHelper? = null
+    private var playerHelper: com.mediaplayer.app.util.IPlayerHelper? = null
     private var retryCount = 0
     private val maxRetries = 3
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -193,7 +193,7 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
         setupTvViews()
-        initVlcPlayer()
+        // Player will be initialized when playing a channel
         setupTouchGestures()
 
         authManager = ClientAuthManager(this)
@@ -403,12 +403,14 @@ class MainActivity : AppCompatActivity() {
 
     private var btnSettingsScale: View? = null
     private var btnSettingsDecoder: View? = null
+    private var btnSettingsCore: View? = null
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
         
         btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
+        btnSettingsCore = findViewById(R.id.btnSettingsCore)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
         
@@ -420,6 +422,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
+        fun updateCoreText(core: Int) {
+            findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
+                Prefs.PLAYER_CORE_VLC -> "VLC"
+                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_X5 -> "X5 Web"
+                else -> "智能切换"
+            }
+        }
+
         fun updateScaleText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
                 Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
@@ -434,10 +446,12 @@ class MainActivity : AppCompatActivity() {
         }
         
         var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        var currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
 
         updateDecoderText(currentDecoderMode)
+        updateCoreText(currentCore)
         updateScaleText(currentScaleMode)
         updateAutoStartText(currentAutoStart)
         
@@ -452,6 +466,20 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "解码模式已保存，下次播放生效", Toast.LENGTH_SHORT).show()
         }
         
+        btnSettingsCore?.setOnClickListener {
+            currentCore = when (currentCore) {
+                Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_VLC
+                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_EXO
+                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
+                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_X5
+                Prefs.PLAYER_CORE_X5 -> Prefs.PLAYER_CORE_AUTO
+                else -> Prefs.PLAYER_CORE_AUTO
+            }
+            updateCoreText(currentCore)
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
+            Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+        }
+        
         btnSettingsScale?.setOnClickListener {
             currentScaleMode = when (currentScaleMode) {
                 Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_STRETCH
@@ -464,11 +492,11 @@ class MainActivity : AppCompatActivity() {
             
             // 立即生效部分
             when (currentScaleMode) {
-                Prefs.SCALE_MODE_STRETCH -> playerHelper?.setAspectRatio("16:9")
-                Prefs.SCALE_MODE_4_3 -> playerHelper?.setAspectRatio("4:3")
-                Prefs.SCALE_MODE_DEFAULT -> playerHelper?.setAspectRatio(null)
+                Prefs.SCALE_MODE_STRETCH -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_STRETCH)
+                Prefs.SCALE_MODE_4_3 -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_4_3)
+                Prefs.SCALE_MODE_DEFAULT -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_DEFAULT)
                 Prefs.SCALE_MODE_CROP -> {
-                    playerHelper?.setAspectRatio(null)
+                    playerHelper?.setAspectRatio(Prefs.SCALE_MODE_CROP)
                     Toast.makeText(this, "画面比例已保存，裁剪模式需重新播放生效", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -488,20 +516,21 @@ class MainActivity : AppCompatActivity() {
         etSettingsUrl?.setText(url)
         
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
-        val progress = if (cacheMs == 0) 0 else ((cacheMs - 100) / 100 + 1).coerceIn(1, 50)
+        val progress = if (cacheMs == 0) 0 else (cacheMs / 10).coerceIn(1, 500)
         sbSettingsCache?.progress = progress
         tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${cacheMs / 1000f} 秒"
 
         sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
-                val newCacheMs = if (progress == 0) 0 else 100 + (progress - 1) * 100
+                val newCacheMs = if (progress == 0) 0 else progress * 10
                 tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${newCacheMs / 1000f} 秒"
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
                 val p = seekBar?.progress ?: 0
-                val newCacheMs = if (p == 0) 0 else 100 + (p - 1) * 100
+                val newCacheMs = if (p == 0) 0 else p * 10
                 prefs.edit().putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs).apply()
+                playerHelper?.setCacheDuration(newCacheMs)
                 Toast.makeText(this@MainActivity, "网络缓存已保存，下次播放生效", Toast.LENGTH_SHORT).show()
             }
         })
@@ -610,6 +639,76 @@ class MainActivity : AppCompatActivity() {
         sbSettingsCache?.requestFocus()
     }
 
+    private fun initPlayerWithCore(core: Int) {
+        val listener = object : com.mediaplayer.app.util.IPlayerHelper.PlayerListener {
+            override fun onBuffering(percent: Float) {
+                uiHandler.post {
+                    if (percent >= 100f || percent == 0f) {
+                        progressBuffering?.visibility = View.GONE
+                    } else {
+                        progressBuffering?.visibility = View.VISIBLE
+                    }
+                }
+            }
+            override fun onPlaying(resolution: String) {
+                uiHandler.post {
+                    progressBuffering?.visibility = View.GONE
+                    retryCount = 0
+                    if (resolution.isNotEmpty()) {
+                        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+                        val decoderStr = when (decoderMode) {
+                            Prefs.DECODER_MODE_HARDWARE -> "硬解"
+                            Prefs.DECODER_MODE_SOFTWARE -> "软解"
+                            else -> "自动解码"
+                        }
+                        val coreStr = when (core) {
+                            Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                            Prefs.PLAYER_CORE_X5 -> "X5 Web"
+                            else -> "VLC"
+                        }
+                        
+                        val fullInfo = buildString {
+                            if (resolution.isNotEmpty()) append(resolution)
+                            if (decoderStr.isNotEmpty()) {
+                                if (isNotEmpty()) append(" | ")
+                                append(decoderStr)
+                            }
+                            if (coreStr.isNotEmpty()) {
+                                if (isNotEmpty()) append(" | ")
+                                append(coreStr)
+                            }
+                        }
+                        tvOsdInfo?.text = fullInfo
+                    }
+                }
+            }
+            override fun onError() {
+                uiHandler.post { handlePlaybackError() }
+            }
+        }
+
+        when (core) {
+            Prefs.PLAYER_CORE_EXO -> {
+                playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+            }
+            Prefs.PLAYER_CORE_IJK -> {
+                playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+            }
+            Prefs.PLAYER_CORE_X5 -> {
+                playerHelper = com.mediaplayer.app.util.X5PlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+            }
+            else -> {
+                val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
+                vlcVideoLayout.layoutParams = android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT)
+                videoLayout?.addView(vlcVideoLayout)
+                
+                playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
+            }
+        }
+    }
+
     private fun setupQrConfigServer(onUrlUpdated: () -> Unit) {
         if (configWebServer == null) {
             configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 9528) { rawUrl ->
@@ -635,54 +734,29 @@ class MainActivity : AppCompatActivity() {
         videoLayout?.requestFocus()
     }
 
-    private fun initVlcPlayer() {
-        val layout = videoLayout ?: return
-        playerHelper = VlcPlayerHelper(this, layout, object : VlcPlayerHelper.PlayerListener {
-            override fun onBuffering(percent: Float) {
-                if (percent == 100f) {
-                    isPlayerBuffering = false
-                    progressBuffering?.visibility = View.GONE
-                    retryCount = 0
-                } else {
-                    isPlayerBuffering = true
-                    progressBuffering?.visibility = View.VISIBLE
-                }
-            }
-
-            override fun onPlaying(resolution: String) {
-                isPlayerBuffering = false
-                progressBuffering?.visibility = View.GONE
-                retryCount = 0
-                if (resolution.isNotEmpty()) {
-                    tvOsdInfo?.text = resolution
-                }
-            }
-
-            override fun onError() {
-                isPlayerBuffering = false
-                progressBuffering?.visibility = View.GONE
-                
-                val channel = allChannels.getOrNull(currentChannelIndex)
-                val lines = channel?.getLinesSafely() ?: emptyList()
-                
-                if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
-                    currentLineIndex++
-                    retryCount = 0
-                    Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
-                    playCurrentLineInTv()
-                } else if (retryCount < maxRetries) {
-                    retryCount++
-                    val delayMs = (3000L * (1 shl (retryCount - 1)))
-                    Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
-                    uiHandler.postDelayed({ 
-                        if (allChannels.isNotEmpty()) playCurrentLineInTv()
-                    }, delayMs)
-                } else {
-                    Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
-                    retryCount = 0
-                }
-            }
-        })
+    private fun handlePlaybackError() {
+        isPlayerBuffering = false
+        progressBuffering?.visibility = View.GONE
+        
+        val channel = allChannels.getOrNull(currentChannelIndex)
+        val lines = channel?.getLinesSafely() ?: emptyList()
+        
+        if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
+            currentLineIndex++
+            retryCount = 0
+            Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+            playCurrentLineInTv()
+        } else if (retryCount < maxRetries) {
+            retryCount++
+            val delayMs = (3000L * (1 shl (retryCount - 1)))
+            Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
+            uiHandler.postDelayed({ 
+                if (allChannels.isNotEmpty()) playCurrentLineInTv()
+            }, delayMs)
+        } else {
+            Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
+            retryCount = 0
+        }
     }
 
     private var resolveJob: kotlinx.coroutines.Job? = null
@@ -720,8 +794,68 @@ class MainActivity : AppCompatActivity() {
         loadEpgForChannel(channel)
         showOsd()
 
-        if (playerHelper == null) {
-            initVlcPlayer()
+        // 核心匹配逻辑
+        var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        if (globalCore == Prefs.PLAYER_CORE_X5) {
+            if (!com.mediaplayer.app.util.WebX5Manager.isInitialized) {
+                val progress = com.mediaplayer.app.util.WebX5Manager.downloadProgress
+                Toast.makeText(this, "WebX5 内核下载中 ($progress%)，已切换为智能模式", Toast.LENGTH_SHORT).show()
+                globalCore = Prefs.PLAYER_CORE_AUTO
+            } else if (!com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
+                Toast.makeText(this, "WebX5 内核暂不可用，已切换为智能模式", Toast.LENGTH_SHORT).show()
+                globalCore = Prefs.PLAYER_CORE_AUTO
+            }
+        }
+        
+        var desiredCore = globalCore
+        var coreText = ""
+        
+        if (globalCore == Prefs.PLAYER_CORE_AUTO) {
+            desiredCore = when (line.streamType.lowercase()) {
+                "vlc" -> {
+                    coreText = "智能 (VLC)"
+                    Prefs.PLAYER_CORE_VLC
+                }
+                "ijk" -> {
+                    coreText = "智能 (IJK)"
+                    Prefs.PLAYER_CORE_IJK
+                }
+                "x5" -> {
+                    coreText = "智能 (X5)"
+                    Prefs.PLAYER_CORE_X5
+                }
+                "ts", "rtp", "udp" -> {
+                    coreText = "智能 (Exo)"
+                    Prefs.PLAYER_CORE_EXO
+                }
+                else -> {
+                    coreText = "智能 (Exo)"
+                    Prefs.PLAYER_CORE_EXO
+                }
+            }
+        } else {
+            coreText = when (desiredCore) {
+                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_X5 -> "WebX5"
+                else -> "VLC"
+            }
+        }
+        
+        findViewById<android.widget.TextView>(com.mediaplayer.app.R.id.tvStreamType)?.text = "${line.streamType.uppercase()} ($coreText)"
+
+        // 判断当前已经实例化的 playerHelper 是否与所需的一致
+        val isCoreMatch = when (desiredCore) {
+            Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
+            Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
+            Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
+            else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
+        }
+
+        if (playerHelper == null || !isCoreMatch) {
+            playerHelper?.release()
+            videoLayout?.removeAllViews() // 清除旧的视图
+            initPlayerWithCore(desiredCore)
         }
         retryCount = 0
         progressBuffering?.visibility = View.VISIBLE
