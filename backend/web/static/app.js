@@ -244,9 +244,9 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const body = document.getElementById('channels-body');
   if (chRes.data && chRes.data.items) {
     channelTotal = chRes.data.total || 0;
-    body.innerHTML = chRes.data.items.map(c => `<tr>
-      <td><input type="checkbox" class="ch-check" value="${c.id}"></td>
-      <td>${c.id}</td>
+    body.innerHTML = chRes.data.items.map((c, i) => `<tr>
+      <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
+      <td style="color:var(--text3)">${(channelPage - 1) * PAGE_SIZE + i + 1}</td>
       <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
       <td>${gm[c.group_id] || '-'}</td>
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
@@ -397,11 +397,11 @@ async function loadGroups() {
     }
   });
 
-  document.getElementById('groups-body').innerHTML = items.map(g => {
+  document.getElementById('groups-body').innerHTML = items.map((g, i) => {
     const isDefault = g.name === '未分类';
     return `<tr>
     <td>${isDefault ? '' : `<input type="checkbox" class="group-check" value="${g.id}" onchange="updateSelectedGroups()">`}</td>
-    <td>${g.id}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
+    <td style="color:var(--text3)">${(groupPage - 1) * PAGE_SIZE + i + 1}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
     <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
     <td>${g.is_direct ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-warn">关闭</span>'}</td>
     <td><a href="javascript:void(0)" onclick="filterChannelsByGroup(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}')" style="font-weight:bold;color:var(--primary);text-decoration:underline;">${g.channel_count || 0}</a></td>
@@ -513,8 +513,8 @@ function renderSourcesTable() {
 
   const tbody = document.getElementById('sources-body');
   if (pageData.length) {
-    tbody.innerHTML = pageData.map(s => `<tr>
-      <td>${s.id}</td>
+    tbody.innerHTML = pageData.map((s, i) => `<tr>
+      <td style="color:var(--text3)">${(sourcePage - 1) * PAGE_SIZE + i + 1}</td>
       <td><strong>${esc(s.name)}</strong></td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
       <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
@@ -694,9 +694,9 @@ async function loadClients() {
   if (items.length === 0) {
     body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:40px">暂无设备</td></tr>';
   } else {
-    body.innerHTML = items.map(c => `<tr>
+    body.innerHTML = items.map((c, i) => `<tr>
       <td><input type="checkbox" class="client-check" value="${c.id}" onchange="updateSelectedClients()"></td>
-      <td>${c.id}</td>
+      <td style="color:var(--text3)">${(clientPage - 1) * PAGE_SIZE + i + 1}</td>
       <td><strong>${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(c.device_id).substring(0, 16)}...</span></td>
       <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
       <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
@@ -787,8 +787,8 @@ function renderPlansTable() {
   const start = (planPage - 1) * PAGE_SIZE;
   const pageData = allPlans.slice(start, start + PAGE_SIZE);
 
-  document.getElementById('plans-body').innerHTML = pageData.map(p => `<tr>
-    <td>${p.id}</td>
+  document.getElementById('plans-body').innerHTML = pageData.map((p, i) => `<tr>
+    <td style="color:var(--text3)">${(planPage - 1) * PAGE_SIZE + i + 1}</td>
     <td><strong>${esc(p.name)}</strong></td>
     <td>${p.days > 0 ? p.days + ' 天' : '永久'}</td>
     <td>${p.max_streams}</td>
@@ -1035,7 +1035,7 @@ function renderClientLogsTable() {
 
   const body = document.getElementById('client-logs-body');
   if (pageData.length) {
-    body.innerHTML = pageData.map(l => {
+    body.innerHTML = pageData.map((l, i) => {
       let actionBadge = '';
       if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
       else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
@@ -1044,7 +1044,7 @@ function renderClientLogsTable() {
       else actionBadge = badge(l.action);
 
       return `<tr>
-        <td>${l.id}</td>
+        <td style="color:var(--text3)">${(clientLogPage - 1) * PAGE_SIZE + i + 1}</td>
         <td><strong>${esc(l.client_name)}</strong><br><span style="font-size:11px;color:var(--text2)">ID: #${l.client_id}</span></td>
         <td>${actionBadge}</td>
         <td><strong>${l.channel_name ? esc(l.channel_name) : '-'}</strong><br><span style="font-size:11px;color:var(--text2)">${l.channel_id ? 'ID: ' + l.channel_id : ''}</span></td>
