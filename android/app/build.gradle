@@ -44,7 +44,7 @@ android {
         abi {
             enable true
             reset()
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            include "armeabi-v7a", "arm64-v8a" // 只保留主流的电视/手机架构，剔除 x86 系列
             universalApk true
         }
     }
@@ -98,13 +98,10 @@ dependencies {
     // VLC Android SDK
     implementation 'org.videolan.android:libvlc-all:3.5.1'
 
-    // IJKPlayer
+    // IJKPlayer (精简了极老的 armv5 和冷门的 x86/x86_64)
     implementation 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'
     implementation 'tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8'
-    implementation 'tv.danmaku.ijk.media:ijkplayer-armv5:0.8.8'
     implementation 'tv.danmaku.ijk.media:ijkplayer-arm64:0.8.8'
-    implementation 'tv.danmaku.ijk.media:ijkplayer-x86:0.8.8'
-    implementation 'tv.danmaku.ijk.media:ijkplayer-x86_64:0.8.8'
 
     // Tencent X5 Web SDK
     implementation 'com.tencent.tbs:tbssdk:44286'

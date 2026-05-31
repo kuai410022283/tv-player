@@ -19,6 +19,7 @@ dependencyResolutionManagement {
         }
         google()
         mavenCentral()
+        jcenter() // IJKPlayer (0.8.8) is hosted on JCenter, needed for GitHub Actions
     }
 }
 
