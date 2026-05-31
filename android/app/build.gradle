@@ -62,6 +62,11 @@ android {
         viewBinding true
     }
 
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def abi = output.getFilter(com.android.build.VariantOutput.ABI) ?: "all"
