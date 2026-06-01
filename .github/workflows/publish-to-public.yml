@@ -169,8 +169,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Gradle
+      - name: Setup Gradle (no dependency cache)
         uses: gradle/actions/setup-gradle@v3
+        with:
+          # 禁用 Gradle 依赖缓存，防止旧缓存中损坏的 .aar/.so 污染 Release 构建
+          cache-disabled: true
+
+      - name: Verify local native libs exist
+        run: |
+          echo "=== 检查本地 .aar 文件 ==="
+          ls -lh android/app/libs/
+          echo "=== 检查 jniLibs .so 文件 ==="
+          find android/app/src/main/jniLibs -name "*.so" | sort | xargs ls -lh
 
       - name: Decode Keystore
         run: |
@@ -188,6 +198,31 @@ jobs:
       - name: Cleanup Keystore
         if: always()
         run: rm -f /tmp/release.keystore
+
+      - name: Verify APK native lib contents
+        run: |
+          echo "=== 验证 arm64-v8a Release APK 内的 native 库 ==="
+          APK=$(find android/app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find android/app/build/outputs/apk/release -name "*all*.apk" | head -1)
+          fi
+          echo "检查 APK: $APK"
+          unzip -l "$APK" | grep -E "lib/|libffmpeg|libvlc|libijk" | awk '{print $NF, $1}'
+          echo "---"
+          # 关键验证：libffmpegJNI.so 必须存在（来自本地 .aar）
+          if unzip -l "$APK" | grep -q "libffmpegJNI.so"; then
+            echo "✅ libffmpegJNI.so 已打包 (FFmpeg 音频解码正常)"
+          else
+            echo "❌ 缺少 libffmpegJNI.so！MP2/MPEG-Audio 将无法解码！"
+            exit 1
+          fi
+          # 关键验证：libvlc.so 必须存在（来自 Maven 依赖）
+          if unzip -l "$APK" | grep -q "libvlc.so"; then
+            echo "✅ libvlc.so 已打包 (VLC 内核正常)"
+          else
+            echo "❌ 缺少 libvlc.so！VLC 播放将不可用！"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

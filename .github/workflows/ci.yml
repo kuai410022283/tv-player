@@ -121,18 +121,55 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Gradle
+      - name: Setup Gradle (no dependency cache)
         uses: gradle/actions/setup-gradle@v3
+        with:
+          # 禁用 Gradle 依赖缓存，防止跨 workflow 的旧缓存损坏 .aar/.so 结果
+          cache-disabled: true
 
-      - name: Assemble Debug APK
+      - name: Verify local native libs exist
+        run: |
+          echo "=== 本地 .aar 文件 ==="
+          ls -lh android/app/libs/
+          echo "=== jniLibs .so 文件 ==="
+          find android/app/src/main/jniLibs -name "*.so" | sort | xargs ls -lh
+
+      - name: Assemble Debug + Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug assembleRelease --no-daemon --no-build-cache
 
-      - name: Upload APK
+      - name: Verify APK native lib contents
+        run: |
+          echo "=== 验证 arm64-v8a Release APK native 库 ==="
+          APK=$(find android/app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
+          echo "检查: $APK ($(($(stat -c%s "$APK") / 1024 / 1024)) MB)"
+          unzip -l "$APK" | grep "lib/arm64" | awk '{print $NF, $1}'
+          echo "---"
+          if unzip -l "$APK" | grep -q "libffmpegJNI.so"; then
+            echo "✅ libffmpegJNI.so 已打包 (FFmpeg 音频解码正常)"
+          else
+            echo "❌ 缺少 libffmpegJNI.so！MP2 音频将无法解码！"
+            exit 1
+          fi
+          if unzip -l "$APK" | grep -q "libvlc.so"; then
+            echo "✅ libvlc.so 已打包 (VLC 内核正常)"
+          else
+            echo "❌ 缺少 libvlc.so！VLC 播放将不可用！"
+            exit 1
+          fi
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 3
+
+      - name: Upload Release APK (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-unsigned
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 3
 
   android-lint:
