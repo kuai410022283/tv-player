@@ -11,8 +11,8 @@ android {
         applicationId "com.mediaplayer.app"
         minSdk 21
         targetSdk 34
-        versionCode 54
-        versionName "1.0.24"
+        versionCode 35
+        versionName "1.0.29"
     }
 
     signingConfigs {
