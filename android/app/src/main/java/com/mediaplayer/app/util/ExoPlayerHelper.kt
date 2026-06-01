@@ -88,11 +88,27 @@ class ExoPlayerHelper(
 
         // 1. Configure Decoder
         val renderersFactory = DefaultRenderersFactory(context).apply {
+            // 控制音频扩展（如 FFmpeg）
             setExtensionRendererMode(
                 when (currentDecoderMode) {
                     Prefs.DECODER_MODE_SOFTWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                     Prefs.DECODER_MODE_HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                     else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                }
+            )
+            
+            // 【关键修复】控制视频解码（硬解/软解）
+            setEnableDecoderFallback(true) // 允许解码器自动降级
+            setMediaCodecSelector(
+                when (currentDecoderMode) {
+                    // 当选择“软解”时，强制优先使用系统 CPU 软件视频解码
+                    Prefs.DECODER_MODE_SOFTWARE -> androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                        val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+                        // 将软件解码器排在前面
+                        decoders.sortedBy { it.hardwareAccelerated }.toMutableList()
+                    }
+                    // 默认使用硬解
+                    else -> androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
                 }
             )
         }
