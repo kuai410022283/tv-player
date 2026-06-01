@@ -60,4 +60,9 @@ interface ApiService {
 
     @GET("update")
     suspend fun checkUpdate(@Query("arch") arch: String): Response<APIResponse<AppUpdateConfig>>
+
+    // ── X5内核检查更新 ───────────────────────────────────────
+
+    @GET("x5core/update")
+    suspend fun checkX5Update(@Query("arch") arch: String): Response<APIResponse<X5UpdateConfig>>
 }

@@ -24,10 +24,9 @@ object Prefs {
     // 播放内核
     const val KEY_PLAYER_CORE = "player_core"
     const val PLAYER_CORE_AUTO = 0
-    const val PLAYER_CORE_VLC = 1
-    const val PLAYER_CORE_EXO = 2
-    const val PLAYER_CORE_IJK = 3
-    const val PLAYER_CORE_X5 = 4
+    const val PLAYER_CORE_EXO = 1
+    const val PLAYER_CORE_VLC = 2
+    const val PLAYER_CORE_X5 = 3
     
     // 开机自启
     const val KEY_AUTO_START = "auto_start"

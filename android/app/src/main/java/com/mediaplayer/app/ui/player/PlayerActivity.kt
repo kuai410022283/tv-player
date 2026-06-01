@@ -79,6 +79,7 @@ class PlayerActivity : AppCompatActivity() {
     private var lineIndex = 0
     private var allChannels = listOf<Channel>()
     private var resolveJob: kotlinx.coroutines.Job? = null
+    private var coreRetryLevel = 0 // 0=default, 1=Exo, 2=VLC
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideInfoRunnable = Runnable { hideChannelInfo() }
@@ -297,19 +298,22 @@ class PlayerActivity : AppCompatActivity() {
                     val channel = allChannels.getOrNull(channelIndex)
                     val lines = channel?.getLinesSafely() ?: emptyList()
                     
-                    if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
+                    if (coreRetryLevel == 0) {
+                        coreRetryLevel = 1
+                        Toast.makeText(this@PlayerActivity, "尝试使用 ExoPlayer 重试该线路...", Toast.LENGTH_SHORT).show()
+                        retryPlay()
+                    } else if (coreRetryLevel == 1) {
+                        coreRetryLevel = 2
+                        Toast.makeText(this@PlayerActivity, "尝试使用 VLC 重试该线路...", Toast.LENGTH_SHORT).show()
+                        retryPlay()
+                    } else if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
                         lineIndex++
-                        retryCount = 0
+                        coreRetryLevel = 0
                         Toast.makeText(this@PlayerActivity, "当前线路失效，自动切换线路 ${lineIndex + 1}...", Toast.LENGTH_SHORT).show()
                         playCurrentLine()
-                    } else if (retryCount < maxRetries) {
-                        retryCount++
-                        val delayMs = (3000L * (1 shl (retryCount - 1)))
-                        Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
-                        handler.postDelayed({ retryPlay() }, delayMs)
                     } else {
                         Toast.makeText(this@PlayerActivity, "播放失败，所有线路均不可用", Toast.LENGTH_LONG).show()
-                        retryCount = 0
+                        coreRetryLevel = 0
                     }
                 }
             }
@@ -318,9 +322,6 @@ class PlayerActivity : AppCompatActivity() {
         when (core) {
             Prefs.PLAYER_CORE_EXO -> {
                 playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-            }
-            Prefs.PLAYER_CORE_IJK -> {
-                playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
             Prefs.PLAYER_CORE_X5 -> {
                 playerHelper = com.mediaplayer.app.util.X5PlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
@@ -370,15 +371,13 @@ class PlayerActivity : AppCompatActivity() {
         var desiredCore = globalCore
         var coreText = ""
         
-        if (globalCore == Prefs.PLAYER_CORE_AUTO) {
+        if (coreRetryLevel > 0) {
+            desiredCore = if (coreRetryLevel == 1) Prefs.PLAYER_CORE_EXO else Prefs.PLAYER_CORE_VLC
+        } else if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             desiredCore = when (type.lowercase()) {
                 "vlc" -> {
                     coreText = "智能 (VLC)"
                     Prefs.PLAYER_CORE_VLC
-                }
-                "ijk" -> {
-                    coreText = "智能 (IJK)"
-                    Prefs.PLAYER_CORE_IJK
                 }
                 "x5" -> {
                     coreText = "智能 (X5)"
@@ -396,17 +395,19 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                 Prefs.PLAYER_CORE_X5 -> "WebX5"
                 else -> "VLC"
             }
+        }
+        
+        if (coreRetryLevel > 0) {
+            coreText = if (coreRetryLevel == 1) "重试 (Exo)" else "重试 (VLC)"
         }
         
         tvStreamType?.text = "${type.uppercase()} ($coreText)"
         
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
-            Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
             Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
@@ -451,6 +452,7 @@ class PlayerActivity : AppCompatActivity() {
 
         channelIndex = index
         lineIndex = 0 // 重置为第一条线路
+        coreRetryLevel = 0
         val channel = allChannels[index]
         channelId = channel.id
         channelName = channel.name

@@ -140,7 +140,7 @@ class VlcPlayerHelper(
                                      lowerUrl.contains("://180.141.") || // 典型电信IPTV
                                      lowerUrl.contains("://127.0.")
             if (isLocalOrMulticast) {
-                finalCacheMs = 200 // 内网 200ms 秒切
+                finalCacheMs = 40 // 内网极限 40ms 秒切
                 useAggressiveLatency = true
             } else {
                 finalCacheMs = 1500 // 公网 1500ms 安全防卡

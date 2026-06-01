@@ -1004,3 +1004,45 @@ func (h *Handler) GetVersion(c *gin.Context) {
 		"started_at": startTime.Format(time.RFC3339),
 	})
 }
+
+// ── X5 Core Update ─────────────────────────────────────
+
+func (h *Handler) GetX5CoreUpdate(c *gin.Context) {
+	arch := c.Query("arch")
+	
+	type X5Update struct {
+		URL  string `json:"url"`
+		Code int    `json:"code"`
+	}
+
+	var update *X5Update
+	switch arch {
+	case "arm64-v8a":
+		update = &X5Update{
+			URL:  "/download/x5/046295.tbs.apk",
+			Code: 46295,
+		}
+	case "armeabi-v7a":
+		update = &X5Update{
+			URL:  "/download/x5/046238.tbs.apk",
+			Code: 46238,
+		}
+	default:
+		fail(c, 400, "unsupported arch")
+		return
+	}
+	
+	if _, err := os.Stat("./web" + update.URL); err != nil {
+		fail(c, 404, "x5 core not found on server")
+		return
+	}
+
+	host := c.Request.Host
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	update.URL = scheme + "://" + host + update.URL
+
+	ok(c, update)
+}
