@@ -446,8 +446,8 @@
                 id="server-base64-text">
                 -
               </div>
-              <button class="btn btn-primary" onclick="copyServerBase64()" style="white-space: nowrap; height: 38px;">复制
-                Base64</button>
+              <button class="btn btn-primary" onclick="copyServerBase64()"
+                style="white-space: nowrap; height: 38px;">复制</button>
             </div>
             <div style="font-size: 11px; color: var(--text2); margin-top: 8px;">
               当前识别的服务器地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
@@ -486,338 +486,339 @@
                 <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
               </div>
             </div>
-          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-          <div class="form-group">
-            <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
-          </div>
-          <div class="form-group">
-            <label>系统公告 (跑马灯)</label>
-            <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
-          </div>
-          <div class="form-group">
-            <label>跑马灯显示间隔 (分钟)</label>
-            <input type="number" id="set-system-announcement-interval" value="0" min="0">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
-            </div>
-          </div>
-          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-          <div class="form-group">
-            <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
-          </div>
-          <div class="form-group">
-            <label>EPG 数据源 URL (XMLTV)</label>
-            <textarea id="set-epg-source-url" rows="3"
-              placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
-              .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
-          </div>
-          <div class="form-row">
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
             <div class="form-group">
-              <label>EPG 自动刷新间隔 (小时)</label>
-              <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
-            </div>
-            <div class="form-group" style="display:flex;align-items:flex-end">
-              <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
-            </div>
-          </div>
-          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-          <div class="form-group">
-            <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>最新版本号 (Version Code)</label>
-              <input type="number" id="set-update-version-code" placeholder="如：10" min="0">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">必须为整数。客户端版本号小于此值将提示升级。</div>
+              <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
             </div>
             <div class="form-group">
-              <label>展示版本名 (Version Name)</label>
-              <input type="text" id="set-update-version-name" placeholder="如：v1.2.0">
+              <label>系统公告 (跑马灯)</label>
+              <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
             </div>
-          </div>
-          <div class="form-group">
-            <label>APK 下载地址</label>
-            <input type="text" id="set-update-download-url" placeholder="http://example.com/app.apk">
-          </div>
-          <div class="form-group">
-            <label>更新日志</label>
-            <textarea id="set-update-log" rows="3" placeholder="填写新版本修复或增加的内容..."></textarea>
-          </div>
-          <div class="form-group">
-            <label>是否强制更新</label>
-            <select id="set-update-force">
-              <option value="false">否 (用户可跳过)</option>
-              <option value="true">是 (必须更新才能使用)</option>
-            </select>
-          </div>
-          <div class="form-actions" style="justify-content:flex-start">
-            <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
-            <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
-              style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
+            <div class="form-group">
+              <label>跑马灯显示间隔 (分钟)</label>
+              <input type="number" id="set-system-announcement-interval" value="0" min="0">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
+              </div>
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <div class="form-group">
+              <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
+            </div>
+            <div class="form-group">
+              <label>EPG 数据源 URL (XMLTV)</label>
+              <textarea id="set-epg-source-url" rows="3"
+                placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
+                .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>EPG 自动刷新间隔 (小时)</label>
+                <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
+              </div>
+              <div class="form-group" style="display:flex;align-items:flex-end">
+                <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
+              </div>
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <div class="form-group">
+              <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>最新版本号 (Version Code)</label>
+                <input type="number" id="set-update-version-code" placeholder="如：10" min="0">
+                <div style="font-size:11px;color:var(--text2);margin-top:4px">必须为整数。客户端版本号小于此值将提示升级。</div>
+              </div>
+              <div class="form-group">
+                <label>展示版本名 (Version Name)</label>
+                <input type="text" id="set-update-version-name" placeholder="如：v1.2.0">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>APK 下载地址</label>
+              <input type="text" id="set-update-download-url" placeholder="http://example.com/app.apk">
+            </div>
+            <div class="form-group">
+              <label>更新日志</label>
+              <textarea id="set-update-log" rows="3" placeholder="填写新版本修复或增加的内容..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>是否强制更新</label>
+              <select id="set-update-force">
+                <option value="false">否 (用户可跳过)</option>
+                <option value="true">是 (必须更新才能使用)</option>
+              </select>
+            </div>
+            <div class="form-actions" style="justify-content:flex-start">
+              <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
+              <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
+                style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modals -->
-  <div class="modal-overlay" id="channel-modal">
-    <div class="modal">
-      <h3 id="channel-modal-title">添加频道</h3>
-      <input type="hidden" id="ch-edit-id">
-      <div class="form-group"><label>名称</label><input type="text" id="ch-name"></div>
-      <div class="form-group"><label>分组</label><select id="ch-group"></select></div>
-      <div class="form-group"><label>流地址</label><input type="text" id="ch-url" placeholder="https://..."></div>
-      <div class="form-group"><label>流类型 (留空自动探测)</label>
-        <input type="text" id="ch-type" list="stream-types" placeholder="例如: hls, ts, mp4">
-        <datalist id="stream-types">
-          <option value="hls"></option>
-          <option value="ts"></option>
-          <option value="flv"></option>
-          <option value="rtmp"></option>
-          <option value="rtsp"></option>
-          <option value="mp4"></option>
-          <option value="dash"></option>
-        </datalist>
-      </div>
-      <div class="form-group"><label>直连模式</label>
-        <select id="ch-is-direct">
-          <option value="true">开启 (默认，省宽带)</option>
-          <option value="false">关闭 (经代理加密源)</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
-      <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
-      <div class="form-group"><label>User-Agent (重写)</label><input type="text" id="ch-user-agent"
-          placeholder="留空使用群组默认或系统默认"></div>
-      <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="ch-headers" rows="2"
-          placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
-        <button class="btn btn-primary" onclick="saveChannel()">保存</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="group-modal">
-    <div class="modal">
-      <h3>添加分组</h3>
-      <input type="hidden" id="grp-edit-id">
-      <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
-      <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
-      <div class="form-group"><label>所有频道直连模式</label>
-        <select id="grp-is-direct">
-          <option value="true">开启 (默认，省宽带)</option>
-          <option value="false">关闭 (经代理加密源)</option>
-        </select>
-      </div>
-      <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
-          placeholder="留空使用订阅源或系统默认"></div>
-      <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2"
-          placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
-        <button class="btn btn-primary" onclick="saveGroup()">保存</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="source-modal">
-    <div class="modal">
-      <h3 id="src-modal-title">添加M3U源</h3>
-      <input type="hidden" id="src-edit-id">
-      <div class="form-group"><label>来源名称</label><input type="text" id="src-name"></div>
-      <div class="form-group"><label>URL</label><input type="text" id="src-url"
-          placeholder="https://example.com/playlist.m3u"></div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>自动同步</label>
-          <select id="src-auto-sync">
-            <option value="false">关闭</option>
-            <option value="true">开启</option>
+    <!-- Modals -->
+    <div class="modal-overlay" id="channel-modal">
+      <div class="modal">
+        <h3 id="channel-modal-title">添加频道</h3>
+        <input type="hidden" id="ch-edit-id">
+        <div class="form-group"><label>名称</label><input type="text" id="ch-name"></div>
+        <div class="form-group"><label>分组</label><select id="ch-group"></select></div>
+        <div class="form-group"><label>流地址</label><input type="text" id="ch-url" placeholder="https://..."></div>
+        <div class="form-group"><label>流类型 (留空自动探测)</label>
+          <input type="text" id="ch-type" list="stream-types" placeholder="例如: hls, ts, mp4">
+          <datalist id="stream-types">
+            <option value="hls"></option>
+            <option value="ts"></option>
+            <option value="flv"></option>
+            <option value="rtmp"></option>
+            <option value="rtsp"></option>
+            <option value="mp4"></option>
+            <option value="dash"></option>
+          </datalist>
+        </div>
+        <div class="form-group"><label>直连模式</label>
+          <select id="ch-is-direct">
+            <option value="true">开启 (默认，省宽带)</option>
+            <option value="false">关闭 (经代理加密源)</option>
           </select>
         </div>
+        <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
+        <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
+        <div class="form-group"><label>User-Agent (重写)</label><input type="text" id="ch-user-agent"
+            placeholder="留空使用群组默认或系统默认"></div>
+        <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="ch-headers" rows="2"
+            placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
+          <button class="btn btn-primary" onclick="saveChannel()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="group-modal">
+      <div class="modal">
+        <h3>添加分组</h3>
+        <input type="hidden" id="grp-edit-id">
+        <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
+        <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
+        <div class="form-group"><label>所有频道直连模式</label>
+          <select id="grp-is-direct">
+            <option value="true">开启 (默认，省宽带)</option>
+            <option value="false">关闭 (经代理加密源)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
+            placeholder="留空使用订阅源或系统默认"></div>
+        <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2"
+            placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
+          <button class="btn btn-primary" onclick="saveGroup()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="source-modal">
+      <div class="modal">
+        <h3 id="src-modal-title">添加M3U源</h3>
+        <input type="hidden" id="src-edit-id">
+        <div class="form-group"><label>来源名称</label><input type="text" id="src-name"></div>
+        <div class="form-group"><label>URL</label><input type="text" id="src-url"
+            placeholder="https://example.com/playlist.m3u"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>自动同步</label>
+            <select id="src-auto-sync">
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>同步间隔 (小时)</label>
+            <input type="number" id="src-sync-interval" value="12" min="1">
+          </div>
+        </div>
+        <div class="form-group"><label>User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent"
+            placeholder="留空使用系统默认"></div>
+        <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2"
+            placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('source-modal')">取消</button>
+          <button class="btn btn-primary" onclick="saveSource()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="import-modal">
+      <div class="modal">
+        <h3>粘贴M3U内容</h3>
+        <div class="form-group"><label>来源名称 <span style="color:var(--danger)">*</span></label><input type="text"
+            id="import-name" placeholder="例如：本地测试源" required></div>
+        <div class="form-group"><label>M3U内容</label><textarea id="import-content" rows="10"
+            placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
+          <button class="btn btn-primary" onclick="importM3UContent()">导入</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="client-detail-modal">
+      <div class="modal" style="width:620px">
+        <h3>设备详情</h3>
+        <div id="client-detail-content"></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="approve-modal">
+      <div class="modal">
+        <h3>审批设备</h3>
+        <input type="hidden" id="approve-client-id">
         <div class="form-group">
-          <label>同步间隔 (小时)</label>
-          <input type="number" id="src-sync-interval" value="12" min="1">
+          <label>绑定套餐</label>
+          <select id="approve-plan-id" onchange="onApprovePlanChange()"></select>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">选择套餐将自动覆盖授权天数和最大并发流</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>授权天数</label><input type="number" id="approve-days" value="365" min="0">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永久</div>
+          </div>
+          <div class="form-group"><label>最大并发流</label><input type="number" id="approve-streams" value="2" min="1"
+              max="10"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('approve-modal')">取消</button>
+          <button class="btn btn-primary" onclick="doApprove()">确认通过</button>
         </div>
       </div>
-      <div class="form-group"><label>User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent"
-          placeholder="留空使用系统默认"></div>
-      <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2"
-          placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('source-modal')">取消</button>
-        <button class="btn btn-primary" onclick="saveSource()">保存</button>
-      </div>
     </div>
-  </div>
 
-  <div class="modal-overlay" id="import-modal">
-    <div class="modal">
-      <h3>粘贴M3U内容</h3>
-      <div class="form-group"><label>来源名称 <span style="color:var(--danger)">*</span></label><input type="text"
-          id="import-name" placeholder="例如：本地测试源" required></div>
-      <div class="form-group"><label>M3U内容</label><textarea id="import-content" rows="10"
-          placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
-        <button class="btn btn-primary" onclick="importM3UContent()">导入</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="client-detail-modal">
-    <div class="modal" style="width:620px">
-      <h3>设备详情</h3>
-      <div id="client-detail-content"></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="approve-modal">
-    <div class="modal">
-      <h3>审批设备</h3>
-      <input type="hidden" id="approve-client-id">
-      <div class="form-group">
-        <label>绑定套餐</label>
-        <select id="approve-plan-id" onchange="onApprovePlanChange()"></select>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px">选择套餐将自动覆盖授权天数和最大并发流</div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>授权天数</label><input type="number" id="approve-days" value="365" min="0">
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永久</div>
-        </div>
-        <div class="form-group"><label>最大并发流</label><input type="number" id="approve-streams" value="2" min="1"
-            max="10"></div>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('approve-modal')">取消</button>
-        <button class="btn btn-primary" onclick="doApprove()">确认通过</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="reject-modal">
-    <div class="modal">
-      <h3>拒绝设备</h3>
-      <input type="hidden" id="reject-client-id">
-      <div class="form-group"><label>拒绝原因</label><textarea id="reject-reason" rows="3"
-          placeholder="填写拒绝原因..."></textarea></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('reject-modal')">取消</button>
-        <button class="btn btn-danger" onclick="doReject()">确认拒绝</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="token-modal">
-    <div class="modal">
-      <h3>令牌管理</h3>
-      <div id="token-modal-content"></div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('token-modal')">关闭</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="batch-modal">
-    <div class="modal">
-      <h3>批量操作</h3>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:16px">对勾选的设备执行操作</p>
-      <div class="form-group">
-        <label>操作</label>
-        <select id="batch-action">
-          <option value="approve">批量通过</option>
-          <option value="reject">批量拒绝</option>
-          <option value="ban">批量封禁</option>
-          <option value="delete">批量删除</option>
-        </select>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('batch-modal')">取消</button>
-        <button class="btn btn-danger" onclick="doBatch()">执行</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="group-batch-modal">
-    <div class="modal">
-      <h3>分组批量操作</h3>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('group-batch-modal')">取消</button>
-        <button class="btn btn-danger" onclick="doGroupBatchDelete()">确认删除</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="channel-batch-modal">
-    <div class="modal">
-      <h3>频道批量操作</h3>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将永久删除勾选的频道，此操作不可恢复。</p>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('channel-batch-modal')">取消</button>
-        <button class="btn btn-danger" onclick="doChannelBatchDelete()">确认删除</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="plan-modal">
-    <div class="modal">
-      <h3>添加/修改套餐</h3>
-      <input type="hidden" id="plan-edit-id">
-      <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
-      <div class="form-row">
-        <div class="form-group"><label>授权天数</label><input type="number" id="plan-days" value="365" min="0"></div>
-        <div class="form-group"><label>并发设备限制</label><input type="number" id="plan-streams" value="100" min="1"></div>
-      </div>
-      <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01"></div>
-      <div class="form-group"><label>描述</label><textarea id="plan-desc" rows="2"></textarea></div>
-      <div class="form-group">
-        <label>关联频道分组 <span
-            style="font-size:12px;color:var(--text2);font-weight:normal;">(不勾选则没有任何频道的访问权限)</span></label>
-        <div id="plan-groups-container"
-          style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);max-height:200px;overflow-y:auto;">
+    <div class="modal-overlay" id="reject-modal">
+      <div class="modal">
+        <h3>拒绝设备</h3>
+        <input type="hidden" id="reject-client-id">
+        <div class="form-group"><label>拒绝原因</label><textarea id="reject-reason" rows="3"
+            placeholder="填写拒绝原因..."></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('reject-modal')">取消</button>
+          <button class="btn btn-danger" onclick="doReject()">确认拒绝</button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="hideModal('plan-modal')">取消</button>
-        <button class="btn btn-primary" onclick="savePlan()">保存</button>
+    </div>
+
+    <div class="modal-overlay" id="token-modal">
+      <div class="modal">
+        <h3>令牌管理</h3>
+        <div id="token-modal-content"></div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('token-modal')">关闭</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="modal-overlay" id="password-modal">
-    <div class="modal">
-      <h3>修改管理员密码</h3>
-      <div class="form-group">
-        <label>原密码</label>
-        <input type="password" id="pwd-old" placeholder="请输入当前密码">
-      </div>
-      <div class="form-group">
-        <label>新密码</label>
-        <input type="password" id="pwd-new" placeholder="请输入新密码">
-      </div>
-      <div class="form-group">
-        <label>确认新密码</label>
-        <input type="password" id="pwd-confirm" placeholder="请再次输入新密码">
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="hideModal('password-modal')">取消</button>
-        <button class="btn btn-primary" onclick="updateAdminPassword()">确认修改</button>
+    <div class="modal-overlay" id="batch-modal">
+      <div class="modal">
+        <h3>批量操作</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">对勾选的设备执行操作</p>
+        <div class="form-group">
+          <label>操作</label>
+          <select id="batch-action">
+            <option value="approve">批量通过</option>
+            <option value="reject">批量拒绝</option>
+            <option value="ban">批量封禁</option>
+            <option value="delete">批量删除</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('batch-modal')">取消</button>
+          <button class="btn btn-danger" onclick="doBatch()">执行</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="toast" id="toast" style="display:none"></div>
-  <div class="loading-overlay" id="loading-overlay">
-    <div class="loading-spinner"></div><span>加载中...</span>
-  </div>
+    <div class="modal-overlay" id="group-batch-modal">
+      <div class="modal">
+        <h3>分组批量操作</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('group-batch-modal')">取消</button>
+          <button class="btn btn-danger" onclick="doGroupBatchDelete()">确认删除</button>
+        </div>
+      </div>
+    </div>
 
-  <script src="/static/app.js"></script>
+    <div class="modal-overlay" id="channel-batch-modal">
+      <div class="modal">
+        <h3>频道批量操作</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将永久删除勾选的频道，此操作不可恢复。</p>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('channel-batch-modal')">取消</button>
+          <button class="btn btn-danger" onclick="doChannelBatchDelete()">确认删除</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="plan-modal">
+      <div class="modal">
+        <h3>添加/修改套餐</h3>
+        <input type="hidden" id="plan-edit-id">
+        <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
+        <div class="form-row">
+          <div class="form-group"><label>授权天数</label><input type="number" id="plan-days" value="365" min="0"></div>
+          <div class="form-group"><label>并发设备限制</label><input type="number" id="plan-streams" value="100" min="1"></div>
+        </div>
+        <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01">
+        </div>
+        <div class="form-group"><label>描述</label><textarea id="plan-desc" rows="2"></textarea></div>
+        <div class="form-group">
+          <label>关联频道分组 <span
+              style="font-size:12px;color:var(--text2);font-weight:normal;">(不勾选则没有任何频道的访问权限)</span></label>
+          <div id="plan-groups-container"
+            style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);max-height:200px;overflow-y:auto;">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="hideModal('plan-modal')">取消</button>
+          <button class="btn btn-primary" onclick="savePlan()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="password-modal">
+      <div class="modal">
+        <h3>修改管理员密码</h3>
+        <div class="form-group">
+          <label>原密码</label>
+          <input type="password" id="pwd-old" placeholder="请输入当前密码">
+        </div>
+        <div class="form-group">
+          <label>新密码</label>
+          <input type="password" id="pwd-new" placeholder="请输入新密码">
+        </div>
+        <div class="form-group">
+          <label>确认新密码</label>
+          <input type="password" id="pwd-confirm" placeholder="请再次输入新密码">
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" onclick="hideModal('password-modal')">取消</button>
+          <button class="btn btn-primary" onclick="updateAdminPassword()">确认修改</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" style="display:none"></div>
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner"></div><span>加载中...</span>
+    </div>
+
+    <script src="/static/app.js"></script>
 </body>
 
 </html>

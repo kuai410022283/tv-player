@@ -47,7 +47,7 @@ class ConfigWebServer(
                         prefs.edit().remove("device_location").apply()
                     }
 
-                    onUrlSaved(newUrl)
+                    onUrlSaved(newUrl!!)
                     return newFixedLengthResponse(getSuccessHtml())
                 } else {
                     return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_HTML, "Invalid URL")
