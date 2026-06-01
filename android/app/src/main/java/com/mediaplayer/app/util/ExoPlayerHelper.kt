@@ -36,6 +36,11 @@ class ExoPlayerHelper(
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
 
+    private var lastUrl = ""
+    private var lastUserAgent = ""
+    private var lastHeaders = ""
+    private var forceSoftDecodeInternal = false
+
     init {
         initPlayerView()
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
@@ -57,6 +62,10 @@ class ExoPlayerHelper(
     }
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        lastUrl = url
+        lastUserAgent = userAgent
+        lastHeaders = customHeaders
+
         if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
             buildPlayer()
         }
@@ -90,9 +99,9 @@ class ExoPlayerHelper(
         val renderersFactory = DefaultRenderersFactory(context).apply {
             // 控制音频扩展（如 FFmpeg）
             setExtensionRendererMode(
-                when (currentDecoderMode) {
-                    Prefs.DECODER_MODE_SOFTWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                    Prefs.DECODER_MODE_HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+                when {
+                    currentDecoderMode == Prefs.DECODER_MODE_SOFTWARE || forceSoftDecodeInternal -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    currentDecoderMode == Prefs.DECODER_MODE_HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                     else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
                 }
             )
@@ -100,15 +109,16 @@ class ExoPlayerHelper(
             // 【关键修复】控制视频解码（硬解/软解）
             setEnableDecoderFallback(true) // 允许解码器自动降级
             setMediaCodecSelector(
-                when (currentDecoderMode) {
-                    // 当选择“软解”时，强制优先使用系统 CPU 软件视频解码
-                    Prefs.DECODER_MODE_SOFTWARE -> androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                if (currentDecoderMode == Prefs.DECODER_MODE_SOFTWARE || forceSoftDecodeInternal) {
+                    // 当选择“软解”或自动回退时，强制优先使用系统 CPU 软件视频解码
+                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
                         val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
                         // 将软件解码器排在前面
                         decoders.sortedBy { it.hardwareAccelerated }.toMutableList()
                     }
+                } else {
                     // 默认使用硬解
-                    else -> androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
+                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
                 }
             )
         }
@@ -180,6 +190,19 @@ class ExoPlayerHelper(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                if ((error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) &&
+                    !forceSoftDecodeInternal && currentDecoderMode != Prefs.DECODER_MODE_SOFTWARE
+                ) {
+                    forceSoftDecodeInternal = true
+                    android.util.Log.w("ExoPlayerHelper", "Hardware decoding failed, retrying with software decoding.")
+                    val pos = exoPlayer?.currentPosition ?: 0L
+                    buildPlayer()
+                    play(lastUrl, lastUserAgent, lastHeaders)
+                    if (pos > 0) exoPlayer?.seekTo(pos)
+                    return
+                }
                 listener.onError()
             }
 

@@ -192,6 +192,13 @@ class MainActivity : AppCompatActivity() {
         // 保持屏幕常亮，防止手机/Pad自动锁屏
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // 兼容刘海屏/挖孔屏：允许画面延伸到屏幕边缘（短边）
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val lp = window.attributes
+            lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes = lp
+        }
+
         setContentView(R.layout.activity_main)
         setupTvViews()
         // Player will be initialized when playing a channel
@@ -476,7 +483,13 @@ class MainActivity : AppCompatActivity() {
             }
             updateCoreText(currentCore)
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
-            Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            
+            if (currentCore == Prefs.PLAYER_CORE_X5 && !com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
+                Toast.makeText(this, "正在为您在后台下载 WebX5 内核...", Toast.LENGTH_SHORT).show()
+                com.mediaplayer.app.util.WebX5Manager.triggerDownload(this)
+            } else {
+                Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            }
         }
         
         btnSettingsScale?.setOnClickListener {

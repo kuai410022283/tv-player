@@ -26,7 +26,7 @@ object WebX5Manager {
 
     fun init(context: Context, callback: ((Boolean) -> Unit)? = null) {
         if (isInitialized) {
-            callback?.invoke(true)
+            callback?.invoke(isX5CoreReady)
             return
         }
 
@@ -43,7 +43,20 @@ object WebX5Manager {
             return
         }
 
-        // 需要下载
+        // 核心修改：如果用户没有在设置里选择 X5 内核，就不自动下载，直接初始化默认环境
+        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+        val currentCore = prefs.getInt(com.mediaplayer.app.Prefs.KEY_PLAYER_CORE, com.mediaplayer.app.Prefs.PLAYER_CORE_AUTO)
+        if (currentCore != com.mediaplayer.app.Prefs.PLAYER_CORE_X5) {
+            Log.d("WebX5Manager", "X5 is not the selected core. Skipping download.")
+            initEnvironment(context.applicationContext, callback)
+            return
+        }
+
+        triggerDownload(context.applicationContext, callback)
+    }
+
+    fun triggerDownload(context: Context, callback: ((Boolean) -> Unit)? = null) {
+        if (QbSdk.canLoadX5(context.applicationContext)) return
         if (isDownloading) return
         isDownloading = true
         downloadProgress = 0
