@@ -365,14 +365,8 @@ class PlayerActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         if (globalCore == Prefs.PLAYER_CORE_X5) {
-            if (!com.mediaplayer.app.util.WebX5Manager.isInitialized) {
-                val progress = com.mediaplayer.app.util.WebX5Manager.downloadProgress
-                Toast.makeText(this, "WebX5 内核下载中 ($progress%)，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            } else if (!com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
-                Toast.makeText(this, "WebX5 内核暂不可用，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            }
+            globalCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
         
         var desiredCore = globalCore
@@ -387,8 +381,8 @@ class PlayerActivity : AppCompatActivity() {
                     Prefs.PLAYER_CORE_VLC
                 }
                 "x5" -> {
-                    coreText = "智能 (X5)"
-                    Prefs.PLAYER_CORE_X5
+                    coreText = "智能 (VLC)"
+                    Prefs.PLAYER_CORE_VLC
                 }
                 "ts", "rtp", "udp" -> {
                     coreText = "智能 (Exo)"
@@ -402,7 +396,6 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_X5 -> "WebX5"
                 else -> "VLC"
             }
         }
@@ -415,7 +408,6 @@ class PlayerActivity : AppCompatActivity() {
         
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
-            Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 

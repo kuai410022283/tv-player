@@ -434,7 +434,6 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
                 Prefs.PLAYER_CORE_VLC -> "VLC"
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_X5 -> "X5 Web"
                 else -> "智能切换"
             }
         }
@@ -454,6 +453,10 @@ class MainActivity : AppCompatActivity() {
         
         var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         var currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        if (currentCore == Prefs.PLAYER_CORE_X5) {
+            currentCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
+        }
         var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
 
@@ -477,19 +480,11 @@ class MainActivity : AppCompatActivity() {
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
                 Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_VLC
-                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_X5
-                Prefs.PLAYER_CORE_X5 -> Prefs.PLAYER_CORE_AUTO
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
-            
-            if (currentCore == Prefs.PLAYER_CORE_X5 && !com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
-                Toast.makeText(this, "正在为您在后台下载 WebX5 内核...", Toast.LENGTH_SHORT).show()
-                com.mediaplayer.app.util.WebX5Manager.triggerDownload(this)
-            } else {
-                Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
         }
         
         btnSettingsScale?.setOnClickListener {
@@ -808,14 +803,8 @@ class MainActivity : AppCompatActivity() {
         // 核心匹配逻辑
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         if (globalCore == Prefs.PLAYER_CORE_X5) {
-            if (!com.mediaplayer.app.util.WebX5Manager.isInitialized) {
-                val progress = com.mediaplayer.app.util.WebX5Manager.downloadProgress
-                Toast.makeText(this, "WebX5 内核下载中 ($progress%)，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            } else if (!com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
-                Toast.makeText(this, "WebX5 内核暂不可用，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            }
+            globalCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
         
         var desiredCore = globalCore
@@ -830,8 +819,8 @@ class MainActivity : AppCompatActivity() {
                     Prefs.PLAYER_CORE_VLC
                 }
                 "x5" -> {
-                    coreText = "智能 (X5)"
-                    Prefs.PLAYER_CORE_X5
+                    coreText = "智能 (VLC)"
+                    Prefs.PLAYER_CORE_VLC
                 }
                 "ts", "rtp", "udp" -> {
                     coreText = "智能 (Exo)"
@@ -845,7 +834,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_X5 -> "WebX5"
                 else -> "VLC"
             }
         }
@@ -859,7 +847,6 @@ class MainActivity : AppCompatActivity() {
         // 判断当前已经实例化的 playerHelper 是否与所需的一致
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
-            Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 
