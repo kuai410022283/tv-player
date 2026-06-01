@@ -43,8 +43,8 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	if err == nil {
 		// 已注册，更新信息
-		_, _ = s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, updated_at=? WHERE id=?`,
-			req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, now, existing.ID)
+		_, _ = s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, request_note=?, updated_at=? WHERE id=?`,
+			req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, req.Note, now, existing.ID)
 
 		resp := &models.ClientRegisterResp{
 			ClientID: existing.ID,

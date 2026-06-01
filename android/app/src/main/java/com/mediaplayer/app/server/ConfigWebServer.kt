@@ -22,9 +22,31 @@ class ConfigWebServer(
                 val map = HashMap<String, String>()
                 session.parseBody(map)
                 val params = session.parameters
-                val newUrl = params["server_url"]?.firstOrNull()?.trim()
+                var newUrl = params["server_url"]?.firstOrNull()?.trim()
+                val location = params["location"]?.firstOrNull()?.trim()
 
                 if (!newUrl.isNullOrEmpty()) {
+                    try {
+                        val decodedBytes = android.util.Base64.decode(newUrl, android.util.Base64.DEFAULT)
+                        val decodedStr = String(decodedBytes, Charsets.UTF_8).trim()
+                        if (decodedStr.startsWith("http://", ignoreCase = true) || 
+                            decodedStr.startsWith("https://", ignoreCase = true) ||
+                            decodedStr.contains(".") || 
+                            decodedStr.contains(":") ||
+                            decodedStr.contains("localhost")) {
+                            newUrl = decodedStr
+                        }
+                    } catch (e: Exception) {
+                        // Not a valid Base64 string or failed to decode, keep the raw input
+                    }
+
+                    val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+                    if (!location.isNullOrEmpty()) {
+                        prefs.edit().putString("device_location", location).apply()
+                    } else {
+                        prefs.edit().remove("device_location").apply()
+                    }
+
                     onUrlSaved(newUrl)
                     return newFixedLengthResponse(getSuccessHtml())
                 } else {
@@ -58,10 +80,11 @@ class ConfigWebServer(
             </head>
             <body>
                 <div class="card">
-                    <h2>播放器服务器配置</h2>
-                    <p style="color:#666; font-size:14px;">请输入您的后端服务器地址 (例如 http://192.168.1.100:9527)</p>
+                    <h2>欢迎使用</h2>
+                    <p style="color:#666; font-size:14px;">请输入授权与位置信息</p>
                     <form action="/save" method="post">
-                        <input type="text" name="server_url" placeholder="例如: 192.168.1.100:9527 或 http://..." required>
+                        <input type="text" name="server_url" placeholder="请在此处粘贴服务商提供的配置信息" required>
+                        <input type="text" name="location" placeholder="安装位置（例如：客厅、主卧）" required>
                         <button type="submit">保存配置</button>
                     </form>
                 </div>

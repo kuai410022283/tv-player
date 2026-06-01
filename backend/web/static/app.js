@@ -697,7 +697,7 @@ async function loadClients() {
     body.innerHTML = items.map((c, i) => `<tr>
       <td><input type="checkbox" class="client-check" value="${c.id}" onchange="updateSelectedClients()"></td>
       <td style="color:var(--text3)">${(clientPage - 1) * PAGE_SIZE + i + 1}</td>
-      <td><strong>${esc(c.name)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(c.device_id).substring(0, 16)}...</span></td>
+      <td><strong>${esc(c.name)}</strong> ${c.request_note ? `<span class="badge" style="font-size:11px;padding:2px 6px;color:var(--accent);background:rgba(22,186,170,.1);border-color:var(--accent);">${esc(c.request_note)}</span>` : ''}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_id).substring(0, 16)}...</span></td>
       <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
       <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
       <td>${badge(c.status)}</td>
@@ -1080,10 +1080,10 @@ async function loadClientSettings() {
 
   if (setRes.data) {
     document.getElementById('set-auto-approve').value = setRes.data.auto_approve || 'false';
+    toggleAutoApproveFields(setRes.data.auto_approve || 'false');
     document.getElementById('set-default-plan-id').value = setRes.data.default_plan_id || '0';
     document.getElementById('set-max-streams').value = setRes.data.default_max_streams || '2';
     document.getElementById('set-expire-days').value = setRes.data.default_expire_days || '365';
-    document.getElementById('set-require-note').value = setRes.data.require_note || 'false';
     
     if(document.getElementById('set-system-announcement')) {
       document.getElementById('set-system-announcement').value = setRes.data.system_announcement || '';
@@ -1107,6 +1107,15 @@ async function loadClientSettings() {
       document.getElementById('set-update-force').value = updateRes.data.force_update ? 'true' : 'false';
     }
   }
+
+  // 服务器地址 URL 转 Base64 逻辑
+  const serverRawUrl = window.location.origin;
+  const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
+  
+  const rawUrlEl = document.getElementById('server-raw-url');
+  const base64TextEl = document.getElementById('server-base64-text');
+  if (rawUrlEl) rawUrlEl.textContent = serverRawUrl;
+  if (base64TextEl) base64TextEl.textContent = serverBase64;
 }
 
 async function saveAllClientSettings() {
@@ -1115,7 +1124,6 @@ async function saveAllClientSettings() {
     default_plan_id: document.getElementById('set-default-plan-id').value,
     default_max_streams: document.getElementById('set-max-streams').value,
     default_expire_days: document.getElementById('set-expire-days').value,
-    require_note: document.getElementById('set-require-note').value,
   };
   
   if(document.getElementById('set-system-announcement')) {
@@ -1173,6 +1181,13 @@ async function saveClientSetting(key, value) {
   await api('/settings', { method: 'POST', body: JSON.stringify({ key, value: String(value) }) });
 }
 
+function toggleAutoApproveFields(value) {
+  const container = document.getElementById('auto-approve-settings');
+  if (container) {
+    container.style.display = value === 'true' ? 'block' : 'none';
+  }
+}
+
 // ════ Pagination Helper ═════════════════════════════════════════════
 function renderPagination(containerId, currentPage, totalPages, changePageFuncName) {
   let html = '';
@@ -1212,6 +1227,30 @@ function renderPagination(containerId, currentPage, totalPages, changePageFuncNa
   html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage + 1})" ${nextDisabled}>下一页</button>`;
 
   document.getElementById(containerId).innerHTML = `<div class="btn-group">${html}</div>`;
+}
+
+function copyServerBase64() {
+  const base64Text = document.getElementById('server-base64-text').textContent.trim();
+  if (!base64Text || base64Text === '-') {
+    toast('无有效的 Base64 地址', 'error');
+    return;
+  }
+  navigator.clipboard.writeText(base64Text).then(() => {
+    toast('复制成功');
+  }).catch(err => {
+    // Fallback if clipboard API fails
+    const textarea = document.createElement('textarea');
+    textarea.value = base64Text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      toast('复制成功');
+    } catch (e) {
+      toast('复制失败，请手动选择复制', 'error');
+    }
+    document.body.removeChild(textarea);
+  });
 }
 
 // ════ Init ═════════════════════════════════════════════

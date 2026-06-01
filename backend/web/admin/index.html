@@ -423,42 +423,69 @@
           <h1>全局设置</h1>
         </div>
         <div class="card" style="padding:24px">
+          <!-- 服务器地址 Base64 -->
+          <div class="form-group"
+            style="background: rgba(22, 186, 170, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
+            <h3
+              style="margin-bottom: 8px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="width: 18px; height: 18px;">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                <line x1="6" y1="6" x2="6.01" y2="6" />
+                <line x1="6" y1="18" x2="6.01" y2="18" />
+              </svg>
+              服务器授权信息
+            </h3>
+            <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;">
+              客户端连接服务器所需信息：
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <div
+                style="flex: 1; min-width: 280px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-family: monospace; font-size: 13px; word-break: break-all; color: var(--accent); user-select: all;"
+                id="server-base64-text">
+                -
+              </div>
+              <button class="btn btn-primary" onclick="copyServerBase64()" style="white-space: nowrap; height: 38px;">复制
+                Base64</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text2); margin-top: 8px;">
+              当前识别的服务器地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
+            </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+
           <div class="form-group">
             <h3 style="margin-bottom: 12px;">设备授权配置</h3>
           </div>
           <div class="form-group">
             <label>自动审批</label>
-            <select id="set-auto-approve" onchange="saveClientSetting('auto_approve', this.value)">
+            <select id="set-auto-approve"
+              onchange="saveClientSetting('auto_approve', this.value); toggleAutoApproveFields(this.value)">
               <option value="false">关闭 (手动审批)</option>
               <option value="true">开启 (自动通过)</option>
             </select>
             <div style="font-size:11px;color:var(--text2);margin-top:4px">新设备注册时是否自动审批通过</div>
           </div>
-          <div class="form-group">
-            <label>自动审批默认套餐</label>
-            <select id="set-default-plan-id">
-              <option value="0">-- 自定义授权 (使用下方并发和天数) --</option>
-            </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">如果绑定套餐，下方的"并发流"和"授权天数"设置将被覆盖</div>
-          </div>
-          <div class="form-row">
+          <div id="auto-approve-settings" style="display:none">
             <div class="form-group">
-              <label>自定义最大并发流</label>
-              <input type="number" id="set-max-streams" value="100" min="1" max="10000">
+              <label>自动审批默认套餐</label>
+              <select id="set-default-plan-id">
+                <option value="0">-- 请选择 --</option>
+              </select>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">如果绑定套餐，下方的"并发流"和"授权天数"设置将被覆盖</div>
             </div>
-            <div class="form-group">
-              <label>自定义授权天数</label>
-              <input type="number" id="set-expire-days" value="365" min="0">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>最大并发流</label>
+                <input type="number" id="set-max-streams" value="100" min="1" max="10000">
+              </div>
+              <div class="form-group">
+                <label>授权天数</label>
+                <input type="number" id="set-expire-days" value="365" min="0">
+                <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
+              </div>
             </div>
-          </div>
-          <div class="form-group">
-            <label>注册时要求填写备注</label>
-            <select id="set-require-note">
-              <option value="false">否</option>
-              <option value="true">是</option>
-            </select>
-          </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
             <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
@@ -479,8 +506,10 @@
           </div>
           <div class="form-group">
             <label>EPG 数据源 URL (XMLTV)</label>
-            <textarea id="set-epg-source-url" rows="3" placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或 .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
+            <textarea id="set-epg-source-url" rows="3"
+              placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
+              .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
           </div>
           <div class="form-row">
             <div class="form-group">

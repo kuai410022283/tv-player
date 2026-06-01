@@ -40,16 +40,21 @@ class ClientAuthManager(private val context: Context) {
         return getStatus() == "approved" && getToken() != null
     }
 
+    fun getLocation(): String? = prefs.getString("device_location", null)
+
     /** 注册设备到后端 */
     suspend fun register(): Result<ClientRegisterResp> = withContext(Dispatchers.IO) {
         try {
-            val body = mapOf(
+            val body = mutableMapOf(
                 "name" to "${Build.MANUFACTURER} ${Build.MODEL}",
                 "device_id" to getDeviceId(),
                 "device_model" to Build.MODEL,
                 "device_os" to "Android ${Build.VERSION.RELEASE}",
                 "app_version" to "1.0.0"
             )
+            getLocation()?.let {
+                body["note"] = it
+            }
             val response = ApiClient.getService().clientRegister(body)
             if (response.isSuccessful) {
                 val resp = response.body()!!
@@ -98,15 +103,17 @@ class ClientAuthManager(private val context: Context) {
             
             // 没有 token 或者验证失败，调用 register 接口获取最新状态
             val name = "${Build.MANUFACTURER} ${Build.MODEL}"
-            val regResp = ApiClient.getService().clientRegister(
-                mapOf(
-                    "name" to name, 
-                    "device_id" to getDeviceId(),
-                    "device_model" to Build.MODEL,
-                    "device_os" to "Android ${Build.VERSION.RELEASE}",
-                    "app_version" to "1.0.0"
-                )
+            val regBody = mutableMapOf(
+                "name" to name, 
+                "device_id" to getDeviceId(),
+                "device_model" to Build.MODEL,
+                "device_os" to "Android ${Build.VERSION.RELEASE}",
+                "app_version" to "1.0.0"
             )
+            getLocation()?.let {
+                regBody["note"] = it
+            }
+            val regResp = ApiClient.getService().clientRegister(regBody)
             if (regResp.isSuccessful) {
                 val resp = regResp.body()
                 val data = resp?.data
