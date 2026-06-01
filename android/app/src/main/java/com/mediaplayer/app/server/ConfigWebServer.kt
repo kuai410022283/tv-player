@@ -71,7 +71,7 @@ class ConfigWebServer(
                 <title>服务器配置</title>
                 <style>
                     body { font-family: -apple-system, sans-serif; background: #f4f4f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                    .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+                    .card { padding: 2rem; width: 90%; max-width: 400px; text-align: center; }
                     h2 { margin-top: 0; color: #333; }
                     input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
                     button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: 0.3s; }
@@ -84,7 +84,7 @@ class ConfigWebServer(
                     <p style="color:#666; font-size:14px;">请输入授权与位置信息</p>
                     <form action="/save" method="post">
                         <input type="text" name="server_url" placeholder="请在此处粘贴服务商提供的配置信息" required>
-                        <input type="text" name="location" placeholder="安装位置（例如：客厅、主卧）" required>
+                        <input type="text" name="location" placeholder="安装位置（例如：13号楼一单元302）" required>
                         <button type="submit">保存配置</button>
                     </form>
                 </div>
