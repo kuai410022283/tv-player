@@ -30,7 +30,7 @@ async function api(path, opts = {}) {
     let data = {};
     const text = await res.text();
     if (text) {
-      try { data = JSON.parse(text); } catch(e) {}
+      try { data = JSON.parse(text); } catch (e) { }
     }
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
@@ -69,9 +69,9 @@ function timeAgo(dateStr) {
   return Math.floor(diff / 86400) + '天前';
 }
 
-function fmtDate(d) { 
+function fmtDate(d) {
   if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">从未同步</span>';
-  return new Date(d).toLocaleString('zh-CN'); 
+  return new Date(d).toLocaleString('zh-CN');
 }
 function badge(status) { return `<span class="badge badge-${status}">${status}</span>`; }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -137,7 +137,7 @@ async function updateAdminPassword() {
     method: 'PUT',
     body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
   });
-  
+
   hideModal('password-modal');
   document.getElementById('pwd-old').value = '';
   document.getElementById('pwd-new').value = '';
@@ -154,7 +154,7 @@ function showSection(name, el) {
   document.querySelectorAll('.main > div[id^="sec-"]').forEach(e => e.style.display = 'none');
   document.getElementById('sec-' + name).style.display = 'block';
   document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
-  
+
   if (el) {
     el.classList.add('active');
   } else {
@@ -232,11 +232,11 @@ let currentChannelGroupId = 0;
 async function loadChannels(search = currentChannelSearch, groupId = currentChannelGroupId) {
   currentChannelSearch = search;
   currentChannelGroupId = groupId;
-  
+
   let q = `?page=${channelPage}&page_size=${PAGE_SIZE}`;
   if (search) q += `&search=${encodeURIComponent(search)}`;
   if (groupId > 0) q += `&group_id=${groupId}`;
-  
+
   const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups')]);
   groups = grpRes.data || [];
   const gm = {};
@@ -457,8 +457,8 @@ function showAddGroupModal() {
 
 async function saveGroup() {
   const id = document.getElementById('grp-edit-id').value;
-  const d = { 
-    name: document.getElementById('grp-name').value, 
+  const d = {
+    name: document.getElementById('grp-name').value,
     sort_order: +document.getElementById('grp-sort').value || 0,
     is_direct: document.getElementById('grp-is-direct').value === 'true',
     user_agent: document.getElementById('grp-user-agent').value,
@@ -538,7 +538,7 @@ function sourceGoToPage(p) {
 }
 
 function showAddSourceModal() {
-  document.getElementById('src-modal-title').innerText = '添加M3U源';
+  document.getElementById('src-modal-title').innerText = '添加M3U/TXT源';
   document.getElementById('src-edit-id').value = '';
   document.getElementById('src-name').value = '';
   document.getElementById('src-url').value = '';
@@ -552,7 +552,7 @@ function showAddSourceModal() {
 function editSource(id) {
   const s = sourcesList.find(x => x.id === id);
   if (!s) return;
-  document.getElementById('src-modal-title').innerText = '编辑M3U源';
+  document.getElementById('src-modal-title').innerText = '编辑M3U/TXT源';
   document.getElementById('src-edit-id').value = s.id;
   document.getElementById('src-name').value = s.name;
   document.getElementById('src-url').value = s.url;
@@ -565,8 +565,8 @@ function editSource(id) {
 
 async function saveSource() {
   const id = document.getElementById('src-edit-id').value;
-  const d = { 
-    name: document.getElementById('src-name').value, 
+  const d = {
+    name: document.getElementById('src-name').value,
     url: document.getElementById('src-url').value,
     auto_sync: document.getElementById('src-auto-sync').value === 'true',
     sync_interval: parseInt(document.getElementById('src-sync-interval').value) || 12,
@@ -810,7 +810,7 @@ function planGoToPage(p) {
 
 async function savePlan() {
   const id = document.getElementById('plan-edit-id').value;
-  
+
   // Collect selected groups
   const checkboxes = document.querySelectorAll('#plan-groups-container input[type="checkbox"]:checked');
   const groupIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
@@ -875,11 +875,11 @@ async function showApproveModal(id) {
   ]);
   const plans = plansRes.data || [];
   const client = clientRes.data || {};
-  
+
   const select = document.getElementById('approve-plan-id');
-  select.innerHTML = '<option value="0">-- 自定义授权 (不绑定套餐) --</option>' + 
+  select.innerHTML = '<option value="0">-- 自定义授权 (不绑定套餐) --</option>' +
     plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}">${esc(p.name)}</option>`).join('');
-  
+
   select.value = client.plan_id || 0;
 
   if (client.plan_id > 0) {
@@ -896,7 +896,7 @@ async function showApproveModal(id) {
     document.getElementById('approve-days').value = client.expires_at ? Math.max(0, Math.ceil((new Date(client.expires_at) - new Date()) / (1000 * 3600 * 24))) : 365;
     document.getElementById('approve-streams').value = client.max_streams || 2;
   }
-  
+
   hideModal('client-detail-modal');
   showModal('approve-modal');
 }
@@ -1075,7 +1075,7 @@ async function loadClientSettings() {
 
   const select = document.getElementById('set-default-plan-id');
   const plans = plansRes.data || [];
-  select.innerHTML = '<option value="0">-- 自定义授权 (使用下方并发和天数) --</option>' + 
+  select.innerHTML = '<option value="0">-- 自定义授权 (使用下方并发和天数) --</option>' +
     plans.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
 
   if (setRes.data) {
@@ -1084,14 +1084,14 @@ async function loadClientSettings() {
     document.getElementById('set-default-plan-id').value = setRes.data.default_plan_id || '0';
     document.getElementById('set-max-streams').value = setRes.data.default_max_streams || '2';
     document.getElementById('set-expire-days').value = setRes.data.default_expire_days || '365';
-    
-    if(document.getElementById('set-system-announcement')) {
+
+    if (document.getElementById('set-system-announcement')) {
       document.getElementById('set-system-announcement').value = setRes.data.system_announcement || '';
       document.getElementById('set-system-announcement-interval').value = setRes.data.system_announcement_interval || '0';
     }
-    
+
     // EPG 配置
-    if(document.getElementById('set-epg-source-url')) {
+    if (document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
     }
@@ -1099,7 +1099,7 @@ async function loadClientSettings() {
 
   // Update 配置
   if (updateRes && updateRes.data) {
-    if(document.getElementById('set-update-version-code')) {
+    if (document.getElementById('set-update-version-code')) {
       document.getElementById('set-update-version-code').value = updateRes.data.version_code || '';
       document.getElementById('set-update-version-name').value = updateRes.data.version_name || '';
       document.getElementById('set-update-download-url').value = updateRes.data.download_url || '';
@@ -1111,7 +1111,7 @@ async function loadClientSettings() {
   // 服务器地址 URL 转 Base64 逻辑
   const serverRawUrl = window.location.origin;
   const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
-  
+
   const rawUrlEl = document.getElementById('server-raw-url');
   const base64TextEl = document.getElementById('server-base64-text');
   if (rawUrlEl) rawUrlEl.textContent = serverRawUrl;
@@ -1125,13 +1125,13 @@ async function saveAllClientSettings() {
     default_max_streams: document.getElementById('set-max-streams').value,
     default_expire_days: document.getElementById('set-expire-days').value,
   };
-  
-  if(document.getElementById('set-system-announcement')) {
+
+  if (document.getElementById('set-system-announcement')) {
     settings.system_announcement = document.getElementById('set-system-announcement').value.trim();
     settings.system_announcement_interval = document.getElementById('set-system-announcement-interval').value;
   }
-  
-  if(document.getElementById('set-epg-source-url')) {
+
+  if (document.getElementById('set-epg-source-url')) {
     settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
     settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
   }
@@ -1139,10 +1139,10 @@ async function saveAllClientSettings() {
   for (const [k, v] of Object.entries(settings)) {
     await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: String(v) }) });
   }
-  
+
   // 同时保存升级配置
   await saveAppUpdateSettings(true); // 传参 true 以便不重复弹 toast，或者就让它弹
-  
+
   toast('所有全局设置和 EPG 配置已保存');
 }
 
@@ -1156,9 +1156,9 @@ async function saveAppUpdateSettings(silent = false) {
   };
 
   try {
-    await api('/admin/settings/update', { 
-      method: 'POST', 
-      body: JSON.stringify(updateConf) 
+    await api('/admin/settings/update', {
+      method: 'POST',
+      body: JSON.stringify(updateConf)
     });
     if (!silent) toast('升级配置已独立保存', 'success');
   } catch (e) {
@@ -1169,7 +1169,7 @@ async function saveAppUpdateSettings(silent = false) {
 async function refreshEPGCache() {
   try {
     const res = await api('/admin/epg/refresh', { method: 'POST' });
-    if(res.code === 0) {
+    if (res.code === 0) {
       toast(res.data.message || '强制刷新已触发');
     }
   } catch (e) {
