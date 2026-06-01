@@ -23,7 +23,8 @@ android/app/build/
 android/.gradle/
 android/local.properties
 android/app/release/
-!android/temp_aar/jni/**/*.so
+!android/temp_aar/*
+!android/app/src/main/jniLibs/**/*.so
 
 # IDE
 .vscode/
