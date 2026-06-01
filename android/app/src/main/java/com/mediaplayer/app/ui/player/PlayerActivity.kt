@@ -96,10 +96,17 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // 兼容刘海屏/挖孔屏：允许画面延伸到屏幕边缘（短边）
+        // 兼容刘海屏/挖孔屏/灵动岛：允许画面延伸到全部屏幕边缘
+        // Android 15+ (API 35): ALWAYS 模式确保横屏时灵动岛/长边缺口区域也被覆盖
+        // Android 9-14 (API 28-34): SHORT_EDGES 已足够覆盖所有刘海/挖孔场景
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             val lp = window.attributes
-            lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            lp.layoutInDisplayCutoutMode = if (android.os.Build.VERSION.SDK_INT >= 35) {
+                // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS = 3 (Android 15+)
+                3
+            } else {
+                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
             window.attributes = lp
         }
 

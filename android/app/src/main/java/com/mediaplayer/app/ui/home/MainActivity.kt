@@ -21,6 +21,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -192,12 +195,23 @@ class MainActivity : AppCompatActivity() {
         // 保持屏幕常亮，防止手机/Pad自动锁屏
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 兼容刘海屏/挖孔屏：允许画面延伸到屏幕边缘（短边）
+        // 兼容刘海屏/挖孔屏/灵动岛：允许画面延伸到全部屏幕边缘
+        // Android 15+ (API 35): ALWAYS 模式确保长边（灵动岛）区域也被覆盖
+        // Android 9-14 (API 28-34): SHORT_EDGES 已足够覆盖所有刘海/挖孔场景
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             val lp = window.attributes
-            lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            lp.layoutInDisplayCutoutMode = if (android.os.Build.VERSION.SDK_INT >= 35) {
+                // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS = 3 (Android 15+)
+                3
+            } else {
+                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
             window.attributes = lp
         }
+
+        // 强行关闭系统布局自适应，允许布局内容延伸到状态栏和导航栏区域下
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        hideSystemUI()
 
         setContentView(R.layout.activity_main)
         setupTvViews()
@@ -215,6 +229,13 @@ class MainActivity : AppCompatActivity() {
         
         // 检查版本更新
         com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+    }
+
+    private fun hideSystemUI() {
+        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     // ── Touch Gestures for Mobile/Tablet ──
@@ -1710,6 +1731,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        hideSystemUI()
         if (settingsChanged || allChannels.isEmpty()) {
             loadData()
             settingsChanged = false
