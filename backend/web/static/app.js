@@ -1235,12 +1235,12 @@ function copyServerBase64() {
     toast('无有效的 Base64 地址', 'error');
     return;
   }
-  navigator.clipboard.writeText(base64Text).then(() => {
-    toast('复制成功');
-  }).catch(err => {
-    // Fallback if clipboard API fails
+
+  const handleFallback = () => {
     const textarea = document.createElement('textarea');
     textarea.value = base64Text;
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
     document.body.appendChild(textarea);
     textarea.select();
     try {
@@ -1250,7 +1250,17 @@ function copyServerBase64() {
       toast('复制失败，请手动选择复制', 'error');
     }
     document.body.removeChild(textarea);
-  });
+  };
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(base64Text).then(() => {
+      toast('复制成功');
+    }).catch(err => {
+      handleFallback();
+    });
+  } else {
+    handleFallback();
+  }
 }
 
 // ════ Init ═════════════════════════════════════════════
