@@ -132,7 +132,6 @@ func main() {
 		public.GET("/client/verify", ch.Verify)
 		public.POST("/client/verify", ch.Verify)
 		public.GET("/update", h.GetAppUpdate)
-		public.GET("/x5core/update", h.GetX5CoreUpdate)
 	}
 
 	// ── 受保护 API（全局限流 + 认证）───────────────

@@ -32,14 +32,6 @@ class ExoPlayerHelper(
     private var currentCacheMs: Int = 0
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
     private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
-    
-    private var lastBuiltCacheMs: Int = -1
-    private var lastBuiltDecoderMode: Int = -1
-
-    private var lastUrl = ""
-    private var lastUserAgent = ""
-    private var lastHeaders = ""
-    private var forceSoftDecodeInternal = false
 
     init {
         initPlayerView()
@@ -52,7 +44,6 @@ class ExoPlayerHelper(
     private fun initPlayerView() {
         playerView = PlayerView(context).apply {
             useController = false
-            setKeepContentOnPlayerReset(true) // 防止 PlayerView 在平滑切流时主动清空画布（黑屏）
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -62,92 +53,30 @@ class ExoPlayerHelper(
     }
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
-        lastUrl = url
-        lastUserAgent = userAgent
-        lastHeaders = customHeaders
-
-        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
-            buildPlayer()
-        }
-
-        exoPlayer?.stop()
-        
-        // 针对 HLS (m3u8) 等分片直播流，强制覆盖其默认的保守延迟策略（通常会强行缓冲3个切片导致慢起播）
-        val mediaItem = MediaItem.Builder()
-            .setUri(Uri.parse(url))
-            .setLiveConfiguration(
-                MediaItem.LiveConfiguration.Builder()
-                    // 强制让播放器紧贴直播时间线，避免下载多余的历史切片
-                    .setTargetOffsetMs(1000)
-                    .setMaxPlaybackSpeed(1.05f) // 允许轻微加速追赶直播进度
-                    .build()
-            )
-            .build()
-            
-        exoPlayer?.setMediaItem(mediaItem)
-        exoPlayer?.prepare()
-        exoPlayer?.play()
-    }
-
-    private fun buildPlayer() {
         releasePlayer()
-
-        lastBuiltCacheMs = currentCacheMs
-        lastBuiltDecoderMode = currentDecoderMode
 
         // 1. Configure Decoder
         val renderersFactory = DefaultRenderersFactory(context).apply {
-            // 控制音频扩展（如 FFmpeg）
             setExtensionRendererMode(
-                when {
-                    currentDecoderMode == Prefs.DECODER_MODE_SOFTWARE || forceSoftDecodeInternal -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                    currentDecoderMode == Prefs.DECODER_MODE_HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+                when (currentDecoderMode) {
+                    Prefs.DECODER_MODE_SOFTWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    Prefs.DECODER_MODE_HARDWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                     else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-                }
-            )
-            
-            // 【关键修复】控制视频解码（硬解/软解）
-            setEnableDecoderFallback(true) // 允许解码器自动降级
-            setMediaCodecSelector(
-                if (currentDecoderMode == Prefs.DECODER_MODE_SOFTWARE || forceSoftDecodeInternal) {
-                    // 当选择“软解”或自动回退时，强制优先使用系统 CPU 软件视频解码
-                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-                        val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
-                        // 将软件解码器排在前面
-                        decoders.sortedBy { it.hardwareAccelerated }.toMutableList()
-                    }
-                } else {
-                    // 默认使用硬解
-                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
                 }
             )
         }
 
         val loadControlBuilder = DefaultLoadControl.Builder()
         if (currentCacheMs > 0) {
-            val safePlaybackBufMs = Math.max(40, currentCacheMs) // 极限下探至 40ms (25fps 的绝对一帧物理极限)
-            val minBufMs = Math.max(1000, currentCacheMs)
+            // ExoPlayer requires a decent minimum buffer to initialize the AudioTrack properly,
+            // otherwise audio decoding fails silently or stutters heavily causing no sound.
+            val minBufMs = Math.max(1500, currentCacheMs)
             val maxBufMs = Math.max(3000, currentCacheMs * 2)
-            // Restore the user's manual network cache setting effect for startup buffer, with a safety net
-            loadControlBuilder.setBufferDurationsMs(minBufMs, maxBufMs, safePlaybackBufMs, safePlaybackBufMs)
-        } else {
-            // Default fast startup for Live TV (e.g. UDP Proxy / TS streams)
-            // 将起播阈值压榨到极限的 40ms
-            // 修复“出画后定屏”：卡顿恢复也降到 40ms
-            loadControlBuilder.setBufferDurationsMs(1000, 3000, 40, 40)
+            loadControlBuilder.setBufferDurationsMs(minBufMs, maxBufMs, minBufMs, minBufMs)
         }
         val loadControl = loadControlBuilder.build()
 
-        val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
-            .setTsExtractorFlags(
-                androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS or
-                androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
-            )
-
-        val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
-
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build()
             
@@ -190,19 +119,6 @@ class ExoPlayerHelper(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                if ((error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
-                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
-                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) &&
-                    !forceSoftDecodeInternal && currentDecoderMode != Prefs.DECODER_MODE_SOFTWARE
-                ) {
-                    forceSoftDecodeInternal = true
-                    android.util.Log.w("ExoPlayerHelper", "Hardware decoding failed, retrying with software decoding.")
-                    val pos = exoPlayer?.currentPosition ?: 0L
-                    buildPlayer()
-                    play(lastUrl, lastUserAgent, lastHeaders)
-                    if (pos > 0) exoPlayer?.seekTo(pos)
-                    return
-                }
                 listener.onError()
             }
 
@@ -222,6 +138,15 @@ class ExoPlayerHelper(
                 }
             }
         })
+
+        // Add UserAgent and Custom Headers
+        // In Media3, custom headers require customizing the HttpDataSource.
+        // For simplicity, we just use standard play for now if headers aren't strictly required by Exo.
+        // Usually streams that need headers might be tricky.
+        val mediaItem = MediaItem.fromUri(Uri.parse(url))
+        exoPlayer?.setMediaItem(mediaItem)
+        exoPlayer?.prepare()
+        exoPlayer?.play()
     }
 
     override fun setAspectRatio(scaleMode: Int) {

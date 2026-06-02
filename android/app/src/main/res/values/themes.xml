@@ -8,16 +8,11 @@
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
-        <!-- 刘海屏/挖孔屏/灵动岛：主界面也允许内容延伸到缺口区域 -->
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
     <style name="Theme.MediaPlayer.Player">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@android:color/black</item>
-        <!-- 关键：在主题层面声明允许延伸到刘海屏/挖孔屏/灵动岛区域
-             确保第一帧渲染就占满，无须等待运行时代码执行（防冷启动闪烁）-->
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">

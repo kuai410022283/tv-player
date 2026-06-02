@@ -11,8 +11,8 @@ android {
         applicationId "com.mediaplayer.app"
         minSdk 21
         targetSdk 34
-        versionCode 36
-        versionName "1.0.36"
+        versionCode 34
+        versionName "1.0.24"
     }
 
     signingConfigs {
@@ -103,7 +103,12 @@ dependencies {
     // VLC Android SDK
     implementation 'org.videolan.android:libvlc-all:3.5.1'
 
-
+    // IJKPlayer
+    implementation 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'
+    implementation 'tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8'
+    implementation 'tv.danmaku.ijk.media:ijkplayer-arm64:0.8.8'
+    implementation 'tv.danmaku.ijk.media:ijkplayer-x86:0.8.8'
+    implementation 'tv.danmaku.ijk.media:ijkplayer-x86_64:0.8.8'
 
     // Tencent X5 Web SDK
     implementation 'com.tencent.tbs:tbssdk:44286'

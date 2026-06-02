@@ -23,12 +23,6 @@ android/app/build/
 android/.gradle/
 android/local.properties
 android/app/release/
-# 本地签名配置（含密码，绝不提交！）
-android/keystore.properties
-*.keystore
-*.jks
-!android/temp_aar/*
-!android/app/src/main/jniLibs/**/*.so
 
 # IDE
 .vscode/

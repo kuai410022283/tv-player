@@ -588,17 +588,6 @@
       const updateLog = document.getElementById('updateLog');
       const downloadBtn = document.getElementById('downloadBtn');
 
-      // 动态替换下载地址的 host 为当前浏览器访问的 host，解决反向代理/Docker内容部IP泄露导致无法下载的问题
-      const fixDownloadUrl = (url) => {
-        if (!url) return url;
-        try {
-          const parsed = new URL(url);
-          return window.location.origin + parsed.pathname + parsed.search;
-        } catch (e) {
-          return url;
-        }
-      };
-
       Promise.all([
         fetch('/api/v1/update?arch=all').then(r => r.json()),
         fetch('/api/v1/update?arch=armeabi-v7a').then(r => r.json()),
@@ -620,18 +609,18 @@
               updateLog.innerHTML = '此版本包含了稳定性改进和流媒体播放器的性能优化。';
             }
 
-            downloadBtn.href = fixDownloadUrl(resAll.data.download_url);
+            downloadBtn.href = resAll.data.download_url;
 
             const archLinks = document.getElementById('archLinks');
             archLinks.innerHTML = '';
             let hasExtra = false;
 
             if (resV7.code === 0 && resV7.data && resV7.data.download_url && resV7.data.download_url !== resAll.data.download_url) {
-              archLinks.innerHTML += `<a href="${fixDownloadUrl(resV7.data.download_url)}" style="color: var(--accent-1); text-decoration: none;">ARMv7 (32位)</a>`;
+              archLinks.innerHTML += `<a href="${resV7.data.download_url}" style="color: var(--accent-1); text-decoration: none;">ARMv7 (32位)</a>`;
               hasExtra = true;
             }
             if (resV8.code === 0 && resV8.data && resV8.data.download_url && resV8.data.download_url !== resAll.data.download_url) {
-              archLinks.innerHTML += `<a href="${fixDownloadUrl(resV8.data.download_url)}" style="color: var(--accent-1); text-decoration: none;">ARM64 (64位)</a>`;
+              archLinks.innerHTML += `<a href="${resV8.data.download_url}" style="color: var(--accent-1); text-decoration: none;">ARM64 (64位)</a>`;
               hasExtra = true;
             }
 
