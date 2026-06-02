@@ -79,6 +79,7 @@ class IjkPlayerHelper(
         isPlayerPlaying = false
         ijkPlayer?.reset()
         applyPlayerOptions(ijkPlayer!!)
+        applyScaleMode()
         applyDataSource(ijkPlayer!!, url, userAgent, customHeaders)
     }
 
@@ -92,6 +93,7 @@ class IjkPlayerHelper(
             ijkPlayer?.setDisplay(surfaceView?.holder)
         }
         setupPlayerListeners(ijkPlayer!!)
+        applyScaleMode()
     }
 
     private fun applyPlayerOptions(player: IjkMediaPlayer) {
@@ -217,8 +219,25 @@ class IjkPlayerHelper(
 
     override fun setAspectRatio(scaleMode: Int) {
         this.currentScaleMode = scaleMode
-        // IjkPlayer SurfaceView scaling would require wrapping in a custom MeasureLayout.
-        // For simplicity in this demo, standard SurfaceView layout acts as FIT/AUTO.
+        applyScaleMode()
+    }
+
+    private fun applyScaleMode() {
+        val player = ijkPlayer ?: return
+        when (currentScaleMode) {
+            Prefs.SCALE_MODE_DEFAULT -> {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "")
+            }
+            Prefs.SCALE_MODE_STRETCH -> {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "fill")
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "")
+            }
+            Prefs.SCALE_MODE_4_3 -> {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "4:3")
+            }
+        }
     }
 
     override fun setDecoderMode(mode: Int) {

@@ -444,6 +444,11 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
         }
         var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        // 迁移旧版本中已废弃的放大裁剪(SCALE_MODE_CROP)到原始比例
+        if (currentScaleMode == Prefs.SCALE_MODE_CROP) {
+            currentScaleMode = Prefs.SCALE_MODE_DEFAULT
+            prefs.edit().putInt(Prefs.KEY_SCALE_MODE, currentScaleMode).apply()
+        }
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
 
         updateDecoderText(currentDecoderMode)
@@ -475,24 +480,20 @@ class MainActivity : AppCompatActivity() {
         }
         
         btnSettingsScale?.setOnClickListener {
+            // 循环：原始比例 → 强制16:9 → 强制4:3 → 原始比例（已移除放大裁剪）
             currentScaleMode = when (currentScaleMode) {
                 Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_STRETCH
-                Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_CROP
-                Prefs.SCALE_MODE_CROP -> Prefs.SCALE_MODE_4_3
+                Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_4_3
                 else -> Prefs.SCALE_MODE_DEFAULT
             }
             updateScaleText(currentScaleMode)
             prefs.edit().putInt(Prefs.KEY_SCALE_MODE, currentScaleMode).apply()
             
-            // 立即生效部分
+            // 立即生效
             when (currentScaleMode) {
                 Prefs.SCALE_MODE_STRETCH -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_STRETCH)
                 Prefs.SCALE_MODE_4_3 -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_4_3)
-                Prefs.SCALE_MODE_DEFAULT -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_DEFAULT)
-                Prefs.SCALE_MODE_CROP -> {
-                    playerHelper?.setAspectRatio(Prefs.SCALE_MODE_CROP)
-                    Toast.makeText(this, "画面比例已保存，裁剪模式需重新播放生效", Toast.LENGTH_SHORT).show()
-                }
+                else -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_DEFAULT)
             }
         }
 

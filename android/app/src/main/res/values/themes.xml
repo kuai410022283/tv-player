@@ -8,11 +8,18 @@
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <!-- 刘海屏/挖孔屏/灵动岛：主界面也允许内容延伸到缺口区域 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
     <style name="Theme.MediaPlayer.Player">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@android:color/black</item>
+        <!-- always 模式：
+             - Android 15+ (API 35)：覆盖横屏灵动岛/长边缺口
+             - Android 11-14 (API 30-34)：覆盖所有刘海/挖孔屏
+             - Android 9-10 (API 28-29)：由运行时代码设为 SHORT_EDGES 兜底 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
     </style>
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">

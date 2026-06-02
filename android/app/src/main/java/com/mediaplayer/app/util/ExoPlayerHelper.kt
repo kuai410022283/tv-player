@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.R as media3R
 import com.mediaplayer.app.Prefs
 
 @UnstableApi
@@ -169,13 +170,67 @@ class ExoPlayerHelper(
     }
     
     private fun applyScaleMode() {
+        // 通过内部 AspectRatioFrameLayout 控制精确比例
+        val contentFrame = playerView?.findViewById<AspectRatioFrameLayout>(media3R.id.exo_content_frame)
+
         when (currentScaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-            Prefs.SCALE_MODE_CROP -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            Prefs.SCALE_MODE_STRETCH -> {
+                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                resetContentFrameAspectRatio(contentFrame)
+                resetPlayerViewAspectRatio()
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                resetContentFrameAspectRatio(contentFrame)
+                resetPlayerViewAspectRatio()
+            }
             Prefs.SCALE_MODE_4_3 -> {
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                // 优先通过 AspectRatioFrameLayout.setAspectRatio() 精确控制 4:3 比例
+                contentFrame?.let { frame ->
+                    try {
+                        val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
+                        setAspectRatio.invoke(frame, 4f / 3f)
+                    } catch (_: Exception) {
+                        // 降级：通过 layoutParams 强制 4:3
+                        playerView?.post {
+                            val parent = playerView?.parent as? ViewGroup ?: return@post
+                            val targetWidth = playerView?.measuredWidth ?: parent.width
+                            if (targetWidth > 0) {
+                                val lp = playerView?.layoutParams
+                                lp?.height = (targetWidth * 3 / 4).coerceAtLeast(1)
+                                playerView?.layoutParams = lp
+                            }
+                        }
+                    }
+                }
             }
-            else -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            else -> {
+                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                resetContentFrameAspectRatio(contentFrame)
+                resetPlayerViewAspectRatio()
+            }
+        }
+    }
+
+    /**
+     * 清除 AspectRatioFrameLayout 内部 aspectRatio，恢复为视频原始比例
+     * 解决 4:3 → 原始比例 切换后画面仍被强制拉伸/压缩的问题
+     */
+    private fun resetContentFrameAspectRatio(frame: AspectRatioFrameLayout?) {
+        frame?.let { f ->
+            try {
+                val setAspectRatio = f.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
+                setAspectRatio.invoke(f, 0f) // 0 = 使用视频原始比例
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun resetPlayerViewAspectRatio() {
+        playerView?.post {
+            val lp = playerView?.layoutParams
+            lp?.height = ViewGroup.LayoutParams.MATCH_PARENT
+            playerView?.layoutParams = lp
         }
     }
 
