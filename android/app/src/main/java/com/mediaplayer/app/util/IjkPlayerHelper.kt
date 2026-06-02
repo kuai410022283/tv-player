@@ -86,12 +86,11 @@ class IjkPlayerHelper(
                 setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
             }
 
-            // Live stream optimizations - HTTP proxy / UDP multicast streams
+            // Common format options
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
@@ -99,14 +98,25 @@ class IjkPlayerHelper(
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
 
-            // Live stream cache settings - start immediately, infinite buffer
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1)
+            // Cache settings - auto vs manual
+            if (currentCacheMs <= 0) {
+                // Auto mode: fastest startup, no pre-buffering
+                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1L)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L)
+            } else {
+                // Manual mode: user-specified cache
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
+                val minFrames = (currentCacheMs / 50).coerceIn(5, 60)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
+            }
+
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10)
 
             // Listeners
             setOnPreparedListener {

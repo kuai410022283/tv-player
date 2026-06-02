@@ -140,14 +140,14 @@ class VlcPlayerHelper(
                                      lowerUrl.contains("://180.141.") || // 典型电信IPTV
                                      lowerUrl.contains("://127.0.")
             if (isLocalOrMulticast) {
-                finalCacheMs = 200 // 内网 200ms 秒切
-                useAggressiveLatency = true
+                finalCacheMs = 50 // 内网 50ms 极速起播
             } else {
-                finalCacheMs = 1500 // 公网 1500ms 安全防卡
+                finalCacheMs = 100 // 公网/代理流 100ms 快速起播
             }
+            useAggressiveLatency = true
         } else {
-            // 如果用户手动设置了很低的缓存（<= 300ms），我们也默认开启激进模式
-            useAggressiveLatency = cacheMs <= 300
+            // 如果用户手动设置了很低的缓存（<= 200ms），也开启激进模式
+            useAggressiveLatency = cacheMs <= 200
         }
 
         media.addOption(":network-caching=$finalCacheMs")
