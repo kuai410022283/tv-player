@@ -404,6 +404,7 @@ class MainActivity : AppCompatActivity() {
     private var btnSettingsScale: View? = null
     private var btnSettingsDecoder: View? = null
     private var btnSettingsCore: View? = null
+    private var currentCore = Prefs.PLAYER_CORE_AUTO
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -421,16 +422,6 @@ class MainActivity : AppCompatActivity() {
                 else -> "自动识别"
             }
         }
-        
-        fun updateCoreText(core: Int) {
-            findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
-                Prefs.PLAYER_CORE_VLC -> "VLC"
-                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                Prefs.PLAYER_CORE_X5 -> "X5 Web"
-                else -> "智能切换"
-            }
-        }
 
         fun updateScaleText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
@@ -446,7 +437,12 @@ class MainActivity : AppCompatActivity() {
         }
         
         var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-        var currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        // 迁移旧版本中 X5 内核的选择（X5 已移除，自动回退到智能切换）
+        if (currentCore == 4) {
+            currentCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
+        }
         var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
 
@@ -468,11 +464,9 @@ class MainActivity : AppCompatActivity() {
         
         btnSettingsCore?.setOnClickListener {
             currentCore = when (currentCore) {
-                Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_VLC
-                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_EXO
-                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
-                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_X5
-                Prefs.PLAYER_CORE_X5 -> Prefs.PLAYER_CORE_AUTO
+                Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
+                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_VLC
+                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_IJK
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
@@ -665,7 +659,6 @@ class MainActivity : AppCompatActivity() {
                         val coreStr = when (core) {
                             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                            Prefs.PLAYER_CORE_X5 -> "X5 Web"
                             else -> "VLC"
                         }
                         
@@ -695,9 +688,6 @@ class MainActivity : AppCompatActivity() {
             }
             Prefs.PLAYER_CORE_IJK -> {
                 playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-            }
-            Prefs.PLAYER_CORE_X5 -> {
-                playerHelper = com.mediaplayer.app.util.X5PlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
             else -> {
                 val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
@@ -734,6 +724,15 @@ class MainActivity : AppCompatActivity() {
         videoLayout?.requestFocus()
     }
 
+    private fun updateCoreText(core: Int) {
+        findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
+            Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+            Prefs.PLAYER_CORE_VLC -> "VLC"
+            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+            else -> "智能切换"
+        }
+    }
+
     private fun handlePlaybackError() {
         isPlayerBuffering = false
         progressBuffering?.visibility = View.GONE
@@ -754,6 +753,19 @@ class MainActivity : AppCompatActivity() {
                 if (allChannels.isNotEmpty()) playCurrentLineInTv()
             }, delayMs)
         } else {
+            // 如果用户指定了特定内核（非智能切换）且播放失败，自动回退到智能模式
+            val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+            val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+            if (savedCore != Prefs.PLAYER_CORE_AUTO) {
+                currentCore = Prefs.PLAYER_CORE_AUTO
+                prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
+                updateCoreText(currentCore)
+                retryCount = 0
+                currentLineIndex = 0
+                Toast.makeText(this@MainActivity, "播放内核播放失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
+                playCurrentLineInTv()
+                return
+            }
             Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
             retryCount = 0
         }
@@ -796,15 +808,9 @@ class MainActivity : AppCompatActivity() {
 
         // 核心匹配逻辑
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore == Prefs.PLAYER_CORE_X5) {
-            if (!com.mediaplayer.app.util.WebX5Manager.isInitialized) {
-                val progress = com.mediaplayer.app.util.WebX5Manager.downloadProgress
-                Toast.makeText(this, "WebX5 内核下载中 ($progress%)，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            } else if (!com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
-                Toast.makeText(this, "WebX5 内核暂不可用，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            }
+        if (globalCore == 4) {
+            globalCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
         
         var desiredCore = globalCore
@@ -821,8 +827,8 @@ class MainActivity : AppCompatActivity() {
                     Prefs.PLAYER_CORE_IJK
                 }
                 "x5" -> {
-                    coreText = "智能 (X5)"
-                    Prefs.PLAYER_CORE_X5
+                    coreText = "智能 (VLC)"
+                    Prefs.PLAYER_CORE_VLC
                 }
                 "ts", "rtp", "udp" -> {
                     coreText = "智能 (Exo)"
@@ -837,7 +843,6 @@ class MainActivity : AppCompatActivity() {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                Prefs.PLAYER_CORE_X5 -> "WebX5"
                 else -> "VLC"
             }
         }
@@ -848,7 +853,6 @@ class MainActivity : AppCompatActivity() {
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
-            Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 

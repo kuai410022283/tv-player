@@ -1,7 +1,6 @@
 package com.mediaplayer.app.util
 
 import android.content.Context
-import android.net.Uri
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
@@ -19,6 +18,7 @@ class IjkPlayerHelper(
     private var surfaceView: SurfaceView? = null
     private var isPlayerPlaying = false
     private var lastResolution = ""
+    private var surfaceCreated = false
 
     private var currentCacheMs: Int = 0
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
@@ -48,11 +48,20 @@ class IjkPlayerHelper(
             )
             holder.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(holder: SurfaceHolder) {
-                    ijkPlayer?.setDisplay(holder)
+                    surfaceCreated = true
+                    ijkPlayer?.let { player ->
+                        player.setDisplay(holder)
+                        // 如果 player 已经 prepare 好了但没有 surface，立刻重设显示
+                    }
                 }
                 override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
                 override fun surfaceDestroyed(holder: SurfaceHolder) {
-                    ijkPlayer?.setDisplay(null)
+                    surfaceCreated = false
+                    ijkPlayer?.let { player ->
+                        try {
+                            player.setDisplay(null)
+                        } catch (_: Exception) {}
+                    }
                 }
             })
         }
@@ -70,43 +79,40 @@ class IjkPlayerHelper(
             val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
             if (enableHw) {
                 setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1)
+                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-hevc", 1)
                 setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
             } else {
                 setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
             }
 
-            // General optimizations
+            // Live stream optimizations - HTTP proxy / UDP multicast streams
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "crypto,file,dash,http,https,rtp,tcp,tls,udp,rtmp,rtsp,data")
             setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
             setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
 
-            // Cache & Anti-Stutter configuration
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            val memInfo = android.app.ActivityManager.MemoryInfo()
-            activityManager.getMemoryInfo(memInfo)
-            val maxBufBytes = minOf(memInfo.availMem / 8, 100L * 1024 * 1024)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", maxBufBytes)
-
-            // CRITICAL FIX: Restore packet-buffering to 1. Setting it to 0 drops audio/video packets on some streams causing black screen and no sound.
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1)
-
-            if (currentCacheMs > 0) {
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max_cached_duration", currentCacheMs.toLong())
-                val probeMs = Math.max(2000L, currentCacheMs.toLong() * 2)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", probeMs * 1000L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L)
-            } else {
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 10L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
-            }
+            // Live stream cache settings - start immediately, infinite buffer
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0)
+            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10)
 
             // Listeners
             setOnPreparedListener {
-                it.start()
+                if (surfaceCreated) {
+                    it.setDisplay(surfaceView?.holder)
+                }
                 isPlayerPlaying = true
                 val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
                 val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
@@ -151,29 +157,28 @@ class IjkPlayerHelper(
                 }
             }
 
-            // Set Data Source
+            // Set Data Source - 参考项目：使用 setDataSource(url, headersMap) 而非 raw headers 选项
             try {
-                if (userAgent.isNotEmpty() || customHeaders.isNotEmpty()) {
-                    val headers = HashMap<String, String>()
-                    if (userAgent.isNotEmpty()) headers["User-Agent"] = userAgent
-                    
-                    if (customHeaders.isNotEmpty()) {
-                        try {
-                            val json = org.json.JSONObject(customHeaders)
-                            val keys = json.keys()
-                            while (keys.hasNext()) {
-                                val key = keys.next()
-                                headers[key] = json.getString(key)
-                            }
-                        } catch (e: Exception) {}
-                    }
-                    // For IjkPlayer, headers can be passed as a string
-                    val headerString = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" } + "\r\n"
-                    setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", headerString)
+                val allHeaders = HashMap<String, String>()
+                if (userAgent.isNotEmpty()) {
+                    setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent)
                 }
-                
-                dataSource = url
-                setDisplay(surfaceView?.holder)
+                if (customHeaders.isNotEmpty()) {
+                    try {
+                        val json = org.json.JSONObject(customHeaders)
+                        val keys = json.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            allHeaders[key] = json.getString(key)
+                        }
+                    } catch (e: Exception) {}
+                }
+
+                if (allHeaders.isNotEmpty()) {
+                    setDataSource(url, allHeaders)
+                } else {
+                    dataSource = url
+                }
                 prepareAsync()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -237,23 +242,31 @@ class IjkPlayerHelper(
     }
     
     private fun releasePlayer() {
-        // SYNCHRONOUS release to prevent native crash
         val player = ijkPlayer
         ijkPlayer = null
+        isPlayerPlaying = false
+        lastResolution = ""
         player?.apply {
+            try {
+                pause()
+            } catch (_: Exception) {}
+            try {
+                stop()
+            } catch (_: Exception) {}
+            try {
+                setDisplay(null)
+            } catch (_: Exception) {}
             setOnPreparedListener(null)
             setOnVideoSizeChangedListener(null)
             setOnErrorListener(null)
             setOnInfoListener(null)
             setOnBufferingUpdateListener(null)
             try {
-                stop()
-            } catch (e: Exception) {}
+                reset()
+            } catch (_: Exception) {}
             try {
                 release()
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
         }
-        isPlayerPlaying = false
-        lastResolution = ""
     }
 }

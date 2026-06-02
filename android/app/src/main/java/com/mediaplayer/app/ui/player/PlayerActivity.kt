@@ -90,6 +90,7 @@ class PlayerActivity : AppCompatActivity() {
     private var retryCount = 0
     private val maxRetries = 3
     private val baseRetryDelay = 3000L // 3秒
+    private var coreRetryLevel = 0 // 0=默认, 1=Exo, 2=VLC
     private var backPressedTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -294,6 +295,18 @@ class PlayerActivity : AppCompatActivity() {
                     tvStatus?.text = "播放失败"
                     progressBar?.visibility = View.GONE
                     
+                    val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                    val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+                    
+                    if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
+                        coreRetryLevel++
+                        val coreName = if (coreRetryLevel == 1) "ExoPlayer" else "VLC"
+                        Toast.makeText(this@PlayerActivity, "尝试使用 $coreName 重试该线路...", Toast.LENGTH_SHORT).show()
+                        playCurrentLine()
+                        return@runOnUiThread
+                    }
+                    
+                    coreRetryLevel = 0
                     val channel = allChannels.getOrNull(channelIndex)
                     val lines = channel?.getLinesSafely() ?: emptyList()
                     
@@ -308,6 +321,17 @@ class PlayerActivity : AppCompatActivity() {
                         Toast.makeText(this@PlayerActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
                         handler.postDelayed({ retryPlay() }, delayMs)
                     } else {
+                        // 如果用户指定了特定内核（非智能切换）且播放失败，自动回退到智能模式
+                        val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+                        if (savedCore != Prefs.PLAYER_CORE_AUTO) {
+                            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO).apply()
+                            coreRetryLevel = 0
+                            retryCount = 0
+                            lineIndex = 0
+                            Toast.makeText(this@PlayerActivity, "播放内核播放失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
+                            playCurrentLine()
+                            return@runOnUiThread
+                        }
                         Toast.makeText(this@PlayerActivity, "播放失败，所有线路均不可用", Toast.LENGTH_LONG).show()
                         retryCount = 0
                     }
@@ -321,9 +345,6 @@ class PlayerActivity : AppCompatActivity() {
             }
             Prefs.PLAYER_CORE_IJK -> {
                 playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-            }
-            Prefs.PLAYER_CORE_X5 -> {
-                playerHelper = com.mediaplayer.app.util.X5PlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
             else -> {
                 val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
@@ -356,48 +377,49 @@ class PlayerActivity : AppCompatActivity() {
         
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore == Prefs.PLAYER_CORE_X5) {
-            if (!com.mediaplayer.app.util.WebX5Manager.isInitialized) {
-                val progress = com.mediaplayer.app.util.WebX5Manager.downloadProgress
-                Toast.makeText(this, "WebX5 内核下载中 ($progress%)，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            } else if (!com.mediaplayer.app.util.WebX5Manager.isX5CoreReady) {
-                Toast.makeText(this, "WebX5 内核暂不可用，已切换为智能模式", Toast.LENGTH_SHORT).show()
-                globalCore = Prefs.PLAYER_CORE_AUTO
-            }
+        if (globalCore == 4) {
+            globalCore = Prefs.PLAYER_CORE_AUTO
+            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
         
         var desiredCore = globalCore
         var coreText = ""
         
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
-            desiredCore = when (type.lowercase()) {
-                "vlc" -> {
-                    coreText = "智能 (VLC)"
-                    Prefs.PLAYER_CORE_VLC
+            if (coreRetryLevel > 0) {
+                desiredCore = when (coreRetryLevel) {
+                    1 -> { coreText = "容灾 (Exo)"; Prefs.PLAYER_CORE_EXO }
+                    2 -> { coreText = "容灾 (VLC)"; Prefs.PLAYER_CORE_VLC }
+                    else -> desiredCore
                 }
-                "ijk" -> {
-                    coreText = "智能 (IJK)"
-                    Prefs.PLAYER_CORE_IJK
-                }
-                "x5" -> {
-                    coreText = "智能 (X5)"
-                    Prefs.PLAYER_CORE_X5
-                }
-                "ts", "rtp", "udp" -> {
-                    coreText = "智能 (Exo)"
-                    Prefs.PLAYER_CORE_EXO
-                }
-                else -> {
-                    coreText = "智能 (Exo)"
-                    Prefs.PLAYER_CORE_EXO
+            } else {
+                desiredCore = when (type.lowercase()) {
+                    "vlc" -> {
+                        coreText = "智能 (VLC)"
+                        Prefs.PLAYER_CORE_VLC
+                    }
+                    "ijk" -> {
+                        coreText = "智能 (IJK)"
+                        Prefs.PLAYER_CORE_IJK
+                    }
+                    "x5" -> {
+                        coreText = "智能 (VLC)"
+                        Prefs.PLAYER_CORE_VLC
+                    }
+                    "ts", "rtp", "udp" -> {
+                        coreText = "智能 (Exo)"
+                        Prefs.PLAYER_CORE_EXO
+                    }
+                    else -> {
+                        coreText = "智能 (Exo)"
+                        Prefs.PLAYER_CORE_EXO
+                    }
                 }
             }
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                Prefs.PLAYER_CORE_X5 -> "WebX5"
                 else -> "VLC"
             }
         }
@@ -407,7 +429,6 @@ class PlayerActivity : AppCompatActivity() {
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
-            Prefs.PLAYER_CORE_X5 -> playerHelper is com.mediaplayer.app.util.X5PlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 
@@ -425,6 +446,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun retryPlay() {
+        coreRetryLevel = 0
         val channel = allChannels.getOrNull(channelIndex)
         if (channel != null) {
             playCurrentLine()
