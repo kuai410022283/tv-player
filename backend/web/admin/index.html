@@ -459,9 +459,8 @@
             <h3 style="margin-bottom: 12px;">设备授权配置</h3>
           </div>
           <div class="form-group">
-            <label>自动审批</label>
-            <select id="set-auto-approve"
-              onchange="saveClientSetting('auto_approve', this.value); toggleAutoApproveFields(this.value)">
+            <label>自动审批设置</label>
+            <select id="set-auto-approve" onchange="toggleAutoApproveFields(this.value)">
               <option value="false">关闭 (手动审批)</option>
               <option value="true">开启 (自动通过)</option>
             </select>
@@ -486,75 +485,75 @@
                 <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
               </div>
             </div>
-            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
+          </div>
+          <div class="form-group">
+            <label>系统公告 (跑马灯)</label>
+            <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
+          </div>
+          <div class="form-group">
+            <label>跑马灯显示间隔 (分钟)</label>
+            <input type="number" id="set-system-announcement-interval" value="0" min="0">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
+            </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
+          </div>
+          <div class="form-group">
+            <label>EPG 数据源 URL (XMLTV)</label>
+            <textarea id="set-epg-source-url" rows="3"
+              placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
+              .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
-              <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
+              <label>EPG 自动刷新间隔 (小时)</label>
+              <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
             </div>
+            <div class="form-group" style="display:flex;align-items:flex-end">
+              <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
+            </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
+          </div>
+          <div class="form-row">
             <div class="form-group">
-              <label>系统公告 (跑马灯)</label>
-              <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
-            </div>
-            <div class="form-group">
-              <label>跑马灯显示间隔 (分钟)</label>
-              <input type="number" id="set-system-announcement-interval" value="0" min="0">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
-              </div>
-            </div>
-            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-            <div class="form-group">
-              <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
-            </div>
-            <div class="form-group">
-              <label>EPG 数据源 URL (XMLTV)</label>
-              <textarea id="set-epg-source-url" rows="3"
-                placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
-                .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>EPG 自动刷新间隔 (小时)</label>
-                <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
-              </div>
-              <div class="form-group" style="display:flex;align-items:flex-end">
-                <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
-              </div>
-            </div>
-            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-            <div class="form-group">
-              <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>最新版本号 (Version Code)</label>
-                <input type="number" id="set-update-version-code" placeholder="如：10" min="0">
-                <div style="font-size:11px;color:var(--text2);margin-top:4px">必须为整数。客户端版本号小于此值将提示升级。</div>
-              </div>
-              <div class="form-group">
-                <label>展示版本名 (Version Name)</label>
-                <input type="text" id="set-update-version-name" placeholder="如：v1.2.0">
-              </div>
+              <label>最新版本号 (Version Code)</label>
+              <input type="number" id="set-update-version-code" placeholder="如：10" min="0">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">必须为整数。客户端版本号小于此值将提示升级。</div>
             </div>
             <div class="form-group">
-              <label>APK 下载地址</label>
-              <input type="text" id="set-update-download-url" placeholder="http://example.com/app.apk">
+              <label>展示版本名 (Version Name)</label>
+              <input type="text" id="set-update-version-name" placeholder="如：v1.2.0">
             </div>
-            <div class="form-group">
-              <label>更新日志</label>
-              <textarea id="set-update-log" rows="3" placeholder="填写新版本修复或增加的内容..."></textarea>
-            </div>
-            <div class="form-group">
-              <label>是否强制更新</label>
-              <select id="set-update-force">
-                <option value="false">否 (用户可跳过)</option>
-                <option value="true">是 (必须更新才能使用)</option>
-              </select>
-            </div>
-            <div class="form-actions" style="justify-content:flex-start">
-              <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
-              <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
-                style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
-            </div>
+          </div>
+          <div class="form-group">
+            <label>APK 下载地址</label>
+            <input type="text" id="set-update-download-url" placeholder="http://example.com/app.apk">
+          </div>
+          <div class="form-group">
+            <label>更新日志</label>
+            <textarea id="set-update-log" rows="3" placeholder="填写新版本修复或增加的内容..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>是否强制更新</label>
+            <select id="set-update-force">
+              <option value="false">否 (用户可跳过)</option>
+              <option value="true">是 (必须更新才能使用)</option>
+            </select>
+          </div>
+          <div class="form-actions" style="justify-content:flex-start">
+            <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
+            <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
+              style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
           </div>
         </div>
       </div>

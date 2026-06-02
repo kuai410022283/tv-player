@@ -366,6 +366,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64 = 0
+	hasFlushed := false // 首次 Flush 标志
 	
 	writeBuf := make([]byte, 0, 128*1024)
 	
@@ -390,19 +391,33 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 			
 			writeBuf = append(writeBuf, chunk...)
 			
-			// Flush strategically: exactly 128KB. 
-			// Go's http.ResponseWriter auto-flushes every 4KB, which causes Wi-Fi micro-stutters.
-			// By buffering locally, we force large TCP writes.
-			if len(writeBuf) >= 128*1024 {
-				n, err := w.Write(writeBuf)
-				if err != nil {
-					return err
+			if !hasFlushed {
+				// 首次数据：立即 Flush，让客户端播放器尽快收到首字节开始解析
+				if len(writeBuf) > 0 {
+					n, err := w.Write(writeBuf)
+					if err != nil {
+						return err
+					}
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					bytesSinceLastUpdate += int64(n)
+					writeBuf = writeBuf[:0]
+					hasFlushed = true
 				}
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
+			} else {
+				// 后续数据：攒够 128KB 再 Flush，减少 TCP 小包写入避免 Wi-Fi 微卡顿
+				if len(writeBuf) >= 128*1024 {
+					n, err := w.Write(writeBuf)
+					if err != nil {
+						return err
+					}
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
+					bytesSinceLastUpdate += int64(n)
+					writeBuf = writeBuf[:0]
 				}
-				bytesSinceLastUpdate += int64(n)
-				writeBuf = writeBuf[:0]
 			}
 			
 			now := time.Now()

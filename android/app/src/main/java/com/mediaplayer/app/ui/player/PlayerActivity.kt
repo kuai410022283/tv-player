@@ -90,7 +90,7 @@ class PlayerActivity : AppCompatActivity() {
     private var retryCount = 0
     private val maxRetries = 3
     private val baseRetryDelay = 3000L // 3秒
-    private var coreRetryLevel = 0 // 0=默认, 1=Exo, 2=VLC
+    private var coreRetryLevel = 0 // 0=默认, 1=VLC, 2=IJK
     private var backPressedTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -300,7 +300,11 @@ class PlayerActivity : AppCompatActivity() {
                     
                     if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
                         coreRetryLevel++
-                        val coreName = if (coreRetryLevel == 1) "ExoPlayer" else "VLC"
+                        val coreName = when (coreRetryLevel) {
+                            1 -> "VLC"
+                            2 -> "IJKPlayer"
+                            else -> "ExoPlayer"
+                        }
                         Toast.makeText(this@PlayerActivity, "尝试使用 $coreName 重试该线路...", Toast.LENGTH_SHORT).show()
                         playCurrentLine()
                         return@runOnUiThread
@@ -388,8 +392,8 @@ class PlayerActivity : AppCompatActivity() {
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             if (coreRetryLevel > 0) {
                 desiredCore = when (coreRetryLevel) {
-                    1 -> { coreText = "容灾 (Exo)"; Prefs.PLAYER_CORE_EXO }
-                    2 -> { coreText = "容灾 (VLC)"; Prefs.PLAYER_CORE_VLC }
+                    1 -> { coreText = "容灾 (VLC)"; Prefs.PLAYER_CORE_VLC }
+                    2 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
                     else -> desiredCore
                 }
             } else {
@@ -446,7 +450,6 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun retryPlay() {
-        coreRetryLevel = 0
         val channel = allChannels.getOrNull(channelIndex)
         if (channel != null) {
             playCurrentLine()
