@@ -65,6 +65,8 @@ class ExoPlayerHelper(
         isPlayerPlaying = false
         exoPlayer?.stop()
 
+        applyScaleMode()
+
         val mediaItem = MediaItem.fromUri(Uri.parse(url))
         exoPlayer?.setMediaItem(mediaItem)
         exoPlayer?.prepare()
@@ -221,7 +223,12 @@ class ExoPlayerHelper(
         frame?.let { f ->
             try {
                 val setAspectRatio = f.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
-                setAspectRatio.invoke(f, 0f) // 0 = 使用视频原始比例
+                // 使用视频的实际宽高比，而非设置为 0
+                // 避免某些 Media3 版本中 aspectRatio=0 时 layout 表现异常
+                val videoSize = exoPlayer?.videoSize
+                if (videoSize != null && videoSize.width > 0 && videoSize.height > 0) {
+                    setAspectRatio.invoke(f, videoSize.width.toFloat() / videoSize.height.toFloat())
+                }
             } catch (_: Exception) {}
         }
     }

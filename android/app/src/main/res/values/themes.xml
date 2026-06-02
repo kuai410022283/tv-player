@@ -15,11 +15,9 @@
     <style name="Theme.MediaPlayer.Player">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@android:color/black</item>
-        <!-- always 模式：
-             - Android 15+ (API 35)：覆盖横屏灵动岛/长边缺口
-             - Android 11-14 (API 30-34)：覆盖所有刘海/挖孔屏
-             - Android 9-10 (API 28-29)：由运行时代码设为 SHORT_EDGES 兜底 -->
-        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+        <!-- 关键：在主题层面声明允许延伸到刘海屏/挖孔屏/灵动岛区域
+             确保第一帧渲染就占满，无须等待运行时代码执行（防冷启动闪烁）-->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">

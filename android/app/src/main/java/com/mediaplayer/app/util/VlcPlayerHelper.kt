@@ -18,8 +18,11 @@ class VlcPlayerHelper(
 
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
 
     init {
+        val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
+        currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         initPlayer()
     }
 
@@ -107,10 +110,9 @@ class VlcPlayerHelper(
     override fun play(url: String, userAgent: String, customHeaders: String) {
         val player = mediaPlayer ?: return
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
-        val scaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
 
-        when (scaleMode) {
+        when (currentScaleMode) {
             Prefs.SCALE_MODE_STRETCH -> {
                 player.aspectRatio = "16:9"
             }
@@ -158,7 +160,7 @@ class VlcPlayerHelper(
         }
         
         media.addOption(":http-reconnect=true")
-        if (scaleMode == Prefs.SCALE_MODE_CROP) {
+        if (currentScaleMode == Prefs.SCALE_MODE_CROP) {
             media.addOption(":crop=16:9")
         }
 
@@ -200,6 +202,7 @@ class VlcPlayerHelper(
     }
 
     override fun setAspectRatio(scaleMode: Int) {
+        this.currentScaleMode = scaleMode
         when (scaleMode) {
             Prefs.SCALE_MODE_STRETCH -> mediaPlayer?.aspectRatio = "16:9"
             Prefs.SCALE_MODE_CROP -> mediaPlayer?.aspectRatio = null

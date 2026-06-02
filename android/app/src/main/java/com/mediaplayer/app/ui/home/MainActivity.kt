@@ -698,6 +698,14 @@ class MainActivity : AppCompatActivity() {
                 playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
             }
         }
+
+        // 创建播放器后，应用保存的画面比例设置
+        val scalePrefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        var savedScaleMode = scalePrefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        if (savedScaleMode == Prefs.SCALE_MODE_CROP) {
+            savedScaleMode = Prefs.SCALE_MODE_DEFAULT
+        }
+        playerHelper?.setAspectRatio(savedScaleMode)
     }
 
     private fun setupQrConfigServer(onUrlUpdated: () -> Unit) {
