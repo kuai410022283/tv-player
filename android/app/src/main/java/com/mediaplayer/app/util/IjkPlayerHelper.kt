@@ -24,6 +24,9 @@ class IjkPlayerHelper(
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
     private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
 
+    private var lastBuiltCacheMs: Int = -1
+    private var lastBuiltDecoderMode: Int = -1
+
     init {
         try {
             IjkMediaPlayer.loadLibrariesOnce(null)
@@ -69,131 +72,146 @@ class IjkPlayerHelper(
     }
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        if (ijkPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
+            buildPlayer()
+        }
+
+        isPlayerPlaying = false
+        ijkPlayer?.reset()
+        applyPlayerOptions(ijkPlayer!!)
+        applyDataSource(ijkPlayer!!, url, userAgent, customHeaders)
+    }
+
+    private fun buildPlayer() {
         releasePlayer()
+        lastBuiltCacheMs = currentCacheMs
+        lastBuiltDecoderMode = currentDecoderMode
+        ijkPlayer = IjkMediaPlayer()
+        applyPlayerOptions(ijkPlayer!!)
+        if (surfaceCreated) {
+            ijkPlayer?.setDisplay(surfaceView?.holder)
+        }
+        setupPlayerListeners(ijkPlayer!!)
+    }
 
-        ijkPlayer = IjkMediaPlayer().apply {
-            // Logging
-            IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_ERROR)
+    private fun applyPlayerOptions(player: IjkMediaPlayer) {
+        IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_ERROR)
 
-            // Hardware decoding
-            val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
-            if (enableHw) {
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-hevc", 1)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
-            } else {
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
+        val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
+        if (enableHw) {
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-hevc", 1)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
+        } else {
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
+        }
+
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
+
+        if (currentCacheMs <= 0) {
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1L)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L)
+        } else {
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
+            val minFrames = (currentCacheMs / 50).coerceIn(5, 60)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
+        }
+
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
+    }
+
+    private fun setupPlayerListeners(player: IjkMediaPlayer) {
+        player.setOnPreparedListener {
+            if (surfaceCreated) {
+                it.setDisplay(surfaceView?.holder)
             }
-
-            // Common format options
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
-
-            // Cache settings - auto vs manual
-            if (currentCacheMs <= 0) {
-                // Auto mode: fastest startup, no pre-buffering
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L)
-            } else {
-                // Manual mode: user-specified cache
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
-                val minFrames = (currentCacheMs / 50).coerceIn(5, 60)
-                setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
-            }
-
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
-            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
-
-            // Listeners
-            setOnPreparedListener {
-                if (surfaceCreated) {
-                    it.setDisplay(surfaceView?.holder)
+            isPlayerPlaying = true
+            val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
+            val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
+            val info = buildString {
+                if (lastResolution.isNotEmpty()) append(lastResolution)
+                if (videoCodec.isNotEmpty()) {
+                    if (isNotEmpty()) append(" | ")
+                    append(videoCodec.uppercase())
                 }
-                isPlayerPlaying = true
+                if (audioCodec.isNotEmpty()) {
+                    if (isNotEmpty()) append(" | ")
+                    append(audioCodec.uppercase())
+                }
+            }
+            listener.onPlaying(if (info.isNotEmpty()) info else lastResolution)
+        }
+        player.setOnInfoListener { _, what, _ ->
+            if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                listener.onBuffering(0f)
+            } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END || what == IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                listener.onBuffering(100f)
+            }
+            false
+        }
+        player.setOnErrorListener { _, _, _ ->
+            listener.onError()
+            true
+        }
+        player.setOnVideoSizeChangedListener { _, width, height, _, _ ->
+            if (width > 0 && height > 0) {
                 val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
                 val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
+                lastResolution = "${width}x${height}"
                 val info = buildString {
-                    if (lastResolution.isNotEmpty()) append(lastResolution)
-                    if (videoCodec.isNotEmpty()) {
-                        if (isNotEmpty()) append(" | ")
-                        append(videoCodec.uppercase())
-                    }
-                    if (audioCodec.isNotEmpty()) {
-                        if (isNotEmpty()) append(" | ")
-                        append(audioCodec.uppercase())
-                    }
+                    append(lastResolution)
+                    if (videoCodec.isNotEmpty()) append(" | ").append(videoCodec.uppercase())
+                    if (audioCodec.isNotEmpty()) append(" | ").append(audioCodec.uppercase())
                 }
-                listener.onPlaying(if (info.isNotEmpty()) info else lastResolution)
-            }
-            setOnInfoListener { _, what, _ ->
-                if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
-                    listener.onBuffering(0f)
-                } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END || what == IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                    listener.onBuffering(100f)
+                if (isPlayerPlaying) {
+                    listener.onPlaying(info)
                 }
-                false
             }
-            setOnErrorListener { _, _, _ ->
-                listener.onError()
-                true
+        }
+    }
+
+    private fun applyDataSource(player: IjkMediaPlayer, url: String, userAgent: String, customHeaders: String) {
+        try {
+            val allHeaders = HashMap<String, String>()
+            if (userAgent.isNotEmpty()) {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent)
             }
-            setOnVideoSizeChangedListener { _, width, height, _, _ ->
-                if (width > 0 && height > 0) {
-                    val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
-                    val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
-                    lastResolution = "${width}x${height}"
-                    val info = buildString {
-                        append(lastResolution)
-                        if (videoCodec.isNotEmpty()) append(" | ").append(videoCodec.uppercase())
-                        if (audioCodec.isNotEmpty()) append(" | ").append(audioCodec.uppercase())
+            if (customHeaders.isNotEmpty()) {
+                try {
+                    val json = org.json.JSONObject(customHeaders)
+                    val keys = json.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        allHeaders[key] = json.getString(key)
                     }
-                    if (isPlayerPlaying) {
-                        listener.onPlaying(info)
-                    }
-                }
+                } catch (e: Exception) {}
             }
 
-            // Set Data Source - 参考项目：使用 setDataSource(url, headersMap) 而非 raw headers 选项
-            try {
-                val allHeaders = HashMap<String, String>()
-                if (userAgent.isNotEmpty()) {
-                    setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent)
-                }
-                if (customHeaders.isNotEmpty()) {
-                    try {
-                        val json = org.json.JSONObject(customHeaders)
-                        val keys = json.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            allHeaders[key] = json.getString(key)
-                        }
-                    } catch (e: Exception) {}
-                }
-
-                if (allHeaders.isNotEmpty()) {
-                    setDataSource(url, allHeaders)
-                } else {
-                    dataSource = url
-                }
-                prepareAsync()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                listener.onError()
+            if (allHeaders.isNotEmpty()) {
+                player.setDataSource(url, allHeaders)
+            } else {
+                player.dataSource = url
             }
+            player.prepareAsync()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            listener.onError()
         }
     }
 

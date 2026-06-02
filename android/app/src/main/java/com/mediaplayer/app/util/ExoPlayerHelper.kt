@@ -33,6 +33,9 @@ class ExoPlayerHelper(
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
     private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
 
+    private var lastBuiltCacheMs: Int = -1
+    private var lastBuiltDecoderMode: Int = -1
+
     init {
         initPlayerView()
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
@@ -44,6 +47,7 @@ class ExoPlayerHelper(
     private fun initPlayerView() {
         playerView = PlayerView(context).apply {
             useController = false
+            setKeepContentOnPlayerReset(true)
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -53,9 +57,25 @@ class ExoPlayerHelper(
     }
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
+            buildPlayer()
+        }
+
+        isPlayerPlaying = false
+        exoPlayer?.stop()
+
+        val mediaItem = MediaItem.fromUri(Uri.parse(url))
+        exoPlayer?.setMediaItem(mediaItem)
+        exoPlayer?.prepare()
+        exoPlayer?.play()
+    }
+
+    private fun buildPlayer() {
         releasePlayer()
 
-        // 1. Configure Decoder
+        lastBuiltCacheMs = currentCacheMs
+        lastBuiltDecoderMode = currentDecoderMode
+
         val renderersFactory = DefaultRenderersFactory(context).apply {
             setExtensionRendererMode(
                 when (currentDecoderMode) {
@@ -141,15 +161,6 @@ class ExoPlayerHelper(
                 }
             }
         })
-
-        // Add UserAgent and Custom Headers
-        // In Media3, custom headers require customizing the HttpDataSource.
-        // For simplicity, we just use standard play for now if headers aren't strictly required by Exo.
-        // Usually streams that need headers might be tricky.
-        val mediaItem = MediaItem.fromUri(Uri.parse(url))
-        exoPlayer?.setMediaItem(mediaItem)
-        exoPlayer?.prepare()
-        exoPlayer?.play()
     }
 
     override fun setAspectRatio(scaleMode: Int) {
@@ -162,7 +173,6 @@ class ExoPlayerHelper(
             Prefs.SCALE_MODE_STRETCH -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
             Prefs.SCALE_MODE_CROP -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             Prefs.SCALE_MODE_4_3 -> {
-                // Approximate 4:3 by using FIT if the video isn't 4:3, but Exo lacks a strict forced 4:3 mode easily.
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
             }
             else -> playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
