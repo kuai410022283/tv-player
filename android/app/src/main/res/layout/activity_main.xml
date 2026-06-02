@@ -573,7 +573,7 @@
                     android:id="@+id/sbSettingsCache"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="500"
+                    android:max="100"
                     android:progress="0"
                     android:nextFocusUp="@+id/btnSettingsCore"
                     android:nextFocusDown="@+id/sbSettingsVolume" />

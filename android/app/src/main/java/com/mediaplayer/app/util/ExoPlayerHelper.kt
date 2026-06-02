@@ -68,11 +68,12 @@ class ExoPlayerHelper(
 
         val loadControlBuilder = DefaultLoadControl.Builder()
         if (currentCacheMs > 0) {
-            // ExoPlayer requires a decent minimum buffer to initialize the AudioTrack properly,
-            // otherwise audio decoding fails silently or stutters heavily causing no sound.
-            val minBufMs = Math.max(1500, currentCacheMs)
-            val maxBufMs = Math.max(3000, currentCacheMs * 2)
-            loadControlBuilder.setBufferDurationsMs(minBufMs, maxBufMs, minBufMs, minBufMs)
+            loadControlBuilder.setBufferDurationsMs(
+                currentCacheMs * 2,
+                currentCacheMs * 4,
+                currentCacheMs,
+                currentCacheMs
+            )
         }
         val loadControl = loadControlBuilder.build()
 

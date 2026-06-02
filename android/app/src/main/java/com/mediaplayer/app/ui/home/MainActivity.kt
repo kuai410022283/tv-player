@@ -510,19 +510,19 @@ class MainActivity : AppCompatActivity() {
         etSettingsUrl?.setText(url)
         
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
-        val progress = if (cacheMs == 0) 0 else (cacheMs / 10).coerceIn(1, 500)
+        val progress = if (cacheMs == 0) 0 else (cacheMs / 50).coerceIn(1, 100)
         sbSettingsCache?.progress = progress
-        tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${cacheMs / 1000f} 秒"
+        tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${"%.2f".format(cacheMs / 1000f)} 秒"
 
         sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
-                val newCacheMs = if (progress == 0) 0 else progress * 10
-                tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${newCacheMs / 1000f} 秒"
+                val newCacheMs = if (progress == 0) 0 else progress * 50
+                tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${"%.2f".format(newCacheMs / 1000f)} 秒"
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
                 val p = seekBar?.progress ?: 0
-                val newCacheMs = if (p == 0) 0 else p * 10
+                val newCacheMs = if (p == 0) 0 else p * 50
                 prefs.edit().putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs).apply()
                 playerHelper?.setCacheDuration(newCacheMs)
                 Toast.makeText(this@MainActivity, "网络缓存已保存，下次播放生效", Toast.LENGTH_SHORT).show()
