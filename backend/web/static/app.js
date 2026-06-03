@@ -73,6 +73,10 @@ function fmtDate(d) {
   if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">从未同步</span>';
   return new Date(d).toLocaleString('zh-CN');
 }
+function fmtExpiresAt(d) {
+  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">永久</span>';
+  return new Date(d).toLocaleString('zh-CN');
+}
 function badge(status) { return `<span class="badge badge-${status}">${status}</span>`; }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -701,7 +705,7 @@ async function loadClients() {
       <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
       <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
       <td>${badge(c.status)}</td>
-      <td>${c.max_streams}</td>
+      <td>${fmtExpiresAt(c.expires_at)}</td>
       <td>${c.total_play_minutes}分钟</td>
       <td>${timeAgo(c.last_seen)}</td>
       <td>${fmtDate(c.created_at)}</td>
@@ -752,8 +756,7 @@ async function showClientDetail(id) {
       <div class="label">IP地址</div><div class="value" style="font-family:monospace">${esc(c.ip)}</div>
       <div class="label">状态</div><div class="value">${badge(c.status)}</div>
       <div class="label">当前套餐</div><div class="value">${c.plan_name ? '<span class="badge badge-info">' + esc(c.plan_name) + '</span>' : '-'}</div>
-      <div class="label">最大并发流</div><div class="value">${c.max_streams}</div>
-      <div class="label">授权过期</div><div class="value">${fmtDate(c.expires_at)}</div>
+      <div class="label">设备过期时间</div><div class="value">${fmtExpiresAt(c.expires_at)}</div>
       <div class="label">审批人</div><div class="value">${esc(c.approved_by) || '-'}</div>
       <div class="label">拒绝原因</div><div class="value">${esc(c.reject_reason) || '-'}</div>
       <div class="label">累计播放</div><div class="value">${c.total_play_minutes} 分钟</div>
@@ -877,22 +880,13 @@ async function showApproveModal(id) {
   const client = clientRes.data || {};
 
   const select = document.getElementById('approve-plan-id');
-  select.innerHTML = '<option value="0">-- 自定义授权 (不绑定套餐) --</option>' +
-    plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}">${esc(p.name)}</option>`).join('');
+  select.innerHTML = '<option value="0" data-desc="">-- 自定义授权 (不绑定套餐) --</option>' +
+    plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}" data-desc="${esc(p.description || '')}">${esc(p.name)}</option>`).join('');
 
   select.value = client.plan_id || 0;
+  onApprovePlanChange();
 
-  if (client.plan_id > 0) {
-    document.getElementById('approve-days').disabled = true;
-    document.getElementById('approve-streams').disabled = true;
-    const plan = plans.find(p => p.id === client.plan_id);
-    if (plan) {
-      document.getElementById('approve-days').value = plan.days;
-      document.getElementById('approve-streams').value = plan.max_streams;
-    }
-  } else {
-    document.getElementById('approve-days').disabled = false;
-    document.getElementById('approve-streams').disabled = false;
+  if (client.plan_id === 0) {
     document.getElementById('approve-days').value = client.expires_at ? Math.max(0, Math.ceil((new Date(client.expires_at) - new Date()) / (1000 * 3600 * 24))) : 365;
     document.getElementById('approve-streams').value = client.max_streams || 2;
   }
@@ -904,14 +898,47 @@ async function showApproveModal(id) {
 function onApprovePlanChange() {
   const select = document.getElementById('approve-plan-id');
   const opt = select.options[select.selectedIndex];
+  const descEl = document.getElementById('approve-plan-desc');
+
   if (select.value === "0") {
-    document.getElementById('approve-days').disabled = false;
-    document.getElementById('approve-streams').disabled = false;
+    if (descEl) {
+      descEl.innerHTML = '';
+      descEl.style.display = 'none';
+    }
   } else {
     document.getElementById('approve-days').value = opt.dataset.days;
     document.getElementById('approve-streams').value = opt.dataset.streams;
-    document.getElementById('approve-days').disabled = true;
-    document.getElementById('approve-streams').disabled = true;
+    if (descEl) {
+      const days = parseInt(opt.dataset.days) || 0;
+      const desc = opt.dataset.desc || '暂无套餐描述';
+      const validityText = days > 0 ? days + ' 天' : '永久';
+      descEl.innerHTML = `套餐有效期：<strong>${validityText}</strong><br>套餐描述：${desc}`;
+      descEl.style.display = 'block';
+    }
+  }
+}
+
+function onDefaultPlanChange() {
+  const select = document.getElementById('set-default-plan-id');
+  const opt = select.options[select.selectedIndex];
+  const fieldsRow = document.getElementById('auto-approve-fields-row');
+  const descEl = document.getElementById('default-plan-desc');
+
+  if (fieldsRow) fieldsRow.style.display = 'none';
+
+  if (select.value === "0") {
+    if (descEl) {
+      descEl.innerHTML = '';
+      descEl.style.display = 'none';
+    }
+  } else {
+    if (descEl) {
+      const days = parseInt(opt.dataset.days) || 0;
+      const desc = opt.dataset.desc || '暂无套餐描述';
+      const validityText = days > 0 ? days + ' 天' : '永久';
+      descEl.innerHTML = `套餐有效期：<strong>${validityText}</strong><br>套餐描述：${desc}`;
+      descEl.style.display = 'block';
+    }
   }
 }
 
@@ -1075,8 +1102,8 @@ async function loadClientSettings() {
 
   const select = document.getElementById('set-default-plan-id');
   const plans = plansRes.data || [];
-  select.innerHTML = '<option value="0">-- 自定义授权 (使用下方并发和天数) --</option>' +
-    plans.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  select.innerHTML = '<option value="0" data-desc="">-- 自定义授权 (使用下方允许同时在线设备数量和有效期) --</option>' +
+    plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}" data-desc="${esc(p.description || '')}">${esc(p.name)}</option>`).join('');
 
   if (setRes.data) {
     document.getElementById('set-auto-approve').value = setRes.data.auto_approve || 'false';
@@ -1084,6 +1111,7 @@ async function loadClientSettings() {
     document.getElementById('set-default-plan-id').value = setRes.data.default_plan_id || '0';
     document.getElementById('set-max-streams').value = setRes.data.default_max_streams || '2';
     document.getElementById('set-expire-days').value = setRes.data.default_expire_days || '365';
+    onDefaultPlanChange();
 
     if (document.getElementById('set-system-announcement')) {
       document.getElementById('set-system-announcement').value = setRes.data.system_announcement || '';
