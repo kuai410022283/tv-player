@@ -48,6 +48,38 @@ func getJWTSecret() string {
 	return ""
 }
 
+// ── Health Check ───────────────────────────────────────
+
+func (h *Handler) TriggerHealthCheck(c *gin.Context) {
+	var body struct {
+		ExpectedMinutes int `json:"expected_minutes"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if body.ExpectedMinutes <= 0 {
+		body.ExpectedMinutes = 60 // 默认 60 分钟
+	}
+
+	if err := h.streamProxy.TriggerHealthCheck(body.ExpectedMinutes); err != nil {
+		fail(c, 400, err.Error())
+		return
+	}
+
+	ok(c, gin.H{"message": "健康检查已启动"})
+}
+
+func (h *Handler) GetHealthCheckStatus(c *gin.Context) {
+	isRunning, current, total, delayMs := h.streamProxy.GetHealthCheckStatus()
+	ok(c, gin.H{
+		"is_running": isRunning,
+		"current":    current,
+		"total":      total,
+		"delay_ms":   delayMs,
+	})
+}
+
 func (h *Handler) getAdminPasswordHash() (string, error) {
 	settings, err := h.channelSvc.GetAllSettings()
 	if err != nil {

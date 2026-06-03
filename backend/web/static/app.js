@@ -267,6 +267,9 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage');
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
+  
+  // 每次加载频道列表时，触发一次状态轮询
+  pollHealthCheckStatus();
 }
 
 function toggleAllChannels(cb) {
@@ -280,6 +283,60 @@ async function doChannelBatchDelete() {
   hideModal('channel-batch-modal');
   toast(`已删除 ${ids.length} 个频道`);
   loadChannels(document.getElementById('channel-search').value);
+}
+
+async function startHealthCheck() {
+  const min = parseInt(document.getElementById('hc-expected-minutes').value) || 120;
+  hideModal('health-check-modal');
+  toast('正在请求启动健康检查...');
+  try {
+    const r = await api('/channels/health-check/start', { method: 'POST', body: JSON.stringify({ expected_minutes: min }) });
+    toast(r.message || '健康检查已平滑启动', 'success');
+    pollHealthCheckStatus(); // 启动后立即轮询一次状态
+  } catch (e) {
+    // Error is handled by api() automatically
+  }
+}
+
+let healthCheckPollTimer = null;
+async function pollHealthCheckStatus() {
+  try {
+    // 这里我们用一个比较安静的 fetch 来获取，不触发全局的 loading 遮罩
+    const headers = { 'Content-Type': 'application/json' };
+    if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+    const res = await fetch(API + '/channels/health-check/status', { headers });
+    if (!res.ok) return;
+    const json = await res.json();
+    const data = json.data;
+    const btn = document.getElementById('btn-health-check');
+    if (!btn) return;
+    
+    if (data && data.is_running) {
+      const pct = data.total > 0 ? Math.floor((data.current / data.total) * 100) : 0;
+      btn.textContent = `检查中 ${pct}%`;
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.style.cursor = 'not-allowed';
+      
+      // 动态计算合理的轮询时间：按进度走 1% 的时间为周期，但限制在 3秒 ~ 15秒之间
+      let pollMs = 3000;
+      if (data.total > 0 && data.delay_ms > 0) {
+        pollMs = (data.total / 100) * data.delay_ms;
+        if (pollMs < 3000) pollMs = 3000;
+        if (pollMs > 15000) pollMs = 15000;
+      }
+
+      // 继续轮询
+      if (healthCheckPollTimer) clearTimeout(healthCheckPollTimer);
+      healthCheckPollTimer = setTimeout(pollHealthCheckStatus, pollMs);
+    } else {
+      btn.textContent = '健康检查';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      if (healthCheckPollTimer) clearTimeout(healthCheckPollTimer);
+    }
+  } catch (e) {}
 }
 
 function channelGoToPage(p) {

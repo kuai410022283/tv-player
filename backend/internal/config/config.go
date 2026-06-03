@@ -28,7 +28,6 @@ type StreamConfig struct {
 	CacheDir       string `yaml:"cache_dir"`
 	MaxConcurrent  int    `yaml:"max_concurrent"`
 	BufferSize     int    `yaml:"buffer_size"`
-	HealthCheckSec int    `yaml:"health_check_sec"`
 }
 
 type AuthConfig struct {
@@ -49,7 +48,6 @@ func Load(path string) (*Config, error) {
 			CacheDir:       "./data/cache",
 			MaxConcurrent:  50,
 			BufferSize:     4096,
-			HealthCheckSec: 30,
 		},
 		Auth: AuthConfig{
 			Secret:        "",

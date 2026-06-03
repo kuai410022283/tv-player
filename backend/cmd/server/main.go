@@ -68,7 +68,6 @@ func main() {
 
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
-	go streamProxy.StartHealthCheck(stop)
 	go startClientExpiry(clientSvc, stop)
 	go middleware.StartRateLimitCleanup(stop)
 	epgSvc.StartEPGScheduler()

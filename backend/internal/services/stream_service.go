@@ -27,6 +27,10 @@ type StreamProxy struct {
 	client         *http.Client
 	channelSvc     *ChannelService
 	sem            chan struct{} // 并发控制
+	isHealthCheckRunning bool
+	healthCheckTotal     int
+	healthCheckCurrent   int
+	healthCheckDelayMs   int
 }
 
 // removed streamState
@@ -144,54 +148,101 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 	return status, nil
 }
 
-// StartHealthCheck runs periodic health checks on all channels
-func (sp *StreamProxy) StartHealthCheck(stop <-chan struct{}) {
-	interval := time.Duration(sp.cfg.HealthCheckSec) * time.Second
-	if interval < 10 { interval = 10 * time.Second }
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			sp.checkAllChannels()
-		}
+// TriggerHealthCheck starts a smooth rolling health check in the background.
+// It distributes the checks evenly over expectedMinutes to prevent CC bans and CPU spikes.
+func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
+	sp.mu.Lock()
+	if sp.isHealthCheckRunning {
+		sp.mu.Unlock()
+		return fmt.Errorf("健康检查已经在运行中")
 	}
+	sp.isHealthCheckRunning = true
+	sp.healthCheckTotal = 0
+	sp.healthCheckCurrent = 0
+	sp.mu.Unlock()
+
+	go func() {
+		defer func() {
+			sp.mu.Lock()
+			sp.isHealthCheckRunning = false
+			sp.healthCheckTotal = 0
+			sp.healthCheckCurrent = 0
+			sp.mu.Unlock()
+		}()
+
+		// 获取全量无限制列表：循环按页取，直到取完
+		page := 1
+		pageSize := 100
+		var allChannels []models.Channel
+
+		for {
+			p := &models.PageRequest{Page: page, PageSize: pageSize}
+			resp, err := sp.channelSvc.ListChannels(0, "", p, 0)
+			if err != nil || resp == nil {
+				break
+			}
+			channels, ok := resp.Items.([]models.Channel)
+			if !ok || len(channels) == 0 {
+				break
+			}
+			allChannels = append(allChannels, channels...)
+			if len(channels) < pageSize {
+				break
+			}
+			page++
+		}
+
+		total := len(allChannels)
+		if total == 0 {
+			return
+		}
+
+		sp.mu.Lock()
+		sp.healthCheckTotal = total
+		sp.mu.Unlock()
+
+		expectedSecs := float64(expectedMinutes * 60)
+		delaySecs := expectedSecs / float64(total)
+		if delaySecs < 0.5 {
+			delaySecs = 0.5 // 防御底线，最快每 0.5 秒查一次
+		}
+		delay := time.Duration(delaySecs * float64(time.Second))
+		
+		sp.mu.Lock()
+		sp.healthCheckDelayMs = int(delay.Milliseconds())
+		sp.mu.Unlock()
+
+		for _, ch := range allChannels {
+			// 支持多线路顺序探测，只要有一条活着就算 online
+			urls := strings.Split(ch.StreamURL, "#")
+			finalStatus := "offline"
+			for _, rawURL := range urls {
+				if strings.TrimSpace(rawURL) == "" { continue }
+				status, _ := sp.CheckHealth(ch.ID, rawURL, ch.StreamType)
+				if status.Status == "online" {
+					finalStatus = "online"
+					break
+				}
+			}
+			_ = sp.channelSvc.UpdateStatus(ch.ID, finalStatus)
+			
+			sp.mu.Lock()
+			sp.healthCheckCurrent++
+			sp.mu.Unlock()
+			
+			// 平滑休眠
+			time.Sleep(delay)
+		}
+	}()
+
+	return nil
 }
 
-func (sp *StreamProxy) checkAllChannels() {
-	page := 1
-	pageSize := 50
-	maxPages := 10
-	for page <= maxPages {
-		p := &models.PageRequest{Page: page, PageSize: pageSize}
-		resp, err := sp.channelSvc.ListChannels(0, "", p, 0)
-		if err != nil || resp == nil {
-			break
-		}
-
-		channels, ok := resp.Items.([]models.Channel)
-		if !ok || len(channels) == 0 {
-			break
-		}
-
-		for _, ch := range channels {
-			status, _ := sp.CheckHealth(ch.ID, ch.StreamURL, ch.StreamType)
-			newStatus := "offline"
-			if status.Status == "online" {
-				newStatus = "online"
-			}
-			_ = sp.channelSvc.UpdateStatus(ch.ID, newStatus)
-		}
-
-		if len(channels) < pageSize {
-			break
-		}
-		page++
-	}
+// GetHealthCheckStatus returns the current health check progress and delay per channel
+func (sp *StreamProxy) GetHealthCheckStatus() (bool, int, int, int) {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	return sp.isHealthCheckRunning, sp.healthCheckCurrent, sp.healthCheckTotal, sp.healthCheckDelayMs
 }
 
 // GetProxyURL returns the proxied URL for a channel

@@ -27,38 +27,50 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 
 	// ── 频道组 ──────────────────────────────────────
 	groups := r.Group("/groups")
+	groups.GET("", hs.Handler.ListGroups)
+	
+	groupWrite := groups.Group("")
+	groupWrite.Use(middleware.RequireAdmin())
 	{
-		groups.GET("", hs.Handler.ListGroups)
-		groups.POST("", hs.Handler.CreateGroup)
-		groups.PUT("/:id", hs.Handler.UpdateGroup)
-		groups.DELETE("/:id", hs.Handler.DeleteGroup)
-		groups.POST("/batch", hs.Handler.BatchGroup)
+		groupWrite.POST("", hs.Handler.CreateGroup)
+		groupWrite.PUT("/:id", hs.Handler.UpdateGroup)
+		groupWrite.DELETE("/:id", hs.Handler.DeleteGroup)
+		groupWrite.POST("/batch", hs.Handler.BatchGroup)
 	}
 
 	// ── 频道 ────────────────────────────────────────
 	channels := r.Group("/channels")
+	channels.GET("", hs.Handler.ListChannels)
+	channels.GET("/:id", hs.Handler.GetChannel)
+	
+	channelWrite := channels.Group("")
+	channelWrite.Use(middleware.RequireAdmin())
 	{
-		channels.GET("", hs.Handler.ListChannels)
-		channels.GET("/:id", hs.Handler.GetChannel)
-		channels.POST("", hs.Handler.CreateChannel)
-		channels.PUT("/:id", hs.Handler.UpdateChannel)
-		channels.DELETE("/:id", hs.Handler.DeleteChannel)
-		channels.DELETE("/batch", hs.Handler.BatchChannel)
+		channelWrite.POST("", hs.Handler.CreateChannel)
+		channelWrite.PUT("/:id", hs.Handler.UpdateChannel)
+		channelWrite.DELETE("/:id", hs.Handler.DeleteChannel)
+		channelWrite.DELETE("/batch", hs.Handler.BatchChannel)
+		channelWrite.POST("/health-check/start", hs.Handler.TriggerHealthCheck)
+		channelWrite.GET("/health-check/status", hs.Handler.GetHealthCheckStatus)
 	}
 
 	// ── 流媒体 ──────────────────────────────────────
 	stream := r.Group("/stream")
+	stream.GET("/proxy/:id", hs.Handler.ProxyStream)
+	stream.GET("/proxy/:id/*path", hs.Handler.ProxyStream)
+	stream.GET("/catchup/:id", hs.Handler.CatchupStream)
+	stream.GET("/check/:id", hs.Handler.CheckStream) // 测试用，可公开
+	
+	streamWrite := stream.Group("")
+	streamWrite.Use(middleware.RequireAdmin())
 	{
-		stream.GET("/proxy/:id", hs.Handler.ProxyStream)
-		stream.GET("/proxy/:id/*path", hs.Handler.ProxyStream)
-		stream.GET("/catchup/:id", hs.Handler.CatchupStream)
-		stream.GET("/check/:id", hs.Handler.CheckStream)
-		stream.GET("/active", hs.Handler.GetActiveStreams)
-		stream.DELETE("/active/:id", hs.Handler.KillStream)
+		streamWrite.GET("/active", hs.Handler.GetActiveStreams)
+		streamWrite.DELETE("/active/:id", hs.Handler.KillStream)
 	}
 
 	// ── M3U 源 ──────────────────────────────────────
 	m3u := r.Group("/m3u")
+	m3u.Use(middleware.RequireAdmin()) // 仅限管理员
 	{
 		m3u.GET("", hs.Handler.ListM3USources)
 		m3u.POST("", hs.Handler.AddM3USource)
@@ -68,14 +80,20 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 	}
 
-	// ── 历史 & 设置 & 统计 & EPG & 版本 ─────────────────
+	// ── 历史 & EPG & 版本 (客户端可读写) ─────────────────
 	r.GET("/history", hs.Handler.GetHistory)
 	r.POST("/history", hs.Handler.AddHistory)
-	r.GET("/settings", hs.Handler.GetSettings)
-	r.POST("/settings", hs.Handler.SetSetting)
-	r.GET("/stats", hs.Handler.GetStats)
 	r.GET("/epg", hs.Handler.GetEPG)
 	r.GET("/version", hs.Handler.GetVersion)
+	r.GET("/settings", hs.Handler.GetSettings) // 客户端需读取公告等
+	
+	// ── 管理端专属 ──────────────────────────────────
+	adminRoot := r.Group("")
+	adminRoot.Use(middleware.RequireAdmin())
+	{
+		adminRoot.POST("/settings", hs.Handler.SetSetting)
+		adminRoot.GET("/stats", hs.Handler.GetStats)
+	}
 
 	// ── 管理端：客户端管理 (需要 admin 权限) ────────
 	clients := r.Group("/admin/clients")
