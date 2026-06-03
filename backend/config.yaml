@@ -12,7 +12,7 @@ stream:
   cache_dir: "./data/cache"
   max_concurrent: 50       # 最大并发流数
   buffer_size: 4096        # 流缓冲区大小 (bytes)
-  health_check_sec: 30     # 健康检查间隔 (秒)
+  health_check_sec: 3600     # 健康检查间隔 (秒)
 
 auth:
   # ⚠️ 必须修改！使用随机生成的长字符串
