@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -219,6 +220,12 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	}
 
 	rawURLs := strings.Split(streamToProxy, "#")
+	if lineStr := r.URL.Query().Get("line"); lineStr != "" {
+		if lineIdx, err := strconv.Atoi(lineStr); err == nil && lineIdx >= 0 && lineIdx < len(rawURLs) {
+			rawURLs = []string{rawURLs[lineIdx]} // 客户端指定了线路，仅尝试该线路
+		}
+	}
+
 	var resp *http.Response
 	var finalURL string
 	var lastErr error

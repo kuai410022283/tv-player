@@ -239,17 +239,6 @@ func (h *Handler) ListChannels(c *gin.Context) {
 			groupMap := make(map[string]int) // name -> index in groupedItems
 
 			for i := range items {
-				proxyURL := ""
-				if !items[i].IsDirect {
-					ext := "ts"
-					switch items[i].StreamType {
-					case "hls", "":
-						ext = "m3u8"
-					case "mp4", "flv", "mkv", "mpd":
-						ext = items[i].StreamType
-					}
-					proxyURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?token=%s", baseURL, items[i].ID, ext, clientToken)
-				}
 				// 无论直连还是代理模式，客户端都拿取继承所得的 UA 与 CustomHeaders 方便统一标准播放
 				if ua, headers, err := h.channelSvc.GetInheritedHeaders(items[i].ID); err == nil {
 					items[i].UserAgent = ua
@@ -277,16 +266,28 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				var linesForThisItem []map[string]interface{}
 
 				if !items[i].IsDirect {
-					// 代理模式下，下发一条指向服务端的代理地址即可（服务端自动实现多线路容灾换线）
-					linesForThisItem = append(linesForThisItem, map[string]interface{}{
-						"id":             items[i].ID,
-						"stream_url":     proxyURL,
-						"stream_type":    items[i].StreamType,
-						"user_agent":     items[i].UserAgent,
-						"custom_headers": items[i].CustomHeaders,
-						"support_catchup": items[i].SupportCatchup,
-						"catchup_days":    items[i].CatchupDays,
-					})
+					ext := "ts"
+					switch items[i].StreamType {
+					case "hls", "":
+						ext = "m3u8"
+					case "mp4", "flv", "mkv", "mpd":
+						ext = items[i].StreamType
+					}
+					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址
+					rawURLs := strings.Split(items[i].StreamURL, "#")
+					for lineIdx, u := range rawURLs {
+						if strings.TrimSpace(u) == "" { continue }
+						lineProxyURL := fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s", baseURL, items[i].ID, ext, lineIdx, clientToken)
+						linesForThisItem = append(linesForThisItem, map[string]interface{}{
+							"id":             items[i].ID,
+							"stream_url":     lineProxyURL,
+							"stream_type":    items[i].StreamType,
+							"user_agent":     items[i].UserAgent,
+							"custom_headers": items[i].CustomHeaders,
+							"support_catchup": items[i].SupportCatchup,
+							"catchup_days":    items[i].CatchupDays,
+						})
+					}
 				} else {
 					// 直连模式下，把 "#" 拼接的多线路拆开下发给客户端，由客户端实现多线路容灾换线
 					rawURLs := strings.Split(items[i].StreamURL, "#")
