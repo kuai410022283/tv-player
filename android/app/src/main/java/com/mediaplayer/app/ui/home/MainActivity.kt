@@ -450,7 +450,16 @@ class MainActivity : AppCompatActivity() {
         val groupsRv = tvGroupsRv
         val channelsRv = tvChannelsRv
         if (groupsRv != null && channelsRv != null) {
-            FocusHelper.linkHorizontalFocus(groupsRv, channelsRv)
+            FocusHelper.linkHorizontalFocus(groupsRv, channelsRv) {
+                val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
+                if (groupIndex >= 0) {
+                    val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                    lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 

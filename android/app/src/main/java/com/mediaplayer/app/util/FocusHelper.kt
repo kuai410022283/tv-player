@@ -53,7 +53,11 @@ object FocusHelper {
      * 左列表按右键 → 右列表获焦
      * 右列表按左键 → 左列表获焦
      */
-    fun linkHorizontalFocus(leftRv: RecyclerView, rightRv: RecyclerView) {
+    fun linkHorizontalFocus(
+        leftRv: RecyclerView, 
+        rightRv: RecyclerView,
+        onLeftNav: (() -> Boolean)? = null
+    ) {
         leftRv.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && event.action == KeyEvent.ACTION_DOWN) {
                 rightRv.requestFocus()
@@ -68,7 +72,10 @@ object FocusHelper {
 
         rightRv.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
-                leftRv.requestFocus()
+                val handled = onLeftNav?.invoke() ?: false
+                if (!handled) {
+                    leftRv.requestFocus()
+                }
                 true
             } else false
         }
