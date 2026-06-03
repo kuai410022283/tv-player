@@ -135,33 +135,54 @@ class MainActivity : AppCompatActivity() {
     private var heartbeatRunnable: Runnable? = null
 
     private var playerHelper: com.mediaplayer.app.util.IPlayerHelper? = null
-    private var retryCount = 0
-    private val maxRetries = 3
+    private var continuousSkipCount = 0
+    private val maxAutoSkips = 5
     private val uiHandler = Handler(Looper.getMainLooper())
     private var coreRetryLevel = 0
     
     // Watchdog State
-    private var isPlayerBuffering = false
+    enum class PlaybackState { IDLE, BUFFERING, PLAYING }
+    private var currentPlaybackState = PlaybackState.IDLE
+    private var stateStartTime = 0L
     private var lastPlaybackTime = 0L
     private var frozenTimeCounter = 0
     private val watchdogRunnable = object : Runnable {
         override fun run() {
-            if (isTvMode && playerHelper?.isPlaying() == true && !isPlayerBuffering) {
-                val currentTime = playerHelper?.getTime() ?: 0L
-                if (currentTime > 0 && currentTime == lastPlaybackTime) {
-                    frozenTimeCounter++
-                    if (frozenTimeCounter >= 2) {
-                        Toast.makeText(this@MainActivity, "检测到流卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
-                        playCurrentLineInTv()
-                        frozenTimeCounter = 0
-                        return
+            if (isTvMode && playerHelper != null) {
+                val now = System.currentTimeMillis()
+                when (currentPlaybackState) {
+                    PlaybackState.BUFFERING -> {
+                        // 场景 A：连接或缓冲超时（10秒未进入 PLAYING）
+                        if (stateStartTime > 0 && now - stateStartTime > 10000L) {
+                            Toast.makeText(this@MainActivity, "网络连接超时，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                            currentPlaybackState = PlaybackState.IDLE
+                            handlePlaybackError()
+                            return
+                        }
                     }
-                } else {
-                    lastPlaybackTime = currentTime
-                    frozenTimeCounter = 0
+                    PlaybackState.PLAYING -> {
+                        // 场景 B：画面冻结（假死）
+                        val currentTime = playerHelper?.getTime() ?: 0L
+                        if (currentTime > 0 && currentTime == lastPlaybackTime) {
+                            frozenTimeCounter++
+                            if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
+                                Toast.makeText(this@MainActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                                currentPlaybackState = PlaybackState.IDLE
+                                handlePlaybackError()
+                                frozenTimeCounter = 0
+                                return
+                            }
+                        } else {
+                            lastPlaybackTime = currentTime
+                            frozenTimeCounter = 0
+                        }
+                    }
+                    PlaybackState.IDLE -> {
+                        frozenTimeCounter = 0
+                    }
                 }
             }
-            uiHandler.postDelayed(this, 5000)
+            uiHandler.postDelayed(this, 2000)
         }
     }
 
@@ -667,6 +688,10 @@ class MainActivity : AppCompatActivity() {
         val listener = object : com.mediaplayer.app.util.IPlayerHelper.PlayerListener {
             override fun onBuffering(percent: Float) {
                 uiHandler.post {
+                    if (currentPlaybackState != PlaybackState.BUFFERING) {
+                        currentPlaybackState = PlaybackState.BUFFERING
+                        stateStartTime = System.currentTimeMillis()
+                    }
                     if (percent >= 100f || percent == 0f) {
                         progressBuffering?.visibility = View.GONE
                     } else {
@@ -676,8 +701,10 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onPlaying(resolution: String) {
                 uiHandler.post {
+                    currentPlaybackState = PlaybackState.PLAYING
+                    stateStartTime = System.currentTimeMillis()
                     progressBuffering?.visibility = View.GONE
-                    retryCount = 0
+                    continuousSkipCount = 0
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -708,7 +735,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             override fun onError() {
-                uiHandler.post { handlePlaybackError() }
+                uiHandler.post { 
+                    currentPlaybackState = PlaybackState.IDLE
+                    handlePlaybackError() 
+                }
             }
         }
 
@@ -772,7 +802,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handlePlaybackError() {
-        isPlayerBuffering = false
+        currentPlaybackState = PlaybackState.IDLE
         progressBuffering?.visibility = View.GONE
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -787,7 +817,6 @@ class MainActivity : AppCompatActivity() {
                 else -> "ExoPlayer"
             }
             Toast.makeText(this, "尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
-            retryCount = 0
             playCurrentLineInTv()
             return
         }
@@ -797,17 +826,9 @@ class MainActivity : AppCompatActivity() {
 
         if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
             currentLineIndex++
-            retryCount = 0
             coreRetryLevel = 0
             Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
             playCurrentLineInTv()
-        } else if (retryCount < maxRetries) {
-            retryCount++
-            val delayMs = (3000L * (1 shl (retryCount - 1)))
-            Toast.makeText(this@MainActivity, "播放失败，${delayMs/1000}秒后重试 ($retryCount/$maxRetries)...", Toast.LENGTH_SHORT).show()
-            uiHandler.postDelayed({ 
-                if (allChannels.isNotEmpty()) playCurrentLineInTv()
-            }, delayMs)
         } else {
             // 如果用户指定了特定内核（非智能切换）且播放失败，自动回退到智能模式
             val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
@@ -815,22 +836,38 @@ class MainActivity : AppCompatActivity() {
                 currentCore = Prefs.PLAYER_CORE_AUTO
                 prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
                 updateCoreText(currentCore)
-                retryCount = 0
                 coreRetryLevel = 0
                 currentLineIndex = 0
                 Toast.makeText(this@MainActivity, "播放内核播放失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
                 playCurrentLineInTv()
                 return
             }
-            Toast.makeText(this@MainActivity, "当前频道所有线路无法播放", Toast.LENGTH_LONG).show()
-            retryCount = 0
+            
             coreRetryLevel = 0
+            currentLineIndex = 0
+            
+            continuousSkipCount++
+            if (continuousSkipCount >= maxAutoSkips) {
+                Toast.makeText(this@MainActivity, "多个频道连续播放失败，已停止自动换台", Toast.LENGTH_LONG).show()
+                continuousSkipCount = 0
+            } else {
+                Toast.makeText(this@MainActivity, "当前频道失效，自动为您跳过", Toast.LENGTH_SHORT).show()
+                if (allChannels.isNotEmpty()) {
+                    val nextChannelIndex = (currentChannelIndex + 1) % allChannels.size
+                    uiHandler.postDelayed({
+                        playTvChannel(nextChannelIndex, isAutoSkip = true)
+                    }, 1000)
+                }
+            }
         }
     }
 
     private var resolveJob: kotlinx.coroutines.Job? = null
 
-    private fun playTvChannel(index: Int) {
+    private fun playTvChannel(index: Int, isAutoSkip: Boolean = false) {
+        if (!isAutoSkip) {
+            continuousSkipCount = 0
+        }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
         
         currentCatchupStartTime = null
@@ -927,20 +964,23 @@ class MainActivity : AppCompatActivity() {
             videoLayout?.removeAllViews() // 清除旧的视图
             initPlayerWithCore(desiredCore)
         }
-        retryCount = 0
         progressBuffering?.visibility = View.VISIBLE
 
         resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
+            currentPlaybackState = PlaybackState.BUFFERING
+            stateStartTime = System.currentTimeMillis()
             playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
         }
         
         // 启动/重置看门狗
+        currentPlaybackState = PlaybackState.BUFFERING
+        stateStartTime = System.currentTimeMillis()
         lastPlaybackTime = 0L
         frozenTimeCounter = 0
         uiHandler.removeCallbacks(watchdogRunnable)
-        uiHandler.postDelayed(watchdogRunnable, 5000)
+        uiHandler.postDelayed(watchdogRunnable, 2000)
         
         // 频道列表中高亮当前播放频道
         channelAdapter.setPlayingIndex(currentChannelIndex)

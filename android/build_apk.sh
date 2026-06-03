@@ -9,7 +9,7 @@ export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
 chmod +x ./gradlew
 
 # 是否自动追加版本号？（可通过 --bump 参数开启）
-BUMP_VERSION=true
+BUMP_VERSION=false
 for arg in "$@"; do
     if [ "$arg" == "--bump" ] || [ "$arg" == "-b" ]; then
         BUMP_VERSION=true
