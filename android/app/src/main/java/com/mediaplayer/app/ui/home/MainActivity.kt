@@ -1830,7 +1830,7 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                     if (!isMenuVisible) {
-                        showZappingMenu(focusOnGroups = false, resetToPlaying = false)
+                        showZappingMenu(focusOnGroups = false, resetToPlaying = true)
                         return true
                     }
                     // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
