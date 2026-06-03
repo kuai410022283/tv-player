@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
     // ── Data ──
     private var groups = listOf<ChannelGroup>()
     private var allChannels = listOf<Channel>()
+    private var channelsByGroup: Map<Long, List<Channel>> = emptyMap()
     private var filteredChannels = listOf<Channel>()
     private var currentGroupId = 0L
     private var currentChannelIndex = 0
@@ -133,6 +134,8 @@ class MainActivity : AppCompatActivity() {
     private var authPollRunnable: Runnable? = null
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private var heartbeatRunnable: Runnable? = null
+    private val focusDebounceHandler = Handler(Looper.getMainLooper())
+    private var focusDebounceRunnable: Runnable? = null
 
     private var playerHelper: com.mediaplayer.app.util.IPlayerHelper? = null
     private var continuousSkipCount = 0
@@ -983,7 +986,7 @@ class MainActivity : AppCompatActivity() {
         uiHandler.postDelayed(watchdogRunnable, 2000)
         
         // 频道列表中高亮当前播放频道
-        channelAdapter.setPlayingIndex(currentChannelIndex)
+        channelAdapter.setPlayingChannelId(channel.id)
     }
 
     private fun showLineSelectionMenu() {
@@ -1134,7 +1137,7 @@ class MainActivity : AppCompatActivity() {
         filteredChannels = allChannels.filter {
             it.name.contains(query, ignoreCase = true)
         }
-        channelAdapter.submitList(filteredChannels)
+        channelAdapter.setData(filteredChannels)
         if (!isTvMode) updateChannelCount()
         showEmpty(filteredChannels.isEmpty(), "未找到匹配的频道")
     }
@@ -1144,12 +1147,31 @@ class MainActivity : AppCompatActivity() {
     // ═══════════════════════════════════════════════════
 
     private fun setupAdapters() {
-        groupAdapter = GroupAdapter { group ->
-            currentGroupId = group.id
-            filterChannels()
-            groupAdapter.setSelected(group.id)
-            if (!isTvMode) updatePhoneGroupTabs()
-        }
+        groupAdapter = GroupAdapter(
+            onClick = { group ->
+                currentGroupId = group.id
+                filterChannels(scrollToTop = true)
+                groupAdapter.setSelected(group.id)
+                if (!isTvMode) updatePhoneGroupTabs()
+                if (isTvMode) tvChannelsRv?.requestFocus()
+            },
+            onFocus = { group ->
+                android.util.Log.d("TV_FOCUS", "MainActivity received onFocus for: ${group.name}, isTvMode: $isTvMode")
+                if (isTvMode) {
+                    // 立即更新左侧分组的选中UI状态，不要有延迟
+                    currentGroupId = group.id
+                    groupAdapter.setSelected(group.id)
+                    
+                    focusDebounceRunnable?.let { focusDebounceHandler.removeCallbacks(it) }
+                    val r = Runnable {
+                        android.util.Log.d("TV_FOCUS", "Executing runnable for: ${group.name}")
+                        filterChannels(scrollToTop = true)
+                    }
+                    focusDebounceRunnable = r
+                    focusDebounceHandler.postDelayed(r, 150)
+                }
+            }
+        )
 
         channelAdapter = ChannelAdapter(
             isTvMode = isTvMode,
@@ -1171,11 +1193,13 @@ class MainActivity : AppCompatActivity() {
                 adapter = groupAdapter
             }
             tvChannelsRv?.apply {
+                setHasFixedSize(true)
                 layoutManager = LinearLayoutManager(this@MainActivity)
                 adapter = channelAdapter
             }
         } else {
             phoneChannelsRv?.apply {
+                setHasFixedSize(true)
                 layoutManager = LinearLayoutManager(this@MainActivity)
                 adapter = channelAdapter
             }
@@ -1383,10 +1407,13 @@ class MainActivity : AppCompatActivity() {
                     channel.globalIndex = index
                 }
                 allChannels = list
-                filteredChannels = list
-                channelAdapter.submitList(list)
-                if (!isTvMode) updateChannelCount()
-                if (!isTvMode) showEmpty(list.isEmpty())
+                channelsByGroup = list.groupBy { it.groupId }
+                if (!isTvMode) {
+                    filteredChannels = list
+                    channelAdapter.setData(list)
+                    updateChannelCount()
+                    showEmpty(list.isEmpty())
+                }
 
                 if (list.isNotEmpty()) {
                     if (isTvMode) {
@@ -1400,6 +1427,9 @@ class MainActivity : AppCompatActivity() {
                                 targetIndex = foundIndex
                             }
                         }
+                        currentGroupId = list[targetIndex].groupId
+                        groupAdapter.setSelected(currentGroupId)
+                        filterChannels(scrollToTop = false)
                         playTvChannel(targetIndex)
                         videoLayout?.requestFocus()
                     } else {
@@ -1424,16 +1454,29 @@ class MainActivity : AppCompatActivity() {
         tvEmptyText?.text = message
     }
 
-    private fun filterChannels() {
+    private fun filterChannels(scrollToTop: Boolean = true) {
         filteredChannels = if (currentGroupId == 0L) {
             allChannels
         } else {
-            allChannels.filter { it.groupId == currentGroupId }
+            channelsByGroup[currentGroupId] ?: emptyList()
         }
-        channelAdapter.submitList(filteredChannels)
-        tvChannelsRv?.scrollToPosition(0) // 分组切换时，频道列表重置到顶部
-        if (!isTvMode) updateChannelCount()
-        if (!isTvMode) showEmpty(filteredChannels.isEmpty(), "该分组暂无频道")
+        channelAdapter.setData(filteredChannels)
+        
+        if (scrollToTop) {
+            tvChannelsRv?.post {
+                tvChannelsRv?.scrollToPosition(0) // 分组切换时，频道列表重置到顶部
+            }
+        }
+        
+        if (!isTvMode) {
+            if (scrollToTop) {
+                phoneChannelsRv?.post {
+                    phoneChannelsRv?.scrollToPosition(0)
+                }
+            }
+            updateChannelCount()
+            showEmpty(filteredChannels.isEmpty(), "该分组暂无频道")
+        }
     }
 
     private fun updateChannelCount() {
@@ -1616,6 +1659,75 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    private fun showZappingMenu(focusOnGroups: Boolean, resetToPlaying: Boolean = false) {
+        if (layoutZappingMenu?.visibility == View.VISIBLE) return
+
+        val playingChannel = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex] else null
+        
+        var groupChanged = false
+        if (resetToPlaying) {
+            val newGroupId = playingChannel?.groupId ?: 0L
+            if (currentGroupId != newGroupId) {
+                currentGroupId = newGroupId
+                groupChanged = true
+            }
+        }
+        
+        if (groupChanged) {
+            groupAdapter.setSelected(currentGroupId)
+            filterChannels(scrollToTop = false)
+        } else {
+            groupAdapter.setSelected(currentGroupId)
+        }
+        
+        // 必须在设置为 VISIBLE 之前封锁左侧焦点，否则 setVisibility 内部会瞬间触发原生焦点分配并篡改当前选中状态
+        tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+
+        layoutZappingMenu?.visibility = View.VISIBLE
+        uiHandler.removeCallbacks(hideZappingRunnable)
+        uiHandler.postDelayed(hideZappingRunnable, 10000)
+
+        if (focusOnGroups) {
+            tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+            val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
+            if (groupIndex >= 0) {
+                tvGroupsRv?.scrollToPosition(groupIndex)
+                tvGroupsRv?.post {
+                    val lm = tvGroupsRv?.layoutManager as? LinearLayoutManager
+                    lm?.findViewByPosition(groupIndex)?.requestFocus() ?: tvGroupsRv?.requestFocus()
+                }
+            } else {
+                tvGroupsRv?.requestFocus()
+            }
+        } else {
+            val playingId = playingChannel?.id ?: -1L
+            val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
+            
+            val requestFocusAction = {
+                tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+                if (indexInFiltered >= 0) {
+                    val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                    lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                } else {
+                    val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                    val firstVisible = lm?.findFirstVisibleItemPosition() ?: 0
+                    lm?.findViewByPosition(firstVisible)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                }
+            }
+            
+            if (indexInFiltered >= 0) {
+                tvChannelsRv?.scrollToPosition(indexInFiltered)
+            }
+            
+            if (groupChanged) {
+                tvChannelsRv?.postDelayed({ requestFocusAction() }, 50)
+            } else {
+                // 如果分组没变，列表视图已经存在，直接同步或稍微延迟即可，但我们仍用 post 确保稳妥
+                tvChannelsRv?.post({ requestFocusAction() })
+            }
+        }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             if (layoutZappingMenu?.visibility == View.VISIBLE) {
@@ -1709,10 +1821,7 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                     if (!isMenuVisible) {
-                        layoutZappingMenu?.visibility = View.VISIBLE
-                        tvGroupsRv?.requestFocus()
-                        uiHandler.removeCallbacks(hideZappingRunnable)
-                        uiHandler.postDelayed(hideZappingRunnable, 10000)
+                        showZappingMenu(focusOnGroups = false, resetToPlaying = false)
                         return true
                     }
                     // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
@@ -1793,20 +1902,8 @@ class MainActivity : AppCompatActivity() {
             if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 if (event?.isTracking == true && !event.isCanceled) {
                     // 短按 OK 键，呼出频道列表
-                    layoutZappingMenu?.visibility = View.VISIBLE
-                    val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
-                    val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
-                    if (indexInFiltered >= 0) {
-                        tvChannelsRv?.scrollToPosition(indexInFiltered)
-                        tvChannelsRv?.postDelayed({
-                            val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
-                            lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
-                        }, 50)
-                    } else {
-                        tvChannelsRv?.requestFocus()
-                    }
-                    uiHandler.removeCallbacks(hideZappingRunnable)
-                    uiHandler.postDelayed(hideZappingRunnable, 10000)
+                    // 短按 OK 键，呼出频道列表，并重置到当前播放的频道
+                    showZappingMenu(focusOnGroups = false, resetToPlaying = true)
                 }
                 return true
             }

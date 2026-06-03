@@ -16,17 +16,32 @@ import com.mediaplayer.app.data.model.Channel
  * 频道列表适配器 - 同时支持 TV (D-pad焦点) 和 手机 (触控)
  */
 class ChannelAdapter(
-    private val isTvMode: Boolean = true,
-    private val onClick: (Channel, Int) -> Unit
-) : ListAdapter<Channel, ChannelAdapter.ViewHolder>(DiffCallback()) {
+    private val isTvMode: Boolean = false,
+    private val onClick: (Channel, Int) -> Unit,
+    private val onFocus: ((Channel, Int) -> Unit)? = null
+) : RecyclerView.Adapter<ChannelAdapter.ViewHolder>() {
 
-    private var playingIndex = -1
+    private var channels: List<Channel> = emptyList()
+    private var playingChannelId: Long = -1L
 
-    fun setPlayingIndex(index: Int) {
-        val old = playingIndex
-        playingIndex = index
-        if (old >= 0) notifyItemChanged(old)
-        if (index >= 0) notifyItemChanged(index)
+    fun setData(list: List<Channel>) {
+        this.channels = list
+        notifyDataSetChanged()
+    }
+
+    override fun getItemCount(): Int = channels.size
+    
+    fun getItem(position: Int): Channel = channels[position]
+
+    fun setPlayingChannelId(id: Long) {
+        val oldId = playingChannelId
+        playingChannelId = id
+        
+        val oldIndex = channels.indexOfFirst { it.id == oldId }
+        val newIndex = channels.indexOfFirst { it.id == id }
+        
+        if (oldIndex >= 0) notifyItemChanged(oldIndex, "play_state_changed")
+        if (newIndex >= 0) notifyItemChanged(newIndex, "play_state_changed")
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -37,7 +52,14 @@ class ChannelAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        holder.bind(item, position == playingIndex)
+        val isPlaying = item.id == playingChannelId
+        
+        holder.itemView.findViewById<TextView>(R.id.tvChannelName)?.setTextColor(
+            if (isPlaying) android.graphics.Color.parseColor("#00E5FF") 
+            else android.graphics.Color.parseColor("#E0E0E0")
+        )
+        
+        holder.bind(item, isPlaying)
 
         // 点击事件
         holder.itemView.setOnClickListener { onClick(item, position) }
@@ -128,10 +150,5 @@ class ChannelAdapter(
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
             itemView.isActivated = isPlaying
         }
-    }
-
-    class DiffCallback : DiffUtil.ItemCallback<Channel>() {
-        override fun areItemsTheSame(a: Channel, b: Channel) = a.id == b.id
-        override fun areContentsTheSame(a: Channel, b: Channel) = a == b
     }
 }

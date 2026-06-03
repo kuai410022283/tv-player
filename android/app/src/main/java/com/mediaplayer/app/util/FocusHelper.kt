@@ -25,7 +25,9 @@ object FocusHelper {
             // 焦点变化时滚动到可见
             addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
                 override fun onChildViewAttachedToWindow(view: View) {
+                    val existingListener = view.onFocusChangeListener
                     view.setOnFocusChangeListener { v, hasFocus ->
+                        existingListener?.onFocusChange(v, hasFocus)
                         if (hasFocus) {
                             val pos = rv.getChildAdapterPosition(v)
                             if (pos != RecyclerView.NO_POSITION) {

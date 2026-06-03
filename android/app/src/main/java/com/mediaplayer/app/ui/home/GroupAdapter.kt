@@ -14,7 +14,8 @@ import com.mediaplayer.app.data.model.ChannelGroup
  * 分组列表适配器 - TV模式使用
  */
 class GroupAdapter(
-    private val onClick: (ChannelGroup) -> Unit
+    private val onClick: (ChannelGroup) -> Unit,
+    private val onFocus: ((ChannelGroup) -> Unit)? = null
 ) : ListAdapter<ChannelGroup, GroupAdapter.ViewHolder>(DiffCallback()) {
 
     private var selectedId = 0L
@@ -24,7 +25,7 @@ class GroupAdapter(
         selectedId = id
         currentList.forEachIndexed { index, group ->
             if (group.id == old || group.id == id) {
-                notifyItemChanged(index)
+                notifyItemChanged(index, "selection_changed")
             }
         }
     }
@@ -32,6 +33,15 @@ class GroupAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_group, parent, false)
         return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains("selection_changed")) {
+            val item = getItem(position)
+            holder.bind(item, item.id == selectedId)
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
@@ -45,9 +55,10 @@ class GroupAdapter(
 
         // TV 焦点动画
         holder.itemView.setOnFocusChangeListener { v, hasFocus ->
-            // 当用遥控器选中某个分组时，立刻联动右侧显示该分组的频道（免去按OK）
+            android.util.Log.d("TV_FOCUS", "Group ${item.name} hasFocus: $hasFocus")
+            // 当用遥控器选中某个分组时，联动防抖
             if (hasFocus) {
-                onClick(item)
+                onFocus?.invoke(item)
             }
             v.animate()
                 .alpha(if (hasFocus) 1.0f else if (item.id == selectedId) 1.0f else 0.7f)
