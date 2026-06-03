@@ -67,8 +67,37 @@ class ExoPlayerHelper(
 
         applyScaleMode()
 
+        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+        if (userAgent.isNotEmpty()) {
+            httpDataSourceFactory.setUserAgent(userAgent)
+        }
+        
+        val headers = HashMap<String, String>()
+        if (customHeaders.isNotEmpty()) {
+            try {
+                val json = org.json.JSONObject(customHeaders)
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    headers[key] = json.getString(key)
+                }
+            } catch (e: Exception) {}
+        }
+        if (headers.isNotEmpty()) {
+            httpDataSourceFactory.setDefaultRequestProperties(headers)
+        }
+
+        // 使用 DefaultDataSource.Factory 包装 HttpDataSource，
+        // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
+        val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(defaultDataSourceFactory)
+
         val mediaItem = MediaItem.fromUri(Uri.parse(url))
-        exoPlayer?.setMediaItem(mediaItem)
+        val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
+        
+        exoPlayer?.setMediaSource(mediaSource)
         exoPlayer?.prepare()
         exoPlayer?.play()
     }
