@@ -280,8 +280,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	var resp *http.Response
 	var finalURL string
 	var lastErr error
-
-	ctx, cancel := context.WithCancel(r.Context())
+	var finalCancel context.CancelFunc
 
 	// Apply inherited UA and custom headers
 	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
@@ -289,56 +288,128 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
 	}
 
+	validURLs := []string{}
 	for _, u := range rawURLs {
 		u = strings.TrimSpace(u)
-		if u == "" { continue }
-
-		// 校验流地址，防止 SSRF
+		if u == "" {
+			continue
+		}
 		if err := ValidateStreamURL(u); err != nil {
 			lastErr = err
 			continue
 		}
+		validURLs = append(validURLs, u)
+	}
 
-		req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
-		if err != nil {
-			lastErr = err
-			continue
+	expectedCount := len(validURLs)
+	if expectedCount == 0 {
+		if lastErr != nil {
+			return fmt.Errorf("线路校验失败: %w", lastErr)
 		}
+		return fmt.Errorf("无有效播放线路")
+	}
+
+	type raceResult struct {
+		index int
+		resp  *http.Response
+		url   string
+		err   error
+	}
+
+	resultChan := make(chan raceResult, expectedCount)
+	cancels := make([]context.CancelFunc, expectedCount)
+
+	for i, u := range validURLs {
+		reqCtx, reqCancel := context.WithCancel(r.Context())
+		cancels[i] = reqCancel
 		
-		req.Header.Set("User-Agent", ua)
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+		go func(idx int, targetURL string, ctx context.Context) {
+			req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+			if err != nil {
+				resultChan <- raceResult{index: idx, err: err}
+				return
+			}
+			req.Header.Set("User-Agent", ua)
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
+			
+			rResp, rErr := sp.client.Do(req)
+			if rErr != nil {
+				resultChan <- raceResult{index: idx, err: rErr}
+				return
+			}
+			if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
+				resultChan <- raceResult{index: idx, resp: rResp, url: targetURL}
+			} else {
+				rResp.Body.Close()
+				resultChan <- raceResult{index: idx, err: fmt.Errorf("status code %d", rResp.StatusCode)}
+			}
+		}(i, u, reqCtx)
+	}
 
-		resp, err = sp.client.Do(req)
-		if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			finalURL = u
+	var errorsList []string
+	winnerIdx := -1
+	consumed := 0
+
+	for i := 0; i < expectedCount; i++ {
+		res := <-resultChan
+		consumed++
+		if res.resp != nil {
+			// 找到最快的一条存活线路
+			resp = res.resp
+			finalURL = res.url
+			winnerIdx = res.index
+			finalCancel = cancels[winnerIdx]
+
 			if resp.Request != nil && resp.Request.URL != nil {
 				finalURL = resp.Request.URL.String()
 			}
 			contentType := resp.Header.Get("Content-Type")
 			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
 				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
-				strings.Contains(strings.ToLower(u), ".m3u8")
+				strings.Contains(strings.ToLower(finalURL), ".m3u8")
 			if isM3U8 {
 				sp.SetRedirectedURL(channelID, finalURL)
 			}
 			break
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-		if err != nil {
-			lastErr = err
 		} else {
-			lastErr = fmt.Errorf("status code %d", resp.StatusCode)
+			if res.err != nil {
+				errorsList = append(errorsList, res.err.Error())
+			}
+			// 当前线路失败，立即释放上下文
+			if cancels[res.index] != nil {
+				cancels[res.index]()
+			}
 		}
 	}
 
+	// 比赛结束，立即截断所有处于 pending 状态的失败者/慢速者
+	for i, c := range cancels {
+		if i != winnerIdx && c != nil {
+			c()
+		}
+	}
+
+	// 开启后台协程排空剩余响应，避免 body 泄露
+	remaining := expectedCount - consumed
+	if remaining > 0 {
+		go func(rem int, winIdx int) {
+			for j := 0; j < rem; j++ {
+				res := <-resultChan
+				if res.resp != nil && res.index != winIdx {
+					res.resp.Body.Close()
+				}
+			}
+		}(remaining, winnerIdx)
+	}
+
 	if finalURL == "" {
-		cancel()
+		if len(errorsList) > 0 {
+			lastErr = fmt.Errorf(strings.Join(errorsList, " | "))
+		}
 		if lastErr != nil {
-			return fmt.Errorf("所有线路均失效, 最后错误: %w", lastErr)
+			return fmt.Errorf("所有线路均失效: %w", lastErr)
 		}
 		return fmt.Errorf("无有效播放线路")
 	}
@@ -359,11 +430,11 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		StartedAt:   time.Now(),
 		LastActive:  time.Now(),
 	}
-	sp.cancels[sessionID] = cancel
+	sp.cancels[sessionID] = finalCancel
 	sp.mu.Unlock()
 
 	defer func() {
-		cancel()
+		finalCancel()
 		sp.mu.Lock()
 		delete(sp.streams, sessionID)
 		delete(sp.cancels, sessionID)
@@ -431,7 +502,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	// Writer loop
 	for {
 		select {
-		case <-ctx.Done(): // Client disconnected
+		case <-r.Context().Done(): // Client disconnected
 			return nil
 		case err := <-errChan:
 			if err == io.EOF { return nil }
