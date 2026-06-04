@@ -26,7 +26,7 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
   <div class="form-group">
     <label>管理密码</label>
     <input type="password" id="login-password" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
-    <div style="font-size:11px;color:var(--text2);margin-top:8px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
+    <div id="default-pwd-hint" style="font-size:11px;color:var(--text2);margin-top:8px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
   </div>
   <div class="form-actions">
     <button class="btn btn-primary" style="width:100%" onclick="doLogin()">登录</button>
@@ -34,5 +34,15 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
 </div>
 <div class="toast" id="toast" style="display:none"></div>
 <script src="/static/app.js"></script>
+<script>
+  fetch('/api/v1/admin/config')
+    .then(res => res.json())
+    .then(data => {
+      if (data.code === 0 && data.data && !data.data.is_default_password) {
+        document.getElementById('default-pwd-hint').style.display = 'none';
+      }
+    })
+    .catch(console.error);
+</script>
 </body>
 </html>

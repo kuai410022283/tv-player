@@ -955,6 +955,22 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 	ok(c, gin.H{"token": token, "message": "登录成功"})
 }
 
+// GetAdminConfig 返回管理后台的基础公开配置状态
+func (h *Handler) GetAdminConfig(c *gin.Context) {
+	hash, err := h.getAdminPasswordHash()
+	if err != nil {
+		failInternal(c, err, "获取配置失败")
+		return
+	}
+	
+	// 判断当前密码是否依然是默认密码 "admin123"
+	isDefault := bcrypt.CompareHashAndPassword([]byte(hash), []byte("admin123")) == nil
+	
+	ok(c, gin.H{
+		"is_default_password": isDefault,
+	})
+}
+
 func (h *Handler) UpdateAdminPassword(c *gin.Context) {
 	var body struct {
 		OldPassword string `json:"old_password" binding:"required"`

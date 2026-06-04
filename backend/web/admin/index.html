@@ -673,8 +673,15 @@
         <h3>粘贴M3U内容</h3>
         <div class="form-group"><label>来源名称 <span style="color:var(--danger)">*</span></label><input type="text"
             id="import-name" placeholder="例如：本地测试源" required></div>
-        <div class="form-group"><label>M3U内容</label><textarea id="import-content" rows="10"
-            placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea></div>
+        <div class="form-group">
+          <label style="display:flex;justify-content:space-between;align-items:center;">
+            <span>M3U内容</span>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">导入源文件</button>
+          </label>
+          <input type="file" id="import-file-input" accept=".m3u,.m3u8,.txt" style="display:none" onchange="handleImportFile(event)">
+          <textarea id="import-content" rows="10"
+            placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea>
+        </div>
         <div class="form-actions">
           <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
           <button class="btn btn-primary" onclick="importM3UContent()">导入</button>

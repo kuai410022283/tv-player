@@ -690,6 +690,28 @@ async function importM3UContent() {
   if (r.data) hideModal('import-modal');
 }
 
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    if (text.includes('#EXTM3U') || text.includes('#EXTINF') || text.includes(',')) {
+      document.getElementById('import-content').value = text;
+      toast('文件读取成功，请点击导入', 'success');
+      const nameInput = document.getElementById('import-name');
+      if (!nameInput.value) {
+        nameInput.value = file.name.replace(/\.[^/.]+$/, "");
+      }
+    } else {
+      toast('文件格式不正确，需要是标准的 M3U 或 TXT 格式', 'error');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
 // ═══ Streams ══════════════════════════════════════════
 function formatSpeed(bytesPerSec) {
   if (!bytesPerSec) return '0 KB/s';

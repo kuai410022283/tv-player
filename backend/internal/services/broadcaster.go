@@ -91,7 +91,7 @@ func (cb *ChannelBroadcaster) ClientCount() int {
 }
 
 func (cb *ChannelBroadcaster) Broadcast(data []byte) {
-	cb.buffer.Write(data)
+	_, _ = cb.buffer.Write(data)
 	
 	var slowClients []string
 

@@ -127,6 +127,7 @@ func main() {
 	public := r.Group("/api/v1")
 	{
 		public.POST("/admin/login", middleware.LoginRateLimit(), h.AdminLogin)
+		public.GET("/admin/config", h.GetAdminConfig)
 		public.POST("/client/register", ch.Register)
 		public.GET("/client/verify", ch.Verify)
 		public.POST("/client/verify", ch.Verify)
