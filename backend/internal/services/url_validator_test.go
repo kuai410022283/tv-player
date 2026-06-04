@@ -10,6 +10,8 @@ func TestValidateStreamURL(t *testing.T) {
 	}{
 		{"正常 HLS", "http://example.com/live.m3u8", false},
 		{"正常 HTTPS", "https://cdn.example.com/video.mp4", false},
+		{"组播 RTP", "rtp://232.0.0.33:8652", false},
+		{"组播 UDP", "udp://239.93.0.184:5140", false},
 		{"空 URL", "", true},
 		{"file 协议", "file:///etc/passwd", true},
 		{"localhost", "http://localhost:8080/stream", true},

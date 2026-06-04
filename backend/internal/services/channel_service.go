@@ -22,8 +22,9 @@ func NewChannelService(db *sql.DB) *ChannelService {
 
 func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, error) {
 	query := `
-		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), g.created_at, g.updated_at,
-		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id) AS channel_count
+		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), COALESCE(g.enable_multiplex, 0), g.created_at, g.updated_at,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id) AS channel_count,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.stream_type NOT IN ('ts', 'flv', 'rtmp', 'rtsp')) AS non_mux_count
 		FROM channel_groups g
 	`
 	var args []interface{}
@@ -48,11 +49,12 @@ func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, erro
 	var groups []models.ChannelGroup
 	for rows.Next() {
 		var g models.ChannelGroup
-		var isDirect int
-		if err := rows.Scan(&g.ID, &g.Name, &g.Icon, &g.SortOrder, &isDirect, &g.Source, &g.UserAgent, &g.CustomHeaders, &g.CreatedAt, &g.UpdatedAt, &g.ChannelCount); err != nil {
+		var isDirect, nonMux int
+		if err := rows.Scan(&g.ID, &g.Name, &g.Icon, &g.SortOrder, &isDirect, &g.Source, &g.UserAgent, &g.CustomHeaders, &g.EnableMultiplex, &g.CreatedAt, &g.UpdatedAt, &g.ChannelCount, &nonMux); err != nil {
 			return nil, err
 		}
 		g.IsDirect = isDirect == 1
+		g.CanMultiplex = (g.ChannelCount > 0 && nonMux == 0)
 		groups = append(groups, g)
 	}
 	if err := rows.Err(); err != nil {
@@ -66,8 +68,8 @@ func (s *ChannelService) CreateGroup(g *models.ChannelGroup) error {
 	direct := 0
 	if g.IsDirect { direct = 1 }
 	if g.Source == "" { g.Source = "手动" }
-	res, err := s.db.Exec(`INSERT INTO channel_groups (name, icon, sort_order, is_direct, source, user_agent, custom_headers, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		g.Name, g.Icon, g.SortOrder, direct, g.Source, g.UserAgent, g.CustomHeaders, now, now)
+	res, err := s.db.Exec(`INSERT INTO channel_groups (name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		g.Name, g.Icon, g.SortOrder, direct, g.Source, g.UserAgent, g.CustomHeaders, g.EnableMultiplex, now, now)
 	if err != nil {
 		return err
 	}
@@ -85,12 +87,12 @@ func (s *ChannelService) UpdateGroup(g *models.ChannelGroup) error {
 	if err != nil { return err }
 	defer func() { _ = tx.Rollback() }()
 
-	_, err = tx.Exec(`UPDATE channel_groups SET name=?, icon=?, sort_order=?, is_direct=?, user_agent=?, custom_headers=?, updated_at=? WHERE id=?`,
-		g.Name, g.Icon, g.SortOrder, direct, g.UserAgent, g.CustomHeaders, time.Now(), g.ID)
+	_, err = tx.Exec(`UPDATE channel_groups SET name=?, icon=?, sort_order=?, is_direct=?, user_agent=?, custom_headers=?, enable_multiplex=?, updated_at=? WHERE id=?`,
+		g.Name, g.Icon, g.SortOrder, direct, g.UserAgent, g.CustomHeaders, g.EnableMultiplex, time.Now(), g.ID)
 	if err != nil { return err }
 
-	// 同步修改分组下所有频道的直连设置
-	_, err = tx.Exec(`UPDATE channels SET is_direct=? WHERE group_id=?`, direct, g.ID)
+	// 同步修改分组下所有频道的直连和复用设置
+	_, err = tx.Exec(`UPDATE channels SET is_direct=?, enable_multiplex=? WHERE group_id=?`, direct, g.EnableMultiplex, g.ID)
 	if err != nil { return err }
 
 	return tx.Commit()
@@ -166,6 +168,9 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 		case "代理", "代理模式":
 			where += " AND (name LIKE ? OR source LIKE ? OR is_direct = 0)"
 			args = append(args, "%"+search+"%", "%"+search+"%")
+		case "复用", "复用模式":
+			where += " AND (name LIKE ? OR source LIKE ? OR enable_multiplex = 1)"
+			args = append(args, "%"+search+"%", "%"+search+"%")
 		default:
 			where += " AND (name LIKE ? OR source LIKE ?)"
 			args = append(args, "%"+search+"%", "%"+search+"%")
@@ -181,8 +186,9 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 	queryArgs := append(args, p.PageSize, offset)
 	
 	rows, err := s.db.Query(fmt.Sprintf(`
-		SELECT id, name, COALESCE(icon, ''), sort_order, is_direct, COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), created_at, updated_at,
-		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id) AS channel_count
+		SELECT id, name, COALESCE(icon, ''), sort_order, is_direct, COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), COALESCE(enable_multiplex, 0), created_at, updated_at,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id) AS channel_count,
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id AND c.stream_type NOT IN ('ts', 'flv', 'rtmp', 'rtsp')) AS non_mux_count
 		FROM channel_groups %s 
 		ORDER BY CASE WHEN name = '未分类' THEN 1 ELSE 0 END, sort_order, id 
 		LIMIT ? OFFSET ?`, where), queryArgs...)
@@ -194,9 +200,11 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 	var items []*models.ChannelGroup
 	for rows.Next() {
 		m := &models.ChannelGroup{}
-		if err := rows.Scan(&m.ID, &m.Name, &m.Icon, &m.SortOrder, &m.IsDirect, &m.Source, &m.UserAgent, &m.CustomHeaders, &m.CreatedAt, &m.UpdatedAt, &m.ChannelCount); err != nil {
+		var nonMux int
+		if err := rows.Scan(&m.ID, &m.Name, &m.Icon, &m.SortOrder, &m.IsDirect, &m.Source, &m.UserAgent, &m.CustomHeaders, &m.EnableMultiplex, &m.CreatedAt, &m.UpdatedAt, &m.ChannelCount, &nonMux); err != nil {
 			return nil, err
 		}
+		m.CanMultiplex = (m.ChannelCount > 0 && nonMux == 0)
 		items = append(items, m)
 	}
 
@@ -227,8 +235,20 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 		queryArgs = append(queryArgs, groupID)
 	}
 	if search != "" {
-		whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ?)")
-		queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		switch search {
+		case "直连", "直连模式":
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.is_direct = 1)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		case "代理", "代理模式":
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.is_direct = 0)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		case "复用", "复用模式":
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.enable_multiplex = 1)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		default:
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ?)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		}
 	}
 
 	where := "WHERE " + strings.Join(whereClauses, " AND ")
@@ -243,7 +263,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 	
 	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
 		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
-		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at ` +
+		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), c.created_at, c.updated_at ` +
 		baseQuery + where + ` ORDER BY c.sort_order LIMIT ? OFFSET ?`
 		
 	rows, err := s.db.Query(query, queryArgs...)
@@ -257,7 +277,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 		var c models.Channel
 		var isHid, isDir, supportCatchup int
 		var lastCheck sql.NullTime
-		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.EnableMultiplex, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.IsHidden = isHid == 1
@@ -266,6 +286,8 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 		if lastCheck.Valid {
 			c.LastCheck = lastCheck.Time
 		}
+		st := strings.ToLower(c.StreamType)
+		c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp")
 		channels = append(channels, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -281,7 +303,7 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 	query := `
 		SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 			c.stream_type, c.epg_channel_id, 
-			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at 
+			c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), c.created_at, c.updated_at 
 		FROM channels c 
 		WHERE c.id=?`
 	args := []interface{}{id}
@@ -290,7 +312,7 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 		query = `
 			SELECT c.id, c.group_id, c.name, c.logo, c.description, c.stream_url, 
 				c.stream_type, c.epg_channel_id, 
-				c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, c.created_at, c.updated_at 
+				c.is_hidden, c.is_direct, c.sort_order, c.status, c.last_check, c.source, COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), c.created_at, c.updated_at 
 			FROM channels c 
 			JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
 			JOIN clients cl ON pgr.plan_id = cl.plan_id AND cl.id = ?
@@ -299,7 +321,7 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 	}
 
 	err := s.db.QueryRow(query, args...).
-		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.CreatedAt, &c.UpdatedAt)
+		Scan(&c.ID, &c.GroupID, &c.Name, &c.Logo, &c.Description, &c.StreamURL, &c.StreamType, &c.EPGChannelID, &isHid, &isDir, &c.SortOrder, &c.Status, &lastCheck, &c.Source, &c.UserAgent, &c.CustomHeaders, &supportCatchup, &c.CatchupType, &c.CatchupSource, &c.CatchupDays, &c.EnableMultiplex, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -309,6 +331,8 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 	if lastCheck.Valid {
 		c.LastCheck = lastCheck.Time
 	}
+	st := strings.ToLower(c.StreamType)
+	c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp")
 	return &c, nil
 }
 
@@ -366,8 +390,8 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, now, now)
+	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, now, now)
 	if err != nil {
 		return err
 	}
@@ -390,8 +414,8 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, support_catchup=?, catchup_type=?, catchup_source=?, catchup_days=?, updated_at=? WHERE id=?`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, time.Now(), c.ID)
+	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, support_catchup=?, catchup_type=?, catchup_source=?, catchup_days=?, enable_multiplex=?, updated_at=? WHERE id=?`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, time.Now(), c.ID)
 	return err
 }
 
@@ -426,6 +450,12 @@ func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
 
 func (s *ChannelService) UpdateStatus(id int64, status string) error {
 	_, err := s.db.Exec(`UPDATE channels SET status=?, last_check=? WHERE id=?`, status, time.Now(), id)
+	return err
+}
+
+// UpdateStreamType updates the stream type of a channel (e.g. from auto-detection)
+func (s *ChannelService) UpdateStreamType(id int64, streamType string) error {
+	_, err := s.db.Exec("UPDATE channels SET stream_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", streamType, id)
 	return err
 }
 

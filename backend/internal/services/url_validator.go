@@ -20,7 +20,7 @@ func ValidateStreamURL(rawURL string) error {
 
 	scheme := strings.ToLower(u.Scheme)
 	switch scheme {
-	case "http", "https", "rtmp", "rtsp":
+	case "http", "https", "rtmp", "rtsp", "rtp", "udp", "p2p":
 		// OK
 	case "file", "ftp", "gopher", "dict", "data":
 		return fmt.Errorf("禁止的协议: %s", scheme)

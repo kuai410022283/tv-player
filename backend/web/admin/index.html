@@ -202,6 +202,7 @@
                 <th>来源</th>
                 <th>类型</th>
                 <th>状态</th>
+                <th>复用状态</th>
 
                 <th>操作</th>
               </tr>
@@ -235,6 +236,7 @@
                 <th>排序</th>
                 <th>来源</th>
                 <th>直连模式</th>
+                <th>复用状态</th>
                 <th>频道数</th>
                 <th>操作</th>
               </tr>
@@ -587,6 +589,12 @@
             <option value="false">关闭 (经代理加密源)</option>
           </select>
         </div>
+        <div class="form-group" id="ch-multiplex-group"><label>启用线路复用 (限直连关闭+可复用流)</label>
+          <select id="ch-enable-multiplex">
+            <option value="0">关闭</option>
+            <option value="1">开启 (多用户共享单条线路)</option>
+          </select>
+        </div>
         <div class="form-group"><label>Logo URL</label><input type="text" id="ch-logo"></div>
         <div class="form-group"><label>EPG频道ID</label><input type="text" id="ch-epg"></div>
         <div class="form-group"><label>User-Agent (重写)</label><input type="text" id="ch-user-agent"
@@ -610,6 +618,12 @@
           <select id="grp-is-direct">
             <option value="true">开启 (默认，省宽带)</option>
             <option value="false">关闭 (经代理加密源)</option>
+          </select>
+        </div>
+        <div class="form-group" id="grp-multiplex-group"><label>批量线路复用 (限全组支持复用)</label>
+          <select id="grp-enable-multiplex">
+            <option value="0">关闭</option>
+            <option value="1">开启 (统一切换组内频道为复用)</option>
           </select>
         </div>
         <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent"

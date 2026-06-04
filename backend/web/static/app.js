@@ -256,6 +256,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
       <td><span class="badge badge-${c.stream_type}">${c.stream_type.toUpperCase()}</span></td>
       <td>${badge(c.status)}</td>
+      <td>${c.can_multiplex ? (c.enable_multiplex === 1 ? '<span style="color:var(--success)">✅ 通行(已开)</span>' : '<span style="color:var(--success)">✅ 通行(未开)</span>') : '<span style="color:var(--danger)">🚫 禁用</span>'}</td>
       <td><div class="btn-group">
         <button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">编辑</button>
         <button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">删除</button>
@@ -376,6 +377,8 @@ function showAddChannelModal() {
   document.getElementById('ch-logo').value = '';
   document.getElementById('ch-epg').value = '';
   document.getElementById('ch-is-direct').value = 'true';
+  document.getElementById('ch-enable-multiplex').value = '0';
+  document.getElementById('ch-multiplex-group').style.display = 'none';
   document.getElementById('ch-user-agent').value = '';
   document.getElementById('ch-headers').value = '';
   showModal('channel-modal');
@@ -391,6 +394,7 @@ async function saveChannel() {
     logo: document.getElementById('ch-logo').value,
     epg_channel_id: document.getElementById('ch-epg').value,
     is_direct: document.getElementById('ch-is-direct').value === 'true',
+    enable_multiplex: parseInt(document.getElementById('ch-enable-multiplex').value) || 0,
     user_agent: document.getElementById('ch-user-agent').value,
     custom_headers: document.getElementById('ch-headers').value
   };
@@ -421,6 +425,8 @@ async function editChannel(id) {
   document.getElementById('ch-logo').value = c.logo || '';
   document.getElementById('ch-epg').value = c.epg_channel_id || '';
   document.getElementById('ch-is-direct').value = c.is_direct !== false ? 'true' : 'false';
+  document.getElementById('ch-enable-multiplex').value = c.enable_multiplex === 1 ? '1' : '0';
+  document.getElementById('ch-multiplex-group').style.display = c.can_multiplex ? 'block' : 'none';
   document.getElementById('ch-user-agent').value = c.user_agent || '';
   document.getElementById('ch-headers').value = c.custom_headers || '';
   document.getElementById('channel-modal-title').textContent = '编辑频道';
@@ -465,6 +471,7 @@ async function loadGroups() {
     <td style="color:var(--text3)">${(groupPage - 1) * PAGE_SIZE + i + 1}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
     <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
     <td>${g.is_direct ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-warn">关闭</span>'}</td>
+    <td>${g.can_multiplex ? (g.enable_multiplex === 1 ? '<span style="color:var(--success)">✅ 通行(已开)</span>' : '<span style="color:var(--success)">✅ 通行(未开)</span>') : '<span style="color:var(--danger)">🚫 禁用</span>'}</td>
     <td><a href="javascript:void(0)" onclick="filterChannelsByGroup(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}')" style="font-weight:bold;color:var(--primary);text-decoration:underline;">${g.channel_count || 0}</a></td>
     <td>
       ${isDefault ? '<span style="color:var(--text3);font-size:12px;user-select:none">系统内置</span>' : `<div class="btn-group">
@@ -511,6 +518,8 @@ function showAddGroupModal() {
   document.getElementById('grp-name').value = '';
   document.getElementById('grp-sort').value = '0';
   document.getElementById('grp-is-direct').value = 'true';
+  document.getElementById('grp-enable-multiplex').value = '0';
+  document.getElementById('grp-multiplex-group').style.display = 'none';
   document.getElementById('grp-user-agent').value = '';
   document.getElementById('grp-headers').value = '';
   showModal('group-modal');
@@ -522,6 +531,7 @@ async function saveGroup() {
     name: document.getElementById('grp-name').value,
     sort_order: +document.getElementById('grp-sort').value || 0,
     is_direct: document.getElementById('grp-is-direct').value === 'true',
+    enable_multiplex: parseInt(document.getElementById('grp-enable-multiplex').value) || 0,
     user_agent: document.getElementById('grp-user-agent').value,
     custom_headers: document.getElementById('grp-headers').value
   };
@@ -547,6 +557,8 @@ function editGroup(id) {
   document.getElementById('grp-name').value = g.name;
   document.getElementById('grp-sort').value = g.sort_order;
   document.getElementById('grp-is-direct').value = g.is_direct !== false ? 'true' : 'false';
+  document.getElementById('grp-enable-multiplex').value = g.enable_multiplex === 1 ? '1' : '0';
+  document.getElementById('grp-multiplex-group').style.display = g.can_multiplex ? 'block' : 'none';
   document.getElementById('grp-user-agent').value = g.user_agent || '';
   document.getElementById('grp-headers').value = g.custom_headers || '';
   showModal('group-modal');

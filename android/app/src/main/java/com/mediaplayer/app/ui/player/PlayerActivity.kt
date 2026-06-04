@@ -549,6 +549,11 @@ class PlayerActivity : AppCompatActivity() {
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
 
+        // 切换频道前，保存上一个频道的观看时长
+        if (channelId > 0) {
+            saveProgress()
+        }
+
         channelIndex = index
         lineIndex = 0 // 重置为第一条线路
         val channel = allChannels[index]
@@ -632,9 +637,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun saveProgress() {
-        val pos = playerHelper?.getTime()?.div(1000)?.toInt() ?: 0
+        val lastPos = playerHelper?.getTime()?.div(1000)?.toInt() ?: 0
+        var duration = 0
+        if (stateStartTime > 0 && currentPlaybackState == PlaybackState.PLAYING) {
+            duration = ((System.currentTimeMillis() - stateStartTime) / 1000).toInt()
+        }
         val clientId = authManager.getClientId()
-        lifecycleScope.launch { repo.addHistory(channelId, pos, pos, clientId) }
+        
+        // 记录播放历史
+        val cId = channelId
+        if (cId > 0 && duration > 0) {
+            lifecycleScope.launch { repo.addHistory(cId, duration, lastPos, clientId) }
+        }
     }
 
     // ═══════════════════════════════════════════════════

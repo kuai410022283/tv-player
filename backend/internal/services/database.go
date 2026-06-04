@@ -48,6 +48,8 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 
 	// 移除 channel_groups.name 的 UNIQUE 约束
 	var sqlStmt string
@@ -100,6 +102,7 @@ func createTables(db *sql.DB) error {
 		source TEXT DEFAULT '手动',
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
+		enable_multiplex INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -126,6 +129,7 @@ func createTables(db *sql.DB) error {
 		catchup_type TEXT DEFAULT '',
 		catchup_source TEXT DEFAULT '',
 		catchup_days INTEGER DEFAULT 0,
+		enable_multiplex INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -264,6 +268,8 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 
 	return err
 }

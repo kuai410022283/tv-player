@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // ── Channel Group ──────────────────────────────────────
 
@@ -14,6 +17,8 @@ type ChannelGroup struct {
 	ChannelCount int       `json:"channel_count" db:"channel_count"`
 	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
 	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
+	EnableMultiplex int    `json:"enable_multiplex" db:"enable_multiplex"`
+	CanMultiplex bool      `json:"can_multiplex" db:"-"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -45,6 +50,8 @@ type Channel struct {
 	CatchupType    string   `json:"catchup_type,omitempty" db:"catchup_type"`
 	CatchupSource  string   `json:"catchup_source,omitempty" db:"catchup_source"`
 	CatchupDays    int      `json:"catchup_days,omitempty" db:"catchup_days"`
+	EnableMultiplex int     `json:"enable_multiplex" db:"enable_multiplex"`
+	CanMultiplex bool       `json:"can_multiplex" db:"-"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -261,6 +268,7 @@ type ServerStats struct {
 
 // ActiveStream 代表当前正在通过服务端代理转发的活跃流状态
 type ActiveStream struct {
+	Mu          *sync.RWMutex `json:"-"`
 	SessionID   string    `json:"session_id"`
 	ClientID    int64     `json:"client_id"`
 	ClientIP    string    `json:"client_ip"`

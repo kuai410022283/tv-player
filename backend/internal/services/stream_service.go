@@ -24,6 +24,8 @@ type StreamProxy struct {
 	streams        map[string]*models.ActiveStream
 	cancels        map[string]context.CancelFunc
 	redirectedURLs map[int64]string // 存储每个频道的重定向后基础 URL
+	broadcasters   map[int64]*ChannelBroadcaster
+	bMu            sync.RWMutex
 	client         *http.Client
 	channelSvc     *ChannelService
 	sem            chan struct{} // 并发控制
@@ -45,6 +47,7 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		streams:        make(map[string]*models.ActiveStream),
 		cancels:        make(map[string]context.CancelFunc),
 		redirectedURLs: make(map[int64]string),
+		broadcasters:   make(map[int64]*ChannelBroadcaster),
 		channelSvc:     channelSvc,
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
@@ -252,17 +255,29 @@ func (sp *StreamProxy) GetProxyURL(channelID int64, baseURL string) string {
 
 // ServeStream proxies the actual stream data. If targetURL is provided, it proxies that URL instead of the channel's default StreamURL.
 func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, targetURL string) error {
+	ch, err := sp.channelSvc.GetChannel(channelID, 0)
+	if err != nil {
+		return fmt.Errorf("channel not found: %w", err)
+	}
+
+	st := strings.ToLower(ch.StreamType)
+	canMultiplex := (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
+	isMultiplex := ch.EnableMultiplex == 1 && canMultiplex && targetURL == ""
+
+	if isMultiplex {
+		return sp.serveMultiplex(channelID, clientID, clientIP, clientName, w, r, ch)
+	}
+
+	return sp.serveDirectProxy(channelID, clientID, clientIP, clientName, w, r, ch, targetURL)
+}
+
+func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
 	// 并发控制
 	select {
 	case sp.sem <- struct{}{}:
 		defer func() { <-sp.sem }()
 	default:
 		return fmt.Errorf("并发流数已达上限 (%d)", sp.cfg.MaxConcurrent)
-	}
-
-	ch, err := sp.channelSvc.GetChannel(channelID, 0)
-	if err != nil {
-		return fmt.Errorf("channel not found: %w", err)
 	}
 
 	streamToProxy := ch.StreamURL
@@ -372,6 +387,18 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 			if isM3U8 {
 				sp.SetRedirectedURL(channelID, finalURL)
 			}
+			var actualType string
+			if isM3U8 {
+				actualType = "hls"
+			} else if strings.Contains(strings.ToLower(contentType), "video/mp2t") || strings.Contains(strings.ToLower(contentType), "octet-stream") {
+				actualType = "ts"
+			} else if strings.Contains(strings.ToLower(contentType), "flv") {
+				actualType = "flv"
+			}
+			if ch.StreamType == "" && actualType != "" {
+				ch.StreamType = actualType
+				_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
+			}
 			break
 		} else {
 			if res.err != nil {
@@ -419,6 +446,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	// Update stream state
 	sp.mu.Lock()
 	sp.streams[sessionID] = &models.ActiveStream{
+		Mu:          &sync.RWMutex{},
 		SessionID:   sessionID,
 		ChannelID:   channelID,
 		ChannelName: ch.Name,
@@ -563,12 +591,14 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 					writeBuf = writeBuf[:0]
 				}
 				
-				sp.mu.Lock()
+				sp.mu.RLock()
 				if s, ok := sp.streams[sessionID]; ok {
+					s.Mu.Lock()
 					s.LastActive = now
 					s.SpeedBytes = bytesSinceLastUpdate
+					s.Mu.Unlock()
 				}
-				sp.mu.Unlock()
+				sp.mu.RUnlock()
 				bytesSinceLastUpdate = 0
 				lastUpdate = now
 			}
@@ -594,7 +624,10 @@ func (sp *StreamProxy) GetActiveStreams() []models.ActiveStream {
 
 	var streams []models.ActiveStream
 	for _, s := range sp.streams {
-		streams = append(streams, *s)
+		s.Mu.RLock()
+		snapshot := *s
+		s.Mu.RUnlock()
+		streams = append(streams, snapshot)
 	}
 	return streams
 }
