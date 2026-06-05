@@ -383,6 +383,9 @@ func (s *EPGService) FetchAndBuildIndex() {
 	}
 
 	slog.Info("本轮 EPG 数据并发拉取更新结束", "total_merged_programs", totalAdded)
+
+	// ── 自动补全 EPG 频道 ID ──
+	go s.autoCompleteEPGChannelIDs()
 }
 
 // 异步检查并触发跨天刷新
@@ -580,4 +583,64 @@ func (s *EPGService) ForceRefresh() error {
 	globalEPGIndex.mu.Unlock()
 	s.FetchAndBuildIndex()
 	return nil
+}
+
+// HasEPG 检查内存中是否存在该频道的任何 EPG 数据
+func (s *EPGService) HasEPG(channelID string) bool {
+	globalEPGIndex.mu.RLock()
+	defer globalEPGIndex.mu.RUnlock()
+
+	if channelID == "" {
+		return false
+	}
+
+	chID := strings.ToLower(channelID)
+	chIDClean := normalizeChannelName(channelID)
+
+	if _, ok := globalEPGIndex.programs[chID]; ok {
+		return true
+	}
+
+	for key := range globalEPGIndex.programs {
+		if normalizeChannelName(key) == chIDClean {
+			return true
+		}
+	}
+
+	return false
+}
+
+// autoCompleteEPGChannelIDs 自动为 epg_channel_id 为空的频道补全匹配的频道名称
+func (s *EPGService) autoCompleteEPGChannelIDs() {
+	rows, err := s.db.Query(`SELECT id, name FROM channels WHERE epg_channel_id = '' OR epg_channel_id IS NULL`)
+	if err != nil {
+		slog.Error("自动补全 EPG 频道 ID 时查询失败", "error", err)
+		return
+	}
+	defer rows.Close()
+
+	updatedCount := 0
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			continue
+		}
+
+		if name == "" {
+			continue
+		}
+
+		if s.HasEPG(name) {
+			_, err := s.db.Exec(`UPDATE channels SET epg_channel_id = ? WHERE id = ?`, name, id)
+			if err == nil {
+				updatedCount++
+				slog.Info("自动补全 EPG 频道 ID 成功", "channel_id", id, "name", name)
+			}
+		}
+	}
+
+	if updatedCount > 0 {
+		slog.Info("本轮 EPG 自动补全结束", "updated_channels", updatedCount)
+	}
 }

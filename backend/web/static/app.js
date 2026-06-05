@@ -252,6 +252,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
       <td style="color:var(--text3)">${(channelPage - 1) * PAGE_SIZE + i + 1}</td>
       <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
+      <td>${c.epg_channel_id ? esc(c.epg_channel_id) : '<span style="color:#999">-</span>'}</td>
       <td>${gm[c.group_id] || '-'}</td>
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
       <td><span class="badge badge-${c.stream_type}">${c.stream_type.toUpperCase()}</span></td>

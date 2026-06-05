@@ -237,17 +237,17 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 	if search != "" {
 		switch search {
 		case "直连", "直连模式":
-			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.is_direct = 1)")
-			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.epg_channel_id LIKE ? OR c.is_direct = 1)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 		case "代理", "代理模式":
-			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.is_direct = 0)")
-			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.epg_channel_id LIKE ? OR c.is_direct = 0)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 		case "复用", "复用模式":
-			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.enable_multiplex = 1)")
-			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.epg_channel_id LIKE ? OR c.enable_multiplex = 1)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 		default:
-			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ?)")
-			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+			whereClauses = append(whereClauses, "(c.name LIKE ? OR cg.name LIKE ? OR c.source LIKE ? OR c.epg_channel_id LIKE ?)")
+			queryArgs = append(queryArgs, "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 		}
 	}
 
