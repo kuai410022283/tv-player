@@ -30,7 +30,8 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 
 	// Create client channel
 	sessionID := fmt.Sprintf("mux-%d-%d-%d", channelID, clientID, time.Now().UnixNano())
-	clientChan := make(chan []byte, 2048)
+	// Create client channel (16384 chunks 给予约 20MB 的抗网络抖动容忍度)
+	clientChan := make(chan []byte, 16384)
 	
 	// Create cancel context for killing stream
 	ctx, cancel := context.WithCancel(r.Context())

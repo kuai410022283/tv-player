@@ -65,7 +65,7 @@ func NewChannelBroadcaster(channelID int64, targetURL string, header http.Header
 		ChannelID: channelID,
 		URL:       targetURL,
 		Header:    header,
-		buffer:    NewRingBuffer(2 * 1024 * 1024), // 2MB burst buffer
+		buffer:    NewRingBuffer(8 * 1024 * 1024), // 8MB burst buffer，解决起播慢问题
 		clients:   make(map[string]chan []byte),
 		cancel:    cancel,
 		active:    true,

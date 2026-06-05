@@ -1486,6 +1486,14 @@ function toggleTokenVisibility(iconSvg) {
 
 // ════ Init ═════════════════════════════════════════════
 if (!window.location.pathname.includes('/login.html') && adminToken) {
-  const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
-  showSection(lastSection);
+  (async () => {
+    try {
+      const setRes = await api('/settings');
+      if (setRes && setRes.data) {
+        localLogoEnabled = (setRes.data.enable_local_logo === 'true');
+      }
+    } catch (e) {}
+    const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
+    showSection(lastSection);
+  })();
 }

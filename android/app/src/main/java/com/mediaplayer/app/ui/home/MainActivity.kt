@@ -158,9 +158,9 @@ class MainActivity : AppCompatActivity() {
                     PlaybackState.BUFFERING -> {
                         // 场景 A：连接或缓冲超时（10秒未进入 PLAYING）
                         if (stateStartTime > 0 && now - stateStartTime > 10000L) {
-                            Toast.makeText(this@MainActivity, "网络连接超时，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "网络连接超时，正在尝试切换线路...", Toast.LENGTH_SHORT).show()
                             currentPlaybackState = PlaybackState.IDLE
-                            handlePlaybackError()
+                            handlePlaybackError(isNetworkTimeout = true)
                             return
                         }
                     }
@@ -775,7 +775,7 @@ class MainActivity : AppCompatActivity() {
             override fun onError() {
                 uiHandler.post { 
                     currentPlaybackState = PlaybackState.IDLE
-                    handlePlaybackError() 
+                    handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
         }
@@ -843,14 +843,16 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvSettingsShowLogoValue)?.text = if (show) "显示" else "隐藏"
     }
 
-    private fun handlePlaybackError() {
+    private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
         currentPlaybackState = PlaybackState.IDLE
         progressBuffering?.visibility = View.GONE
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
 
-        // 内核容灾：智能模式下尝试切换播放内核
+        // 如果是网络超时，不要去切换内核（因为内核没毛病），直接走换线逻辑
+        if (!isNetworkTimeout) {
+            // 内核容灾：智能模式下尝试切换播放内核
         if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
@@ -862,6 +864,7 @@ class MainActivity : AppCompatActivity() {
             playCurrentLineInTv()
             return
         }
+        }
 
         val channel = allChannels.getOrNull(currentChannelIndex)
         val lines = channel?.getLinesSafely() ?: emptyList()
@@ -872,15 +875,15 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
             playCurrentLineInTv()
         } else {
-            // 如果用户指定了特定内核（非智能切换）且播放失败，自动回退到智能模式
+            // 如果用户指定了特定内核（非智能切换）且播放失败，并且不是网络超时，才回退到智能模式
             val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-            if (savedCore != Prefs.PLAYER_CORE_AUTO) {
+            if (savedCore != Prefs.PLAYER_CORE_AUTO && !isNetworkTimeout) {
                 currentCore = Prefs.PLAYER_CORE_AUTO
                 prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
                 updateCoreText(currentCore)
                 coreRetryLevel = 0
                 currentLineIndex = 0
-                Toast.makeText(this@MainActivity, "播放内核播放失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放内核解码失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
                 playCurrentLineInTv()
                 return
             }

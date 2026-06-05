@@ -107,9 +107,9 @@ class PlayerActivity : AppCompatActivity() {
                 when (currentPlaybackState) {
                     PlaybackState.BUFFERING -> {
                         if (stateStartTime > 0 && now - stateStartTime > 10000L) {
-                            Toast.makeText(this@PlayerActivity, "网络连接超时，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@PlayerActivity, "网络连接超时，正在尝试切换线路...", Toast.LENGTH_SHORT).show()
                             currentPlaybackState = PlaybackState.IDLE
-                            handlePlaybackError()
+                            handlePlaybackError(isNetworkTimeout = true)
                             return
                         }
                     }
@@ -360,9 +360,9 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onError() {
-                runOnUiThread {
+                handler.post { 
                     currentPlaybackState = PlaybackState.IDLE
-                    handlePlaybackError()
+                    handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
         }
@@ -493,8 +493,8 @@ class PlayerActivity : AppCompatActivity() {
         handler.postDelayed(watchdogRunnable, 2000)
     }
 
-    private fun handlePlaybackError() {
-        tvStatus?.text = "播放失败"
+    private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
+        currentPlaybackState = PlaybackState.IDLE
         progressBar?.visibility = View.GONE
         
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -522,11 +522,11 @@ class PlayerActivity : AppCompatActivity() {
             playCurrentLine()
         } else {
             val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-            if (savedCore != Prefs.PLAYER_CORE_AUTO) {
+            if (savedCore != Prefs.PLAYER_CORE_AUTO && !isNetworkTimeout) {
                 prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO).apply()
                 coreRetryLevel = 0
                 lineIndex = 0
-                Toast.makeText(this@PlayerActivity, "播放内核播放失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@PlayerActivity, "播放内核解码失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
                 playCurrentLine()
                 return
             }
