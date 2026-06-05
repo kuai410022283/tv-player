@@ -83,6 +83,16 @@ class ExoPlayerHelper(
                 }
             } catch (e: Exception) {}
         }
+        
+        // 动态添加系统 Token，防止 Token 在地址栏暴露
+        val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl()
+        if (url.startsWith(serverUrl)) {
+            val token = com.mediaplayer.app.data.api.ApiClient.accessToken
+            if (!token.isNullOrEmpty()) {
+                headers["Authorization"] = "Bearer $token"
+            }
+        }
+
         if (headers.isNotEmpty()) {
             httpDataSourceFactory.setDefaultRequestProperties(headers)
         }

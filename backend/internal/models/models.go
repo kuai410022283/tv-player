@@ -171,8 +171,8 @@ type Client struct {
 	DeviceOS     string    `json:"device_os" db:"device_os"`         // 系统版本
 	AppVersion   string    `json:"app_version" db:"app_version"`     // 客户端版本
 	IP           string    `json:"ip" db:"ip"`                       // 最近连接IP
-	AccessToken  string    `json:"-" db:"access_token"`              // 访问令牌 (对外不暴露)
-	TokenPreview string    `json:"token_preview,omitempty" db:"-"`   // 令牌预览 (前8位...)
+	AccessToken  string    `json:"access_token,omitempty" db:"access_token"` // 访问令牌
+	TokenPreview string    `json:"token_preview,omitempty" db:"-"`   // 令牌预览
 	Status       string    `json:"status" db:"status"`               // pending, approved, rejected, banned, expired
 	PlanID       int64     `json:"plan_id" db:"plan_id"`             // 绑定的套餐ID
 	PlanName     string    `json:"plan_name,omitempty" db:"-"`       // 套餐名称 (展示用)

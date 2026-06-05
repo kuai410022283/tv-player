@@ -10,6 +10,7 @@ object Prefs {
     const val DEFAULT_SERVER_URL = "http://0.0.0.0:9527"
     const val KEY_SERVER_URL = "server_url"
     const val KEY_GESTURE_HINT_SHOWN = "gesture_hint_shown"
+    const val KEY_SHOW_CHANNEL_LOGO = "show_channel_logo"
     
     // 播放器设置
     const val KEY_NETWORK_CACHE = "network_cache_ms"

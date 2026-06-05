@@ -523,7 +523,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsDecoder"
-                    android:nextFocusDown="@+id/sbSettingsCache">
+                    android:nextFocusDown="@+id/btnSettingsShowLogo">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -536,6 +536,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="智能切换"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginEnd="8dp"/>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsShowLogo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsCore"
+                    android:nextFocusDown="@+id/sbSettingsCache">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="显示频道台标"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsShowLogoValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="显示"
                         android:textColor="#AAAAAA"
                         android:textSize="16sp"
                         android:layout_marginEnd="8dp"/>
@@ -575,7 +610,7 @@
                     android:layout_height="wrap_content"
                     android:max="100"
                     android:progress="0"
-                    android:nextFocusUp="@+id/btnSettingsCore"
+                    android:nextFocusUp="@+id/btnSettingsShowLogo"
                     android:nextFocusDown="@+id/sbSettingsVolume" />
             </LinearLayout>
 

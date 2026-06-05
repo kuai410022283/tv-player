@@ -20,6 +20,10 @@ object StreamResolver {
     suspend fun resolve(originalUrl: String, userAgent: String?, customHeaders: String?): String {
         return withContext(Dispatchers.IO) {
             var currentUrl = originalUrl
+            if (currentUrl.startsWith("/")) {
+                val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
+                currentUrl = serverUrl + currentUrl
+            }
             var redirects = 0
             val maxRedirects = 5
 

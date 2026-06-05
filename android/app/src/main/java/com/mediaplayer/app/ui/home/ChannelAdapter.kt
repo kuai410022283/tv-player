@@ -21,6 +21,7 @@ class ChannelAdapter(
     private val onFocus: ((Channel, Int) -> Unit)? = null
 ) : RecyclerView.Adapter<ChannelAdapter.ViewHolder>() {
 
+    var showLogo: Boolean = true
     private var channels: List<Channel> = emptyList()
     private var playingChannelId: Long = -1L
 
@@ -59,7 +60,7 @@ class ChannelAdapter(
             else android.graphics.Color.parseColor("#E0E0E0")
         )
         
-        holder.bind(item, isPlaying)
+        holder.bind(item, isPlaying, showLogo)
 
         // 点击事件
         holder.itemView.setOnClickListener { onClick(item, position) }
@@ -109,7 +110,7 @@ class ChannelAdapter(
         private val ivFav: ImageView = itemView.findViewById(R.id.ivFavorite)
         private val playingIndicator: View = itemView.findViewById(R.id.viewPlaying)
 
-        fun bind(item: Channel, isPlaying: Boolean) {
+        fun bind(item: Channel, isPlaying: Boolean, showLogo: Boolean = true) {
             tvIndex.text = String.format("%03d", item.globalIndex + 1)
             tvName.text = item.name
             
@@ -135,8 +136,13 @@ class ChannelAdapter(
             tvTypeBadge.text = streamType.uppercase()
             tvTypeBadge.visibility = View.VISIBLE
 
-            if (item.logo.isNotEmpty()) {
-                ivLogo.load(item.logo) {
+            if (showLogo && item.logo.isNotEmpty()) {
+                var loadUrl = item.logo
+                if (loadUrl.startsWith("/")) {
+                    val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
+                    loadUrl = serverUrl + loadUrl
+                }
+                ivLogo.load(loadUrl) {
                     placeholder(R.drawable.ic_channel_placeholder)
                     error(R.drawable.ic_channel_placeholder)
                 }

@@ -1,9 +1,11 @@
 package com.mediaplayer.app
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.mediaplayer.app.data.api.ApiClient
 
-class MediaPlayerApp : Application() {
+class MediaPlayerApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
@@ -16,6 +18,14 @@ class MediaPlayerApp : Application() {
         
         // Restore access token
         ApiClient.accessToken = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
+    }
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .okHttpClient {
+                ApiClient.getOkHttpClient()
+            }
+            .build()
     }
 
     companion object {

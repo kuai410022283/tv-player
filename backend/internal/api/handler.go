@@ -118,15 +118,17 @@ type Handler struct {
 	importer    *services.M3UImporter
 	clientSvc   *services.ClientService
 	epgSvc      *services.EPGService
+	logoSvc     *services.LogoService
 }
 
-func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService) *Handler {
+func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService, logoSvc *services.LogoService) *Handler {
 	return &Handler{
 		channelSvc:  channelSvc,
 		streamProxy: streamProxy,
 		importer:    importer,
 		clientSvc:   clientSvc,
 		epgSvc:      epgSvc,
+		logoSvc:     logoSvc,
 	}
 }
 
@@ -254,16 +256,11 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	authType, _ := c.Get("auth_type")
 	if authType == "client" {
 		if items, ok := resp.Items.([]models.Channel); ok {
-			host := c.Request.Host
-			scheme := "http"
-			if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
-				scheme = "https"
-			}
-			baseURL := scheme + "://" + host
-			
-			clientToken := ""
-			if t, exists := c.Get("client_token"); exists {
-				clientToken = t.(string)
+			// token 已经被去除，不在这里获取了
+
+			localLogoEnabled := false
+			if enableStr, err := h.channelSvc.GetSetting("enable_local_logo"); err == nil && enableStr == "true" {
+				localLogoEnabled = true
 			}
 
 			// 聚合后的列表
@@ -305,11 +302,11 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					case "mp4", "flv", "mkv", "mpd":
 						ext = items[i].StreamType
 					}
-					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址
+					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址（相对路径）
 					rawURLs := strings.Split(items[i].StreamURL, "#")
 					for lineIdx, u := range rawURLs {
 						if strings.TrimSpace(u) == "" { continue }
-						lineProxyURL := fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s", baseURL, items[i].ID, ext, lineIdx, clientToken)
+						lineProxyURL := fmt.Sprintf("/api/v1/stream/proxy/%d/play.%s?line=%d", items[i].ID, ext, lineIdx)
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
 							"id":             items[i].ID,
 							"stream_url":     lineProxyURL,
@@ -342,12 +339,21 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					lines := groupedItems[idx]["lines"].([]map[string]interface{})
 					groupedItems[idx]["lines"] = append(lines, linesForThisItem...)
 				} else {
+					// 处理台标重写
+					logoURL := items[i].Logo
+					if localLogoEnabled {
+						cleanName := h.logoSvc.CleanName(items[i].Name)
+						if h.logoSvc.HasLocalLogo(cleanName) {
+							logoURL = fmt.Sprintf("/api/v1/logo?name=%s", cleanName)
+						}
+					}
+
 					// 新频道
 					newGroup := map[string]interface{}{
 						"id":          items[i].ID,
 						"group_id":    items[i].GroupID,
 						"name":        items[i].Name,
-						"logo":        items[i].Logo,
+						"logo":        logoURL,
 						"description": items[i].Description,
 						"current_epg": items[i].CurrentEPG,
 						"epg_percent": items[i].EpgPercent,
@@ -382,20 +388,12 @@ func (h *Handler) GetChannel(c *gin.Context) {
 
 	authType, _ := c.Get("auth_type")
 	if authType == "client" {
-		host := c.Request.Host
-		scheme := "http"
-		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
-			scheme = "https"
-		}
-		baseURL := scheme + "://" + host
+		// baseURL 已经被去除，全部使用相对路径
 		
-		clientToken := ""
-		if t, exists := c.Get("client_token"); exists {
-			clientToken = t.(string)
-		}
+		// token 已经被去除，不在这里获取了
 
 		if !ch.IsDirect {
-			ch.StreamURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d?token=%s", baseURL, ch.ID, clientToken)
+			ch.StreamURL = fmt.Sprintf("/api/v1/stream/proxy/%d", ch.ID)
 		}
 		if ua, headers, err := h.channelSvc.GetInheritedHeaders(ch.ID); err == nil {
 			ch.UserAgent = ua
@@ -1052,4 +1050,37 @@ func (h *Handler) GetVersion(c *gin.Context) {
 		"go_version": runtime.Version(),
 		"started_at": startTime.Format(time.RFC3339),
 	})
+}
+
+// ── Logo Management ───────────────────────────────────────
+
+func (h *Handler) GetLogo(c *gin.Context) {
+	name := c.Query("name")
+	if name == "" {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	cleanName := h.logoSvc.CleanName(name)
+	if h.logoSvc.HasLocalLogo(cleanName) {
+		c.File(h.logoSvc.GetLogoPath(cleanName))
+		return
+	}
+	
+	// 未命中本地缓存
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) TriggerCacheLogos(c *gin.Context) {
+	go h.logoSvc.CacheExistingLogos()
+	ok(c, gin.H{"message": "已在后台启动缓存现有台标任务"})
+}
+
+func (h *Handler) TriggerBatchFetchLogos(c *gin.Context) {
+	var req struct {
+		Overwrite bool `json:"overwrite"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	go h.logoSvc.FetchLogosFromSources(req.Overwrite)
+	ok(c, gin.H{"message": "已在后台启动从源库批量拉取任务"})
 }

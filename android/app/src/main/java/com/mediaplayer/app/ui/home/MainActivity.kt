@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
     private val maxAutoSkips = 5
     private val uiHandler = Handler(Looper.getMainLooper())
     private var coreRetryLevel = 0
+    private var isWatchdogEnabledForCurrentStream = false
     
     // Watchdog State
     enum class PlaybackState { IDLE, BUFFERING, PLAYING }
@@ -164,21 +165,31 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     PlaybackState.PLAYING -> {
-                        // 场景 B：画面冻结（假死）
-                        val currentTime = playerHelper?.getTime() ?: 0L
-                        if (currentTime > 0 && currentTime == lastPlaybackTime) {
-                            frozenTimeCounter++
-                            if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
-                                Toast.makeText(this@MainActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
-                                currentPlaybackState = PlaybackState.IDLE
-                                handlePlaybackError()
-                                frozenTimeCounter = 0
-                                return
-                            }
-                        } else {
-                            lastPlaybackTime = currentTime
+                        // 场景 B：画面冻结（假死）逻辑
+                        // 由于多数直播流底层时间戳不会随播放推进而正常改变（getTime() 返回固定值），
+                        // 这里通过比对 currentTime == lastPlaybackTime 极易造成正常播放时的误判卡死，
+                        // 因此将此逻辑注释掉。如有真实卡顿，应依靠播放器的 onBuffering 或 onError 来处理。
+                        /*
+                        if (!isWatchdogEnabledForCurrentStream) {
+                            lastPlaybackTime = playerHelper?.getTime() ?: 0L
                             frozenTimeCounter = 0
+                        } else {
+                            val currentTime = playerHelper?.getTime() ?: 0L
+                            if (currentTime > 0 && currentTime == lastPlaybackTime) {
+                                frozenTimeCounter++
+                                if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
+                                    Toast.makeText(this@MainActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                                    currentPlaybackState = PlaybackState.IDLE
+                                    handlePlaybackError()
+                                    frozenTimeCounter = 0
+                                    return
+                                }
+                            } else {
+                                lastPlaybackTime = currentTime
+                                frozenTimeCounter = 0
+                            }
                         }
+                        */
                     }
                     PlaybackState.IDLE -> {
                         frozenTimeCounter = 0
@@ -512,11 +523,13 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putInt(Prefs.KEY_SCALE_MODE, currentScaleMode).apply()
         }
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
+        var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
 
         updateDecoderText(currentDecoderMode)
         updateCoreText(currentCore)
         updateScaleText(currentScaleMode)
         updateAutoStartText(currentAutoStart)
+        updateShowLogoText(currentShowLogo)
         
         btnSettingsDecoder?.setOnClickListener {
             currentDecoderMode = when (currentDecoderMode) {
@@ -539,6 +552,19 @@ class MainActivity : AppCompatActivity() {
             updateCoreText(currentCore)
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
             Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+        }
+        
+        val btnSettingsShowLogo = findViewById<View>(R.id.btnSettingsShowLogo)
+        btnSettingsShowLogo?.setOnClickListener {
+            currentShowLogo = !currentShowLogo
+            updateShowLogoText(currentShowLogo)
+            prefs.edit().putBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, currentShowLogo).apply()
+            
+            // 立即生效
+            if (::channelAdapter.isInitialized) {
+                channelAdapter.showLogo = currentShowLogo
+                channelAdapter.notifyDataSetChanged()
+            }
         }
         
         btnSettingsScale?.setOnClickListener {
@@ -693,7 +719,7 @@ class MainActivity : AppCompatActivity() {
             layoutQrConfig?.visibility = View.GONE
         }
         
-        sbSettingsCache?.requestFocus()
+        findViewById<View>(R.id.btnSettingsScale)?.requestFocus()
     }
 
     private fun initPlayerWithCore(core: Int) {
@@ -811,6 +837,10 @@ class MainActivity : AppCompatActivity() {
             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
             else -> "智能切换"
         }
+    }
+
+    private fun updateShowLogoText(show: Boolean) {
+        findViewById<TextView>(R.id.tvSettingsShowLogoValue)?.text = if (show) "显示" else "隐藏"
     }
 
     private fun handlePlaybackError() {
@@ -978,9 +1008,19 @@ class MainActivity : AppCompatActivity() {
         }
         progressBuffering?.visibility = View.VISIBLE
 
-        resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
+            
+            val lowerUrl = finalUrl.lowercase()
+            val streamTypeLower = line.streamType.lowercase()
+            val isMulticastOrLive = lowerUrl.startsWith("udp://") || 
+                                    lowerUrl.startsWith("rtp://") || 
+                                    lowerUrl.contains(".ts") || 
+                                    lowerUrl.contains(".flv") || 
+                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv")
+            // 对于组播、ts、flv等特殊流，放行看门狗（不检测假死）
+            isWatchdogEnabledForCurrentStream = !isMulticastOrLive
+            
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
@@ -1195,6 +1235,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         )
+        
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        channelAdapter.showLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
 
         if (isTvMode) {
             tvGroupsRv?.apply {

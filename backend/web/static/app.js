@@ -7,6 +7,7 @@ let groups = [], selectedClientIds = new Set(), selectedGroupIds = new Set();
 let adminToken = localStorage.getItem('admin_token') || '';
 let channelPage = 1, clientPage = 1, groupPage = 1, sourcePage = 1, streamPage = 1, planPage = 1, clientLogPage = 1;
 const PAGE_SIZE = 20;
+let localLogoEnabled = false;
 
 // ═══ API helpers ══════════════════════════════════════
 let loadingCount = 0;
@@ -248,9 +249,18 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const body = document.getElementById('channels-body');
   if (chRes.data && chRes.data.items) {
     channelTotal = chRes.data.total || 0;
-    body.innerHTML = chRes.data.items.map((c, i) => `<tr>
+    body.innerHTML = chRes.data.items.map((c, i) => {
+      let logoHtml = '<span style="color:#999">-</span>';
+      if (localLogoEnabled) {
+          let fallbackAttr = c.logo ? `data-fallback-src="${c.logo}"` : '';
+          logoHtml = `<img data-auth-src="/api/v1/logo?name=${encodeURIComponent(c.epg_channel_id || c.name)}" ${fallbackAttr} loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+      } else if (c.logo) {
+          logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+      }
+      return `<tr>
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
       <td style="color:var(--text3)">${(channelPage - 1) * PAGE_SIZE + i + 1}</td>
+      <td>${logoHtml}</td>
       <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
       <td>${c.epg_channel_id ? esc(c.epg_channel_id) : '<span style="color:#999">-</span>'}</td>
       <td>${gm[c.group_id] || '-'}</td>
@@ -262,8 +272,34 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
         <button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">编辑</button>
         <button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">删除</button>
       </div></td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
   }
+  
+  // 触发带鉴权的图片懒加载
+  document.querySelectorAll('img[data-auth-src]').forEach(async img => {
+    const handleFallback = () => {
+      const fallback = img.getAttribute('data-fallback-src');
+      if (fallback) {
+        img.removeAttribute('data-fallback-src');
+        img.src = fallback;
+      } else {
+        img.dispatchEvent(new Event('error'));
+      }
+    };
+    try {
+      const res = await fetch(img.getAttribute('data-auth-src'), { headers: { 'Authorization': 'Bearer ' + adminToken } });
+      if (res.status === 200) {
+        const blob = await res.blob();
+        img.src = URL.createObjectURL(blob);
+      } else {
+        handleFallback();
+      }
+    } catch (e) {
+      handleFallback();
+    }
+  });
+
   document.getElementById('check-all-channels').checked = false;
   document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
@@ -855,7 +891,11 @@ async function showClientDetail(id) {
       <div class="label">最近在线</div><div class="value">${fmtDate(c.last_seen)}</div>
       <div class="label">注册时间</div><div class="value">${fmtDate(c.created_at)}</div>
       <div class="label">申请备注</div><div class="value">${esc(c.request_note) || '-'}</div>
-      <div class="label">令牌</div><div class="value"><code style="font-size:12px">${tokenPreview}</code></div>
+      <div class="label">令牌</div>
+      <div class="value" style="display:flex;align-items:center;gap:8px;">
+        <code style="font-size:12px" id="detail-token-display" data-preview="${esc(tokenPreview)}" data-full="${esc(c.access_token || '')}">${esc(tokenPreview)}</code>
+        ${c.access_token ? `<svg onclick="toggleTokenVisibility(this)" style="width:16px;height:16px;cursor:pointer;color:var(--text2);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>` : ''}
+      </div>
     </div>
     <div class="btn-group" style="flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="showTokenModal(${c.id})">🔑 令牌管理</button>
@@ -1197,7 +1237,11 @@ async function loadClientSettings() {
   select.innerHTML = '<option value="0" data-desc="">-- 自定义授权 (使用下方允许同时在线设备数量和有效期) --</option>' +
     plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}" data-desc="${esc(p.description || '')}">${esc(p.name)}</option>`).join('');
 
-  if (setRes.data) {
+    if (setRes.data) {
+    if (document.getElementById('set-enable-url-token')) {
+      document.getElementById('set-enable-url-token').value = setRes.data.enable_url_token || 'false';
+    }
+
     document.getElementById('set-auto-approve').value = setRes.data.auto_approve || 'false';
     toggleAutoApproveFields(setRes.data.auto_approve || 'false');
     document.getElementById('set-default-plan-id').value = setRes.data.default_plan_id || '0';
@@ -1214,6 +1258,13 @@ async function loadClientSettings() {
     if (document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
+    }
+
+    // 台标配置
+    if (document.getElementById('set-enable-local-logo')) {
+      document.getElementById('set-enable-local-logo').value = setRes.data.enable_local_logo || 'false';
+      localLogoEnabled = (setRes.data.enable_local_logo === 'true');
+      document.getElementById('set-local-logo-urls').value = setRes.data.local_logo_urls || '';
     }
   }
 
@@ -1240,6 +1291,7 @@ async function loadClientSettings() {
 
 async function saveAllClientSettings() {
   const settings = {
+    enable_url_token: document.getElementById('set-enable-url-token') ? document.getElementById('set-enable-url-token').value : 'false',
     auto_approve: document.getElementById('set-auto-approve').value,
     default_plan_id: document.getElementById('set-default-plan-id').value,
     default_max_streams: document.getElementById('set-max-streams').value,
@@ -1254,6 +1306,11 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-epg-source-url')) {
     settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
     settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
+  }
+
+  if (document.getElementById('set-enable-local-logo')) {
+    settings.enable_local_logo = document.getElementById('set-enable-local-logo').value;
+    settings.local_logo_urls = document.getElementById('set-local-logo-urls').value.trim();
   }
 
   for (const [k, v] of Object.entries(settings)) {
@@ -1297,6 +1354,33 @@ async function refreshEPGCache() {
   }
 }
 
+async function triggerCacheExistingLogos() {
+  try {
+    const res = await api('/admin/logo/cache', { method: 'POST' });
+    if (res.code === 0) {
+      toast(res.data.message || '缓存外链台标任务已触发，请查看后台日志。');
+    }
+  } catch (e) {
+    toast('触发失败: ' + e.message, 'error');
+  }
+}
+
+async function triggerBatchFetchLogos(overwrite) {
+  if (overwrite && !confirm("全量覆盖拉取将覆盖本地已有的所有台标并重新下载，可能非常耗时，确定吗？")) {
+    return;
+  }
+  try {
+    const res = await api('/admin/logo/fetch', { 
+      method: 'POST',
+      body: JSON.stringify({ overwrite: overwrite })
+    });
+    if (res.code === 0) {
+      toast(res.data.message || '批量拉取缺失台标任务已触发，请查看后台日志。');
+    }
+  } catch (e) {
+    toast('触发失败: ' + e.message, 'error');
+  }
+}
 async function saveClientSetting(key, value) {
   await api('/settings', { method: 'POST', body: JSON.stringify({ key, value: String(value) }) });
 }
@@ -1380,6 +1464,23 @@ function copyServerBase64() {
     });
   } else {
     handleFallback();
+  }
+}
+
+function toggleTokenVisibility(iconSvg) {
+  const codeEl = document.getElementById('detail-token-display');
+  if (!codeEl) return;
+  const isFull = codeEl.getAttribute('data-showing-full') === 'true';
+  if (isFull) {
+    codeEl.textContent = codeEl.getAttribute('data-preview');
+    codeEl.setAttribute('data-showing-full', 'false');
+    iconSvg.style.color = 'var(--text2)';
+    iconSvg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+  } else {
+    codeEl.textContent = codeEl.getAttribute('data-full');
+    codeEl.setAttribute('data-showing-full', 'true');
+    iconSvg.style.color = 'var(--primary)';
+    iconSvg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
   }
 }
 

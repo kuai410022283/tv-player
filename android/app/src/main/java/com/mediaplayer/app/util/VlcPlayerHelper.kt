@@ -171,15 +171,24 @@ class VlcPlayerHelper(
             else -> media.setHWDecoderEnabled(true, false) // 自动
         }
 
-        applyMediaOptions(media, userAgent, customHeaders)
+        applyMediaOptions(media, url, userAgent, customHeaders)
         player.media = media
         player.play()
     }
 
-    private fun applyMediaOptions(media: Media, userAgent: String?, customHeaders: String?) {
-        if (!userAgent.isNullOrEmpty()) {
-            media.addOption(":http-user-agent=$userAgent")
+    private fun applyMediaOptions(media: Media, url: String, userAgent: String?, customHeaders: String?) {
+        var finalUserAgent = userAgent ?: "TVPlayer/1.0"
+        
+        // 动态添加系统 Token 到 User-Agent，防止 Token 在地址栏暴露 (针对不支持 Authorization 头的 VLC)
+        val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl()
+        if (url.startsWith(serverUrl)) {
+            val token = com.mediaplayer.app.data.api.ApiClient.accessToken
+            if (!token.isNullOrEmpty()) {
+                finalUserAgent = "$finalUserAgent (Token=$token)"
+            }
         }
+        
+        media.addOption(":http-user-agent=$finalUserAgent")
         if (!customHeaders.isNullOrEmpty()) {
             try {
                 val json = JSONObject(customHeaders)

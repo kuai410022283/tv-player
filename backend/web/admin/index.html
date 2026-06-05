@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="MediaPlayer 管理后台">
+  <meta name="referrer" content="no-referrer">
   <title>MediaPlayer 管理后台</title>
   <link rel="stylesheet" href="/static/style.css">
   <!-- Favicon -->
@@ -186,7 +187,8 @@
           <h1>频道管理</h1>
           <div class="search">
             <input type="text" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
-            <button class="btn btn-ghost" id="btn-health-check" onclick="showModal('health-check-modal')" style="background:var(--accent);color:white;border:none;">健康检查</button>
+            <button class="btn btn-ghost" id="btn-health-check" onclick="showModal('health-check-modal')"
+              style="background:var(--accent);color:white;border:none;">健康检查</button>
             <button class="btn btn-danger btn-sm" onclick="showModal('channel-batch-modal')">批量操作</button>
             <button class="btn btn-primary" onclick="showAddChannelModal()">+ 添加频道</button>
           </div>
@@ -197,6 +199,7 @@
               <tr>
                 <th width="40"><input type="checkbox" id="check-all-channels" onchange="toggleAllChannels(this)"></th>
                 <th width="60">序号</th>
+                <th>台标</th>
                 <th>名称</th>
                 <th>EPG匹配ID</th>
                 <th>分组</th>
@@ -476,8 +479,10 @@
               <select id="set-default-plan-id" onchange="onDefaultPlanChange()">
                 <option value="0">-- 请选择 --</option>
               </select>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">说明：选择特定套餐或自定义授权，均会自动隐藏下方的配置选项并应用对应规则（自定义授权将自动使用系统默认配置）。</div>
-              <div id="default-plan-desc" style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">
+                说明：选择特定套餐或自定义授权，均会自动隐藏下方的配置选项并应用对应规则（自定义授权将自动使用系统默认配置）。</div>
+              <div id="default-plan-desc"
+                style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
             </div>
             <div class="form-row" id="auto-approve-fields-row" style="display:none">
               <div class="form-group" id="set-max-streams-group">
@@ -527,6 +532,31 @@
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
+            <h3 style="margin-bottom: 12px;">台标缓存配置</h3>
+          </div>
+          <div class="form-group">
+            <label>启用本地台标缓存</label>
+            <select id="set-enable-local-logo">
+              <option value="false">关闭</option>
+              <option value="true">开启 (本地台标)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>台标源库地址</label>
+            <textarea id="set-local-logo-urls" rows="3"
+              placeholder="http://example.com/logo/{name|uppercase}.png"></textarea>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+              配置台标包的根目录，按行分割，拉取时会自动拼接清洗后的频道名称。例如：http://example.com/logo/cctv1.png</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="display:flex;align-items:flex-end;gap:10px;">
+              <button class="btn btn-ghost" onclick="triggerCacheExistingLogos()">缓存已有外链台标</button>
+              <button class="btn btn-primary" onclick="triggerBatchFetchLogos(false)">增量拉取缺失台标</button>
+              <button class="btn btn-danger" onclick="triggerBatchFetchLogos(true)">全量覆盖拉取台标</button>
+            </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
             <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
           </div>
           <div class="form-row">
@@ -554,6 +584,21 @@
               <option value="false">否 (用户可跳过)</option>
               <option value="true">是 (必须更新才能使用)</option>
             </select>
+          </div>
+          <div style="display: none;">
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <div class="form-group">
+              <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
+            </div>
+            <div class="form-group">
+              <label>允许 URL 传递 Token (开发调试开关)</label>
+              <select id="set-enable-url-token">
+                <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
+                <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
+              </select>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
+                即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
+            </div>
           </div>
           <div class="form-actions" style="justify-content:flex-start">
             <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
@@ -677,11 +722,12 @@
         <div class="form-group">
           <label style="display:flex;justify-content:space-between;align-items:center;">
             <span>M3U内容</span>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">导入源文件</button>
+            <button class="btn btn-ghost btn-sm"
+              onclick="document.getElementById('import-file-input').click()">导入源文件</button>
           </label>
-          <input type="file" id="import-file-input" accept=".m3u,.m3u8,.txt" style="display:none" onchange="handleImportFile(event)">
-          <textarea id="import-content" rows="10"
-            placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea>
+          <input type="file" id="import-file-input" accept=".m3u,.m3u8,.txt" style="display:none"
+            onchange="handleImportFile(event)">
+          <textarea id="import-content" rows="10" placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea>
         </div>
         <div class="form-actions">
           <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
@@ -708,7 +754,8 @@
           <label>绑定套餐</label>
           <select id="approve-plan-id" onchange="onApprovePlanChange()"></select>
           <div style="font-size:11px;color:var(--text2);margin-top:4px">选择套餐将自动覆盖有效期和允许同时在线设备数量</div>
-          <div id="approve-plan-desc" style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
+          <div id="approve-plan-desc"
+            style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
         </div>
         <input type="hidden" id="approve-days" value="365">
         <input type="hidden" id="approve-streams" value="2">
@@ -806,7 +853,8 @@
         <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
         <div class="form-row">
           <div class="form-group"><label>有效期 (天)</label><input type="number" id="plan-days" value="365" min="0"></div>
-          <div class="form-group"><label>允许同时在线设备数量</label><input type="number" id="plan-streams" value="100" min="1"></div>
+          <div class="form-group"><label>允许同时在线设备数量</label><input type="number" id="plan-streams" value="100" min="1">
+          </div>
         </div>
         <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01">
         </div>

@@ -12,3 +12,5 @@ services:
       - ./data:/app/data
       # 客户端 APK 下载存放目录
       - ./downloads:/app/web/download
+      # 频道logo目录
+      - ./library/channel_logo:/app/library/channel_logo

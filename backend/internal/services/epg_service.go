@@ -585,29 +585,37 @@ func (s *EPGService) ForceRefresh() error {
 	return nil
 }
 
-// HasEPG 检查内存中是否存在该频道的任何 EPG 数据
-func (s *EPGService) HasEPG(channelID string) bool {
+// MatchEPGChannel 检查内存中是否存在该频道的任何 EPG 数据，如果存在，返回真正匹配的 epg_channel_id
+func (s *EPGService) MatchEPGChannel(channelID string) (string, bool) {
 	globalEPGIndex.mu.RLock()
 	defer globalEPGIndex.mu.RUnlock()
 
 	if channelID == "" {
-		return false
+		return "", false
 	}
 
 	chID := strings.ToLower(channelID)
 	chIDClean := normalizeChannelName(channelID)
 
+	// 精确匹配
 	if _, ok := globalEPGIndex.programs[chID]; ok {
-		return true
+		return chID, true
 	}
 
+	// 模糊匹配
 	for key := range globalEPGIndex.programs {
 		if normalizeChannelName(key) == chIDClean {
-			return true
+			return key, true
 		}
 	}
 
-	return false
+	return "", false
+}
+
+// HasEPG 检查内存中是否存在该频道的任何 EPG 数据
+func (s *EPGService) HasEPG(channelID string) bool {
+	_, found := s.MatchEPGChannel(channelID)
+	return found
 }
 
 // autoCompleteEPGChannelIDs 自动为 epg_channel_id 为空的频道补全匹配的频道名称
@@ -631,11 +639,12 @@ func (s *EPGService) autoCompleteEPGChannelIDs() {
 			continue
 		}
 
-		if s.HasEPG(name) {
-			_, err := s.db.Exec(`UPDATE channels SET epg_channel_id = ? WHERE id = ?`, name, id)
+		if matchID, found := s.MatchEPGChannel(name); found {
+			// 这里将真正匹配到的标准 EPG ID 写入数据库，而不是原始的 name
+			_, err := s.db.Exec(`UPDATE channels SET epg_channel_id = ? WHERE id = ?`, matchID, id)
 			if err == nil {
 				updatedCount++
-				slog.Info("自动补全 EPG 频道 ID 成功", "channel_id", id, "name", name)
+				slog.Info("自动补全 EPG 频道 ID 成功", "channel_id", id, "original_name", name, "matched_epg_id", matchID)
 			}
 		}
 	}

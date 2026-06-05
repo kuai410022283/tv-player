@@ -92,6 +92,7 @@ class PlayerActivity : AppCompatActivity() {
     private val maxAutoSkips = 5
     private var coreRetryLevel = 0 // 0=默认, 1=VLC, 2=IJK
     private var backPressedTime = 0L
+    private var isWatchdogEnabledForCurrentStream = false
 
     // ── Watchdog ──
     enum class PlaybackState { IDLE, BUFFERING, PLAYING }
@@ -113,19 +114,24 @@ class PlayerActivity : AppCompatActivity() {
                         }
                     }
                     PlaybackState.PLAYING -> {
-                        val currentTime = playerHelper?.getTime() ?: 0L
-                        if (currentTime > 0 && currentTime == lastPlaybackTime) {
-                            frozenTimeCounter++
-                            if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
-                                Toast.makeText(this@PlayerActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
-                                currentPlaybackState = PlaybackState.IDLE
-                                handlePlaybackError()
-                                frozenTimeCounter = 0
-                                return
-                            }
-                        } else {
-                            lastPlaybackTime = currentTime
+                        if (!isWatchdogEnabledForCurrentStream) {
+                            lastPlaybackTime = playerHelper?.getTime() ?: 0L
                             frozenTimeCounter = 0
+                        } else {
+                            val currentTime = playerHelper?.getTime() ?: 0L
+                            if (currentTime > 0 && currentTime == lastPlaybackTime) {
+                                frozenTimeCounter++
+                                if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
+                                    Toast.makeText(this@PlayerActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                                    currentPlaybackState = PlaybackState.IDLE
+                                    handlePlaybackError()
+                                    frozenTimeCounter = 0
+                                    return
+                                }
+                            } else {
+                                lastPlaybackTime = currentTime
+                                frozenTimeCounter = 0
+                            }
                         }
                     }
                     PlaybackState.IDLE -> {
@@ -460,8 +466,20 @@ class PlayerActivity : AppCompatActivity() {
         }
         
         resolveJob?.cancel()
+        resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(url, userAgent, customHeaders)
+            
+            val lowerUrl = finalUrl.lowercase()
+            val streamTypeLower = type.lowercase()
+            val isMulticastOrLive = lowerUrl.startsWith("udp://") || 
+                                    lowerUrl.startsWith("rtp://") || 
+                                    lowerUrl.contains(".ts") || 
+                                    lowerUrl.contains(".flv") || 
+                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv")
+            // 对于组播、ts、flv等特殊流，放行看门狗（不检测假死）
+            isWatchdogEnabledForCurrentStream = !isMulticastOrLive
+            
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             playerHelper?.play(finalUrl, userAgent, customHeaders)

@@ -16,6 +16,7 @@ object ApiClient {
     private var serverUrl: String = com.mediaplayer.app.Prefs.DEFAULT_SERVER_URL
     private var retrofit: Retrofit? = null
     private var apiService: ApiService? = null
+    private var okHttpClient: OkHttpClient? = null
 
     /** 当前使用的 token（由 ClientAuthManager 设置） */
     var accessToken: String? = null
@@ -34,11 +35,13 @@ object ApiClient {
         serverUrl = normalized
         retrofit = null
         apiService = null
+        okHttpClient = null
     }
 
     fun reset() {
         retrofit = null
         apiService = null
+        okHttpClient = null
         accessToken = null
     }
 
@@ -51,47 +54,53 @@ object ApiClient {
         return apiService!!
     }
 
-    private fun getRetrofit(): Retrofit {
-        if (retrofit == null) {
+    fun getOkHttpClient(): OkHttpClient {
+        if (okHttpClient == null) {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
 
-            val client = OkHttpClient.Builder()
+            okHttpClient = OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(15, TimeUnit.SECONDS)
                 .addInterceptor { chain ->
                     val original = chain.request()
                     val builder = original.newBuilder()
-                    accessToken?.let { builder.header("Authorization", "Bearer $it") }
+                    val requestUrl = original.url.toString()
+                    if (requestUrl.startsWith(serverUrl)) {
+                        accessToken?.let { builder.header("Authorization", "Bearer $it") }
+                    }
                     chain.proceed(builder.build())
                 }
                 .addInterceptor(logging)
                 .build()
+        }
+        return okHttpClient!!
+    }
 
+    private fun getRetrofit(): Retrofit {
+        if (retrofit == null) {
             val gson = GsonBuilder()
                 .setLenient()
                 .create()
 
             retrofit = Retrofit.Builder()
                 .baseUrl("$serverUrl/api/v1/")
-                .client(client)
+                .client(getOkHttpClient())
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .build()
         }
         return retrofit!!
     }
 
-    /** 获取流代理 URL（带 token 参数，兼容旧播放器） */
+    /** 获取流代理 URL */
     fun getStreamProxyUrl(channelId: Long): String {
-        val token = accessToken ?: ""
-        return "$serverUrl/api/v1/stream/proxy/$channelId?token=$token"
+        return "$serverUrl/api/v1/stream/proxy/$channelId"
     }
 
     /** 获取回看流 URL */
     fun getCatchupUrl(channelId: Long, startTimeUnix: Long, endTimeUnix: Long): String {
-        val token = accessToken ?: ""
-        return "$serverUrl/api/v1/stream/catchup/$channelId?start=$startTimeUnix&end=$endTimeUnix&token=$token"
+        return "$serverUrl/api/v1/stream/catchup/$channelId?start=$startTimeUnix&end=$endTimeUnix"
     }
 }

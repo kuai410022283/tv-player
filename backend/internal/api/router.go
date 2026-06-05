@@ -80,12 +80,13 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 	}
 
-	// ── 历史 & EPG & 版本 (客户端可读写) ─────────────────
+	// ── 历史 & EPG & 版本 & 台标 (客户端可读写) ─────────────────
 	r.GET("/history", hs.Handler.GetHistory)
 	r.POST("/history", hs.Handler.AddHistory)
 	r.GET("/epg", hs.Handler.GetEPG)
 	r.GET("/version", hs.Handler.GetVersion)
 	r.GET("/settings", hs.Handler.GetSettings) // 客户端需读取公告等
+	r.GET("/logo", hs.Handler.GetLogo)         // 获取台标 (需鉴权)
 	
 	// ── 管理端专属 ──────────────────────────────────
 	adminRoot := r.Group("")
@@ -144,5 +145,13 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	{
 		adminSettings.POST("/update", hs.Handler.SetAppUpdate)
 		adminSettings.PUT("/password", hs.Handler.UpdateAdminPassword)
+	}
+
+	// ── 管理端：台标管理 ──────────────────────────
+	adminLogo := r.Group("/admin/logo")
+	adminLogo.Use(middleware.RequireAdmin())
+	{
+		adminLogo.POST("/cache", hs.Handler.TriggerCacheLogos)
+		adminLogo.POST("/fetch", hs.Handler.TriggerBatchFetchLogos)
 	}
 }

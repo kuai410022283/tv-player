@@ -57,16 +57,33 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		if token == "" {
 			token = strings.TrimPrefix(auth, "Bearer ")
 		}
-		// 流代理场景：通过 query 参数传递 token（已废弃，建议用 Header）
-		if token == "" {
-			token = c.Query("token")
-			if token != "" {
-				slog.Warn("token 通过 URL query 传递已废弃，请使用 Header",
-					"path", c.Request.URL.Path,
-					"ip", c.ClientIP(),
-				)
+		// 流代理场景：开发调试开关 (允许通过 URL query 传递 token)
+		if token == "" && db != nil {
+			var enableUrlToken string
+			_ = db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_url_token'`).Scan(&enableUrlToken)
+			if enableUrlToken == "true" {
+				token = c.Query("token")
+				if token != "" {
+					slog.Warn("token 通过 URL query 传递 (调试模式已开启)",
+						"path", c.Request.URL.Path,
+						"ip", c.ClientIP(),
+					)
+				}
 			}
 		}
+
+		// 针对 VLC 等不支持自定义 Authorization 头的播放器，尝试从 User-Agent 提取 (Token=xxx)
+		if token == "" {
+			ua := c.GetHeader("User-Agent")
+			if strings.Contains(ua, "(Token=") {
+				parts := strings.Split(ua, "(Token=")
+				if len(parts) > 1 {
+					extracted := strings.Split(parts[1], ")")[0]
+					token = strings.TrimSpace(extracted)
+				}
+			}
+		}
+
 		if token != "" && db != nil {
 			var clientID int64
 			var status string

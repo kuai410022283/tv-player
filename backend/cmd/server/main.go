@@ -65,6 +65,7 @@ func main() {
 	importer := services.NewM3UImporter(channelSvc)
 	clientSvc := services.NewClientService(db)
 	epgSvc := services.NewEPGService(db)
+	logoSvc := services.NewLogoService(db)
 
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
@@ -101,9 +102,9 @@ func main() {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
-		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("Referrer-Policy", "no-referrer")
 		// CSP: 允许 inline script (管理后台需要) + 同源资源
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self'")
 		c.Next()
 	})
 
@@ -118,7 +119,7 @@ func main() {
 	planSvc := services.NewPlanService(db)
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
-	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc)
+	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc)
 	ch := api.NewClientHandler(clientSvc, channelSvc)
 	ph := api.NewPlanHandler(planSvc)
 	hs := api.NewHandlers(h, ch, ph)
