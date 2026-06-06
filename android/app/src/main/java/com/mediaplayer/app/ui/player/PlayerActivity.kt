@@ -420,26 +420,35 @@ class PlayerActivity : AppCompatActivity() {
                     else -> desiredCore
                 }
             } else {
-                desiredCore = when (type.lowercase()) {
-                    "vlc" -> {
-                        coreText = "智能 (VLC)"
-                        Prefs.PLAYER_CORE_VLC
-                    }
-                    "ijk" -> {
-                        coreText = "智能 (IJK)"
-                        Prefs.PLAYER_CORE_IJK
-                    }
-                    "x5" -> {
-                        coreText = "智能 (VLC)"
-                        Prefs.PLAYER_CORE_VLC
-                    }
-                    "ts", "rtp", "udp" -> {
-                        coreText = "智能 (Exo)"
-                        Prefs.PLAYER_CORE_EXO
-                    }
-                    else -> {
-                        coreText = "智能 (Exo)"
-                        Prefs.PLAYER_CORE_EXO
+                val lowerUrl = url.lowercase()
+                // 识别高危的 IPTV / 组播流（特别是 rtsp 协议和 smil 扩展名，ExoPlayer 解析 Payload 33 容易闪退）
+                val isHighRiskMulticast = lowerUrl.startsWith("rtsp://") || lowerUrl.contains(".smil")
+                
+                if (isHighRiskMulticast) {
+                    coreText = "智能防灾 (VLC)"
+                    desiredCore = Prefs.PLAYER_CORE_VLC
+                } else {
+                    desiredCore = when (type.lowercase()) {
+                        "vlc" -> {
+                            coreText = "智能 (VLC)"
+                            Prefs.PLAYER_CORE_VLC
+                        }
+                        "ijk" -> {
+                            coreText = "智能 (IJK)"
+                            Prefs.PLAYER_CORE_IJK
+                        }
+                        "x5" -> {
+                            coreText = "智能 (VLC)"
+                            Prefs.PLAYER_CORE_VLC
+                        }
+                        "ts", "rtp", "udp" -> {
+                            coreText = "智能 (Exo)"
+                            Prefs.PLAYER_CORE_EXO
+                        }
+                        else -> {
+                            coreText = "智能 (Exo)"
+                            Prefs.PLAYER_CORE_EXO
+                        }
                     }
                 }
             }

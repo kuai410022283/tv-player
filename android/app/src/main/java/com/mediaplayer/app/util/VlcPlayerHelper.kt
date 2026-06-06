@@ -36,8 +36,7 @@ class VlcPlayerHelper(
         options.add("--drop-late-frames")
         options.add("--skip-frames")
         // 强制 RTSP 使用 TCP 传输，解决 UDP 在 Android/TV 盒子环境下容易丢包或被 NAT 拦截导致无法播放的问题
-        // 针对运营商 IPTV (如电信 PLTV)，服务器通常不支持 RTSP over TCP，因此先注释掉，让其走默认的 UDP
-        // options.add("--rtsp-tcp")
+        options.add("--rtsp-tcp")
 
         // We no longer add caching or jitter options globally here because they are applied per-Media based on URL in play().
         // options.add("--network-caching=$cacheMs")
