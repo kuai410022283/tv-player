@@ -79,7 +79,12 @@ class ClientAuthManager(private val context: Context) {
             val token = getToken() ?: return@withContext Result.failure(Exception("无令牌"))
             val response = ApiClient.getService().clientVerify("Bearer $token")
             if (response.isSuccessful && response.body()?.code == 0) {
-                Result.success(response.body()?.data)
+                val data = response.body()?.data
+                if (data != null) {
+                    prefs.edit().putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog).apply()
+                    com.mediaplayer.app.util.RemoteLogger.updateConfig(data.enableLog)
+                }
+                Result.success(data)
             } else {
                 Result.success(null)
             }
@@ -139,8 +144,10 @@ class ClientAuthManager(private val context: Context) {
             }
             putLong(Prefs.KEY_CLIENT_ID, resp.clientId)
             putString(Prefs.KEY_CLIENT_STATUS, resp.status)
+            putBoolean(Prefs.KEY_ENABLE_LOG, resp.enableLog)
             apply()
         }
+        com.mediaplayer.app.util.RemoteLogger.updateConfig(resp.enableLog)
         // 同步到 ApiClient
         resp.accessToken.takeIf { it.isNotEmpty() }?.let {
             ApiClient.accessToken = it

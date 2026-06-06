@@ -1,9 +1,13 @@
 package api
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mediaplayer/backend/internal/models"
@@ -98,6 +102,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"expires_at":   client.ExpiresAt,
 		"announcement": announcement,
 		"announcement_interval": announcementInterval,
+		"enable_log":   client.EnableLog,
 	})
 }
 
@@ -336,4 +341,88 @@ func extractToken(c *gin.Context) string {
 		token = c.Query("token")
 	}
 	return token
+}
+
+// ── 客户端日志上传 ───────────────────────────────────────
+
+func (h *ClientHandler) UploadLog(c *gin.Context) {
+	token := extractToken(c)
+	if token == "" {
+		fail(c, 401, "缺少令牌")
+		return
+	}
+	client, err := h.clientSvc.Validate(token, c.ClientIP())
+	if err != nil {
+		fail(c, 401, "令牌无效或已过期")
+		return
+	}
+
+	file, err := c.FormFile("log_file")
+	if err != nil {
+		fail(c, 400, "缺少日志文件")
+		return
+	}
+
+	os.MkdirAll("library/logs", 0755)
+	logPath := fmt.Sprintf("library/logs/%s.log", client.DeviceID)
+
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error("打开日志文件失败", "error", err)
+		fail(c, 500, "服务端错误")
+		return
+	}
+	defer f.Close()
+
+	src, err := file.Open()
+	if err != nil {
+		fail(c, 500, "读取上传文件失败")
+		return
+	}
+	defer src.Close()
+
+	if _, err := f.WriteString(fmt.Sprintf("\n--- Log Upload: %s ---\n", time.Now().Format(time.RFC3339))); err != nil {
+		fail(c, 500, "写入日志失败")
+		return
+	}
+
+	if _, err := io.Copy(f, src); err != nil {
+		fail(c, 500, "写入日志失败")
+		return
+	}
+
+	ok(c, gin.H{"message": "日志上传成功"})
+}
+
+func (h *ClientHandler) UpdateLogConfig(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var body struct {
+		EnableLog bool `json:"enable_log"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.clientSvc.UpdateLogConfig(id, body.EnableLog); err != nil {
+		failInternal(c, err, "更新配置失败")
+		return
+	}
+	ok(c, gin.H{"message": "配置已更新"})
+}
+
+func (h *ClientHandler) DownloadLog(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	client, err := h.clientSvc.GetByID(id)
+	if err != nil {
+		fail(c, 404, "设备不存在")
+		return
+	}
+
+	logPath := fmt.Sprintf("library/logs/%s.log", client.DeviceID)
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		fail(c, 404, "暂无终端日志")
+		return
+	}
+
+	c.FileAttachment(logPath, fmt.Sprintf("%s.log", client.DeviceID))
 }

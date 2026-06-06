@@ -157,12 +157,16 @@ class MainActivity : AppCompatActivity() {
                 when (currentPlaybackState) {
                     PlaybackState.BUFFERING -> {
                         // 场景 A：连接或缓冲超时（10秒未进入 PLAYING）
+                        // 注释掉该看门狗策略，将超时判断权完全交还给底层播放器（ExoPlayer/VLC）。
+                        // 避免在弱网或加载较慢的有效源上出现频繁的“误杀”和自动换台跳跃。
+                        /*
                         if (stateStartTime > 0 && now - stateStartTime > 10000L) {
                             Toast.makeText(this@MainActivity, "网络连接超时，正在尝试切换线路...", Toast.LENGTH_SHORT).show()
                             currentPlaybackState = PlaybackState.IDLE
                             handlePlaybackError(isNetworkTimeout = true)
                             return
                         }
+                        */
                     }
                     PlaybackState.PLAYING -> {
                         // 场景 B：画面冻结（假死）逻辑
@@ -200,10 +204,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val hideOsdRunnable = Runnable { layoutOsd?.visibility = View.GONE }
+    private val hideOsdRunnable = Runnable { 
+        layoutOsd?.visibility = View.GONE 
+        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD GONE")
+    }
     private val hideZappingRunnable = Runnable { 
         layoutZappingMenu?.visibility = View.GONE 
         videoLayout?.requestFocus()
+        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "ZappingMenu GONE")
     }
 
     // System Announcement state
@@ -220,9 +228,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var activeListArea = "channels" // "groups", "channels", "epg"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // 终极全局焦点防溢出守护神：监听由系统(如RecyclerView回收)引发的非自愿焦点跳转
+        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            if (newFocus != null) {
+                val isNewGroups = isViewDescendantOf(newFocus, tvGroupsRv)
+                val isNewChannels = isViewDescendantOf(newFocus, tvChannelsRv)
+                val isNewEpg = isViewDescendantOf(newFocus, rvEpgList)
+
+                if (isNewGroups && activeListArea != "groups") {
+                    com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "Involuntary jump to Groups rejected! Forcing back to $activeListArea.")
+                    bounceFocusBack()
+                } else if (isNewChannels && activeListArea != "channels") {
+                    com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "Involuntary jump to Channels rejected! Forcing back to $activeListArea.")
+                    bounceFocusBack()
+                } else if (isNewEpg && activeListArea != "epg") {
+                    com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "Involuntary jump to EPG rejected! Forcing back to $activeListArea.")
+                    bounceFocusBack()
+                }
+            }
+        }
 
         // 强制所有设备使用 TV 的沉浸式界面大一统！
         isTvMode = true
@@ -272,6 +302,8 @@ class MainActivity : AppCompatActivity() {
         // 检查版本更新
         com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
     }
+
+
 
     private fun hideSystemUI() {
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
@@ -452,7 +484,28 @@ class MainActivity : AppCompatActivity() {
                 e.printStackTrace()
             }
         }
-        rvEpgList?.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rvEpgList?.layoutManager = object : androidx.recyclerview.widget.LinearLayoutManager(this) {
+            override fun onFocusSearchFailed(focused: View, focusDirection: Int, recycler: androidx.recyclerview.widget.RecyclerView.Recycler, state: androidx.recyclerview.widget.RecyclerView.State): View? {
+                val next = super.onFocusSearchFailed(focused, focusDirection, recycler, state)
+                if (next == null && (focusDirection == View.FOCUS_DOWN || focusDirection == View.FOCUS_UP)) {
+                    return focused // 捕获焦点
+                }
+                return next
+            }
+            override fun requestChildRectangleOnScreen(parent: androidx.recyclerview.widget.RecyclerView, child: View, rect: android.graphics.Rect, immediate: Boolean, focusedChildVisible: Boolean): Boolean {
+                // 核心UX优化：预留上下各 2 个 Item 的高度作为焦点边距
+                // 这样在焦点达到倒数第 3 个时，列表就会提前向上滚动
+                rect.top -= child.height * 2
+                rect.bottom += child.height * 2
+                return super.requestChildRectangleOnScreen(parent, child, rect, immediate, focusedChildVisible)
+            }
+        }
+        rvEpgList?.setOnKeyListener { _, keyCode, event ->
+            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                if (FocusHelper.trapVerticalScroll(rvEpgList!!, keyCode)) return@setOnKeyListener true
+            }
+            false
+        }
         rvEpgList?.adapter = epgAdapter
         
         // Line Menu
@@ -1124,6 +1177,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showOsd() {
         layoutOsd?.visibility = View.VISIBLE
+        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD VISIBLE")
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.postDelayed(hideOsdRunnable, 5000)
         
@@ -1258,12 +1312,38 @@ class MainActivity : AppCompatActivity() {
 
         if (isTvMode) {
             tvGroupsRv?.apply {
-                layoutManager = LinearLayoutManager(this@MainActivity)
+                layoutManager = object : LinearLayoutManager(this@MainActivity) {
+                    override fun onFocusSearchFailed(focused: View, focusDirection: Int, recycler: androidx.recyclerview.widget.RecyclerView.Recycler, state: androidx.recyclerview.widget.RecyclerView.State): View? {
+                        val next = super.onFocusSearchFailed(focused, focusDirection, recycler, state)
+                        if (next == null && (focusDirection == View.FOCUS_DOWN || focusDirection == View.FOCUS_UP)) {
+                            return focused // 捕获焦点
+                        }
+                        return next
+                    }
+                    override fun requestChildRectangleOnScreen(parent: androidx.recyclerview.widget.RecyclerView, child: View, rect: android.graphics.Rect, immediate: Boolean, focusedChildVisible: Boolean): Boolean {
+                        rect.top -= child.height * 2
+                        rect.bottom += child.height * 2
+                        return super.requestChildRectangleOnScreen(parent, child, rect, immediate, focusedChildVisible)
+                    }
+                }
                 adapter = groupAdapter
             }
             tvChannelsRv?.apply {
                 setHasFixedSize(true)
-                layoutManager = LinearLayoutManager(this@MainActivity)
+                layoutManager = object : LinearLayoutManager(this@MainActivity) {
+                    override fun onFocusSearchFailed(focused: View, focusDirection: Int, recycler: androidx.recyclerview.widget.RecyclerView.Recycler, state: androidx.recyclerview.widget.RecyclerView.State): View? {
+                        val next = super.onFocusSearchFailed(focused, focusDirection, recycler, state)
+                        if (next == null && (focusDirection == View.FOCUS_DOWN || focusDirection == View.FOCUS_UP)) {
+                            return focused // 捕获焦点，防止快速滚动时意外逃逸到侧边栏
+                        }
+                        return next
+                    }
+                    override fun requestChildRectangleOnScreen(parent: androidx.recyclerview.widget.RecyclerView, child: View, rect: android.graphics.Rect, immediate: Boolean, focusedChildVisible: Boolean): Boolean {
+                        rect.top -= child.height * 2
+                        rect.bottom += child.height * 2
+                        return super.requestChildRectangleOnScreen(parent, child, rect, immediate, focusedChildVisible)
+                    }
+                }
                 adapter = channelAdapter
             }
         } else {
@@ -1601,6 +1681,7 @@ class MainActivity : AppCompatActivity() {
         layoutZappingMenu?.visibility = View.GONE
         layoutSettingsMenu?.visibility = View.GONE
         layoutEpgMenu?.visibility = View.VISIBLE
+        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "EPG VISIBLE")
         
         tvEpgMenuTitle?.text = "节目单"
         
@@ -1753,6 +1834,7 @@ class MainActivity : AppCompatActivity() {
         tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
 
         layoutZappingMenu?.visibility = View.VISIBLE
+        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "ZappingMenu VISIBLE")
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.postDelayed(hideZappingRunnable, 10000)
 
@@ -1797,11 +1879,137 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isViewDescendantOf(view: View, parent: View?): Boolean {
+        if (parent == null) return false
+        var p = view.parent
+        while (p != null) {
+            if (p === parent) return true
+            p = p.parent
+        }
+        return false
+    }
+
+    private var isBouncingFocus = false
+
+    private fun bounceFocusBack() {
+        if (isBouncingFocus) return
+        isBouncingFocus = true
+        
+        when (activeListArea) {
+            "channels" -> {
+                val rv = tvChannelsRv
+                val lm = rv?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                val pos = lm?.findFirstCompletelyVisibleItemPosition()?.takeIf { it != -1 } ?: lm?.findFirstVisibleItemPosition() ?: 0
+                if (pos != -1) {
+                    val view = lm?.findViewByPosition(pos)
+                    if (view != null) view.requestFocus() else rv?.requestFocus()
+                }
+            }
+            "groups" -> {
+                val rv = tvGroupsRv
+                val lm = rv?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                val pos = lm?.findFirstCompletelyVisibleItemPosition()?.takeIf { it != -1 } ?: lm?.findFirstVisibleItemPosition() ?: 0
+                if (pos != -1) {
+                    val view = lm?.findViewByPosition(pos)
+                    if (view != null) view.requestFocus() else rv?.requestFocus()
+                }
+            }
+            "epg" -> {
+                val rv = rvEpgList
+                val lm = rv?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                val pos = lm?.findFirstCompletelyVisibleItemPosition()?.takeIf { it != -1 } ?: lm?.findFirstVisibleItemPosition() ?: 0
+                if (pos != -1) {
+                    val view = lm?.findViewByPosition(pos)
+                    if (view != null) view.requestFocus() else rv?.requestFocus()
+                }
+            }
+        }
+        
+        tvChannelsRv?.postDelayed({ isBouncingFocus = false }, 100)
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
+            val keyCode = event.keyCode
+            
+            com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "User pressed key $keyCode")
+
+            // 只要面板处于显示状态，用户的任何按键都应当重置自动隐藏的时间
             if (layoutZappingMenu?.visibility == View.VISIBLE) {
                 uiHandler.removeCallbacks(hideZappingRunnable)
                 uiHandler.postDelayed(hideZappingRunnable, 15000)
+            }
+            if (layoutOsd?.visibility == View.VISIBLE) {
+                uiHandler.removeCallbacks(hideOsdRunnable)
+                uiHandler.postDelayed(hideOsdRunnable, 5000)
+            }
+            
+            val focusedView = currentFocus
+            if (focusedView != null) {
+                // 跟踪用户的合法横向意图
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (isViewDescendantOf(focusedView, tvChannelsRv)) activeListArea = "groups"
+                    else if (isViewDescendantOf(focusedView, rvEpgList)) activeListArea = "channels"
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (isViewDescendantOf(focusedView, tvGroupsRv)) activeListArea = "channels"
+                    else if (isViewDescendantOf(focusedView, tvChannelsRv)) activeListArea = "epg"
+                }
+            }
+
+            // 【终极 TV 焦点防御系统】
+            // 拦截 Activity 级别的所有按键分发。防止极速滚动时脱离列表边界。
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (focusedView != null) {
+                    val direction = if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) View.FOCUS_DOWN else View.FOCUS_UP
+                    val dirStr = if (direction == View.FOCUS_DOWN) "DOWN" else "UP"
+                    
+                    fun handleListFocus(rv: androidx.recyclerview.widget.RecyclerView, listName: String): Boolean {
+                        val lm = rv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                        val adapter = rv.adapter
+                        val focusedPos = rv.getChildAdapterPosition(focusedView)
+                        val nextFocus = android.view.FocusFinder.getInstance().findNextFocus(rv as android.view.ViewGroup, focusedView, direction)
+                        
+                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "$listName $dirStr | currPos:$focusedPos, nextFocusPos:${nextFocus?.let { rv.getChildAdapterPosition(it) }}, lastVisible:${lm?.findLastVisibleItemPosition()}")
+
+                        if (nextFocus != null) {
+                            nextFocus.requestFocus()
+                            return true
+                        } else {
+                            if (lm != null && adapter != null && focusedPos != androidx.recyclerview.widget.RecyclerView.NO_POSITION) {
+                                if (direction == View.FOCUS_DOWN) {
+                                    val nextPos = focusedPos + 1
+                                    if (nextPos < adapter.itemCount) {
+                                        rv.scrollToPosition(nextPos)
+                                        rv.post { lm.findViewByPosition(nextPos)?.requestFocus() }
+                                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "$listName Blocked escape DOWN. Snap to $nextPos")
+                                    } else {
+                                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "$listName reached BOTTOM.")
+                                    }
+                                } else {
+                                    val nextPos = focusedPos - 1
+                                    if (nextPos >= 0) {
+                                        rv.scrollToPosition(nextPos)
+                                        rv.post { lm.findViewByPosition(nextPos)?.requestFocus() }
+                                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "$listName Blocked escape UP. Snap to $nextPos")
+                                    } else {
+                                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "$listName reached TOP.")
+                                    }
+                                }
+                            }
+                            return true // 始终吞噬，绝对不让 Android 全局接管焦点！
+                        }
+                    }
+
+                    if (isViewDescendantOf(focusedView, tvChannelsRv)) {
+                        return handleListFocus(tvChannelsRv as androidx.recyclerview.widget.RecyclerView, "ChannelList")
+                    } else if (isViewDescendantOf(focusedView, tvGroupsRv)) {
+                        return handleListFocus(tvGroupsRv as androidx.recyclerview.widget.RecyclerView, "GroupList")
+                    } else if (isViewDescendantOf(focusedView, rvEpgList)) {
+                        return handleListFocus(rvEpgList as androidx.recyclerview.widget.RecyclerView, "EpgList")
+                    } else {
+                        com.mediaplayer.app.util.RemoteLogger.i("FocusTrace", "OtherArea $dirStr | focusedId:${focusedView.id}")
+                    }
+                }
             }
             
             // 遥控器数字键换台

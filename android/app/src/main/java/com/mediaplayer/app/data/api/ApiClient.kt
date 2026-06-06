@@ -56,7 +56,15 @@ object ApiClient {
 
     fun getOkHttpClient(): OkHttpClient {
         if (okHttpClient == null) {
-            val logging = HttpLoggingInterceptor().apply {
+            val logging = HttpLoggingInterceptor(object : HttpLoggingInterceptor.Logger {
+                override fun log(message: String) {
+                    if (message.contains("Exception") || message.contains("Failed") || message.contains("error", ignoreCase = true)) {
+                        com.mediaplayer.app.util.RemoteLogger.e("OkHttp", message)
+                    } else {
+                        com.mediaplayer.app.util.RemoteLogger.d("OkHttp", message)
+                    }
+                }
+            }).apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
 

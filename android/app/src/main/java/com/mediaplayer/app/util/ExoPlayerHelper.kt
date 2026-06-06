@@ -141,7 +141,12 @@ class ExoPlayerHelper(
         }
         val loadControl = loadControlBuilder.build()
 
+        val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
+            setParameters(buildUponParameters().setTunnelingEnabled(true))
+        }
+
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)
+            .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .build()
             
@@ -184,6 +189,7 @@ class ExoPlayerHelper(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Playback error", error)
                 listener.onError()
             }
 

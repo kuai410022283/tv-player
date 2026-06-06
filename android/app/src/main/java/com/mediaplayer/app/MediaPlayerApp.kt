@@ -12,6 +12,7 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         instance = this
 
         com.mediaplayer.app.util.CrashHandler.instance.init(this)
+        com.mediaplayer.app.util.RemoteLogger.init(this)
 
         // Initialize API with saved server URL or default
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)

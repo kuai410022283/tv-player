@@ -252,10 +252,10 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
     body.innerHTML = chRes.data.items.map((c, i) => {
       let logoHtml = '<span style="color:#999">-</span>';
       if (localLogoEnabled) {
-          let fallbackAttr = c.logo ? `data-fallback-src="${c.logo}"` : '';
-          logoHtml = `<img data-auth-src="/api/v1/logo?name=${encodeURIComponent(c.epg_channel_id || c.name)}" ${fallbackAttr} loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+        let fallbackAttr = c.logo ? `data-fallback-src="${c.logo}"` : '';
+        logoHtml = `<img data-auth-src="/api/v1/logo?name=${encodeURIComponent(c.epg_channel_id || c.name)}" ${fallbackAttr} loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
       } else if (c.logo) {
-          logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+        logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
       }
       return `<tr>
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
@@ -275,7 +275,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
     </tr>`;
     }).join('');
   }
-  
+
   // 触发带鉴权的图片懒加载
   document.querySelectorAll('img[data-auth-src]').forEach(async img => {
     const handleFallback = () => {
@@ -305,7 +305,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage');
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
-  
+
   // 每次加载频道列表时，触发一次状态轮询
   pollHealthCheckStatus();
 }
@@ -348,14 +348,14 @@ async function pollHealthCheckStatus() {
     const data = json.data;
     const btn = document.getElementById('btn-health-check');
     if (!btn) return;
-    
+
     if (data && data.is_running) {
       const pct = data.total > 0 ? Math.floor((data.current / data.total) * 100) : 0;
       btn.textContent = `检查中 ${pct}%`;
       btn.disabled = true;
       btn.style.opacity = '0.7';
       btn.style.cursor = 'not-allowed';
-      
+
       // 动态计算合理的轮询时间：按进度走 1% 的时间为周期，但限制在 3秒 ~ 15秒之间
       let pollMs = 3000;
       if (data.total > 0 && data.delay_ms > 0) {
@@ -374,7 +374,7 @@ async function pollHealthCheckStatus() {
       btn.style.cursor = 'pointer';
       if (healthCheckPollTimer) clearTimeout(healthCheckPollTimer);
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function channelGoToPage(p) {
@@ -732,7 +732,7 @@ function handleImportFile(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     const text = e.target.result;
     if (text.includes('#EXTM3U') || text.includes('#EXTINF') || text.includes(',')) {
       document.getElementById('import-content').value = text;
@@ -896,15 +896,40 @@ async function showClientDetail(id) {
         <code style="font-size:12px" id="detail-token-display" data-preview="${esc(tokenPreview)}" data-full="${esc(c.access_token || '')}">${esc(tokenPreview)}</code>
         ${c.access_token ? `<svg onclick="toggleTokenVisibility(this)" style="width:16px;height:16px;cursor:pointer;color:var(--text2);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>` : ''}
       </div>
+      <div class="label">远程日志</div>
+      <div class="value" style="display:flex;align-items:center;gap:8px;">
+        <label style="position:relative;display:inline-block;width:36px;height:20px;">
+          <input type="checkbox" onchange="this.nextElementSibling.style.backgroundColor = this.checked ? '#5fb878' : '#ccc'; this.nextElementSibling.firstElementChild.style.transform = this.checked ? 'translateX(16px)' : 'translateX(0)'; toggleClientLog(${c.id}, this.checked)" ${c.enable_log ? 'checked' : ''} style="opacity:0;width:0;height:0;">
+          <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:${c.enable_log ? '#5fb878' : '#ccc'};transition:.4s;border-radius:20px;">
+            <span style="position:absolute;content:'';height:16px;width:16px;left:2px;bottom:2px;background-color:white;transition:.4s;border-radius:50%;transform:${c.enable_log ? 'translateX(16px)' : 'translateX(0)'};"></span>
+          </span>
+        </label>
+        <span style="font-size:12px;color:var(--text2);">采集设备端报错及行为 (异步)</span>
+      </div>
     </div>
     <div class="btn-group" style="flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="showTokenModal(${c.id})">🔑 令牌管理</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('/api/v1/admin/clients/${c.id}/download-log?token=' + encodeURIComponent(localStorage.getItem('token')), '_blank')">⬇️ 终端日志</button>
       ${c.status === 'approved' ? `<button class="btn btn-warn btn-sm" onclick="banClient(${c.id},'管理员封禁')">封禁</button>` : ''}
       ${c.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button>` : ''}
       <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">删除设备</button>
     </div>
   `;
   showModal('client-detail-modal');
+}
+
+async function toggleClientLog(id, enable) {
+  const r = await api(`/admin/clients/${id}/log-config`, {
+    method: 'POST',
+    body: JSON.stringify({ enable_log: enable })
+  });
+  if (r.code === 0) {
+    toast(enable ? '已开启终端日志采集' : '已关闭终端日志采集');
+    // Refresh modal
+    showClientDetail(id);
+  } else {
+    toast(r.message || '操作失败', 'error');
+  }
 }
 
 let allPlans = [];
@@ -1237,7 +1262,7 @@ async function loadClientSettings() {
   select.innerHTML = '<option value="0" data-desc="">-- 自定义授权 (使用下方允许同时在线设备数量和有效期) --</option>' +
     plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}" data-desc="${esc(p.description || '')}">${esc(p.name)}</option>`).join('');
 
-    if (setRes.data) {
+  if (setRes.data) {
     if (document.getElementById('set-enable-url-token')) {
       document.getElementById('set-enable-url-token').value = setRes.data.enable_url_token || 'false';
     }
@@ -1370,7 +1395,7 @@ async function triggerBatchFetchLogos(overwrite) {
     return;
   }
   try {
-    const res = await api('/admin/logo/fetch', { 
+    const res = await api('/admin/logo/fetch', {
       method: 'POST',
       body: JSON.stringify({ overwrite: overwrite })
     });
@@ -1492,7 +1517,7 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
       if (setRes && setRes.data) {
         localLogoEnabled = (setRes.data.enable_local_logo === 'true');
       }
-    } catch (e) {}
+    } catch (e) { }
     const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
     showSection(lastSection);
   })();

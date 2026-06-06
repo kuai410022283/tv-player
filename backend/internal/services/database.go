@@ -50,6 +50,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
 
 	// 移除 channel_groups.name 的 UNIQUE 约束
 	var sqlStmt string
@@ -186,6 +187,7 @@ func createTables(db *sql.DB) error {
 		last_seen DATETIME,
 		total_play_minutes INTEGER DEFAULT 0,
 		request_note TEXT DEFAULT '',
+		enable_log INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -270,6 +272,7 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
 
 	return err
 }

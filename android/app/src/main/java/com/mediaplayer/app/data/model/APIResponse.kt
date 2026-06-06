@@ -22,5 +22,6 @@ data class ClientRegisterResp(
     @SerializedName("expires_at") val expiresAt: String = "",
     @SerializedName("message") val message: String = "",
     @SerializedName("announcement") val announcement: String? = null,
-    @SerializedName("announcement_interval") val announcementInterval: Int = 0
+    @SerializedName("announcement_interval") val announcementInterval: Int = 0,
+    @SerializedName("enable_log") val enableLog: Boolean = false
 )

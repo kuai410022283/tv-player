@@ -59,26 +59,66 @@ object FocusHelper {
         onLeftNav: (() -> Boolean)? = null
     ) {
         leftRv.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && event.action == KeyEvent.ACTION_DOWN) {
-                rightRv.requestFocus()
-                // 让右列表聚焦到第一个可见项
-                val firstVisible = (rightRv.layoutManager as? LinearLayoutManager)
-                    ?.findFirstVisibleItemPosition() ?: 0
-                rightRv.getChildAt(firstVisible - (rightRv.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition())
-                    ?.requestFocus()
-                true
-            } else false
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    rightRv.requestFocus()
+                    val firstVisible = (rightRv.layoutManager as? LinearLayoutManager)
+                        ?.findFirstVisibleItemPosition() ?: 0
+                    rightRv.getChildAt(firstVisible - (rightRv.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition())
+                        ?.requestFocus()
+                    return@setOnKeyListener true
+                }
+                if (trapVerticalScroll(leftRv, keyCode)) return@setOnKeyListener true
+            }
+            false
         }
 
         rightRv.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
-                val handled = onLeftNav?.invoke() ?: false
-                if (!handled) {
-                    leftRv.requestFocus()
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    val handled = onLeftNav?.invoke() ?: false
+                    if (!handled) {
+                        leftRv.requestFocus()
+                    }
+                    return@setOnKeyListener true
                 }
-                true
-            } else false
+                if (trapVerticalScroll(rightRv, keyCode)) return@setOnKeyListener true
+            }
+            false
         }
+    }
+
+    /**
+     * 捕获极速滚动时的上下焦点逃逸
+     */
+    fun trapVerticalScroll(rv: RecyclerView, keyCode: Int): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_DPAD_UP && keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false
+        val direction = if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) View.FOCUS_DOWN else View.FOCUS_UP
+        val focused = rv.findFocus() ?: return false
+        
+        // 尝试在 RecyclerView 内部寻找下一个焦点
+        val nextFocus = FocusFinder.getInstance().findNextFocus(rv, focused, direction)
+        if (nextFocus == null) {
+            // 内部找不到焦点，通常是因为 RecyclerView 正在极速动画或 layout，下一个子 View 还没挂载上来。
+            // 此时必须强制吃掉按键事件，防止系统 fallback 到全局搜索导致焦点飞到隔壁列表。
+            val lm = rv.layoutManager as? LinearLayoutManager
+            val adapter = rv.adapter
+            if (lm != null && adapter != null) {
+                if (direction == View.FOCUS_DOWN) {
+                    val lastVisible = lm.findLastVisibleItemPosition()
+                    if (lastVisible < adapter.itemCount - 1) {
+                        rv.smoothScrollToPosition(lastVisible + 1)
+                    }
+                } else {
+                    val firstVisible = lm.findFirstVisibleItemPosition()
+                    if (firstVisible > 0) {
+                        rv.smoothScrollToPosition(firstVisible - 1)
+                    }
+                }
+            }
+            return true // 捕获焦点！
+        }
+        return false
     }
 
     /**

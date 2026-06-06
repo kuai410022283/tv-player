@@ -183,6 +183,7 @@ type Client struct {
 	LastSeen     time.Time `json:"last_seen,omitempty" db:"last_seen"`
 	TotalPlayMin int64     `json:"total_play_minutes" db:"total_play_minutes"` // 累计播放分钟
 	RequestNote  string    `json:"request_note,omitempty" db:"request_note"` // 申请备注
+	EnableLog    bool      `json:"enable_log" db:"enable_log"`               // 是否采集日志
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -204,6 +205,7 @@ type ClientRegisterResp struct {
 	AccessToken string `json:"access_token,omitempty"` // 仅 approved 时返回
 	ExpiresAt   string `json:"expires_at,omitempty"`
 	Message     string `json:"message"`
+	EnableLog   bool   `json:"enable_log"`
 }
 
 // 客户端审批请求

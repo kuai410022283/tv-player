@@ -45,6 +45,7 @@ class CrashHandler private constructor() : Thread.UncaughtExceptionHandler {
 
     private fun handleException(ex: Throwable?): Boolean {
         if (ex == null) return false
+        com.mediaplayer.app.util.RemoteLogger.e("CrashHandler", "Uncaught Exception", ex)
         saveCrashInfoToFile(ex)
         return true
     }

@@ -27,6 +27,14 @@ interface ApiService {
     @GET("client/me")
     suspend fun clientMe(): Response<APIResponse<JsonElement>>
 
+    // ── 客户端日志 ───────────────────────────────────────
+
+    @Multipart
+    @POST("client/logs")
+    suspend fun clientUploadLog(
+        @Part logFile: okhttp3.MultipartBody.Part
+    ): Response<APIResponse<JsonElement>>
+
     // ── 频道分组 ───────────────────────────────────────
 
     @GET("groups")

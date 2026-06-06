@@ -24,6 +24,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 
 	// ── 客户端自服务 (需要客户端 token) ──────────────
 	r.GET("/client/me", hs.ClientHandler.Me)
+	r.POST("/client/logs", hs.ClientHandler.UploadLog)
 
 	// ── 频道组 ──────────────────────────────────────
 	groups := r.Group("/groups")
@@ -111,6 +112,8 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		clients.POST("/:id/revoke", hs.ClientHandler.RevokeToken)
 		clients.POST("/:id/regenerate", hs.ClientHandler.RegenerateToken)
 		clients.GET("/:id/logs", hs.ClientHandler.GetLogs)
+		clients.POST("/:id/log-config", hs.ClientHandler.UpdateLogConfig)
+		clients.GET("/:id/download-log", hs.ClientHandler.DownloadLog)
 		clients.DELETE("/:id", hs.ClientHandler.Delete)
 		clients.POST("/batch", hs.ClientHandler.Batch)
 	}
