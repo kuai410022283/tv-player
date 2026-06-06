@@ -57,7 +57,28 @@ class ExoPlayerHelper(
         videoLayout.addView(playerView)
     }
 
+    // Playback state for retry
+    private var currentUrl: String = ""
+    private var currentUserAgent: String = ""
+    private var currentHeaders: String = ""
+    private var isMimeTypeFallback: Boolean = false
+    
+    // Circuit breaker for Behind Live Window
+    private var behindLiveWindowCount: Int = 0
+    private var behindLiveWindowLastTime: Long = 0L
+
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        currentUrl = url
+        currentUserAgent = userAgent
+        currentHeaders = customHeaders
+        isMimeTypeFallback = false
+        behindLiveWindowCount = 0
+        behindLiveWindowLastTime = 0L
+        
+        playInternal(url, userAgent, customHeaders, null)
+    }
+
+    private fun playInternal(url: String, userAgent: String, customHeaders: String, mimeType: String?) {
         if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
             buildPlayer()
         }
@@ -104,7 +125,11 @@ class ExoPlayerHelper(
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(defaultDataSourceFactory)
 
-        val mediaItem = MediaItem.fromUri(Uri.parse(url))
+        val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
+        if (mimeType != null) {
+            mediaItemBuilder.setMimeType(mimeType)
+        }
+        val mediaItem = mediaItemBuilder.build()
         val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
         
         exoPlayer?.setMediaSource(mediaSource)
@@ -189,7 +214,43 @@ class ExoPlayerHelper(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Playback error", error)
+                com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Playback error code: ${error.errorCode}", error)
+                
+                // 1. 直播流滑窗越界自愈 (带熔断机制)
+                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    val now = System.currentTimeMillis()
+                    if (now - behindLiveWindowLastTime > 60000) {
+                        behindLiveWindowCount = 0
+                    }
+                    behindLiveWindowCount++
+                    behindLiveWindowLastTime = now
+                    
+                    if (behindLiveWindowCount <= 3) {
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window detected ($behindLiveWindowCount/3), auto-recovering...")
+                        exoPlayer?.seekToDefaultPosition()
+                        exoPlayer?.prepare()
+                        return // 吞掉错误，不再向上层报错
+                    } else {
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window circuit breaker tripped! Throwing error.")
+                        // 熔断，重置计数，并抛给上层换源
+                        behindLiveWindowCount = 0
+                    }
+                }
+                
+                // 2. 格式嗅探与重试 (MimeType 降级)
+                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+                ) {
+                    if (!isMimeTypeFallback) {
+                        isMimeTypeFallback = true
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Parsing error detected, falling back to M3U8 MimeType...")
+                        // 强制使用 M3U8 MimeType 再次尝试播放
+                        playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+                        return // 吞掉本次错误
+                    }
+                }
+
                 listener.onError()
             }
 

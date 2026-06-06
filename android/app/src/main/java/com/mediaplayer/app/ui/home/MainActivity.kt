@@ -829,6 +829,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         tvOsdInfo?.text = fullInfo
+                        com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback started successfully. Stream info: $fullInfo")
                     }
                 }
             }
@@ -920,17 +921,18 @@ class MainActivity : AppCompatActivity() {
         // 如果是网络超时，不要去切换内核（因为内核没毛病），直接走换线逻辑
         if (!isNetworkTimeout) {
             // 内核容灾：智能模式下尝试切换播放内核
-        if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
-            coreRetryLevel++
-            val coreName = when (coreRetryLevel) {
-                1 -> "VLC"
-                2 -> "IJKPlayer"
-                else -> "ExoPlayer"
+            if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
+                coreRetryLevel++
+                val coreName = when (coreRetryLevel) {
+                    1 -> "VLC"
+                    2 -> "IJKPlayer"
+                    else -> "ExoPlayer"
+                }
+                Toast.makeText(this, "尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback failed. Retrying with core: $coreName")
+                playCurrentLineInTv()
+                return
             }
-            Toast.makeText(this, "尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
-            playCurrentLineInTv()
-            return
-        }
         }
 
         val channel = allChannels.getOrNull(currentChannelIndex)
@@ -940,6 +942,7 @@ class MainActivity : AppCompatActivity() {
             currentLineIndex++
             coreRetryLevel = 0
             Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "Core failed. Switching to line ${currentLineIndex + 1}")
             playCurrentLineInTv()
         } else {
             // 如果用户指定了特定内核（非智能切换）且播放失败，并且不是网络超时，才回退到智能模式
@@ -951,12 +954,17 @@ class MainActivity : AppCompatActivity() {
                 coreRetryLevel = 0
                 currentLineIndex = 0
                 Toast.makeText(this@MainActivity, "播放内核解码失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Fixed core playback failed. Reverting to auto-core retry.")
                 playCurrentLineInTv()
                 return
             }
             
             coreRetryLevel = 0
             currentLineIndex = 0
+            
+            val msg = if (isNetworkTimeout) "网络超时，播放失败" else "所有线路均已失效"
+            com.mediaplayer.app.util.RemoteLogger.e("Player", "All lines and cores failed for channel: ${channel?.name ?: "Unknown"}. Reason: $msg")
+            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
             
             continuousSkipCount++
             if (continuousSkipCount >= maxAutoSkips) {

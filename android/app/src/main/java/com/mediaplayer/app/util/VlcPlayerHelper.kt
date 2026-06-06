@@ -33,10 +33,9 @@ class VlcPlayerHelper(
         val options = ArrayList<String>()
         options.add("--aout=opensles")
         options.add("--audio-time-stretch")
-        options.add("--drop-late-frames")
-        options.add("--skip-frames")
         // 强制 RTSP 使用 TCP 传输，解决 UDP 在 Android/TV 盒子环境下容易丢包或被 NAT 拦截导致无法播放的问题
         options.add("--rtsp-tcp")
+        options.add("--network-synchronisation") // 增加全局容错选项
 
         // We no longer add caching or jitter options globally here because they are applied per-Media based on URL in play().
         // options.add("--network-caching=$cacheMs")
@@ -98,8 +97,12 @@ class VlcPlayerHelper(
                         }
                     }, 1000)
                 }
-                MediaPlayer.Event.EncounteredError,
+                MediaPlayer.Event.EncounteredError -> {
+                    com.mediaplayer.app.util.RemoteLogger.e("VLCPlayer", "Encountered internal playback error.")
+                    listener.onError()
+                }
                 MediaPlayer.Event.EndReached -> {
+                    com.mediaplayer.app.util.RemoteLogger.i("VLCPlayer", "End of stream reached.")
                     listener.onError()
                 }
             }
@@ -141,13 +144,13 @@ class VlcPlayerHelper(
                                      lowerUrl.contains("://180.141.") || // 典型电信IPTV
                                      lowerUrl.contains("://127.0.")
             if (isLocalOrMulticast) {
-                finalCacheMs = 50 // 内网 50ms 极速起播
+                finalCacheMs = 300 // 内网适当提高到 300ms 保证不卡顿
             } else {
-                finalCacheMs = 100 // 公网/代理流 100ms 快速起播
+                finalCacheMs = 1500 // 公网流 1500ms，保证足够的抗抖动能力
             }
-            useAggressiveLatency = true
+            useAggressiveLatency = false // 自动模式下，不再强制开启激进防抖屏蔽
         } else {
-            // 如果用户手动设置了很低的缓存（<= 200ms），也开启激进模式
+            // 如果用户手动设置了很低的缓存（<= 200ms），则开启激进模式
             useAggressiveLatency = cacheMs <= 200
         }
 

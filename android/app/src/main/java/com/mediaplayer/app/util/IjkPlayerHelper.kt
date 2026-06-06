@@ -110,15 +110,23 @@ class IjkPlayerHelper(
         }
 
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
+        // 允许 DNS 缓存，提升起播速度
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 0)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
+        // 降低极限丢帧率，防止画面变成幻灯片
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000000L) // 30秒超时 (单位为微秒)
+
+        // 加入底层的 HTTP 断开重连机制，提升弱网抗性
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_at_eof", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 5) // 最大重连延迟5秒
 
         if (currentCacheMs <= 0) {
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
@@ -132,9 +140,9 @@ class IjkPlayerHelper(
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
         }
 
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L) 
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒嗅探时长 (单位为微秒)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L) // 1MB 探针大小
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
 
         // 强制 RTSP 使用 TCP 传输，防止组播流被路由器拦截
@@ -171,7 +179,8 @@ class IjkPlayerHelper(
             }
             false
         }
-        player.setOnErrorListener { _, _, _ ->
+        player.setOnErrorListener { _, what, extra ->
+            com.mediaplayer.app.util.RemoteLogger.e("IJKPlayer", "Playback error. what: $what, extra: $extra")
             listener.onError()
             true
         }
