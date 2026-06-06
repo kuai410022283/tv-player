@@ -11,8 +11,8 @@ android {
         applicationId "com.mediaplayer.app"
         minSdk 21
         targetSdk 34
-        versionCode 41
-        versionName "1.0.41"
+        versionCode 42
+        versionName "1.0.42"
     }
 
     signingConfigs {
@@ -126,4 +126,7 @@ dependencies {
 
     // Splash Screen
     implementation 'androidx.core:core-splashscreen:1.0.1'
+
+    // AndroidAutoSize (Screen Adaptation for TV/Pad)
+    implementation 'me.jessyan:autosize:1.2.1'
 }

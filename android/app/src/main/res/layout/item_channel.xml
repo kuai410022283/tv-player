@@ -4,7 +4,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
+    android:layout_height="80dp"
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:paddingHorizontal="16dp"
@@ -23,11 +23,11 @@
     <!-- 序号 -->
     <TextView
         android:id="@+id/tvChannelIndex"
-        android:layout_width="44dp"
+        android:layout_width="56dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp"
+        android:textSize="18sp"
         android:textStyle="bold"
         android:fontFamily="monospace"
         tools:text="001" />
@@ -35,8 +35,8 @@
     <!-- Logo -->
     <ImageView
         android:id="@+id/ivChannelLogo"
-        android:layout_width="48dp"
-        android:layout_height="36dp"
+        android:layout_width="64dp"
+        android:layout_height="48dp"
         android:scaleType="fitCenter"
         android:layout_marginEnd="10dp"
         android:visibility="gone" />
@@ -53,7 +53,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_primary"
-            android:textSize="15sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:singleLine="true"
             android:ellipsize="marquee"
@@ -66,8 +66,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp"
-            android:layout_marginTop="2dp"
+            android:textSize="16sp"
+            android:layout_marginTop="4dp"
             android:singleLine="true"
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"
@@ -78,8 +78,8 @@
             android:id="@+id/progressEpgItem"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:layout_marginTop="3dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="6dp"
             android:layout_marginEnd="8dp"
             android:progressTint="@color/accent"
             android:progressBackgroundTint="#33FFFFFF"
@@ -95,7 +95,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
         android:textColor="@color/text_secondary"
-        android:textSize="10sp"
+        android:textSize="14sp"
         android:background="@drawable/bg_badge"
         android:paddingHorizontal="4dp"
         android:paddingVertical="1dp"
@@ -106,8 +106,8 @@
     <!-- 收藏图标 -->
     <ImageView
         android:id="@+id/ivFavorite"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:src="@drawable/ic_star"
         android:visibility="gone" />
 

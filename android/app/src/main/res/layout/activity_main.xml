@@ -83,7 +83,7 @@
                 android:layout_height="wrap_content"
                 android:text="001"
                 android:textColor="@color/accent"
-                android:textSize="36sp"
+                android:textSize="48sp"
                 android:textStyle="bold"
                 android:layout_marginEnd="16dp"/>
 
@@ -93,7 +93,7 @@
                 android:layout_height="wrap_content"
                 android:text="CCTV-1 综合"
                 android:textColor="#FFFFFF"
-                android:textSize="36sp"
+                android:textSize="48sp"
                 android:textStyle="bold" />
 
             <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -104,7 +104,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#AAAAAA"
-                android:textSize="16sp"
+                android:textSize="22sp"
                 android:text="1080P | H264 | AC3" />
         </LinearLayout>
 
@@ -114,7 +114,7 @@
             android:layout_height="wrap_content"
             android:text="正在播放: 精彩节目"
             android:textColor="#DDDDDD"
-            android:textSize="18sp"
+            android:textSize="24sp"
             android:layout_marginTop="8dp"/>
             
         <ProgressBar
@@ -131,7 +131,7 @@
     <!-- 3. 左侧侧滑菜单 (Zapping Menu) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layoutZappingMenu"
-        android:layout_width="450dp"
+        android:layout_width="600dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:background="#CC000000"
@@ -141,7 +141,7 @@
         <!-- 左侧：分组列表 -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvGroups"
-            android:layout_width="150dp"
+            android:layout_width="200dp"
             android:layout_height="0dp"
             android:paddingTop="32dp"
             android:paddingBottom="32dp"
@@ -202,7 +202,7 @@
     <!-- 3.5 右侧侧滑 EPG 菜单 (Full EPG Grid) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/layoutEpgMenu"
-        android:layout_width="320dp"
+        android:layout_width="420dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
         android:background="#DD000000"
@@ -270,7 +270,7 @@
         android:focusable="false">
         
         <LinearLayout
-            android:layout_width="400dp"
+            android:layout_width="540dp"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:orientation="vertical"
@@ -355,7 +355,7 @@
                     android:layout_height="wrap_content"
                     android:text="正在连接服务器..."
                     android:textColor="#AAAAAA"
-                    android:textSize="16sp"
+                    android:textSize="22sp"
                     android:gravity="center"
                     android:lineSpacingExtra="6dp" />
             </LinearLayout>
@@ -373,8 +373,8 @@
 
                 <ImageView
                     android:id="@+id/ivAuthQrCode"
-                    android:layout_width="220dp"
-                    android:layout_height="220dp" />
+                    android:layout_width="300dp"
+                    android:layout_height="300dp" />
 
                 <TextView
                     android:id="@+id/tvAuthQrConfigHint"
@@ -383,7 +383,7 @@
                     android:layout_marginTop="20dp"
                     android:text="手机扫码设置服务器"
                     android:textColor="#FFFFFF"
-                    android:textSize="16sp"
+                    android:textSize="22sp"
                     android:gravity="center"
                     android:focusable="false" />
             </LinearLayout>
@@ -394,7 +394,7 @@
     <!-- 5. 右侧侧滑设置菜单 (Settings Menu) -->
     <ScrollView
         android:id="@+id/layoutSettingsMenu"
-        android:layout_width="320dp"
+        android:layout_width="420dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
         android:background="#E6000000"
@@ -430,7 +430,7 @@
                 android:layout_height="wrap_content"
                 android:text="播放与画面"
                 android:textColor="#88FFFFFF"
-                android:textSize="14sp"
+                android:textSize="18sp"
                 android:layout_marginBottom="8dp"
                 android:layout_marginStart="8dp" />
 
@@ -459,7 +459,7 @@
                         android:layout_height="wrap_content"
                         android:text="画面比例"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsScaleValue"
@@ -467,7 +467,7 @@
                         android:layout_height="wrap_content"
                         android:text="原始比例"
                         android:textColor="#AAAAAA"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:layout_marginEnd="8dp"/>
                     <ImageView
                         android:layout_width="16dp"
@@ -494,7 +494,7 @@
                         android:layout_height="wrap_content"
                         android:text="解码模式"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsDecoderValue"
@@ -502,7 +502,7 @@
                         android:layout_height="wrap_content"
                         android:text="自动识别"
                         android:textColor="#AAAAAA"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:layout_marginEnd="8dp"/>
                     <ImageView
                         android:layout_width="16dp"
@@ -529,7 +529,7 @@
                         android:layout_height="wrap_content"
                         android:text="播放内核"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsCoreValue"
@@ -537,7 +537,7 @@
                         android:layout_height="wrap_content"
                         android:text="智能切换"
                         android:textColor="#AAAAAA"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:layout_marginEnd="8dp"/>
                     <ImageView
                         android:layout_width="16dp"
@@ -564,7 +564,7 @@
                         android:layout_height="wrap_content"
                         android:text="显示频道台标"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsShowLogoValue"
@@ -572,7 +572,7 @@
                         android:layout_height="wrap_content"
                         android:text="显示"
                         android:textColor="#AAAAAA"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:layout_marginEnd="8dp"/>
                     <ImageView
                         android:layout_width="16dp"
@@ -592,7 +592,7 @@
                         android:layout_height="wrap_content"
                         android:text="网络缓存时长"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textSize="22sp" />
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsCacheValue"
@@ -600,7 +600,7 @@
                         android:layout_height="wrap_content"
                         android:text="1.5 秒"
                         android:textColor="@color/accent"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -620,7 +620,7 @@
                 android:layout_height="wrap_content"
                 android:text="设备与系统"
                 android:textColor="#88FFFFFF"
-                android:textSize="14sp"
+                android:textSize="18sp"
                 android:layout_marginBottom="8dp"
                 android:layout_marginStart="8dp" />
 
@@ -637,7 +637,7 @@
                     android:layout_height="wrap_content"
                     android:text="系统音量"
                     android:textColor="#FFFFFF"
-                    android:textSize="16sp"
+                    android:textSize="22sp"
                     android:layout_marginBottom="8dp"/>
                 <SeekBar
                     android:id="@+id/sbSettingsVolume"
@@ -654,7 +654,7 @@
                     android:layout_height="wrap_content"
                     android:text="画面亮度"
                     android:textColor="#FFFFFF"
-                    android:textSize="16sp"
+                    android:textSize="22sp"
                     android:layout_marginBottom="8dp"/>
                 <SeekBar
                     android:id="@+id/sbSettingsBrightness"
@@ -672,7 +672,7 @@
                 android:layout_height="wrap_content"
                 android:text="应用管理"
                 android:textColor="#88FFFFFF"
-                android:textSize="14sp"
+                android:textSize="18sp"
                 android:layout_marginBottom="8dp"
                 android:layout_marginStart="8dp" />
 
@@ -702,7 +702,7 @@
                         android:layout_height="wrap_content"
                         android:text="开机自动启动"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsAutoStartValue"
@@ -710,7 +710,7 @@
                         android:layout_height="wrap_content"
                         android:text="开"
                         android:textColor="#AAAAAA"
-                        android:textSize="16sp"
+                        android:textSize="22sp"
                         android:layout_marginEnd="8dp"/>
                     <ImageView
                         android:layout_width="16dp"
@@ -737,7 +737,7 @@
                         android:layout_height="wrap_content"
                         android:text="检查更新"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp"/>
+                        android:textSize="22sp"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <ImageView
                         android:layout_width="20dp"
@@ -757,7 +757,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#AAAAAA"
-                android:textSize="14sp"
+                android:textSize="18sp"
                 android:lineSpacingExtra="6dp" />
 
 
@@ -784,7 +784,7 @@
                     android:layout_marginTop="12dp"
                     android:text="手机扫码快速配置服务器"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:textSize="18sp"
                     android:gravity="center"
                     android:focusable="false" />
             </LinearLayout>
@@ -795,7 +795,7 @@
                 android:layout_height="wrap_content"
                 android:text="QQ群: 864744268 (点击加入)"
                 android:textColor="@color/accent"
-                android:textSize="16sp"
+                android:textSize="22sp"
                 android:layout_marginTop="32dp"
                 android:layout_marginBottom="32dp"
                 android:paddingHorizontal="16dp"

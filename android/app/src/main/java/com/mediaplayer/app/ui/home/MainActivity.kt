@@ -227,6 +227,13 @@ class MainActivity : AppCompatActivity() {
         // 强制所有设备使用 TV 的沉浸式界面大一统！
         isTvMode = true
         
+        // 安全地请求横屏方向，规避 Android 8.0 透明主题请求固定方向时的崩溃Bug
+        try {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } catch (e: Exception) {
+            // 忽略 Android 8.0 上的 IllegalStateException
+        }
+
         // 保持屏幕常亮，防止手机/Pad自动锁屏
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -780,20 +787,27 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        when (core) {
-            Prefs.PLAYER_CORE_EXO -> {
-                playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+        try {
+            when (core) {
+                Prefs.PLAYER_CORE_EXO -> {
+                    playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+                }
+                Prefs.PLAYER_CORE_IJK -> {
+                    playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+                }
+                else -> {
+                    val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
+                    vlcVideoLayout.layoutParams = android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT)
+                    videoLayout?.addView(vlcVideoLayout)
+                    
+                    playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
+                }
             }
-            Prefs.PLAYER_CORE_IJK -> {
-                playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-            }
-            else -> {
-                val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
-                vlcVideoLayout.layoutParams = android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT)
-                videoLayout?.addView(vlcVideoLayout)
-                
-                playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
-            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "播放内核初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+            // 回退到默认状态或触发错误逻辑
+            listener.onError()
         }
 
         // 创建播放器后，应用保存的画面比例设置
@@ -1994,6 +2008,14 @@ class MainActivity : AppCompatActivity() {
             playerHelper?.release()
             playerHelper = null
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Pad 或设备旋转时，系统触发横竖屏切换或屏幕尺寸变化
+        // 由于我们在 manifest 中声明了 configChanges="orientation|screenSize"，Activity 不会重建
+        // 在这里可以安全地调整 UI 或通知播放器重新计算尺寸，防止 Surface 尺寸异常导致闪退
+        videoLayout?.requestLayout()
     }
 
     override fun onDestroy() {

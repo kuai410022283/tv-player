@@ -11,6 +11,8 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         super.onCreate()
         instance = this
 
+        com.mediaplayer.app.util.CrashHandler.instance.init(this)
+
         // Initialize API with saved server URL or default
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
