@@ -136,17 +136,21 @@ class ChannelAdapter(
             tvTypeBadge.text = streamType.uppercase()
             tvTypeBadge.visibility = View.VISIBLE
 
-            if (showLogo && item.logo.isNotEmpty()) {
-                var loadUrl = item.logo
-                if (loadUrl.startsWith("/")) {
-                    val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
-                    loadUrl = serverUrl + loadUrl
-                }
-                ivLogo.load(loadUrl) {
-                    placeholder(R.drawable.ic_channel_placeholder)
-                    error(R.drawable.ic_channel_placeholder)
-                }
+            if (showLogo) {
                 ivLogo.visibility = View.VISIBLE
+                if (item.logo.isNotEmpty()) {
+                    var loadUrl = item.logo
+                    if (loadUrl.startsWith("/")) {
+                        val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
+                        loadUrl = serverUrl + loadUrl
+                    }
+                    ivLogo.load(loadUrl) {
+                        placeholder(R.drawable.ic_channel_placeholder)
+                        error(R.drawable.ic_channel_placeholder)
+                    }
+                } else {
+                    ivLogo.load(R.drawable.ic_channel_placeholder)
+                }
             } else {
                 ivLogo.visibility = View.GONE
             }
