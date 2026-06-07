@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Manually mapped scaled dimensions -->
-    <dimen name="menu_zapping_width">570dp</dimen>
-    <dimen name="menu_side_width">399dp</dimen>
-    <dimen name="menu_line_width">513dp</dimen>
-    <dimen name="zapping_groups_width">190dp</dimen>
-    <dimen name="qr_code_size">255dp</dimen>
-    <dimen name="qr_code_small_size">136dp</dimen>
-    <dimen name="auth_logo_size">100dp</dimen>
-    <dimen name="size_64">80dp</dimen>
-    <dimen name="size_48">60dp</dimen>
-    <dimen name="size_32">40dp</dimen>
-    <dimen name="size_24">30dp</dimen>
+    <dimen name="menu_zapping_width">600dp</dimen>
+    <dimen name="menu_side_width">420dp</dimen>
+    <dimen name="menu_line_width">540dp</dimen>
+    <dimen name="zapping_groups_width">200dp</dimen>
+    <dimen name="qr_code_size">300dp</dimen>
+    <dimen name="qr_code_small_size">160dp</dimen>
+    <dimen name="auth_logo_size">80dp</dimen>
+    <dimen name="size_64">64dp</dimen>
+    <dimen name="size_48">48dp</dimen>
+    <dimen name="size_32">32dp</dimen>
+    <dimen name="size_24">24dp</dimen>
     <dimen name="text_48">48sp</dimen>
     <dimen name="text_32">32sp</dimen>
     <dimen name="text_28">28sp</dimen>
@@ -29,16 +29,16 @@
     <dimen name="dp_16">16dp</dimen>
     <dimen name="dp_20">20dp</dimen>
     <dimen name="dp_24">24dp</dimen>
-    <dimen name="dp_32">40dp</dimen>
-    <dimen name="dp_40">50dp</dimen>
-    <dimen name="dp_44">55dp</dimen>
-    <dimen name="dp_48">60dp</dimen>
-    <dimen name="dp_56">48dp</dimen>
-    <dimen name="dp_64">54dp</dimen>
-    <dimen name="dp_75">64dp</dimen>
-    <dimen name="dp_80">68dp</dimen>
-    <dimen name="dp_120">102dp</dimen>
-    <dimen name="dp_400">340dp</dimen>
+    <dimen name="dp_32">32dp</dimen>
+    <dimen name="dp_40">40dp</dimen>
+    <dimen name="dp_44">44dp</dimen>
+    <dimen name="dp_48">48dp</dimen>
+    <dimen name="dp_56">56dp</dimen>
+    <dimen name="dp_64">64dp</dimen>
+    <dimen name="dp_75">75dp</dimen>
+    <dimen name="dp_80">80dp</dimen>
+    <dimen name="dp_120">120dp</dimen>
+    <dimen name="dp_400">400dp</dimen>
     <dimen name="sp_11">11sp</dimen>
     <dimen name="sp_12">12sp</dimen>
     <dimen name="sp_13">13sp</dimen>

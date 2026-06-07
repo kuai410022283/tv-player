@@ -126,7 +126,4 @@ dependencies {
 
     // Splash Screen
     implementation 'androidx.core:core-splashscreen:1.0.1'
-
-    // AndroidAutoSize (Screen Adaptation for TV/Pad)
-    implementation 'me.jessyan:autosize:1.2.1'
 }

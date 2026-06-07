@@ -36,6 +36,23 @@ import kotlin.math.min
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
 
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        val dm = res.displayMetrics
+        if (dm.widthPixels > 0 && dm.heightPixels > 0) {
+            val shortSide = Math.min(dm.widthPixels, dm.heightPixels)
+            val targetDensity = shortSide / 720f
+            if (Math.abs(dm.density - targetDensity) > 0.01f) {
+                val targetScaledDensity = targetDensity * (dm.scaledDensity / dm.density)
+                val targetDensityDpi = (160 * targetDensity).toInt()
+                dm.density = targetDensity
+                dm.scaledDensity = targetScaledDensity
+                dm.densityDpi = targetDensityDpi
+            }
+        }
+        return res
+    }
+
     private var playerHelper: com.mediaplayer.app.util.IPlayerHelper? = null
     private val repo = ChannelRepository()
     private lateinit var authManager: ClientAuthManager
@@ -143,9 +160,14 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        findViewById<android.view.View>(R.id.videoLayout)?.requestLayout()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        
         // 兼容刘海屏/挖孔屏/灵动岛：允许画面延伸到全部屏幕边缘
         // Android 15+ (API 35): ALWAYS 模式确保横屏时灵动岛/长边缺口区域也被覆盖
         // Android 9-14 (API 28-34): SHORT_EDGES 已足够覆盖所有刘海/挖孔场景
@@ -160,7 +182,8 @@ class PlayerActivity : AppCompatActivity() {
             window.attributes = lp
         }
 
-        isTvMode = DeviceUtils.isTV(this)
+        // 强制所有设备使用 TV 模式逻辑
+        isTvMode = true
 
         setContentView(R.layout.activity_player)
         setupViews()

@@ -49,6 +49,23 @@ import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
 
+    override fun getResources(): android.content.res.Resources {
+        val res = super.getResources()
+        val dm = res.displayMetrics
+        if (dm.widthPixels > 0 && dm.heightPixels > 0) {
+            val shortSide = Math.min(dm.widthPixels, dm.heightPixels)
+            val targetDensity = shortSide / 720f
+            if (Math.abs(dm.density - targetDensity) > 0.01f) {
+                val targetScaledDensity = targetDensity * (dm.scaledDensity / dm.density)
+                val targetDensityDpi = (160 * targetDensity).toInt()
+                dm.density = targetDensity
+                dm.scaledDensity = targetScaledDensity
+                dm.densityDpi = targetDensityDpi
+            }
+        }
+        return res
+    }
+
     private val repo = ChannelRepository()
     private lateinit var authManager: ClientAuthManager
     private var isTvMode = true
@@ -2062,6 +2079,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        
         // Pad 或设备旋转时，系统触发横竖屏切换或屏幕尺寸变化
         // 由于我们在 manifest 中声明了 configChanges="orientation|screenSize"，Activity 不会重建
         // 在这里可以安全地调整 UI 或通知播放器重新计算尺寸，防止 Surface 尺寸异常导致闪退
