@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mediaplayer-server:
-    image: laoknas/mediaplayer:main
+    image: laoknas/mediaplayer:latest
     container_name: mediaplayer-server
     restart: always
     ports:

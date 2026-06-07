@@ -993,6 +993,11 @@ class MainActivity : AppCompatActivity() {
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
         
+        // 取消上一个频道的 URL 解析协程，防止旧 play() 在新频道启动后"迟到"触发，造成双声道叠加
+        // 不调用 stop()，让旧频道持续渲染直到新频道 play() 自然替换，避免切台黑屏闪烁
+        resolveJob?.cancel()
+        resolveJob = null
+
         currentCatchupStartTime = null
         currentCatchupChannelIndex = -1
         
