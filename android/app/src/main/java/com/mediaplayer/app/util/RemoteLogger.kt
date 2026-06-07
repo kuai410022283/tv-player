@@ -18,6 +18,7 @@ object RemoteLogger {
     private const val MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB 切片
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isRunning = AtomicBoolean(false)
+    private var uploadJob: Job? = null
     private var isEnabled = false
 
     private lateinit var logDir: File
@@ -40,7 +41,12 @@ object RemoteLogger {
 
     fun updateConfig(enabled: Boolean) {
         isEnabled = enabled
-        if (enabled && !isRunning.get()) {
+        if (!enabled) {
+            // 立即取消上传任务，无需等待下一个 30s 循环检查点
+            uploadJob?.cancel()
+            uploadJob = null
+            isRunning.set(false)
+        } else if (!isRunning.get()) {
             startUploadTask()
         }
     }
@@ -93,16 +99,12 @@ object RemoteLogger {
 
     private fun startUploadTask() {
         if (isRunning.compareAndSet(false, true)) {
-            scope.launch {
-                while (isActive) {
-                    if (!isEnabled) {
-                        isRunning.set(false)
-                        break
-                    }
-
+            uploadJob = scope.launch {
+                while (isActive && isEnabled) {
                     uploadPendingLogs()
-                    delay(30_000) 
+                    delay(30_000)
                 }
+                isRunning.set(false)
             }
         }
     }
