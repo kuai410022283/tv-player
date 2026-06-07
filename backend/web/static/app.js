@@ -909,7 +909,7 @@ async function showClientDetail(id) {
     </div>
     <div class="btn-group" style="flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="showTokenModal(${c.id})">🔑 令牌管理</button>
-      <button class="btn btn-ghost btn-sm" onclick="window.open('/api/v1/admin/clients/${c.id}/download-log?token=' + encodeURIComponent(localStorage.getItem('token')), '_blank')">⬇️ 终端日志</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('/api/v1/admin/clients/${c.id}/download-log?token=' + encodeURIComponent(localStorage.getItem('admin_token')), '_blank')">⬇️ 终端日志</button>
       ${c.status === 'approved' ? `<button class="btn btn-warn btn-sm" onclick="banClient(${c.id},'管理员封禁')">封禁</button>` : ''}
       ${c.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button>` : ''}
       <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">删除设备</button>
