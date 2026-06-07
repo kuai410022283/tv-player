@@ -162,12 +162,10 @@ class PlayerActivity : AppCompatActivity() {
 
         isTvMode = DeviceUtils.isTV(this)
 
-        if (isTvMode) {
-            setContentView(R.layout.activity_player)
-            setupMediaPlayerViews()
-        } else {
-            setContentView(R.layout.activity_player_phone)
-            setupPhonePlayerViews()
+        setContentView(R.layout.activity_player)
+        setupViews()
+        
+        if (!isTvMode) {
             setupGestures()
             showGestureHintOnce()
         }
@@ -196,20 +194,7 @@ class PlayerActivity : AppCompatActivity() {
     // VIEW SETUP
     // ═══════════════════════════════════════════════════
 
-    private fun setupMediaPlayerViews() {
-        videoLayout = findViewById(R.id.videoLayout)
-        progressBar = findViewById(R.id.progressBar)
-        layoutChannelInfo = findViewById(R.id.layoutChannelInfo)
-        tvChannelName = findViewById(R.id.tvChannelName)
-        tvStreamType = findViewById(R.id.tvStreamType)
-        tvStatus = findViewById(R.id.tvStatus)
-        tvResolution = findViewById(R.id.tvResolution)
-        layoutEpg = findViewById(R.id.layoutEpg)
-        tvEpgNow = findViewById(R.id.tvEpgNow)
-        tvEpgNext = findViewById(R.id.tvEpgNext)
-    }
-
-    private fun setupPhonePlayerViews() {
+    private fun setupViews() {
         videoLayout = findViewById(R.id.videoLayout)
         progressBar = findViewById(R.id.progressBar)
         layoutChannelInfo = findViewById(R.id.layoutChannelInfo)

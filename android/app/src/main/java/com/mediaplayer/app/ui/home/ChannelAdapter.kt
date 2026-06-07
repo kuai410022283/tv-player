@@ -46,7 +46,7 @@ class ChannelAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val layoutId = if (isTvMode) R.layout.item_channel else R.layout.item_channel_phone
+        val layoutId = R.layout.item_channel
         val view = LayoutInflater.from(parent.context).inflate(layoutId, parent, false)
         return ViewHolder(view)
     }

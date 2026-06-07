@@ -98,21 +98,9 @@ class MainActivity : AppCompatActivity() {
     private var ivAuthQrCode: android.widget.ImageView? = null
     private var tvAuthQrConfigHint: TextView? = null
 
-    // ── Views (Phone mode) ──
-    private var phoneGroupTabs: LinearLayout? = null
-    private var phoneChannelsRv: RecyclerView? = null
-    private var phoneChannelCount: TextView? = null
-    private var phoneAuthWaiting: View? = null
-    private var phoneContent: View? = null
-    private var phoneSearchLayout: View? = null
-    private var phoneSearchEdit: EditText? = null
-    private var phoneScrollView: HorizontalScrollView? = null
-    private var phoneSwipeRefresh: SwipeRefreshLayout? = null
 
     // ── Shared loading/empty views ──
     private var progressLoading: ProgressBar? = null
-    private var layoutEmpty: View? = null
-    private var tvEmptyText: TextView? = null
 
     // ── Catchup State ──
     private var currentCatchupStartTime: String? = null
@@ -423,8 +411,6 @@ class MainActivity : AppCompatActivity() {
         progressBuffering = findViewById(R.id.progressBuffering)
         videoLayout = findViewById(R.id.videoLayout)
         progressLoading = findViewById(R.id.progressLoading)
-        layoutEmpty = findViewById(R.id.layoutEmpty)
-        tvEmptyText = findViewById(R.id.tvEmptyText)
 
         // Settings sidebar
         layoutSettingsMenu = findViewById(R.id.layoutSettingsMenu)
@@ -1139,11 +1125,14 @@ class MainActivity : AppCompatActivity() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    setMargins(0, 8, 0, 8)
+                    val margin8 = resources.getDimensionPixelSize(R.dimen.dp_8)
+                    setMargins(0, margin8, 0, margin8)
                 }
                 text = "线路 ${index + 1} (${line.streamType.uppercase()})"
-                textSize = 18f
-                setPadding(32, 24, 32, 24)
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.sp_18))
+                val pad32 = resources.getDimensionPixelSize(R.dimen.dp_32)
+                val pad24 = resources.getDimensionPixelSize(R.dimen.dp_24)
+                setPadding(pad32, pad24, pad32, pad24)
                 isFocusable = true
                 isClickable = true
                 isFocusableInTouchMode = true
@@ -1207,68 +1196,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ═══════════════════════════════════════════════════
-    // PHONE MODE SETUP
-    // ═══════════════════════════════════════════════════
-
-    private fun setupPhoneViews() {
-        phoneGroupTabs = findViewById(R.id.layoutGroupTabs)
-        phoneChannelsRv = findViewById(R.id.rvChannels)
-        phoneChannelCount = findViewById(R.id.tvChannelCount)
-        phoneAuthWaiting = findViewById(R.id.layoutAuthWaiting)
-        phoneContent = findViewById(R.id.layoutContent)
-        phoneSearchLayout = findViewById(R.id.layoutSearch)
-        phoneSearchEdit = findViewById(R.id.etSearch)
-        phoneScrollView = findViewById<View>(R.id.layoutGroupTabs)?.parent as? HorizontalScrollView
-        phoneSwipeRefresh = findViewById(R.id.swipeRefresh)
-        progressLoading = findViewById(R.id.progressLoading)
-        layoutEmpty = findViewById(R.id.layoutEmpty)
-        tvEmptyText = findViewById(R.id.tvEmptyText)
-
-        phoneSwipeRefresh?.setColorSchemeResources(R.color.accent)
-        phoneSwipeRefresh?.setOnRefreshListener { loadData() }
-
-        findViewById<View>(R.id.btnSearch)?.setOnClickListener {
-            toggleSearch()
-        }
-
-        findViewById<View>(R.id.btnSettings)?.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        }
-
-        phoneSearchEdit?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                filterBySearch(s?.toString() ?: "")
-            }
-        })
-    }
-
-    private fun toggleSearch() {
-        phoneSearchLayout?.let {
-            if (it.visibility == View.VISIBLE) {
-                it.visibility = View.GONE
-                phoneSearchEdit?.setText("")
-                filterChannels()
-            } else {
-                it.visibility = View.VISIBLE
-                phoneSearchEdit?.requestFocus()
-            }
-        }
-    }
-
-    private fun filterBySearch(query: String) {
-        if (query.isEmpty()) {
-            filterChannels()
-            return
-        }
-        filteredChannels = allChannels.filter {
-            it.name.contains(query, ignoreCase = true)
-        }
-        channelAdapter.setData(filteredChannels)
-        if (!isTvMode) updateChannelCount()
-        showEmpty(filteredChannels.isEmpty(), "未找到匹配的频道")
-    }
 
     // ═══════════════════════════════════════════════════
     // SHARED LOGIC
@@ -1280,8 +1207,7 @@ class MainActivity : AppCompatActivity() {
                 currentGroupId = group.id
                 filterChannels(scrollToTop = true)
                 groupAdapter.setSelected(group.id)
-                if (!isTvMode) updatePhoneGroupTabs()
-                if (isTvMode) tvChannelsRv?.requestFocus()
+                tvChannelsRv?.requestFocus()
             },
             onFocus = { group ->
                 android.util.Log.d("TV_FOCUS", "MainActivity received onFocus for: ${group.name}, isTvMode: $isTvMode")
@@ -1304,14 +1230,9 @@ class MainActivity : AppCompatActivity() {
         channelAdapter = ChannelAdapter(
             isTvMode = isTvMode,
             onClick = { channel, _ ->
-                if (isTvMode) {
                     val realIndex = allChannels.indexOf(channel)
                     playTvChannel(realIndex)
                     uiHandler.postDelayed(hideZappingRunnable, 500)
-                } else {
-                    currentChannelIndex = allChannels.indexOf(channel)
-                    playChannelPhone(channel)
-                }
             }
         )
         
@@ -1352,12 +1273,6 @@ class MainActivity : AppCompatActivity() {
                         return super.requestChildRectangleOnScreen(parent, child, rect, immediate, focusedChildVisible)
                     }
                 }
-                adapter = channelAdapter
-            }
-        } else {
-            phoneChannelsRv?.apply {
-                setHasFixedSize(true)
-                layoutManager = LinearLayoutManager(this@MainActivity)
                 adapter = channelAdapter
             }
         }
@@ -1432,10 +1347,6 @@ class MainActivity : AppCompatActivity() {
         if (isTvMode) {
             tvAuthWaiting?.visibility = View.VISIBLE
             findViewById<TextView>(R.id.tvAuthStatus)?.text = message
-        } else {
-            phoneAuthWaiting?.visibility = View.VISIBLE
-            phoneContent?.visibility = View.GONE
-            findViewById<TextView>(R.id.tvAuthStatus)?.text = message
         }
         
         if (showQr) {
@@ -1466,12 +1377,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showContent() {
-        if (isTvMode) {
-            tvAuthWaiting?.visibility = View.GONE
-        } else {
-            phoneAuthWaiting?.visibility = View.GONE
-            phoneContent?.visibility = View.VISIBLE
-        }
+        tvAuthWaiting?.visibility = View.GONE
 
         // 初始触发跑马灯
         if (!sysAnnouncement.isNullOrEmpty()) {
@@ -1549,14 +1455,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadData() {
-        if (!isTvMode) showLoading(true)
         lifecycleScope.launch {
             // 1. 先拉分组列表
             val realGroups = repo.getGroups().getOrElse { emptyList() }
             groups = listOf(ChannelGroup(id = 0, name = "全部")) + realGroups
             groupAdapter.submitList(groups)
             groupAdapter.setSelected(0)
-            if (!isTvMode) buildPhoneGroupTabs()
 
             // 2. 按分组并行拉取全量频道（彻底绕过全局 page_size 上限）
             repo.getAllChannelsByGroups(realGroups).onSuccess { list ->
@@ -1565,50 +1469,35 @@ class MainActivity : AppCompatActivity() {
                 }
                 allChannels = list
                 channelsByGroup = list.groupBy { it.groupId }
-                if (!isTvMode) {
-                    filteredChannels = list
-                    channelAdapter.setData(list)
-                    updateChannelCount()
-                    showEmpty(list.isEmpty())
-                }
-
                 if (list.isNotEmpty()) {
-                    if (isTvMode) {
-                        // 尝试恢复上次播放的频道
-                        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                        val lastChannelId = prefs.getLong("last_channel_id", -1L)
-                        var targetIndex = 0
-                        if (lastChannelId != -1L) {
-                            val foundIndex = list.indexOfFirst { it.id == lastChannelId }
-                            if (foundIndex != -1) {
-                                targetIndex = foundIndex
-                            }
+                    // 尝试恢复上次播放的频道
+                    val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                    val lastChannelId = prefs.getLong("last_channel_id", -1L)
+                    var targetIndex = 0
+                    if (lastChannelId != -1L) {
+                        val foundIndex = list.indexOfFirst { it.id == lastChannelId }
+                        if (foundIndex != -1) {
+                            targetIndex = foundIndex
                         }
-                        currentGroupId = list[targetIndex].groupId
-                        groupAdapter.setSelected(currentGroupId)
-                        filterChannels(scrollToTop = false)
-                        playTvChannel(targetIndex)
-                        videoLayout?.requestFocus()
-                    } else {
-                        currentChannelIndex = 0
                     }
+                    currentGroupId = list[targetIndex].groupId
+                    groupAdapter.setSelected(currentGroupId)
+                    filterChannels(scrollToTop = false)
+                    playTvChannel(targetIndex)
+                    videoLayout?.requestFocus()
                 }
             }.onFailure {
-                if (!isTvMode) showEmpty(true, "加载失败，请检查网络")
+                // handle failure
             }
-            if (!isTvMode) showLoading(false)
-            phoneSwipeRefresh?.isRefreshing = false
         }
     }
-
 
     private fun showLoading(show: Boolean) {
         progressLoading?.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun showEmpty(show: Boolean, message: String = getString(R.string.no_channels)) {
-        layoutEmpty?.visibility = if (show) View.VISIBLE else View.GONE
-        tvEmptyText?.text = message
+        // layoutEmpty is not present in TV layout
     }
 
     private fun filterChannels(scrollToTop: Boolean = true) {
@@ -1624,63 +1513,8 @@ class MainActivity : AppCompatActivity() {
                 tvChannelsRv?.scrollToPosition(0) // 分组切换时，频道列表重置到顶部
             }
         }
-        
-        if (!isTvMode) {
-            if (scrollToTop) {
-                phoneChannelsRv?.post {
-                    phoneChannelsRv?.scrollToPosition(0)
-                }
-            }
-            updateChannelCount()
-            showEmpty(filteredChannels.isEmpty(), "该分组暂无频道")
-        }
     }
 
-    private fun updateChannelCount() {
-        val text = "${filteredChannels.size} 个频道"
-        phoneChannelCount?.text = text
-    }
-
-    // ── Phone group tabs ───────────────────────────────
-
-    private fun buildPhoneGroupTabs() {
-        phoneGroupTabs?.removeAllViews()
-        groups.forEach { group ->
-            val tab = LayoutInflater.from(this).inflate(R.layout.item_group_tab, phoneGroupTabs, false) as TextView
-            tab.text = group.name
-            tab.isSelected = group.id == currentGroupId
-            tab.setOnClickListener {
-                currentGroupId = group.id
-                filterChannels()
-                updatePhoneGroupTabs()
-            }
-            phoneGroupTabs?.addView(tab)
-        }
-    }
-
-    private fun updatePhoneGroupTabs() {
-        for (i in 0 until (phoneGroupTabs?.childCount ?: 0)) {
-            phoneGroupTabs?.getChildAt(i)?.isSelected = groups.getOrNull(i)?.id == currentGroupId
-        }
-    }
-
-    // ── Play channel (Phone) ───────────────────────────
-
-    private fun playChannelPhone(channel: Channel) {
-        val lines = channel.getLinesSafely()
-        val firstLine = if (lines.isNotEmpty()) lines[0] else ChannelLine()
-        
-        val intent = Intent(this, PlayerActivity::class.java).apply {
-            putExtra("channel_id", channel.id)
-            putExtra("channel_name", channel.name)
-            putExtra("stream_url", firstLine.streamUrl)
-            putExtra("stream_type", firstLine.streamType)
-            putExtra("channel_index", currentChannelIndex)
-            putExtra("user_agent", firstLine.userAgent)
-            putExtra("custom_headers", firstLine.customHeaders)
-        }
-        startActivity(intent)
-    }
 
     private fun showEpgMenu() {
         if (currentChannelIndex < 0 || currentChannelIndex >= allChannels.size) return

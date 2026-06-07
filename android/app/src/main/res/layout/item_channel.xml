@@ -4,10 +4,10 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="80dp"
+    android:layout_height="@dimen/dp_80"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingHorizontal="16dp"
+    android:paddingHorizontal="@dimen/dp_16"
     android:background="@drawable/selector_channel_item"
     android:focusable="true"
     android:focusableInTouchMode="true">
@@ -15,19 +15,19 @@
     <!-- 正在播放指示器 -->
     <View
         android:id="@+id/viewPlaying"
-        android:layout_width="3dp"
-        android:layout_height="32dp"
+        android:layout_width="@dimen/dp_3"
+        android:layout_height="@dimen/dp_32"
         android:background="@color/accent"
         android:visibility="gone" />
 
     <!-- 序号 -->
     <TextView
         android:id="@+id/tvChannelIndex"
-        android:layout_width="56dp"
+        android:layout_width="@dimen/dp_56"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="@dimen/dp_8"
         android:textColor="@color/text_secondary"
-        android:textSize="18sp"
+        android:textSize="@dimen/sp_18"
         android:textStyle="bold"
         android:fontFamily="monospace"
         tools:text="001" />
@@ -35,10 +35,10 @@
     <!-- Logo -->
     <ImageView
         android:id="@+id/ivChannelLogo"
-        android:layout_width="64dp"
-        android:layout_height="48dp"
+        android:layout_width="@dimen/dp_64"
+        android:layout_height="@dimen/dp_48"
         android:scaleType="fitCenter"
-        android:layout_marginEnd="10dp"
+        android:layout_marginEnd="@dimen/dp_10"
         android:visibility="gone" />
 
     <!-- 频道名称 + 类型 -->
@@ -53,7 +53,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_primary"
-            android:textSize="22sp"
+            android:textSize="@dimen/sp_22"
             android:textStyle="bold"
             android:singleLine="true"
             android:ellipsize="marquee"
@@ -66,8 +66,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            android:layout_marginTop="4dp"
+            android:textSize="@dimen/sp_16"
+            android:layout_marginTop="@dimen/dp_4"
             android:singleLine="true"
             android:ellipsize="marquee"
             android:marqueeRepeatLimit="marquee_forever"
@@ -78,9 +78,9 @@
             android:id="@+id/progressEpgItem"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="3dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginEnd="8dp"
+            android:layout_height="@dimen/dp_3"
+            android:layout_marginTop="@dimen/dp_6"
+            android:layout_marginEnd="@dimen/dp_8"
             android:progressTint="@color/accent"
             android:progressBackgroundTint="#33FFFFFF"
             android:visibility="gone"
@@ -93,11 +93,11 @@
         android:id="@+id/tvStreamTypeBadge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="8dp"
+        android:layout_marginEnd="@dimen/dp_8"
         android:textColor="@color/text_secondary"
-        android:textSize="14sp"
+        android:textSize="@dimen/sp_14"
         android:background="@drawable/bg_badge"
-        android:paddingHorizontal="4dp"
+        android:paddingHorizontal="@dimen/dp_4"
         android:paddingVertical="1dp"
         android:visibility="gone"
         tools:text="HLS"
@@ -106,8 +106,8 @@
     <!-- 收藏图标 -->
     <ImageView
         android:id="@+id/ivFavorite"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="@dimen/dp_24"
+        android:layout_height="@dimen/dp_24"
         android:src="@drawable/ic_star"
         android:visibility="gone" />
 
