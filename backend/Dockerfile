@@ -26,6 +26,7 @@ WORKDIR /app
 COPY --from=builder /build/mediaplayer .
 COPY --from=builder /build/web ./web
 COPY --from=builder /build/config.yaml .
+COPY --from=builder /build/version .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 

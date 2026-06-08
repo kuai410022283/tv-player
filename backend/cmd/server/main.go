@@ -26,8 +26,8 @@ func main() {
 	// 从 version 文件读取版本号
 	if content, err := os.ReadFile("version"); err == nil {
 		Version = strings.TrimSpace(string(content))
-		api.Version = Version
 	}
+	api.Version = Version
 	// ── 结构化日志初始化 ───────────────────────────────
 	logLevel := slog.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
