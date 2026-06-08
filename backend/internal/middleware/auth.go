@@ -69,6 +69,16 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 						"ip", c.ClientIP(),
 					)
 				}
+			} else if c.Query("plan") == "1" {
+				// 如果开启了外部订阅，允许外部订阅流地址带有 plan=1 时，从 URL 提取 token 进行播放。
+				var enableExternalSub string
+				_ = db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_external_sub'`).Scan(&enableExternalSub)
+				if enableExternalSub == "true" {
+					token = c.Query("token")
+					if token != "" {
+						c.Set("is_sub_token_only", true)
+					}
+				}
 			}
 		}
 
@@ -85,34 +95,47 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		}
 
 		if token != "" && db != nil {
-			var clientID int64
-			var status string
-			var name string
-			err := db.QueryRow(`SELECT id, status, name FROM clients WHERE access_token=?`, token).Scan(&clientID, &status, &name)
-			if err == nil {
-				if status != "approved" {
-					c.JSON(http.StatusForbidden, gin.H{
-						"code":    403,
-						"message": "客户端未授权",
-					})
-					c.Abort()
+			isSubTokenOnly := c.GetBool("is_sub_token_only")
+
+			if !isSubTokenOnly {
+				var clientID int64
+				var status string
+				var name string
+				err := db.QueryRow(`SELECT id, status, name FROM clients WHERE access_token=?`, token).Scan(&clientID, &status, &name)
+				if err == nil {
+					if status != "approved" {
+						c.JSON(http.StatusForbidden, gin.H{
+							"code":    403,
+							"message": "客户端未授权",
+						})
+						c.Abort()
+						return
+					}
+					c.Set("auth_type", "client")
+					c.Set("client_id", clientID)
+					c.Set("client_name", name)
+					c.Set("client_token", token)
+					c.Next()
 					return
 				}
+			}
+
+			// 如果不是合法的客户端 Token (或仅限订阅校验)，校验是否为合法的订阅 Token (允许第三方播放器通过订阅访问代理流)
+			var planID int64
+			err := db.QueryRow(`SELECT id FROM subscription_plans WHERE subscription_token=?`, token).Scan(&planID)
+			if err == nil {
 				c.Set("auth_type", "client")
-				c.Set("client_id", clientID)
-				c.Set("client_name", name)
 				c.Set("client_token", token)
 				c.Next()
 				return
 			}
 
-			// 如果不是合法的客户端 Token，校验是否为合法的订阅 Token (允许第三方播放器通过订阅访问代理流)
-			var planID int64
-			err = db.QueryRow(`SELECT id FROM subscription_plans WHERE subscription_token=?`, token).Scan(&planID)
-			if err == nil {
-				c.Set("auth_type", "client")
-				c.Set("client_token", token)
-				c.Next()
+			if isSubTokenOnly {
+				c.JSON(http.StatusForbidden, gin.H{
+					"code":    403,
+					"message": "无效的订阅 Token",
+				})
+				c.Abort()
 				return
 			}
 		}

@@ -25,6 +25,7 @@ RUN addgroup -g 1000 -S mediaplayer && adduser -u 1000 -S mediaplayer -G mediapl
 WORKDIR /app
 COPY --from=builder /build/mediaplayer .
 COPY --from=builder /build/web ./web
+COPY --from=builder /build/library .
 COPY --from=builder /build/config.yaml .
 COPY --from=builder /build/version .
 COPY entrypoint.sh .

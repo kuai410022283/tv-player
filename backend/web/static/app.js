@@ -13,6 +13,7 @@ let enableExternalSubSetting = 'false';
 
 // ═══ API helpers ══════════════════════════════════════
 let loadingCount = 0;
+const _abortControllers = new Map();
 
 function showLoading() {
   loadingCount++;
@@ -25,6 +26,15 @@ function hideLoading() {
 }
 
 async function api(path, opts = {}) {
+  // 取消之前的同类请求（如果指定了 abortKey）
+  if (opts.abortKey) {
+    if (_abortControllers.has(opts.abortKey)) _abortControllers.get(opts.abortKey).abort();
+    const controller = new AbortController();
+    _abortControllers.set(opts.abortKey, controller);
+    opts.signal = controller.signal;
+    delete opts.abortKey;
+  }
+
   const headers = { 'Content-Type': 'application/json' };
   if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
   showLoading();
@@ -44,11 +54,36 @@ async function api(path, opts = {}) {
     }
     return data;
   } catch (e) {
+    // AbortError 是主动取消，不属于错误，静默处理
+    if (e.name === 'AbortError') { hideLoading(); throw e; }
     toast('请求失败: ' + e.message, 'error');
     throw e;
   } finally {
     hideLoading();
   }
+}
+
+// === 请求世代计数器：防止旧请求的响应覆盖新请求的结果 ===
+const _loadGen = {};
+function nextGen(key) { _loadGen[key] = (_loadGen[key] || 0) + 1; return _loadGen[key]; }
+function isStale(key, gen) { return _loadGen[key] !== gen; }
+
+// === saveClientSetting：带 300ms debounce，防止快速切换时发送大量并发请求 ===
+const _saveSettingTimers = {};
+async function saveClientSetting(key, value) {
+  return new Promise((resolve) => {
+    clearTimeout(_saveSettingTimers[key]);
+    _saveSettingTimers[key] = setTimeout(async () => {
+      try {
+        const res = await fetch(API + '/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+          body: JSON.stringify({ key, value: String(value) })
+        });
+        resolve(await res.json());
+      } catch (e) { resolve(null); }
+    }, 300);
+  });
 }
 
 function toast(msg, type = 'success') {
@@ -193,10 +228,12 @@ function showSection(name, el) {
 
 // ═══ Dashboard ════════════════════════════════════════
 async function loadDashboard() {
+  const gen = nextGen('dashboard');
   const [stats, clientStats, sources, logs] = await Promise.all([
     api('/stats'), api('/admin/clients/stats'), api('/m3u'), api('/admin/clients/logs?limit=10')
-  ]);
-  const s = stats.data || {};
+  ]).catch(() => []);
+  if (isStale('dashboard', gen)) return;
+  const s = (stats && stats.data) || {};
   document.getElementById('stat-total').textContent = s.total_channels || 0;
   document.getElementById('stat-online').textContent = s.online_channels || 0;
   document.getElementById('stat-streams').textContent = s.active_streams || 0;
@@ -239,13 +276,15 @@ let currentChannelGroupId = 0;
 async function loadChannels(search = currentChannelSearch, groupId = currentChannelGroupId) {
   currentChannelSearch = search;
   currentChannelGroupId = groupId;
+  const gen = nextGen('channels');
 
   let q = `?page=${channelPage}&page_size=${PAGE_SIZE}`;
   if (search) q += `&search=${encodeURIComponent(search)}`;
   if (groupId > 0) q += `&group_id=${groupId}`;
 
-  const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups')]);
-  groups = grpRes.data || [];
+  const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups')]).catch(() => []);
+  if (isStale('channels', gen)) return;
+  groups = (grpRes && grpRes.data) || [];
   const gm = {};
   groups.forEach(g => gm[g.id] = g.name);
   const body = document.getElementById('channels-body');
@@ -807,13 +846,15 @@ async function killStream(sessionId) {
 let clientTotal = 0;
 
 async function loadClients() {
+  const gen = nextGen('clients');
   const status = document.getElementById('client-status-filter').value;
   const search = document.getElementById('client-search').value;
   let q = `?page=${clientPage}&page_size=${PAGE_SIZE}`;
   if (status) q += '&status=' + status;
   if (search) q += '&search=' + encodeURIComponent(search);
 
-  const [listRes, statsRes] = await Promise.all([api('/admin/clients' + q), api('/admin/clients/stats')]);
+  const [listRes, statsRes] = await Promise.all([api('/admin/clients' + q), api('/admin/clients/stats')]).catch(() => []);
+  if (isStale('clients', gen)) return;
 
   const st = statsRes.data || {};
   document.getElementById('cstat-total').textContent = st.total_clients || 0;
@@ -937,10 +978,12 @@ async function toggleClientLog(id, enable) {
 let allPlans = [];
 
 async function loadPlans() {
+  const gen = nextGen('plans');
   const [plansRes, settingsRes] = await Promise.all([
     api('/admin/plans'),
     api('/settings').catch(() => ({ data: {} }))
   ]);
+  if (isStale('plans', gen)) return;
   allPlans = plansRes.data || [];
   serverUrlSetting = (settingsRes && settingsRes.data && settingsRes.data.server_url) || '';
   enableExternalSubSetting = (settingsRes && settingsRes.data && settingsRes.data.enable_external_sub) || 'false';
@@ -1474,10 +1517,9 @@ async function triggerBatchFetchLogos(overwrite) {
     toast('触发失败: ' + e.message, 'error');
   }
 }
-async function saveClientSetting(key, value) {
-  await api('/settings', { method: 'POST', body: JSON.stringify({ key, value: String(value) }) });
-}
+// saveClientSetting 已在文件顶部以 debounce 方式重新定义
 
+// toggleAutoApproveFields: 纯 UI 函数，仅控制子选项区域显隐，加载页面时安全调用
 function toggleAutoApproveFields(value) {
   const container = document.getElementById('auto-approve-settings');
   if (container) {
@@ -1485,14 +1527,22 @@ function toggleAutoApproveFields(value) {
   }
 }
 
-function onEnableExternalSubChange(value) {
-  if (value === 'true') {
-    const devTokenSelect = document.getElementById('set-enable-url-token');
-    if (devTokenSelect && devTokenSelect.value === 'false') {
-      devTokenSelect.value = 'true';
-      toast('已自动开启“允许 URL 传递 Token”以确保外部订阅播放正常');
-    }
-  }
+// onAutoApproveChange: 用户主动切换时调用，负责保存并给出反馈
+function onAutoApproveChange(value) {
+  toggleAutoApproveFields(value);
+  saveClientSetting('auto_approve', value).then(() => toast('自动审批已' + (value === 'true' ? '开启' : '关闭')));
+}
+
+async function onEnableExternalSubChange(value) {
+  await saveClientSetting('enable_external_sub', value);
+  enableExternalSubSetting = value;
+  toast('外部订阅已' + (value === 'true' ? '开启，套餐页面将显示订阅地址' : '关闭'));
+  if (typeof renderPlansTable === 'function') renderPlansTable();
+}
+
+async function onEnableLocalLogoChange(value) {
+  await saveClientSetting('enable_local_logo', value);
+  toast('本地台标缓存已' + (value === 'true' ? '开启' : '关闭'));
 }
 
 // ════ Pagination Helper ═════════════════════════════════════════════

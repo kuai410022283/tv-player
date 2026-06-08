@@ -111,7 +111,8 @@
         </svg>
         <span>退出登录</span>
       </div>
-      <div class="sidebar-footer" id="sidebar-version-container" style="padding: 24px 24px 0; font-size: 12px; color: var(--side-text2); text-align: center; margin-top: auto; opacity: 0.6;">
+      <div class="sidebar-footer" id="sidebar-version-container"
+        style="padding: 24px 24px 0; font-size: 12px; color: var(--side-text2); text-align: center; margin-top: auto; opacity: 0.6;">
         版本: <span id="sidebar-version">-</span>
       </div>
     </div>
@@ -448,12 +449,14 @@
               </svg>
               服务器授权与网络配置
             </h3>
-            
+
             <!-- 服务器域名/地址配置 -->
             <div class="form-group" style="margin-bottom: 16px;">
               <label style="color: var(--text); font-weight: 500; font-size: 13px;">自定义服务器外网域名/地址 (Server URL)</label>
-              <input type="text" id="set-server-url" placeholder="例如：http://tv.example.com (留空则默认使用当前识别的地址)" style="margin-top: 6px; height: 38px;">
-              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">用于生成客户端授权信息、订阅链接以及订阅文件内的播放代理地址。末尾请勿添加斜杠 /。</div>
+              <input type="text" id="set-server-url" placeholder="例如：http://tv.example.com (留空则默认使用当前识别的地址)"
+                style="margin-top: 6px; height: 38px;">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
+                用于生成客户端授权信息、订阅链接以及订阅文件内的播放代理地址。末尾请勿添加斜杠 /。</div>
             </div>
 
             <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;">
@@ -475,7 +478,7 @@
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">服务器网络配置</h3>
+            <h3 style="margin-bottom: 12px;">订阅配置</h3>
           </div>
           <div class="form-group">
             <label>是否开启外部订阅</label>
@@ -483,7 +486,11 @@
               <option value="false">关闭 (禁止外部订阅)</option>
               <option value="true">开启 (允许外部订阅)</option>
             </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">是否允许设备或第三方播放器通过 M3U/TXT 链接拉取套餐内频道订阅。</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+              开启后，可在套餐管理页面复制 M3U/TXT 订阅地址，分享给用户导入第三方播放器（如 VLC、Tivimate 等）直接使用，<strong
+                style="color:var(--accent)">无需开启开发调试模式</strong>。
+              订阅地址内的代理流链接采用专属验证参数，仅允许通过套餐订阅 Token 鉴权，不会影响普通设备 Token 的安全边界。
+            </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
@@ -492,7 +499,7 @@
           </div>
           <div class="form-group">
             <label>自动审批设置</label>
-            <select id="set-auto-approve" onchange="toggleAutoApproveFields(this.value)">
+            <select id="set-auto-approve" onchange="onAutoApproveChange(this.value)">
               <option value="false">关闭 (手动审批)</option>
               <option value="true">开启 (自动通过)</option>
             </select>
@@ -561,7 +568,7 @@
           </div>
           <div class="form-group">
             <label>启用本地台标缓存</label>
-            <select id="set-enable-local-logo">
+            <select id="set-enable-local-logo" onchange="onEnableLocalLogoChange(this.value)">
               <option value="false">关闭</option>
               <option value="true">开启 (本地台标)</option>
             </select>
@@ -610,18 +617,20 @@
               <option value="true">是 (必须更新才能使用)</option>
             </select>
           </div>
-          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-          <div class="form-group">
-            <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
-          </div>
-          <div class="form-group">
-            <label>允许 URL 传递 Token (开发调试开关)</label>
-            <select id="set-enable-url-token">
-              <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
-              <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
-            </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
-              即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
+          <div style="display: none;">
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+            <div class="form-group">
+              <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
+            </div>
+            <div class="form-group">
+              <label>允许 URL 传递 Token (开发调试开关)</label>
+              <select id="set-enable-url-token">
+                <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
+                <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
+              </select>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
+                即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
+            </div>
           </div>
           <div class="form-actions" style="justify-content:flex-start">
             <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
@@ -886,7 +895,8 @@
           <label>订阅 Token (不填写会自动生成)</label>
           <div style="display:flex;gap:10px;">
             <input type="text" id="plan-token" placeholder="留空自动生成" style="flex:1;">
-            <button class="btn btn-ghost" type="button" onclick="regeneratePlanTokenInput()" style="white-space:nowrap;">随机生成</button>
+            <button class="btn btn-ghost" type="button" onclick="regeneratePlanTokenInput()"
+              style="white-space:nowrap;">随机生成</button>
           </div>
         </div>
         <div class="form-group" id="plan-subscription-buttons-group" style="display:none;">
