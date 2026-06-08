@@ -21,9 +21,6 @@ import (
 	"github.com/mediaplayer/backend/internal/services"
 )
 
-// Version 由编译时注入: go build -ldflags "-X main.Version=v1.0.0"
-var Version = "dev"
-
 // startTime 记录服务启动时间，用于 uptime 统计
 var startTime = time.Now()
 
@@ -119,9 +116,10 @@ type Handler struct {
 	clientSvc   *services.ClientService
 	epgSvc      *services.EPGService
 	logoSvc     *services.LogoService
+	version     string
 }
 
-func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService, logoSvc *services.LogoService) *Handler {
+func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService, logoSvc *services.LogoService, version string) *Handler {
 	return &Handler{
 		channelSvc:  channelSvc,
 		streamProxy: streamProxy,
@@ -129,6 +127,7 @@ func NewHandler(channelSvc *services.ChannelService, streamProxy *services.Strea
 		clientSvc:   clientSvc,
 		epgSvc:      epgSvc,
 		logoSvc:     logoSvc,
+		version:     version,
 	}
 }
 
@@ -1046,7 +1045,7 @@ func (h *Handler) GetStats(c *gin.Context) {
 
 func (h *Handler) GetVersion(c *gin.Context) {
 	ok(c, gin.H{
-		"version":    Version,
+		"version":    h.version,
 		"go_version": runtime.Version(),
 		"started_at": startTime.Format(time.RFC3339),
 	})

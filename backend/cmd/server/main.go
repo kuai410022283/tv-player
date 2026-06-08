@@ -27,7 +27,6 @@ func main() {
 	if content, err := os.ReadFile("version"); err == nil {
 		Version = strings.TrimSpace(string(content))
 	}
-	api.Version = Version
 	// ── 结构化日志初始化 ───────────────────────────────
 	logLevel := slog.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
@@ -125,7 +124,7 @@ func main() {
 	planSvc := services.NewPlanService(db)
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
-	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc)
+	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, Version)
 	ch := api.NewClientHandler(clientSvc, channelSvc)
 	ph := api.NewPlanHandler(planSvc)
 	hs := api.NewHandlers(h, ch, ph)

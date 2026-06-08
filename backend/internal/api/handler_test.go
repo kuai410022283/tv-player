@@ -225,12 +225,7 @@ func TestAdminTokenAccess(t *testing.T) {
 	}
 }
 
-func TestVersion(t *testing.T) {
-	// 测试版本号变量
-	if Version != "dev" {
-		t.Logf("Version: %s", Version)
-	}
-}
+
 
 func TestMain(m *testing.M) {
 	// 设置测试环境
