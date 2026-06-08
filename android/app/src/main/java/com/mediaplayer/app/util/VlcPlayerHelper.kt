@@ -19,6 +19,7 @@ class VlcPlayerHelper(
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
+    private var isTransitioning: Boolean = false
 
     init {
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
@@ -98,12 +99,16 @@ class VlcPlayerHelper(
                     }, 1000)
                 }
                 MediaPlayer.Event.EncounteredError -> {
-                    com.mediaplayer.app.util.RemoteLogger.e("VLCPlayer", "Encountered internal playback error.")
-                    listener.onError()
+                    if (!isTransitioning) {
+                        com.mediaplayer.app.util.RemoteLogger.e("VLCPlayer", "Encountered internal playback error.")
+                        listener.onError()
+                    }
                 }
                 MediaPlayer.Event.EndReached -> {
-                    com.mediaplayer.app.util.RemoteLogger.i("VLCPlayer", "End of stream reached.")
-                    listener.onError()
+                    if (!isTransitioning) {
+                        com.mediaplayer.app.util.RemoteLogger.i("VLCPlayer", "End of stream reached.")
+                        listener.onError()
+                    }
                 }
             }
         }
@@ -113,6 +118,10 @@ class VlcPlayerHelper(
         val player = mediaPlayer ?: return
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
+
+        // 停止旧播放，防止旧流在新流准备好之前继续输出音频，导致声音重叠
+        isTransitioning = true
+        player.stop()
 
         when (currentScaleMode) {
             Prefs.SCALE_MODE_STRETCH -> {
@@ -175,6 +184,7 @@ class VlcPlayerHelper(
 
         applyMediaOptions(media, url, userAgent, customHeaders)
         player.media = media
+        isTransitioning = false
         player.play()
     }
 

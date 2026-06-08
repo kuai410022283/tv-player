@@ -1,6 +1,7 @@
 package com.mediaplayer.app.util
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -28,6 +29,9 @@ object StreamResolver {
             val maxRedirects = 5
 
             while (redirects < maxRedirects) {
+                // 检查协程是否已被取消，及时退出避免不必要的 HTTP 请求
+                if (!isActive) return@withContext currentUrl
+
                 try {
                     val requestBuilder = Request.Builder().url(currentUrl)
 
@@ -53,6 +57,13 @@ object StreamResolver {
                     requestBuilder.get()
 
                     val response = client.newCall(requestBuilder.build()).execute()
+                    
+                    // HTTP 请求返回后检查协程是否已被取消
+                    if (!isActive) {
+                        response.close()
+                        return@withContext currentUrl
+                    }
+                    
                     val code = response.code
                     val isRedirect = code in 300..399
 

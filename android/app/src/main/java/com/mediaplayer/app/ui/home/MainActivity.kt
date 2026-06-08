@@ -214,8 +214,8 @@ class MainActivity : AppCompatActivity() {
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD GONE")
     }
     private val hideZappingRunnable = Runnable { 
-        layoutZappingMenu?.visibility = View.GONE 
-        videoLayout?.requestFocus()
+        layoutZappingMenu?.visibility = View.GONE
+        activeListArea = "channels"
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "ZappingMenu GONE")
     }
 
@@ -607,9 +607,9 @@ class MainActivity : AppCompatActivity() {
         
         btnSettingsCore?.setOnClickListener {
             currentCore = when (currentCore) {
-                Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_VLC
-                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_EXO
-                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
+                Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
+                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_VLC
+                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_IJK
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
@@ -898,7 +898,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideSettingsMenu() {
         layoutSettingsMenu?.visibility = View.GONE
-        videoLayout?.requestFocus()
+        activeListArea = "channels"
     }
 
     private fun updateCoreText(core: Int) {
@@ -918,13 +918,38 @@ class MainActivity : AppCompatActivity() {
         currentPlaybackState = PlaybackState.IDLE
         progressBuffering?.visibility = View.GONE
 
+        // ===== Catchup 回看流自然结束或出错，不触发自动换源 =====
+        if (currentCatchupStartTime != null) {
+            tvOsdInfo?.text = "回看播放完毕"
+            showOsd()
+            currentCatchupStartTime = null
+            currentCatchupChannelIndex = -1
+            val channel = allChannels.getOrNull(currentChannelIndex)
+            if (channel != null) loadEpgForChannel(channel)
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback ended. No auto-switch.")
+            return
+        }
+
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+
+        // ===== 手动指定内核模式：不做任何自动切换，仅 OSD 提示用户 =====
+        if (globalCore != Prefs.PLAYER_CORE_AUTO) {
+            val coreName = when (globalCore) {
+                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                else -> "VLC"
+            }
+            tvOsdInfo?.text = "当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式"
+            showOsd()
+            com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
+            return
+        }
 
         // 如果是网络超时，不要去切换内核（因为内核没毛病），直接走换线逻辑
         if (!isNetworkTimeout) {
             // 内核容灾：智能模式下尝试切换播放内核
-            if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
+            if (coreRetryLevel < 2) {
                 coreRetryLevel++
                 val coreName = when (coreRetryLevel) {
                     1 -> "VLC"
@@ -948,20 +973,6 @@ class MainActivity : AppCompatActivity() {
             com.mediaplayer.app.util.RemoteLogger.i("Player", "Core failed. Switching to line ${currentLineIndex + 1}")
             playCurrentLineInTv()
         } else {
-            // 如果用户指定了特定内核（非智能切换）且播放失败，并且不是网络超时，才回退到智能模式
-            val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-            if (savedCore != Prefs.PLAYER_CORE_AUTO && !isNetworkTimeout) {
-                currentCore = Prefs.PLAYER_CORE_AUTO
-                prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
-                updateCoreText(currentCore)
-                coreRetryLevel = 0
-                currentLineIndex = 0
-                Toast.makeText(this@MainActivity, "播放内核解码失败，自动切换为智能模式重试", Toast.LENGTH_LONG).show()
-                com.mediaplayer.app.util.RemoteLogger.i("Player", "Fixed core playback failed. Reverting to auto-core retry.")
-                playCurrentLineInTv()
-                return
-            }
-            
             coreRetryLevel = 0
             currentLineIndex = 0
             
@@ -986,6 +997,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var resolveJob: kotlinx.coroutines.Job? = null
+    private var playGeneration: Int = 0
 
     private fun playTvChannel(index: Int, isAutoSkip: Boolean = false) {
         if (!isAutoSkip) {
@@ -993,8 +1005,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
         
-        // 取消上一个频道的 URL 解析协程，防止旧 play() 在新频道启动后"迟到"触发，造成双声道叠加
-        // 不调用 stop()，让旧频道持续渲染直到新频道 play() 自然替换，避免切台黑屏闪烁
+        // 取消上一个频道的 URL 解析协程，各播放器 play() 内部会自动 stop() 旧流。
         resolveJob?.cancel()
         resolveJob = null
 
@@ -1095,7 +1106,14 @@ class MainActivity : AppCompatActivity() {
         progressBuffering?.visibility = View.VISIBLE
 
         resolveJob = lifecycleScope.launch {
+            val gen = ++playGeneration
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
+            
+            // 如果在此期间又发生了切台，放弃本次播放，防止旧 resolve 协程覆盖新频道
+            if (gen != playGeneration) {
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Discarded stale play() for generation $gen (current: $playGeneration)")
+                return@launch
+            }
             
             val lowerUrl = finalUrl.lowercase()
             val streamTypeLower = line.streamType.lowercase()
@@ -1191,7 +1209,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideLineSelectionMenu() {
         layoutLineMenu?.visibility = View.GONE
-        videoLayout?.requestFocus()
+        activeListArea = "channels"
     }
 
     private fun showOsd() {
@@ -1542,6 +1560,9 @@ class MainActivity : AppCompatActivity() {
         if (currentChannelIndex < 0 || currentChannelIndex >= allChannels.size) return
         val channel = allChannels[currentChannelIndex]
         
+        // 在显示 EPG 面板前主动更新焦点区域，防止 OnGlobalFocusChangeListener 拒绝合法焦点转移
+        activeListArea = "epg"
+        
         layoutZappingMenu?.visibility = View.GONE
         layoutSettingsMenu?.visibility = View.GONE
         layoutEpgMenu?.visibility = View.VISIBLE
@@ -1629,7 +1650,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideEpgMenu() {
         layoutEpgMenu?.visibility = View.GONE
-        videoLayout?.requestFocus()
+        activeListArea = "channels"
     }
 
     // ── Number Input State ──
@@ -1694,6 +1715,12 @@ class MainActivity : AppCompatActivity() {
             groupAdapter.setSelected(currentGroupId)
         }
         
+        // 先清除 videoLayout 上的焦点，防止其子 View 拦截后续按键事件
+        videoLayout?.clearFocus()
+        
+        // 在设置可见性和请求焦点前主动更新焦点区域，防止 OnGlobalFocusChangeListener 拒绝合法焦点转移
+        activeListArea = if (focusOnGroups) "groups" else "channels"
+        
         // 必须在设置为 VISIBLE 之前封锁左侧焦点，否则 setVisibility 内部会瞬间触发原生焦点分配并篡改当前选中状态
         tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
 
@@ -1718,11 +1745,25 @@ class MainActivity : AppCompatActivity() {
             val playingId = playingChannel?.id ?: -1L
             val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
             
+            if (indexInFiltered >= 0) {
+                tvChannelsRv?.scrollToPosition(indexInFiltered)
+            }
+            
+            // 使用 postDelayed 确保布局完成后再请求焦点
             val requestFocusAction = {
                 tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
                 if (indexInFiltered >= 0) {
                     val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
-                    lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                    val view = lm?.findViewByPosition(indexInFiltered)
+                    if (view != null) {
+                        view.requestFocus()
+                    } else {
+                        // 如果视图还未布局完成，通过滚动触发再试一次
+                        tvChannelsRv?.post {
+                            val lm2 = tvChannelsRv?.layoutManager as? LinearLayoutManager
+                            lm2?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
+                        }
+                    }
                 } else {
                     val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
                     val firstVisible = lm?.findFirstVisibleItemPosition() ?: 0
@@ -1730,16 +1771,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             
-            if (indexInFiltered >= 0) {
-                tvChannelsRv?.scrollToPosition(indexInFiltered)
-            }
-            
-            if (groupChanged) {
-                tvChannelsRv?.postDelayed({ requestFocusAction() }, 50)
-            } else {
-                // 如果分组没变，列表视图已经存在，直接同步或稍微延迟即可，但我们仍用 post 确保稳妥
-                tvChannelsRv?.post({ requestFocusAction() })
-            }
+            tvChannelsRv?.postDelayed({ requestFocusAction() }, 100)
         }
     }
 
@@ -1900,6 +1932,28 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
             }
+        } else if (event.action == KeyEvent.ACTION_UP) {
+            val keyCode = event.keyCode
+            if (isTvMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
+                val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+                val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
+                val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
+                val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible
+
+                if (!anyPanelOpen) {
+                    // 【关键修复】当焦点在频道列表项上时，Android 会将 ACTION_UP 分发给焦点视图，
+                    // 导致视图的 onKeyUp → performClick() → OnClickListener 触发换台。
+                    // Activity.onKeyUp 因此永远不会被调用，zapping 菜单无法弹出。
+                    // 在此处提前拦截，直接呼出频道列表菜单。
+                    val focusedView = currentFocus
+                    if (focusedView != null && isViewDescendantOf(focusedView, tvChannelsRv)) {
+                        com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for zapping menu")
+                        showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                        return true
+                    }
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
     }
@@ -2039,8 +2093,10 @@ class MainActivity : AppCompatActivity() {
         if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
             val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
             val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
-            
-            if (!isMenuVisible && !isSettingsVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+            val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
+            val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
+
+            if (!isMenuVisible && !isSettingsVisible && !isEpgVisible && !isLineVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 if (event?.isTracking == true && !event.isCanceled) {
                     // 短按 OK 键，呼出频道列表
                     // 短按 OK 键，呼出频道列表，并重置到当前播放的频道
