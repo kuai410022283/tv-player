@@ -190,20 +190,6 @@ class ExoPlayerHelper(
                         if (exoPlayer?.playWhenReady == true) {
                             if (!isPlayerPlaying) {
                                 isPlayerPlaying = true
-                                val audioMime = exoPlayer?.audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
-                                val videoMime = exoPlayer?.videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
-                                val info = buildString {
-                                    if (lastResolution.isNotEmpty()) append(lastResolution)
-                                    if (videoMime.isNotEmpty()) {
-                                        if (isNotEmpty()) append(" | ")
-                                        append(videoMime)
-                                    }
-                                    if (audioMime.isNotEmpty()) {
-                                        if (isNotEmpty()) append(" | ")
-                                        append(audioMime)
-                                    }
-                                }
-                                listener.onPlaying(if (info.isNotEmpty()) info else lastResolution)
                             }
                         }
                     }
