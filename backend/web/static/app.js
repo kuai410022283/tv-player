@@ -8,6 +8,8 @@ let adminToken = localStorage.getItem('admin_token') || '';
 let channelPage = 1, clientPage = 1, groupPage = 1, sourcePage = 1, streamPage = 1, planPage = 1, clientLogPage = 1;
 const PAGE_SIZE = 20;
 let localLogoEnabled = false;
+let serverUrlSetting = '';
+let enableExternalSubSetting = 'false';
 
 // ═══ API helpers ══════════════════════════════════════
 let loadingCount = 0;
@@ -935,8 +937,13 @@ async function toggleClientLog(id, enable) {
 let allPlans = [];
 
 async function loadPlans() {
-  const r = await api('/admin/plans');
-  allPlans = r.data || [];
+  const [plansRes, settingsRes] = await Promise.all([
+    api('/admin/plans'),
+    api('/settings').catch(() => ({ data: {} }))
+  ]);
+  allPlans = plansRes.data || [];
+  serverUrlSetting = (settingsRes && settingsRes.data && settingsRes.data.server_url) || '';
+  enableExternalSubSetting = (settingsRes && settingsRes.data && settingsRes.data.enable_external_sub) || 'false';
   renderPlansTable();
 }
 
@@ -947,10 +954,20 @@ function renderPlansTable() {
   const start = (planPage - 1) * PAGE_SIZE;
   const pageData = allPlans.slice(start, start + PAGE_SIZE);
 
+  const showSub = (enableExternalSubSetting === 'true');
+  const thSub = document.getElementById('th-plan-sub');
+  if (thSub) thSub.style.display = showSub ? '' : 'none';
+
   document.getElementById('plans-body').innerHTML = pageData.map((p, i) => {
-    const origin = window.location.origin;
+    const origin = serverUrlSetting || window.location.origin;
     const m3uUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=m3u`;
     const txtUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=txt`;
+    const subCellHtml = showSub ? `<td>
+        <div class="btn-group" style="gap:4px;">
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(m3uUrl)}')" style="white-space:nowrap;">📋 M3U</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(txtUrl)}')" style="white-space:nowrap;">📋 TXT</button>
+        </div>
+      </td>` : '';
     return `<tr>
       <td style="color:var(--text3)">${(planPage - 1) * PAGE_SIZE + i + 1}</td>
       <td><strong>${esc(p.name)}</strong></td>
@@ -958,12 +975,7 @@ function renderPlansTable() {
       <td>${p.max_streams}</td>
       <td>${p.price > 0 ? '¥' + p.price : '-'}</td>
       <td>${esc(p.description)}</td>
-      <td>
-        <div class="btn-group" style="gap:4px;">
-          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(m3uUrl)}')" style="white-space:nowrap;">📋 M3U</button>
-          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(txtUrl)}')" style="white-space:nowrap;">📋 TXT</button>
-        </div>
-      </td>
+      ${subCellHtml}
       <td><div class="btn-group">
         <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">编辑</button>
         <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
@@ -1033,9 +1045,9 @@ async function editPlan(id) {
   document.getElementById('plan-token').value = p.subscription_token || '';
 
   const subBtnGroup = document.getElementById('plan-subscription-buttons-group');
-  if (id) {
+  if (id && enableExternalSubSetting === 'true') {
     subBtnGroup.style.display = 'block';
-    const origin = window.location.origin;
+    const origin = serverUrlSetting || window.location.origin;
     const m3uUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=m3u`;
     const txtUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=txt`;
     
@@ -1318,6 +1330,17 @@ async function loadClientSettings() {
       localLogoEnabled = (setRes.data.enable_local_logo === 'true');
       document.getElementById('set-local-logo-urls').value = setRes.data.local_logo_urls || '';
     }
+
+    // 服务器网络配置
+    if (document.getElementById('set-enable-external-sub')) {
+      const isExternalSub = setRes.data.enable_external_sub || 'false';
+      enableExternalSubSetting = isExternalSub;
+      document.getElementById('set-enable-external-sub').value = isExternalSub;
+    }
+    if (document.getElementById('set-server-url')) {
+      serverUrlSetting = setRes.data.server_url || '';
+      document.getElementById('set-server-url').value = serverUrlSetting;
+    }
   }
 
   // Update 配置
@@ -1332,7 +1355,7 @@ async function loadClientSettings() {
   }
 
   // 服务器地址 URL 转 Base64 逻辑
-  const serverRawUrl = window.location.origin;
+  const serverRawUrl = serverUrlSetting || window.location.origin;
   const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
 
   const rawUrlEl = document.getElementById('server-raw-url');
@@ -1343,6 +1366,8 @@ async function loadClientSettings() {
 
 async function saveAllClientSettings() {
   const settings = {
+    enable_external_sub: document.getElementById('set-enable-external-sub').value,
+    server_url: document.getElementById('set-server-url').value.trim(),
     enable_url_token: document.getElementById('set-enable-url-token') ? document.getElementById('set-enable-url-token').value : 'false',
     auto_approve: document.getElementById('set-auto-approve').value,
     default_plan_id: document.getElementById('set-default-plan-id').value,
@@ -1368,6 +1393,17 @@ async function saveAllClientSettings() {
   for (const [k, v] of Object.entries(settings)) {
     await api('/settings', { method: 'POST', body: JSON.stringify({ key: k, value: String(v) }) });
   }
+
+  enableExternalSubSetting = settings.enable_external_sub;
+  serverUrlSetting = settings.server_url;
+
+  // 更新前端服务器地址与 Base64 授权码预览
+  const serverRawUrl = serverUrlSetting || window.location.origin;
+  const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
+  const rawUrlEl = document.getElementById('server-raw-url');
+  const base64TextEl = document.getElementById('server-base64-text');
+  if (rawUrlEl) rawUrlEl.textContent = serverRawUrl;
+  if (base64TextEl) base64TextEl.textContent = serverBase64;
 
   // 同时保存升级配置
   await saveAppUpdateSettings(true); // 传参 true 以便不重复弹 toast，或者就让它弹

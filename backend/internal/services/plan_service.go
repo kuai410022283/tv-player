@@ -151,3 +151,21 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 	}
 	return items, nil
 }
+
+func (s *PlanService) GetServerURL() string {
+	var val string
+	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='server_url'`).Scan(&val)
+	if err != nil {
+		return ""
+	}
+	return val
+}
+
+func (s *PlanService) IsExternalSubEnabled() bool {
+	var val string
+	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_external_sub'`).Scan(&val)
+	if err != nil {
+		return false
+	}
+	return val == "true"
+}

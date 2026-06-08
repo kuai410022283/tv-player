@@ -388,7 +388,7 @@
                 <th>允许同时在线设备数量</th>
                 <th>价格</th>
                 <th>描述</th>
-                <th>订阅地址</th>
+                <th id="th-plan-sub">订阅地址</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -438,7 +438,7 @@
           <div class="form-group"
             style="background: rgba(22, 186, 170, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
             <h3
-              style="margin-bottom: 8px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
+              style="margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 style="width: 18px; height: 18px;">
                 <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
@@ -446,10 +446,18 @@
                 <line x1="6" y1="6" x2="6.01" y2="6" />
                 <line x1="6" y1="18" x2="6.01" y2="18" />
               </svg>
-              服务器授权信息
+              服务器授权与网络配置
             </h3>
+            
+            <!-- 服务器域名/地址配置 -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label style="color: var(--text); font-weight: 500; font-size: 13px;">自定义服务器外网域名/地址 (Server URL)</label>
+              <input type="text" id="set-server-url" placeholder="例如：http://tv.example.com (留空则默认使用当前识别的地址)" style="margin-top: 6px; height: 38px;">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">用于生成客户端授权信息、订阅链接以及订阅文件内的播放代理地址。末尾请勿添加斜杠 /。</div>
+            </div>
+
             <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;">
-              客户端连接服务器所需信息：
+              客户端连接服务器所需信息（授权码）：
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <div
@@ -461,8 +469,21 @@
                 style="white-space: nowrap; height: 38px;">复制</button>
             </div>
             <div style="font-size: 11px; color: var(--text2); margin-top: 8px;">
-              当前识别的服务器地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
+              当前自动识别的本地访问地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
             </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">服务器网络配置</h3>
+          </div>
+          <div class="form-group">
+            <label>是否开启外部订阅</label>
+            <select id="set-enable-external-sub">
+              <option value="false">关闭 (禁止外部订阅)</option>
+              <option value="true">开启 (允许外部订阅)</option>
+            </select>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">是否允许设备或第三方播放器通过 M3U/TXT 链接拉取套餐内频道订阅。</div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 

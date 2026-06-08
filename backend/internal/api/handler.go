@@ -849,11 +849,16 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 		}
 		
 		if selectedApk != "" {
-			scheme := "http"
-			if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
-				scheme = "https"
+			baseURL := ""
+			if val, ok := settings["server_url"]; ok && val != "" {
+				baseURL = strings.TrimSuffix(val, "/")
+			} else {
+				scheme := "http"
+				if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
+					scheme = "https"
+				}
+				baseURL = scheme + "://" + c.Request.Host
 			}
-			baseURL := scheme + "://" + c.Request.Host
 			localUpdate.DownloadURL = baseURL + "/download/" + maxLocalFolderName + "/" + selectedApk
 		}
 		

@@ -91,6 +91,11 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	token := c.Query("subscription_token")
 	format := c.Query("subscription_format")
 
+	if !h.svc.IsExternalSubEnabled() {
+		c.String(http.StatusForbidden, "Forbidden: External subscription is disabled")
+		return
+	}
+
 	if planName == "" || token == "" {
 		c.String(http.StatusBadRequest, "Missing subscription_plans or subscription_token")
 		return
@@ -103,11 +108,14 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	}
 
 	// 确定代理及台标的 baseURL
-	scheme := "http"
-	if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
+	baseURL := strings.TrimSuffix(h.svc.GetServerURL(), "/")
+	if baseURL == "" {
+		scheme := "http"
+		if c.Request.TLS != nil || c.Request.Header.Get("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		baseURL = fmt.Sprintf("%s://%s", scheme, c.Request.Host)
 	}
-	baseURL := fmt.Sprintf("%s://%s", scheme, c.Request.Host)
 
 	// TXT 格式
 	if format == "txt" {
