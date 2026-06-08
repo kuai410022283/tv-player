@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/mediaplayer/backend/internal/models"
@@ -16,7 +17,7 @@ func NewPlanService(db *sql.DB) *PlanService {
 }
 
 func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {
-	query := `SELECT id, name, days, max_streams, price, description, created_at, updated_at FROM subscription_plans`
+	query := `SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM subscription_plans`
 	var args []interface{}
 	if search != "" {
 		query += ` WHERE name LIKE ?`
@@ -32,7 +33,7 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 	var items []*models.SubscriptionPlan
 	for rows.Next() {
 		m := &models.SubscriptionPlan{}
-		if err := rows.Scan(&m.ID, &m.Name, &m.Days, &m.MaxStreams, &m.Price, &m.Description, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Days, &m.MaxStreams, &m.Price, &m.Description, &m.SubscriptionToken, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, m)
@@ -58,8 +59,11 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 
 func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 	now := time.Now()
-	res, err := s.db.Exec(`INSERT INTO subscription_plans (name, days, max_streams, price, description, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`,
-		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, now, now)
+	if m.SubscriptionToken == "" {
+		m.SubscriptionToken = generateToken()
+	}
+	res, err := s.db.Exec(`INSERT INTO subscription_plans (name, days, max_streams, price, description, subscription_token, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
+		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, now, now)
 	if err != nil {
 		return err
 	}
@@ -77,8 +81,11 @@ func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 
 func (s *PlanService) UpdatePlan(m *models.SubscriptionPlan) error {
 	now := time.Now()
-	_, err := s.db.Exec(`UPDATE subscription_plans SET name=?, days=?, max_streams=?, price=?, description=?, updated_at=? WHERE id=?`,
-		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, now, m.ID)
+	if m.SubscriptionToken == "" {
+		m.SubscriptionToken = generateToken()
+	}
+	_, err := s.db.Exec(`UPDATE subscription_plans SET name=?, days=?, max_streams=?, price=?, description=?, subscription_token=?, updated_at=? WHERE id=?`,
+		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, now, m.ID)
 	if err != nil {
 		return err
 	}
@@ -100,4 +107,47 @@ func (s *PlanService) DeletePlan(id int64) error {
 		_, _ = s.db.Exec(`UPDATE clients SET plan_id=0 WHERE plan_id=?`, id)
 	}
 	return err
+}
+
+func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models.SubscriptionChannel, error) {
+	// 1. 验证套餐及订阅 Token 匹配度
+	var planID int64
+	err := s.db.QueryRow(`SELECT id FROM subscription_plans WHERE name=? AND subscription_token=?`, planName, token).Scan(&planID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("invalid plan or token")
+		}
+		return nil, err
+	}
+
+	// 2. 加载套餐关联分组下的非隐藏频道 (并按分组和频道的排序条件排序)
+	query := `
+		SELECT c.id, c.group_id, cg.name AS group_name, c.name, COALESCE(c.logo, '') AS logo, 
+		       c.stream_url, COALESCE(c.stream_type, '') AS stream_type, COALESCE(c.epg_channel_id, '') AS epg_channel_id,
+		       c.is_direct, c.support_catchup, COALESCE(c.catchup_type, '') AS catchup_type, c.catchup_days
+		FROM channels c
+		JOIN channel_groups cg ON c.group_id = cg.id
+		JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
+		WHERE pgr.plan_id = ? AND c.is_hidden = 0
+		ORDER BY cg.sort_order ASC, cg.id ASC, c.sort_order ASC, c.id ASC
+	`
+	rows, err := s.db.Query(query, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []*models.SubscriptionChannel
+	for rows.Next() {
+		m := &models.SubscriptionChannel{}
+		var isDirect, supportCatchup int
+		if err := rows.Scan(&m.ID, &m.GroupID, &m.GroupName, &m.Name, &m.Logo,
+			&m.StreamURL, &m.StreamType, &m.EPGChannelID, &isDirect, &supportCatchup, &m.CatchupType, &m.CatchupDays); err != nil {
+			return nil, err
+		}
+		m.IsDirect = isDirect == 1
+		m.SupportCatchup = supportCatchup == 1
+		items = append(items, m)
+	}
+	return items, nil
 }

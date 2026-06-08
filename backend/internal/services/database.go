@@ -51,6 +51,26 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT ''`)
+
+	// 自动为已有空 Token 的套餐生成 Token 凭证
+	if rows, err := db.Query("SELECT id FROM subscription_plans WHERE subscription_token = '' OR subscription_token IS NULL"); err == nil {
+		type planIDAndToken struct {
+			id    int64
+			token string
+		}
+		var updates []planIDAndToken
+		for rows.Next() {
+			var id int64
+			if rows.Scan(&id) == nil {
+				updates = append(updates, planIDAndToken{id: id, token: generateToken()})
+			}
+		}
+		rows.Close()
+		for _, u := range updates {
+			_, _ = db.Exec("UPDATE subscription_plans SET subscription_token = ? WHERE id = ?", u.token, u.id)
+		}
+	}
 
 	// 移除 channel_groups.name 的 UNIQUE 约束
 	var sqlStmt string
@@ -235,6 +255,7 @@ func createTables(db *sql.DB) error {
 		max_streams INTEGER DEFAULT 1,
 		price REAL DEFAULT 0.0,
 		description TEXT DEFAULT '',
+		subscription_token TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -273,6 +294,7 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
 
 	return err
 }

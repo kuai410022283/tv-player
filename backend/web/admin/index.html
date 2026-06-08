@@ -111,6 +111,9 @@
         </svg>
         <span>退出登录</span>
       </div>
+      <div class="sidebar-footer" id="sidebar-version-container" style="padding: 24px 24px 0; font-size: 12px; color: var(--side-text2); text-align: center; margin-top: auto; opacity: 0.6;">
+        版本: <span id="sidebar-version">-</span>
+      </div>
     </div>
 
     <div class="main">
@@ -385,6 +388,7 @@
                 <th>允许同时在线设备数量</th>
                 <th>价格</th>
                 <th>描述</th>
+                <th>订阅地址</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -859,6 +863,20 @@
         <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01">
         </div>
         <div class="form-group"><label>描述</label><textarea id="plan-desc" rows="2"></textarea></div>
+        <div class="form-group">
+          <label>订阅 Token (不填写会自动生成)</label>
+          <div style="display:flex;gap:10px;">
+            <input type="text" id="plan-token" placeholder="留空自动生成" style="flex:1;">
+            <button class="btn btn-ghost" type="button" onclick="regeneratePlanTokenInput()" style="white-space:nowrap;">随机生成</button>
+          </div>
+        </div>
+        <div class="form-group" id="plan-subscription-buttons-group" style="display:none;">
+          <label>复制订阅链接</label>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-ghost" type="button" id="btn-copy-m3u" style="flex:1;">订阅 M3U</button>
+            <button class="btn btn-ghost" type="button" id="btn-copy-txt" style="flex:1;">订阅 TXT</button>
+          </div>
+        </div>
         <div class="form-group">
           <label>关联频道分组 <span
               style="font-size:12px;color:var(--text2);font-weight:normal;">(不勾选则没有任何频道的访问权限)</span></label>

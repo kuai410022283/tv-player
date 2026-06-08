@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +23,11 @@ import (
 var Version = "dev"
 
 func main() {
+	// 从 version 文件读取版本号
+	if content, err := os.ReadFile("version"); err == nil {
+		Version = strings.TrimSpace(string(content))
+		api.Version = Version
+	}
 	// ── 结构化日志初始化 ───────────────────────────────
 	logLevel := slog.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
@@ -133,6 +139,7 @@ func main() {
 		public.GET("/client/verify", ch.Verify)
 		public.POST("/client/verify", ch.Verify)
 		public.GET("/update", h.GetAppUpdate)
+		public.GET("/subscription", ph.GetSubscription)
 	}
 
 	// ── 受保护 API（全局限流 + 认证）───────────────

@@ -83,15 +83,31 @@ type PlayHistory struct {
 // ── Subscription Plan (套餐) ──────────────────────────
 
 type SubscriptionPlan struct {
-	ID          int64     `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`
-	Days        int       `json:"days" db:"days"`               // 授权天数, 0表示永久
-	MaxStreams  int       `json:"max_streams" db:"max_streams"` // 允许并发设备数
-	Price       float64   `json:"price" db:"price"`             // 展示价格
-	Description string    `json:"description" db:"description"`
-	GroupIDs    []int64   `json:"group_ids" db:"-"`             // 关联的频道分组
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID                int64     `json:"id" db:"id"`
+	Name              string    `json:"name" db:"name"`
+	Days              int       `json:"days" db:"days"`               // 授权天数, 0表示永久
+	MaxStreams        int       `json:"max_streams" db:"max_streams"` // 允许并发设备数
+	Price             float64   `json:"price" db:"price"`             // 展示价格
+	Description       string    `json:"description" db:"description"`
+	SubscriptionToken string    `json:"subscription_token" db:"subscription_token"`
+	GroupIDs          []int64   `json:"group_ids" db:"-"`             // 关联的频道分组
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type SubscriptionChannel struct {
+	ID             int64  `json:"id"`
+	GroupID        int64  `json:"group_id"`
+	GroupName      string `json:"group_name"`
+	Name           string `json:"name"`
+	Logo           string `json:"logo"`
+	StreamURL      string `json:"stream_url"`
+	StreamType     string `json:"stream_type"`
+	EPGChannelID   string `json:"epg_channel_id"`
+	IsDirect       bool   `json:"is_direct"`
+	SupportCatchup bool   `json:"support_catchup"`
+	CatchupType    string `json:"catchup_type"`
+	CatchupDays    int    `json:"catchup_days"`
 }
 
 // ── User Settings ──────────────────────────────────────

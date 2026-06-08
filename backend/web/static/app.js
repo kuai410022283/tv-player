@@ -947,18 +947,29 @@ function renderPlansTable() {
   const start = (planPage - 1) * PAGE_SIZE;
   const pageData = allPlans.slice(start, start + PAGE_SIZE);
 
-  document.getElementById('plans-body').innerHTML = pageData.map((p, i) => `<tr>
-    <td style="color:var(--text3)">${(planPage - 1) * PAGE_SIZE + i + 1}</td>
-    <td><strong>${esc(p.name)}</strong></td>
-    <td>${p.days > 0 ? p.days + ' 天' : '永久'}</td>
-    <td>${p.max_streams}</td>
-    <td>${p.price > 0 ? '¥' + p.price : '-'}</td>
-    <td>${esc(p.description)}</td>
-    <td><div class="btn-group">
-      <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">编辑</button>
-      <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
-    </div></td>
-  </tr>`).join('');
+  document.getElementById('plans-body').innerHTML = pageData.map((p, i) => {
+    const origin = window.location.origin;
+    const m3uUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=m3u`;
+    const txtUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=txt`;
+    return `<tr>
+      <td style="color:var(--text3)">${(planPage - 1) * PAGE_SIZE + i + 1}</td>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${p.days > 0 ? p.days + ' 天' : '永久'}</td>
+      <td>${p.max_streams}</td>
+      <td>${p.price > 0 ? '¥' + p.price : '-'}</td>
+      <td>${esc(p.description)}</td>
+      <td>
+        <div class="btn-group" style="gap:4px;">
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(m3uUrl)}')" style="white-space:nowrap;">📋 M3U</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${esc(txtUrl)}')" style="white-space:nowrap;">📋 TXT</button>
+        </div>
+      </td>
+      <td><div class="btn-group">
+        <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
+      </div></td>
+    </tr>`;
+  }).join('');
   renderPagination('plans-pagination', planPage, totalPages, 'planGoToPage');
   document.getElementById('plans-info').textContent = `共 ${total} 个套餐`;
 }
@@ -981,6 +992,7 @@ async function savePlan() {
     max_streams: +document.getElementById('plan-streams').value || 1,
     price: parseFloat(document.getElementById('plan-price').value) || 0.0,
     description: document.getElementById('plan-desc').value,
+    subscription_token: document.getElementById('plan-token').value,
     group_ids: groupIds
   };
   if (!d.name) { toast('请填写名称', 'error'); return; }
@@ -1018,6 +1030,21 @@ async function editPlan(id) {
   document.getElementById('plan-streams').value = p.max_streams;
   document.getElementById('plan-price').value = p.price;
   document.getElementById('plan-desc').value = p.description;
+  document.getElementById('plan-token').value = p.subscription_token || '';
+
+  const subBtnGroup = document.getElementById('plan-subscription-buttons-group');
+  if (id) {
+    subBtnGroup.style.display = 'block';
+    const origin = window.location.origin;
+    const m3uUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=m3u`;
+    const txtUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=txt`;
+    
+    document.getElementById('btn-copy-m3u').onclick = () => copyText(m3uUrl);
+    document.getElementById('btn-copy-txt').onclick = () => copyText(txtUrl);
+  } else {
+    subBtnGroup.style.display = 'none';
+  }
+
   showModal('plan-modal');
 }
 
@@ -1508,7 +1535,6 @@ function toggleTokenVisibility(iconSvg) {
     iconSvg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
   }
 }
-
 // ════ Init ═════════════════════════════════════════════
 if (!window.location.pathname.includes('/login.html') && adminToken) {
   (async () => {
@@ -1518,7 +1544,53 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
         localLogoEnabled = (setRes.data.enable_local_logo === 'true');
       }
     } catch (e) { }
+    try {
+      const verRes = await api('/version');
+      if (verRes && verRes.data && verRes.data.version) {
+        document.getElementById('sidebar-version').textContent = verRes.data.version;
+      }
+    } catch (e) { }
     const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
     showSection(lastSection);
   })();
+}
+function copyText(text) {
+  if (!text) {
+    toast('无有效内容', 'error');
+    return;
+  }
+  const handleFallback = () => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      toast('复制成功');
+    } catch (e) {
+      toast('复制失败，请手动复制', 'error');
+    }
+    document.body.removeChild(textarea);
+  };
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(text).then(() => {
+      toast('复制成功');
+    }).catch(err => {
+      handleFallback();
+    });
+  } else {
+    handleFallback();
+  }
+}
+
+function regeneratePlanTokenInput() {
+  const chars = '0123456789abcdef';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars[Math.floor(Math.random() * 16)];
+  }
+  document.getElementById('plan-token').value = token;
 }
