@@ -1044,6 +1044,11 @@ async function editPlan(id) {
   document.getElementById('plan-desc').value = p.description;
   document.getElementById('plan-token').value = p.subscription_token || '';
 
+  const tokenGroup = document.getElementById('plan-token-group');
+  if (tokenGroup) {
+    tokenGroup.style.display = (enableExternalSubSetting === 'true') ? 'block' : 'none';
+  }
+
   const subBtnGroup = document.getElementById('plan-subscription-buttons-group');
   if (id && enableExternalSubSetting === 'true') {
     subBtnGroup.style.display = 'block';
