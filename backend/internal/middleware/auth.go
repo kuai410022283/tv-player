@@ -105,6 +105,16 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 				c.Next()
 				return
 			}
+
+			// 如果不是合法的客户端 Token，校验是否为合法的订阅 Token (允许第三方播放器通过订阅访问代理流)
+			var planID int64
+			err = db.QueryRow(`SELECT id FROM subscription_plans WHERE subscription_token=?`, token).Scan(&planID)
+			if err == nil {
+				c.Set("auth_type", "client")
+				c.Set("client_token", token)
+				c.Next()
+				return
+			}
 		}
 
 		// 未认证请求：仅允许特定只读 GET 接口

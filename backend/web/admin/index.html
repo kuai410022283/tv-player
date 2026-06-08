@@ -479,7 +479,7 @@
           </div>
           <div class="form-group">
             <label>是否开启外部订阅</label>
-            <select id="set-enable-external-sub">
+            <select id="set-enable-external-sub" onchange="onEnableExternalSubChange(this.value)">
               <option value="false">关闭 (禁止外部订阅)</option>
               <option value="true">开启 (允许外部订阅)</option>
             </select>
@@ -610,20 +610,18 @@
               <option value="true">是 (必须更新才能使用)</option>
             </select>
           </div>
-          <div style="display: none;">
-            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
-            <div class="form-group">
-              <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
-            </div>
-            <div class="form-group">
-              <label>允许 URL 传递 Token (开发调试开关)</label>
-              <select id="set-enable-url-token">
-                <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
-                <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
-              </select>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
-                即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
-            </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
+            <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
+          </div>
+          <div class="form-group">
+            <label>允许 URL 传递 Token (开发调试开关)</label>
+            <select id="set-enable-url-token">
+              <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
+              <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
+            </select>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
+              即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
           </div>
           <div class="form-actions" style="justify-content:flex-start">
             <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>

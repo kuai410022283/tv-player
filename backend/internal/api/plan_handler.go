@@ -136,12 +136,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 					continue
 				}
 
-				var displayName string
-				if len(lines) > 1 {
-					displayName = fmt.Sprintf("%s - 线路%d", ch.Name, lineIdx+1)
-				} else {
-					displayName = ch.Name
-				}
+				displayName := ch.Name
 
 				var playURL string
 				if ch.IsDirect {
@@ -154,7 +149,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 					case "mp4", "flv", "mkv", "mpd":
 						ext = ch.StreamType
 					}
-					playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d", baseURL, ch.ID, ext, lineIdx)
+					playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s", baseURL, ch.ID, ext, lineIdx, token)
 				}
 
 				sb.WriteString(fmt.Sprintf("%s,%s\n", displayName, playURL))
@@ -198,12 +193,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				continue
 			}
 
-			var displayName string
-			if len(lines) > 1 {
-				displayName = fmt.Sprintf("%s - 线路%d", ch.Name, lineIdx+1)
-			} else {
-				displayName = ch.Name
-			}
+			displayName := ch.Name
 
 			var playURL string
 			if ch.IsDirect {
@@ -216,7 +206,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				case "mp4", "flv", "mkv", "mpd":
 					ext = ch.StreamType
 				}
-				playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d", baseURL, ch.ID, ext, lineIdx)
+				playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s", baseURL, ch.ID, ext, lineIdx, token)
 			}
 
 			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-logo="%s" group-title="%s"%s,%s`+"\n",

@@ -1485,6 +1485,16 @@ function toggleAutoApproveFields(value) {
   }
 }
 
+function onEnableExternalSubChange(value) {
+  if (value === 'true') {
+    const devTokenSelect = document.getElementById('set-enable-url-token');
+    if (devTokenSelect && devTokenSelect.value === 'false') {
+      devTokenSelect.value = 'true';
+      toast('已自动开启“允许 URL 传递 Token”以确保外部订阅播放正常');
+    }
+  }
+}
+
 // ════ Pagination Helper ═════════════════════════════════════════════
 function renderPagination(containerId, currentPage, totalPages, changePageFuncName) {
   let html = '';
