@@ -257,10 +257,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 		if items, ok := resp.Items.([]models.Channel); ok {
 			// token 已经被去除，不在这里获取了
 
-			localLogoEnabled := false
-			if enableStr, err := h.channelSvc.GetSetting("enable_local_logo"); err == nil && enableStr == "true" {
-				localLogoEnabled = true
-			}
+			strategy := h.logoSvc.GetLogoStrategy()
 
 			// 聚合后的列表
 			var groupedItems []map[string]interface{}
@@ -339,13 +336,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					groupedItems[idx]["lines"] = append(lines, linesForThisItem...)
 				} else {
 					// 处理台标重写
-					logoURL := items[i].Logo
-					if localLogoEnabled {
-						cleanName := h.logoSvc.CleanName(items[i].Name)
-						if h.logoSvc.HasLocalLogo(cleanName) {
-							logoURL = fmt.Sprintf("/api/v1/logo?name=%s", cleanName)
-						}
-					}
+					logoURL := h.logoSvc.ResolveLogo(items[i].Name, items[i].EPGChannelID, items[i].Logo, items[i].ID, strategy, "")
 
 					// 新频道
 					newGroup := map[string]interface{}{
@@ -388,6 +379,8 @@ func (h *Handler) GetChannel(c *gin.Context) {
 	authType, _ := c.Get("auth_type")
 	if authType == "client" {
 		// baseURL 已经被去除，全部使用相对路径
+		strategy := h.logoSvc.GetLogoStrategy()
+		ch.Logo = h.logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, "")
 		
 		// token 已经被去除，不在这里获取了
 
@@ -1060,19 +1053,93 @@ func (h *Handler) GetVersion(c *gin.Context) {
 
 func (h *Handler) GetLogo(c *gin.Context) {
 	name := c.Query("name")
+	idStr := c.Query("id")
 	if name == "" {
 		c.Status(http.StatusNoContent)
 		return
 	}
 
-	cleanName := h.logoSvc.CleanName(name)
-	if h.logoSvc.HasLocalLogo(cleanName) {
-		c.File(h.logoSvc.GetLogoPath(cleanName))
+	if name == "default" || name == "default.png" {
+		c.File("./library/channel_logo/default.png")
 		return
 	}
-	
-	// 未命中本地缓存
-	c.Status(http.StatusNoContent)
+
+	strategy := h.logoSvc.GetLogoStrategy()
+
+	var id int64
+	if idStr != "" {
+		id, _ = strconv.ParseInt(idStr, 10, 64)
+	}
+
+	cleanName := h.logoSvc.CleanName(name)
+
+	var dbLogo, chName, epgID string
+	if id > 0 {
+		if ch, err := h.channelSvc.GetChannel(id, 0); err == nil && ch != nil {
+			dbLogo = ch.Logo
+			chName = ch.Name
+			epgID = ch.EPGChannelID
+		}
+	}
+
+	var cleanEPG string
+	if epgID != "" {
+		cleanEPG = h.logoSvc.CleanName(epgID)
+	}
+
+	serveLocal := func() bool {
+		if cleanEPG != "" && h.logoSvc.HasLocalLogo(cleanEPG) {
+			c.File(h.logoSvc.GetLogoPath(cleanEPG))
+			return true
+		}
+		if cleanName != "" && h.logoSvc.HasLocalLogo(cleanName) {
+			c.File(h.logoSvc.GetLogoPath(cleanName))
+			return true
+		}
+		if chName != "" {
+			cleanChName := h.logoSvc.CleanName(chName)
+			if h.logoSvc.HasLocalLogo(cleanChName) {
+				c.File(h.logoSvc.GetLogoPath(cleanChName))
+				return true
+			}
+		}
+		return false
+	}
+
+	redirectDB := func() bool {
+		if dbLogo != "" {
+			c.Redirect(http.StatusFound, dbLogo)
+			return true
+		}
+		return false
+	}
+
+	switch strategy {
+	case "local":
+		if serveLocal() {
+			return
+		}
+		if redirectDB() {
+			return
+		}
+	case "source":
+		if redirectDB() {
+			return
+		}
+		if serveLocal() {
+			return
+		}
+	case "interface":
+		if redirectDB() {
+			return
+		}
+		if serveLocal() {
+			return
+		}
+	}
+
+	// Fallback to default.png
+	c.File("./library/channel_logo/default.png")
 }
 
 func (h *Handler) TriggerCacheLogos(c *gin.Context) {

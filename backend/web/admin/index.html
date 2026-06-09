@@ -568,9 +568,10 @@
           </div>
           <div class="form-group">
             <label>启用本地台标缓存</label>
-            <select id="set-enable-local-logo" onchange="onEnableLocalLogoChange(this.value)">
-              <option value="false">关闭</option>
-              <option value="true">开启 (本地台标)</option>
+            <select id="set-logo-strategy" onchange="onLogoStrategyChange(this.value)">
+              <option value="local">本地优先 (本地 》 数据库 》 接口)</option>
+              <option value="source">源优先 (数据库 》 本地 》 接口)</option>
+              <option value="interface">接口优先 (接口 》 数据库 》 本地)</option>
             </select>
           </div>
           <div class="form-group">

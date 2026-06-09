@@ -1373,9 +1373,12 @@ async function loadClientSettings() {
     }
 
     // 台标配置
-    if (document.getElementById('set-enable-local-logo')) {
-      document.getElementById('set-enable-local-logo').value = setRes.data.enable_local_logo || 'false';
-      localLogoEnabled = (setRes.data.enable_local_logo === 'true');
+    if (document.getElementById('set-logo-strategy')) {
+      let strategy = setRes.data.logo_strategy;
+      if (!strategy) {
+        strategy = (setRes.data.enable_local_logo === 'true') ? 'local' : 'source';
+      }
+      document.getElementById('set-logo-strategy').value = strategy;
       document.getElementById('set-local-logo-urls').value = setRes.data.local_logo_urls || '';
     }
 
@@ -1433,8 +1436,8 @@ async function saveAllClientSettings() {
     settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
   }
 
-  if (document.getElementById('set-enable-local-logo')) {
-    settings.enable_local_logo = document.getElementById('set-enable-local-logo').value;
+  if (document.getElementById('set-logo-strategy')) {
+    settings.logo_strategy = document.getElementById('set-logo-strategy').value;
     settings.local_logo_urls = document.getElementById('set-local-logo-urls').value.trim();
   }
 
@@ -1540,9 +1543,14 @@ async function onEnableExternalSubChange(value) {
   if (typeof renderPlansTable === 'function') renderPlansTable();
 }
 
-async function onEnableLocalLogoChange(value) {
-  await saveClientSetting('enable_local_logo', value);
-  toast('本地台标缓存已' + (value === 'true' ? '开启' : '关闭'));
+async function onLogoStrategyChange(value) {
+  await saveClientSetting('logo_strategy', value);
+  const strategies = {
+    'local': '本地优先',
+    'source': '源优先',
+    'interface': '接口优先'
+  };
+  toast('台标获取策略已切换为: ' + (strategies[value] || value));
 }
 
 // ════ Pagination Helper ═════════════════════════════════════════════
@@ -1641,9 +1649,6 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
   (async () => {
     try {
       const setRes = await api('/settings');
-      if (setRes && setRes.data) {
-        localLogoEnabled = (setRes.data.enable_local_logo === 'true');
-      }
     } catch (e) { }
     try {
       const verRes = await api('/version');

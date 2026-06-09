@@ -164,12 +164,22 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	var sb strings.Builder
 	sb.WriteString("#EXTM3U\n")
 
+	logoSvc := h.svc.GetLogoService()
+	strategy := "source"
+	if logoSvc != nil {
+		strategy = logoSvc.GetLogoStrategy()
+	}
+
 	for _, ch := range channels {
 		logoURL := ch.Logo
-		if logoURL == "" {
-			logoURL = fmt.Sprintf("%s/api/v1/logo?name=%s", baseURL, url.QueryEscape(ch.Name))
-		} else if !strings.HasPrefix(logoURL, "http://") && !strings.HasPrefix(logoURL, "https://") {
-			logoURL = baseURL + logoURL
+		if logoSvc != nil {
+			logoURL = logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, baseURL)
+		} else {
+			if logoURL == "" {
+				logoURL = fmt.Sprintf("%s/api/v1/logo?name=%s", baseURL, url.QueryEscape(ch.Name))
+			} else if !strings.HasPrefix(logoURL, "http://") && !strings.HasPrefix(logoURL, "https://") {
+				logoURL = baseURL + logoURL
+			}
 		}
 
 		catchupStr := ""

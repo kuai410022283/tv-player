@@ -249,6 +249,7 @@ func createTables(db *sql.DB) error {
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('require_note', 'false');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('server_url', '');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('enable_external_sub', 'false');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('logo_strategy', 'source');
 
 	CREATE TABLE IF NOT EXISTS subscription_plans (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

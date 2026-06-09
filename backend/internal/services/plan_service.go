@@ -9,11 +9,16 @@ import (
 )
 
 type PlanService struct {
-	db *sql.DB
+	db      *sql.DB
+	logoSvc *LogoService
 }
 
-func NewPlanService(db *sql.DB) *PlanService {
-	return &PlanService{db: db}
+func NewPlanService(db *sql.DB, logoSvc *LogoService) *PlanService {
+	return &PlanService{db: db, logoSvc: logoSvc}
+}
+
+func (s *PlanService) GetLogoService() *LogoService {
+	return s.logoSvc
 }
 
 func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {

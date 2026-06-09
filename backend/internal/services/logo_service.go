@@ -2,9 +2,11 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -286,3 +288,100 @@ func (s *LogoService) FetchLogosFromSources(overwrite bool) {
 	wg.Wait()
 	slog.Info("从源库拉取台标完成", "downloaded", successCount)
 }
+
+// GetLogoStrategy 获取当前的台标策略
+func (s *LogoService) GetLogoStrategy() string {
+	var strategy string
+	err := s.db.QueryRow("SELECT value FROM user_settings WHERE key = 'logo_strategy'").Scan(&strategy)
+	if err == nil && strategy != "" {
+		return strategy
+	}
+
+	var enableLocal string
+	err = s.db.QueryRow("SELECT value FROM user_settings WHERE key = 'enable_local_logo'").Scan(&enableLocal)
+	if err == nil && enableLocal == "true" {
+		return "local"
+	}
+	return "source" // 默认策略
+}
+
+// ResolveLogo 解析并返回最符合策略的台标 URL
+func (s *LogoService) ResolveLogo(name, epg, dbLogo string, id int64, strategy string, baseURL string) string {
+	cleanName := s.CleanName(name)
+	var cleanEPG string
+	if epg != "" {
+		cleanEPG = s.CleanName(epg)
+	}
+
+	// 检查本地台标是否存在
+	hasLocal := false
+	localClean := cleanName
+	if cleanEPG != "" && s.HasLocalLogo(cleanEPG) {
+		hasLocal = true
+		localClean = cleanEPG
+	} else if s.HasLocalLogo(cleanName) {
+		hasLocal = true
+	}
+
+	// 格式化本地台标 URL
+	formatLocalURL := func() string {
+		escaped := url.QueryEscape(localClean)
+		path := fmt.Sprintf("/api/v1/logo?name=%s&id=%d", escaped, id)
+		if baseURL != "" {
+			return baseURL + path
+		}
+		return path
+	}
+
+	// 格式化数据库台标 URL
+	formatDBURL := func() string {
+		if strings.HasPrefix(dbLogo, "http://") || strings.HasPrefix(dbLogo, "https://") {
+			return dbLogo
+		}
+		if baseURL != "" {
+			return baseURL + dbLogo
+		}
+		return dbLogo
+	}
+
+	// 格式化固定兜底台标 URL
+	formatDefaultURL := func() string {
+		path := "/library/channel_logo/default.png"
+		if baseURL != "" {
+			return baseURL + path
+		}
+		return path
+	}
+
+	switch strategy {
+	case "local":
+		// 本地优先：本地 》 数据库 》 接口
+		if hasLocal {
+			return formatLocalURL()
+		}
+		if dbLogo != "" {
+			return formatDBURL()
+		}
+		// 接口
+		return formatLocalURL()
+
+	case "source":
+		// 源优先：数据库 》 本地 》 接口
+		if dbLogo != "" {
+			return formatDBURL()
+		}
+		if hasLocal {
+			return formatLocalURL()
+		}
+		// 接口
+		return formatLocalURL()
+
+	case "interface":
+		// 接口优先：接口 》 数据库 》 本地
+		return formatLocalURL()
+
+	default:
+		return formatDefaultURL()
+	}
+}
+
