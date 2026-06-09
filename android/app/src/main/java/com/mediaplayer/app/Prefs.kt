@@ -45,4 +45,5 @@ object Prefs {
     const val KEY_CLIENT_STATUS = "client_status"
     const val KEY_DEVICE_ID = "device_id"
     const val KEY_ENABLE_LOG = "enable_log"
+    const val KEY_REVERSE_CHANNEL_KEYS = "reverse_channel_keys"
 }

@@ -550,6 +550,7 @@ class MainActivity : AppCompatActivity() {
         btnSettingsCore = findViewById(R.id.btnSettingsCore)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
+        val btnSettingsReverseChannels = findViewById<View>(R.id.btnSettingsReverseChannels)
         
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
@@ -572,6 +573,10 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (enabled) "开" else "关"
         }
         
+        fun updateReverseChannelsText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsReverseChannelsValue)?.text = if (enabled) "开" else "关"
+        }
+        
         var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         // 迁移旧版本中 X5 内核的选择（X5 已移除，自动回退到智能切换）
@@ -587,12 +592,14 @@ class MainActivity : AppCompatActivity() {
         }
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
+        var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
 
         updateDecoderText(currentDecoderMode)
         updateCoreText(currentCore)
         updateScaleText(currentScaleMode)
         updateAutoStartText(currentAutoStart)
         updateShowLogoText(currentShowLogo)
+        updateReverseChannelsText(currentReverseChannels)
         
         btnSettingsDecoder?.setOnClickListener {
             currentDecoderMode = when (currentDecoderMode) {
@@ -652,6 +659,12 @@ class MainActivity : AppCompatActivity() {
             currentAutoStart = !currentAutoStart
             updateAutoStartText(currentAutoStart)
             prefs.edit().putBoolean(Prefs.KEY_AUTO_START, currentAutoStart).apply()
+        }
+
+        btnSettingsReverseChannels?.setOnClickListener {
+            currentReverseChannels = !currentReverseChannels
+            updateReverseChannelsText(currentReverseChannels)
+            prefs.edit().putBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, currentReverseChannels).apply()
         }
 
         val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
@@ -1982,18 +1995,27 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
+            val reverseChannels = getSharedPreferences(Prefs.FILE, MODE_PRIVATE).getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (!anyPanelOpen) {
-                        val prev = if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
-                        playTvChannel(prev)
+                        val targetIdx = if (reverseChannels) {
+                            if (currentChannelIndex < allChannels.size - 1) currentChannelIndex + 1 else 0
+                        } else {
+                            if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
+                        }
+                        playTvChannel(targetIdx)
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (!anyPanelOpen) {
-                        val next = if (currentChannelIndex < allChannels.size - 1) currentChannelIndex + 1 else 0
-                        playTvChannel(next)
+                        val targetIdx = if (reverseChannels) {
+                            if (currentChannelIndex > 0) currentChannelIndex - 1 else allChannels.size - 1
+                        } else {
+                            if (currentChannelIndex < allChannels.size - 1) currentChannelIndex + 1 else 0
+                        }
+                        playTvChannel(targetIdx)
                         return true
                     }
                 }

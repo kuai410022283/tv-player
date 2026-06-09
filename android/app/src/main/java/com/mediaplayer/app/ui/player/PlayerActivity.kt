@@ -732,12 +732,19 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         // TV 模式: D-pad 控制
+        val reverseChannels = getSharedPreferences(Prefs.FILE, MODE_PRIVATE).getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
         when (keyCode) {
             KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP,
-            KeyEvent.KEYCODE_DPAD_RIGHT -> { nextChannel(); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (reverseChannels) prevChannel() else nextChannel()
+                return true
+            }
 
             KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT -> { prevChannel(); return true }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (reverseChannels) nextChannel() else prevChannel()
+                return true
+            }
 
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 toggleChannelInfo(); return true
