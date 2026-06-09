@@ -325,28 +325,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
-                val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
-                if (!isMenuVisible) {
-                    layoutZappingMenu?.visibility = View.VISIBLE
-                    
-                    val playingId = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex].id else -1L
-                    val indexInFiltered = filteredChannels.indexOfFirst { it.id == playingId }
-                    if (indexInFiltered >= 0) {
-                        tvChannelsRv?.scrollToPosition(indexInFiltered)
-                        tvChannelsRv?.postDelayed({
-                            val lm = tvChannelsRv?.layoutManager as? LinearLayoutManager
-                            lm?.findViewByPosition(indexInFiltered)?.requestFocus() ?: tvChannelsRv?.requestFocus()
-                        }, 50)
-                    } else {
-                        tvChannelsRv?.requestFocus()
-                    }
-
-                    uiHandler.removeCallbacks(hideZappingRunnable)
-                    uiHandler.postDelayed(hideZappingRunnable, 10000)
-                } else {
-                    uiHandler.removeCallbacks(hideZappingRunnable)
-                    hideZappingRunnable.run()
-                }
+                // 单点：显示 OSD（5s 自动隐藏）
+                showOsd()
                 return true
             }
 
@@ -381,18 +361,25 @@ class MainActivity : AppCompatActivity() {
                     }
                     return true
                 } 
-                // 左右滑动
+                // 左右滑动：上下文感知的抽屉式交互
                 else if (kotlin.math.abs(deltaX) > kotlin.math.abs(deltaY) && kotlin.math.abs(deltaX) > 100) {
                     if (deltaX < 0) {
-                        // 向左滑动：呼出右侧的 EPG 菜单
-                        if (layoutZappingMenu?.visibility != View.VISIBLE && layoutSettingsMenu?.visibility != View.VISIBLE) {
+                        // 向左滑动：侧边栏已显示则关闭，否则显示 EPG
+                        if (layoutZappingMenu?.visibility == View.VISIBLE) {
+                            uiHandler.removeCallbacks(hideZappingRunnable)
+                            hideZappingRunnable.run()
+                            return true
+                        } else if (layoutEpgMenu?.visibility != View.VISIBLE && layoutSettingsMenu?.visibility != View.VISIBLE) {
                             showEpgMenu()
                             return true
                         }
                     } else {
-                        // 向右滑动：如果是 EPG 面板，则关闭它
+                        // 向右滑动：EPG 已显示则关闭，否则显示侧边栏
                         if (layoutEpgMenu?.visibility == View.VISIBLE) {
                             hideEpgMenu()
+                            return true
+                        } else if (layoutZappingMenu?.visibility != View.VISIBLE && layoutSettingsMenu?.visibility != View.VISIBLE) {
+                            showZappingMenu(focusOnGroups = false, resetToPlaying = true)
                             return true
                         }
                     }
@@ -1226,6 +1213,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOsd() {
+        // 刷新频道号码和名称（来自当前频道，不依赖播放器回调）
+        val channel = allChannels.getOrNull(currentChannelIndex)
+        if (channel != null) {
+            tvOsdChannelNum?.text = String.format("%03d", channel.globalIndex + 1)
+            tvOsdChannelName?.text = channel.name
+        }
+        
+        // 如果正在播放但 tvOsdInfo 仍卡在"连接中"（播放器未上报分辨率/编码信息），
+        // 至少显示解码模式和播放内核作为回退信息
+        // 使用 playerHelper?.isPlaying() 而非 currentPlaybackState，以兼容 ExoPlayer
+        // （ExoPlayerHelper 只在 onVideoSizeChanged 中调用 onPlaying，无视频尺寸时不回调）
+        if (playerHelper?.isPlaying() == true) {
+            val infoText = tvOsdInfo?.text?.toString() ?: ""
+            if (infoText.contains("连接中") || infoText.isEmpty()) {
+                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+                val decoderStr = when (decoderMode) {
+                    Prefs.DECODER_MODE_HARDWARE -> "硬解"
+                    Prefs.DECODER_MODE_SOFTWARE -> "软解"
+                    else -> "自动解码"
+                }
+                val coreStr = playerHelper?.let {
+                    when (it) {
+                        is com.mediaplayer.app.util.ExoPlayerHelper -> "ExoPlayer"
+                        is com.mediaplayer.app.util.IjkPlayerHelper -> "IJKPlayer"
+                        is com.mediaplayer.app.util.VlcPlayerHelper -> "VLC"
+                        else -> ""
+                    }
+                } ?: ""
+                tvOsdInfo?.text = if (coreStr.isNotEmpty()) "$decoderStr | $coreStr" else decoderStr
+            }
+        }
+
         layoutOsd?.visibility = View.VISIBLE
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD VISIBLE")
         uiHandler.removeCallbacks(hideOsdRunnable)
@@ -1955,14 +1975,12 @@ class MainActivity : AppCompatActivity() {
                 val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible
 
                 if (!anyPanelOpen) {
-                    // 【关键修复】当焦点在频道列表项上时，Android 会将 ACTION_UP 分发给焦点视图，
-                    // 导致视图的 onKeyUp → performClick() → OnClickListener 触发换台。
-                    // Activity.onKeyUp 因此永远不会被调用，zapping 菜单无法弹出。
-                    // 在此处提前拦截，直接呼出频道列表菜单。
+                    // 【焦点修复】拦截焦点遗留在频道列表项上的 OK 事件，防止触发换台
+                    // 改为显示 OSD（用户可通过 LEFT 键呼出频道列表）
                     val focusedView = currentFocus
                     if (focusedView != null && isViewDescendantOf(focusedView, tvChannelsRv)) {
-                        com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for zapping menu")
-                        showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                        com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for OSD")
+                        showOsd()
                         return true
                     }
                 }
@@ -2120,9 +2138,8 @@ class MainActivity : AppCompatActivity() {
 
             if (!isMenuVisible && !isSettingsVisible && !isEpgVisible && !isLineVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 if (event?.isTracking == true && !event.isCanceled) {
-                    // 短按 OK 键，呼出频道列表
-                    // 短按 OK 键，呼出频道列表，并重置到当前播放的频道
-                    showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                    // 短按 OK 键，显示 OSD（5s 自动隐藏）
+                    showOsd()
                 }
                 return true
             }

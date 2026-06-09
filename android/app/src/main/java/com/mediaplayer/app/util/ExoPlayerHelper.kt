@@ -190,6 +190,26 @@ class ExoPlayerHelper(
                         if (exoPlayer?.playWhenReady == true) {
                             if (!isPlayerPlaying) {
                                 isPlayerPlaying = true
+                                // 在 STATE_READY 时主动上报可用信息
+                                // （onVideoSizeChanged 可能因流未上报尺寸而不触发）
+                                val videoFormat = exoPlayer?.videoFormat
+                                val audioFormat = exoPlayer?.audioFormat
+                                val info = buildString {
+                                    if (videoFormat != null && videoFormat.width > 0 && videoFormat.height > 0) {
+                                        append("${videoFormat.width}x${videoFormat.height}")
+                                    }
+                                    val videoMime = videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
+                                    val audioMime = audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
+                                    if (!videoMime.isNullOrEmpty()) {
+                                        if (isNotEmpty()) append(" | ")
+                                        append(videoMime)
+                                    }
+                                    if (!audioMime.isNullOrEmpty()) {
+                                        if (isNotEmpty()) append(" | ")
+                                        append(audioMime)
+                                    }
+                                }
+                                listener.onPlaying(info)
                             }
                         }
                     }
