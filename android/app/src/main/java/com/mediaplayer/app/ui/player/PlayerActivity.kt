@@ -58,6 +58,10 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var authManager: ClientAuthManager
     private var isTvMode = false
 
+    // ── 播放重试控制 ──
+    private var retryCount = 0
+    private val maxRetries = 4
+
     // ── Views ──
     private var videoLayout: android.widget.FrameLayout? = null
     private var progressBar: View? = null
@@ -341,6 +345,7 @@ class PlayerActivity : AppCompatActivity() {
                     progressBar?.visibility = View.GONE
                     tvStatus?.text = "播放中"
                     continuousSkipCount = 0
+                    retryCount = 0
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -481,7 +486,12 @@ class PlayerActivity : AppCompatActivity() {
             videoLayout?.removeAllViews() // 清除旧的视图
             initPlayerWithCore(desiredCore)
         }
-        
+
+        // 应用保存的画面比例设置
+        val savedScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
+        val finalScaleMode = if (savedScaleMode == Prefs.SCALE_MODE_CROP) Prefs.SCALE_MODE_DEFAULT else savedScaleMode
+        playerHelper?.setAspectRatio(finalScaleMode)
+
         resolveJob?.cancel()
         resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
@@ -511,9 +521,29 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
+        retryCount++
+        if (retryCount > maxRetries) {
+            currentPlaybackState = PlaybackState.IDLE
+            progressBar?.visibility = View.GONE
+            tvStatus?.text = "播放失败，请稍后重试"
+            continuousSkipCount = 0
+            return
+        }
+
         currentPlaybackState = PlaybackState.IDLE
         progressBar?.visibility = View.GONE
 
+        if (retryCount > 1) {
+            val delayMs = (1L shl retryCount) * 1000L
+            tvStatus?.text = "播放失败，${delayMs / 1000} 秒后自动重试..."
+            handler.postDelayed({ executeRetry(isNetworkTimeout) }, delayMs)
+            return
+        }
+
+        executeRetry(isNetworkTimeout)
+    }
+
+    private fun executeRetry(isNetworkTimeout: Boolean) {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
 
@@ -540,11 +570,11 @@ class PlayerActivity : AppCompatActivity() {
             playCurrentLine()
             return
         }
-        
+
         coreRetryLevel = 0
         val channel = allChannels.getOrNull(channelIndex)
         val lines = channel?.getLinesSafely() ?: emptyList()
-        
+
         if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
             lineIndex++
             tvStatus?.text = "当前线路失效，自动切换线路 ${lineIndex + 1}..."
@@ -559,10 +589,10 @@ class PlayerActivity : AppCompatActivity() {
                 playCurrentLine()
                 return
             }
-            
+
             coreRetryLevel = 0
             lineIndex = 0
-            
+
             continuousSkipCount++
             if (continuousSkipCount >= maxAutoSkips) {
                 tvStatus?.text = "多个频道连续播放失败，已停止自动换台"
@@ -593,6 +623,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun switchChannel(index: Int, isAutoSkip: Boolean = false) {
         if (!isAutoSkip) {
             continuousSkipCount = 0
+            retryCount = 0
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
 

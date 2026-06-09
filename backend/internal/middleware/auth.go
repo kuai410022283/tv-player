@@ -218,16 +218,47 @@ type visitor struct {
 
 var loginLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
-	rate:     5,              // 5 次
+	rate:     5,               // 5 次
 	window:   1 * time.Minute, // 每分钟
 	maxSize:  10000,
 }
 
 var apiLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
-	rate:     300,            // 放宽至 300 次/分钟，防止管理后台正常刷新被误伤
+	rate:     300,             // 放宽至 300 次/分钟，防止管理后台正常刷新被误伤
 	window:   1 * time.Minute, // 每分钟
 	maxSize:  50000,
+}
+
+var logoLimiter = &rateLimiter{
+	visitors: make(map[string]*visitor),
+	rate:     600, // 台标请求量大但轻量，600 次/分钟
+	window:   1 * time.Minute,
+	maxSize:  50000,
+}
+
+var streamLimiter = &rateLimiter{
+	visitors: make(map[string]*visitor),
+	rate:     60, // 流代理播放，正常换台不会超过 60 次/分钟
+	window:   1 * time.Minute,
+	maxSize:  50000,
+}
+
+// InitRateLimiters 从配置覆盖限流速率值（由 main 启动时调用）
+// 传入值 <= 0 时保持原有默认值不变
+func InitRateLimiters(apiRate, logoRate, streamRate int) {
+	if apiRate > 0 {
+		apiLimiter.rate = apiRate
+		slog.Info("rate limit configured", "limiter", "api", "rate", apiRate)
+	}
+	if logoRate > 0 {
+		logoLimiter.rate = logoRate
+		slog.Info("rate limit configured", "limiter", "logo", "rate", logoRate)
+	}
+	if streamRate > 0 {
+		streamLimiter.rate = streamRate
+		slog.Info("rate limit configured", "limiter", "stream", "rate", streamRate)
+	}
 }
 
 func (rl *rateLimiter) allow(key string) bool {
@@ -294,7 +325,7 @@ func LoginRateLimit() gin.HandlerFunc {
 	}
 }
 
-// APIRateLimit 全局 API 限流（每 IP 每分钟 60 次）
+// APIRateLimit 全局 API 限流（每 IP 每分钟 300 次）
 func APIRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
@@ -303,6 +334,40 @@ func APIRateLimit() gin.HandlerFunc {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"code":    429,
 				"message": "请求过于频繁，请稍后再试",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// LogoRateLimit 台标接口限流（每 IP 每分钟 600 次），独立于 API 限流
+func LogoRateLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if !logoLimiter.allow(ip) {
+			slog.Warn("logo rate limit exceeded", "ip", ip)
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":    429,
+				"message": "台标请求过于频繁，请稍后再试",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// StreamRateLimit 流代理接口限流（每 IP 每分钟 60 次），独立于 API 限流
+func StreamRateLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if !streamLimiter.allow(ip) {
+			slog.Warn("stream rate limit exceeded", "ip", ip, "path", c.Request.URL.Path)
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":    429,
+				"message": "流媒体请求过于频繁，请稍后再试",
 			})
 			c.Abort()
 			return
@@ -322,6 +387,8 @@ func StartRateLimitCleanup(stop <-chan struct{}) {
 		case <-ticker.C:
 			loginLimiter.Cleanup()
 			apiLimiter.Cleanup()
+			logoLimiter.Cleanup()
+			streamLimiter.Cleanup()
 		}
 	}
 }

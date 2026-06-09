@@ -269,9 +269,25 @@ class ExoPlayerHelper(
 
         when (currentScaleMode) {
             Prefs.SCALE_MODE_STRETCH -> {
-                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-                resetContentFrameAspectRatio(contentFrame)
-                resetPlayerViewAspectRatio()
+                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                // 强制 16:9 比例（与 VLC 实现一致）
+                contentFrame?.let { frame ->
+                    try {
+                        val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
+                        setAspectRatio.invoke(frame, 16f / 9f)
+                    } catch (_: Exception) {
+                        // 降级：通过 layoutParams 强制 16:9
+                        playerView?.post {
+                            val parent = playerView?.parent as? ViewGroup ?: return@post
+                            val targetWidth = playerView?.measuredWidth ?: parent.width
+                            if (targetWidth > 0) {
+                                val lp = playerView?.layoutParams
+                                lp?.height = (targetWidth * 9 / 16).coerceAtLeast(1)
+                                playerView?.layoutParams = lp
+                            }
+                        }
+                    }
+                }
             }
             Prefs.SCALE_MODE_CROP -> {
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM

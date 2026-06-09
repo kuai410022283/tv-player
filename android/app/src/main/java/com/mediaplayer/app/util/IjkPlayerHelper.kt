@@ -251,10 +251,10 @@ class IjkPlayerHelper(
                 player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "")
             }
             Prefs.SCALE_MODE_STRETCH -> {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "fill")
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "16:9")
             }
             Prefs.SCALE_MODE_CROP -> {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "")
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "fill")
             }
             Prefs.SCALE_MODE_4_3 -> {
                 player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "4:3")

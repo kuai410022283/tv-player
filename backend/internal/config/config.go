@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Stream   StreamConfig   `yaml:"stream"`
-	Auth     AuthConfig     `yaml:"auth"`
-	CORS     CORSConfig     `yaml:"cors"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Stream    StreamConfig    `yaml:"stream"`
+	Auth      AuthConfig      `yaml:"auth"`
+	CORS      CORSConfig      `yaml:"cors"`
+	RateLimit RateLimitConfig `yaml:"rate_limit"`
 }
 
 type ServerConfig struct {
@@ -25,9 +26,9 @@ type DatabaseConfig struct {
 }
 
 type StreamConfig struct {
-	CacheDir       string `yaml:"cache_dir"`
-	MaxConcurrent  int    `yaml:"max_concurrent"`
-	BufferSize     int    `yaml:"buffer_size"`
+	CacheDir      string `yaml:"cache_dir"`
+	MaxConcurrent int    `yaml:"max_concurrent"`
+	BufferSize    int    `yaml:"buffer_size"`
 }
 
 type AuthConfig struct {
@@ -40,14 +41,20 @@ type CORSConfig struct {
 	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
+type RateLimitConfig struct {
+	API    int `yaml:"api"`    // 通用 API 次/分钟/IP
+	Logo   int `yaml:"logo"`   // 台标 次/分钟/IP
+	Stream int `yaml:"stream"` // 流代理 次/分钟/IP
+}
+
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Server: ServerConfig{Port: 9527, Host: "0.0.0.0"},
+		Server:   ServerConfig{Port: 9527, Host: "0.0.0.0"},
 		Database: DatabaseConfig{Path: "./data/mediaplayer.db"},
 		Stream: StreamConfig{
-			CacheDir:       "./data/cache",
-			MaxConcurrent:  50,
-			BufferSize:     4096,
+			CacheDir:      "./data/cache",
+			MaxConcurrent: 50,
+			BufferSize:    4096,
 		},
 		Auth: AuthConfig{
 			Secret:        "",
@@ -56,6 +63,11 @@ func Load(path string) (*Config, error) {
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: []string{"*"},
+		},
+		RateLimit: RateLimitConfig{
+			API:    300, // 通用 API 300 次/分钟
+			Logo:   600, // 台标 600 次/分钟
+			Stream: 60,  // 流代理 60 次/分钟
 		},
 	}
 

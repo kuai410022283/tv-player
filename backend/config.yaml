@@ -29,3 +29,9 @@ cors:
   #   - "http://localhost:3000"
   allowed_origins:
     - "*"
+
+# IP 级请求频率限制 (次/分钟/IP)
+rate_limit:
+  api: 300          # 通用 API（频道列表、分组、管理等）
+  logo: 600         # 台标接口（Coil 加载台标）
+  stream: 60        # 流代理接口（播放换台）

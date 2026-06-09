@@ -54,6 +54,9 @@ func main() {
 	// ── 启动安全检查 ─────────────────────────────────
 	checkSecurityDefaults(cfg)
 
+	// ── 初始化限流器（从配置覆盖默认值）──────────────
+	middleware.InitRateLimiters(cfg.RateLimit.API, cfg.RateLimit.Logo, cfg.RateLimit.Stream)
+
 	// ── 初始化数据库 ─────────────────────────────────
 	dbPath := cfg.Database.Path
 	os.MkdirAll("./data", 0755)
@@ -141,10 +144,9 @@ func main() {
 		public.GET("/subscription", ph.GetSubscription)
 	}
 
-	// ── 受保护 API（全局限流 + 认证）───────────────
+	// ── 受保护 API（仅认证，不限流——限流由 router.go 内部分组控制）─
 	v1 := r.Group("/api/v1")
 	{
-		v1.Use(middleware.APIRateLimit())
 		v1.Use(middleware.AuthMiddleware(cfg.Auth.Secret, db))
 		hs.RegisterRoutes(v1)
 	}
