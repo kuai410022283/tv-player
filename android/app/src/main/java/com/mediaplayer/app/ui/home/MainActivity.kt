@@ -1432,7 +1432,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupDuration: Int, startupSkipAfter: Int) {
+    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int) {
         this.sysAnnouncement = sysAnnouncement
         this.sysAnnouncementInterval = sysAnnouncementInterval
         
@@ -1440,6 +1440,7 @@ class MainActivity : AppCompatActivity() {
             hasShownSplash = true
             val intent = android.content.Intent(this, com.mediaplayer.app.ui.splash.SplashMediaActivity::class.java).apply {
                 putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_MEDIA_URL, startupMediaUrl)
+                putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_MEDIA_TYPE, startupMediaType)
                 putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_DURATION, startupDuration)
                 putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_SKIP_AFTER, startupSkipAfter)
             }
@@ -1454,7 +1455,7 @@ class MainActivity : AppCompatActivity() {
             if (authManager.isApproved()) {
                 authManager.verify().onSuccess { resp ->
                     if (resp != null) {
-                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupDuration, resp.startupSkipAfter)
+                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter)
                     } else doRegister()
                 }.onFailure { doRegister() }
             } else {
@@ -1469,7 +1470,7 @@ class MainActivity : AppCompatActivity() {
             authManager.register().onSuccess { result ->
                 when (result.status) {
                     "approved" -> {
-                        handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupDuration, result.startupSkipAfter)
+                        handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter)
                     }
                     "pending" -> {
                         showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")

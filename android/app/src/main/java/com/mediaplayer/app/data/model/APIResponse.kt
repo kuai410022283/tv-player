@@ -26,6 +26,7 @@ data class ClientRegisterResp(
     @SerializedName("enable_log") val enableLog: Boolean = false,
     @SerializedName("startup_media_enabled") val startupMediaEnabled: Boolean = false,
     @SerializedName("startup_media") val startupMedia: String? = null,
+    @SerializedName("startup_media_type") val startupMediaType: String = "image",
     @SerializedName("startup_duration") val startupDuration: Int = 5,
     @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0
 )

@@ -1369,6 +1369,7 @@ async function loadClientSettings() {
     if (document.getElementById('set-startup-media-url')) {
       document.getElementById('set-startup-media-enabled').value = setRes.data.startup_media_enabled || 'false';
       document.getElementById('set-startup-media-url').value = setRes.data.startup_media_url || '';
+      document.getElementById('set-startup-media-type').value = setRes.data.startup_media_type || 'image';
       document.getElementById('set-startup-duration').value = setRes.data.startup_duration || '5';
       document.getElementById('set-startup-skip-after').value = setRes.data.startup_skip_after || '0';
     }
@@ -1441,6 +1442,7 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-startup-media-url')) {
     settings.startup_media_enabled = document.getElementById('set-startup-media-enabled').value;
     settings.startup_media_url = document.getElementById('set-startup-media-url').value.trim();
+    settings.startup_media_type = document.getElementById('set-startup-media-type').value;
     settings.startup_duration = document.getElementById('set-startup-duration').value;
     settings.startup_skip_after = document.getElementById('set-startup-skip-after').value;
   }

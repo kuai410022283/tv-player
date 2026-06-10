@@ -599,13 +599,22 @@
               <option value="true">开启</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>开机广告媒体 URL</label>
-            <input type="text" id="set-startup-media-url" placeholder="http://example.com/ad.mp4 或 /library/ad/test.jpg">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">
-              支持常规格式（mp4, mkv, jpg, png, webp），如果填相对路径请将文件放入服务器的 library/ad 目录下。<br>
-              <strong style="color:var(--danger)">强烈不建议填入 m3u8 等直播流，会导致开机严重卡顿。</strong>
+          <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+              <label>开机广告媒体 URL</label>
+              <input type="text" id="set-startup-media-url" placeholder="http://example.com/ad.mp4 或 /library/ad/test.jpg">
             </div>
+            <div class="form-group" style="flex: 1;">
+              <label>解析类型</label>
+              <select id="set-startup-media-type">
+                <option value="image">图片模式 (静态/GIF/API)</option>
+                <option value="video">视频模式 (MP4/MKV等)</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:15px;margin-top:-5px;">
+            请根据您填入的链接类型明确选择“图片”或“视频”。若格式在电视端无法被解析，将自动跳过广告。<br>
+            <strong style="color:var(--danger)">强烈不建议填入 m3u8 等直播流，会导致开机严重卡顿。</strong>
           </div>
           <div class="form-row">
             <div class="form-group">

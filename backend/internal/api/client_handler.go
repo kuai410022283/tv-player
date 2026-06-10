@@ -50,6 +50,10 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	startupMediaEnabledStr, _ := h.channelSvc.GetSetting("startup_media_enabled")
 	startupMediaEnabled := startupMediaEnabledStr == "true"
 	startupMedia, _ := h.channelSvc.GetSetting("startup_media_url")
+	startupMediaType, _ := h.channelSvc.GetSetting("startup_media_type")
+	if startupMediaType == "" {
+		startupMediaType = "auto"
+	}
 	startupDurationStr, _ := h.channelSvc.GetSetting("startup_duration")
 	startupDuration, _ := strconv.Atoi(startupDurationStr)
 	if startupDuration == 0 {
@@ -68,6 +72,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"announcement_interval": announcementInterval,
 			"startup_media_enabled": startupMediaEnabled,
 			"startup_media":         startupMedia,
+			"startup_media_type":    startupMediaType,
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
 		})
@@ -82,6 +87,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"announcement_interval": announcementInterval,
 			"startup_media_enabled": startupMediaEnabled,
 			"startup_media":         startupMedia,
+			"startup_media_type":    startupMediaType,
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
 		}})
@@ -119,6 +125,10 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	startupMediaEnabledStr, _ := h.channelSvc.GetSetting("startup_media_enabled")
 	startupMediaEnabled := startupMediaEnabledStr == "true"
 	startupMedia, _ := h.channelSvc.GetSetting("startup_media_url")
+	startupMediaType, _ := h.channelSvc.GetSetting("startup_media_type")
+	if startupMediaType == "" {
+		startupMediaType = "auto"
+	}
 	startupDurationStr, _ := h.channelSvc.GetSetting("startup_duration")
 	startupDuration, _ := strconv.Atoi(startupDurationStr)
 	if startupDuration == 0 {
@@ -137,6 +147,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"enable_log":            client.EnableLog,
 		"startup_media_enabled": startupMediaEnabled,
 		"startup_media":         startupMedia,
+		"startup_media_type":    startupMediaType,
 		"startup_duration":      startupDuration,
 		"startup_skip_after":    startupSkipAfter,
 	})
