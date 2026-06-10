@@ -150,6 +150,9 @@ class IjkPlayerHelper(
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp")
     }
 
+    private var videoWidth = 0
+    private var videoHeight = 0
+
     private fun setupPlayerListeners(player: IjkMediaPlayer) {
         player.setOnPreparedListener {
             if (surfaceCreated) {
@@ -170,6 +173,7 @@ class IjkPlayerHelper(
                 }
             }
             listener.onPlaying(if (info.isNotEmpty()) info else lastResolution)
+            applyScaleMode()
         }
         player.setOnInfoListener { _, what, _ ->
             if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
@@ -186,6 +190,8 @@ class IjkPlayerHelper(
         }
         player.setOnVideoSizeChangedListener { _, width, height, _, _ ->
             if (width > 0 && height > 0) {
+                videoWidth = width
+                videoHeight = height
                 val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
                 val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
                 lastResolution = "${width}x${height}"
@@ -197,6 +203,7 @@ class IjkPlayerHelper(
                 if (isPlayerPlaying) {
                     listener.onPlaying(info)
                 }
+                applyScaleMode()
             }
         }
     }
@@ -245,17 +252,95 @@ class IjkPlayerHelper(
     }
 
     private fun applyScaleMode() {
-        val player = ijkPlayer ?: return
+        val parent = videoLayout
+        val sv = surfaceView ?: return
+        val parentWidth = parent.width
+        val parentHeight = parent.height
+        
+        if (parentWidth == 0 || parentHeight == 0) {
+            parent.post { applyScaleMode() }
+            return
+        }
+
+        var targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
+        var targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
+
         when (currentScaleMode) {
             Prefs.SCALE_MODE_DEFAULT -> {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "")
+                if (videoWidth > 0 && videoHeight > 0) {
+                    val ratio = videoWidth.toFloat() / videoHeight.toFloat()
+                    val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                    if (ratio > parentRatio) {
+                        targetWidth = parentWidth
+                        targetHeight = (parentWidth / ratio).toInt()
+                    } else {
+                        targetHeight = parentHeight
+                        targetWidth = (parentHeight * ratio).toInt()
+                    }
+                }
             }
             Prefs.SCALE_MODE_STRETCH -> {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "16:9")
+                val ratio = 16f / 9f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
+                }
+            }
+            Prefs.SCALE_MODE_16_10 -> {
+                val ratio = 16f / 10f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
+                }
             }
             Prefs.SCALE_MODE_4_3 -> {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "aspect-ratio", "4:3")
+                val ratio = 4f / 3f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
+                }
             }
+            Prefs.SCALE_MODE_FILL -> {
+                targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
+                targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                if (videoWidth > 0 && videoHeight > 0) {
+                    val ratio = videoWidth.toFloat() / videoHeight.toFloat()
+                    val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                    if (ratio > parentRatio) {
+                        targetHeight = parentHeight
+                        targetWidth = (parentHeight * ratio).toInt()
+                    } else {
+                        targetWidth = parentWidth
+                        targetHeight = (parentWidth / ratio).toInt()
+                    }
+                }
+            }
+        }
+
+        val lp = sv.layoutParams
+        if (lp is android.widget.FrameLayout.LayoutParams) {
+            lp.width = targetWidth
+            lp.height = targetHeight
+            lp.gravity = android.view.Gravity.CENTER
+            sv.layoutParams = lp
+        } else {
+            lp.width = targetWidth
+            lp.height = targetHeight
+            sv.layoutParams = lp
         }
     }
 

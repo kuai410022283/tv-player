@@ -168,6 +168,7 @@ class VlcPlayerHelper(
         player.media = media
         isTransitioning = false
         player.play()
+        applyScaleMode()
     }
 
     private fun applyMediaOptions(media: Media, url: String, userAgent: String?, customHeaders: String?) {
@@ -204,13 +205,44 @@ class VlcPlayerHelper(
         }
     }
 
+    private fun applyScaleMode() {
+        when (currentScaleMode) {
+            Prefs.SCALE_MODE_STRETCH -> {
+                mediaPlayer?.aspectRatio = "16:9"
+                mediaPlayer?.scale = 0f
+            }
+            Prefs.SCALE_MODE_16_10 -> {
+                mediaPlayer?.aspectRatio = "16:10"
+                mediaPlayer?.scale = 0f
+            }
+            Prefs.SCALE_MODE_4_3 -> {
+                mediaPlayer?.aspectRatio = "4:3"
+                mediaPlayer?.scale = 0f
+            }
+            Prefs.SCALE_MODE_FILL -> {
+                val w = videoLayout.width
+                val h = videoLayout.height
+                if (w > 0 && h > 0) {
+                    mediaPlayer?.aspectRatio = "$w:$h"
+                } else {
+                    mediaPlayer?.aspectRatio = null
+                }
+                mediaPlayer?.scale = 0f
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                mediaPlayer?.aspectRatio = null
+                mediaPlayer?.scale = 0f // libvlc default fit
+            }
+            else -> {
+                mediaPlayer?.aspectRatio = null
+                mediaPlayer?.scale = 0f
+            }
+        }
+    }
+
     override fun setAspectRatio(scaleMode: Int) {
         this.currentScaleMode = scaleMode
-        when (scaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> mediaPlayer?.aspectRatio = "16:9"
-            Prefs.SCALE_MODE_4_3 -> mediaPlayer?.aspectRatio = "4:3"
-            else -> mediaPlayer?.aspectRatio = null
-        }
+        applyScaleMode()
     }
 
     override fun setDecoderMode(mode: Int) {}

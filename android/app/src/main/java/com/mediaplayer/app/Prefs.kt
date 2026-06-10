@@ -34,10 +34,12 @@ object Prefs {
 
     // 画面比例
     const val KEY_SCALE_MODE = "scale_mode"
-    const val SCALE_MODE_DEFAULT = 0 // 自适应
+    const val SCALE_MODE_DEFAULT = 0 // 自适应 (Fit)
     const val SCALE_MODE_STRETCH = 1 // 16:9 强行拉伸
-    const val SCALE_MODE_CROP = 2    // 16:9 裁剪放大
+    const val SCALE_MODE_CROP = 2    // 裁剪放大 (Crop)
     const val SCALE_MODE_4_3 = 3     // 强制 4:3
+    const val SCALE_MODE_16_10 = 4   // 强制 16:10
+    const val SCALE_MODE_FILL = 5    // 铺满全屏
 
     // 认证信息
     const val KEY_ACCESS_TOKEN = "access_token"

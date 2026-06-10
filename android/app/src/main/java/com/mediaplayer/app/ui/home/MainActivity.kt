@@ -556,6 +556,9 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
                 Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
                 Prefs.SCALE_MODE_4_3 -> "强制 4:3"
+                Prefs.SCALE_MODE_16_10 -> "强制 16:10"
+                Prefs.SCALE_MODE_CROP -> "放大裁剪"
+                Prefs.SCALE_MODE_FILL -> "铺满全屏"
                 else -> "原始比例"
             }
         }
@@ -624,21 +627,19 @@ class MainActivity : AppCompatActivity() {
         }
         
         btnSettingsScale?.setOnClickListener {
-            // 循环：原始比例 → 强制16:9 → 强制4:3 → 原始比例（已移除放大裁剪）
             currentScaleMode = when (currentScaleMode) {
-                Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_STRETCH
-                Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_4_3
+                Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_FILL
+                Prefs.SCALE_MODE_FILL -> Prefs.SCALE_MODE_STRETCH
+                Prefs.SCALE_MODE_STRETCH -> Prefs.SCALE_MODE_16_10
+                Prefs.SCALE_MODE_16_10 -> Prefs.SCALE_MODE_4_3
+                Prefs.SCALE_MODE_4_3 -> Prefs.SCALE_MODE_CROP
                 else -> Prefs.SCALE_MODE_DEFAULT
             }
             updateScaleText(currentScaleMode)
             prefs.edit().putInt(Prefs.KEY_SCALE_MODE, currentScaleMode).apply()
             
             // 立即生效
-            when (currentScaleMode) {
-                Prefs.SCALE_MODE_STRETCH -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_STRETCH)
-                Prefs.SCALE_MODE_4_3 -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_4_3)
-                else -> playerHelper?.setAspectRatio(Prefs.SCALE_MODE_DEFAULT)
-            }
+            playerHelper?.setAspectRatio(currentScaleMode)
         }
 
         btnSettingsAutoStart?.setOnClickListener {

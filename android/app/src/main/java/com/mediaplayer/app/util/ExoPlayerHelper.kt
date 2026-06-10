@@ -290,47 +290,80 @@ class ExoPlayerHelper(
     }
     
     private fun applyScaleMode() {
-        val contentFrame = playerView?.findViewById<AspectRatioFrameLayout>(media3R.id.exo_content_frame)
+        val parent = videoLayout
+        val pv = playerView ?: return
+        val parentWidth = parent.width
+        val parentHeight = parent.height
+        
+        if (parentWidth == 0 || parentHeight == 0) {
+            // Wait for layout
+            parent.post { applyScaleMode() }
+            return
+        }
+
+        var targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
+        var targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
 
         when (currentScaleMode) {
+            Prefs.SCALE_MODE_DEFAULT -> {
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
             Prefs.SCALE_MODE_STRETCH -> {
-                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                contentFrame?.let { frame ->
-                    try {
-                        val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
-                        setAspectRatio.invoke(frame, 16f / 9f)
-                    } catch (_: Exception) {}
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                val ratio = 16f / 9f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
+                }
+            }
+            Prefs.SCALE_MODE_16_10 -> {
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                val ratio = 16f / 10f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
                 }
             }
             Prefs.SCALE_MODE_4_3 -> {
-                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                contentFrame?.let { frame ->
-                    try {
-                        val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
-                        setAspectRatio.invoke(frame, 4f / 3f)
-                    } catch (_: Exception) {}
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                val ratio = 4f / 3f
+                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
+                if (ratio > parentRatio) {
+                    targetWidth = parentWidth
+                    targetHeight = (parentWidth / ratio).toInt()
+                } else {
+                    targetHeight = parentHeight
+                    targetWidth = (parentHeight * ratio).toInt()
                 }
             }
-            else -> {
-                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                resetContentFrameAspectRatio(contentFrame)
-                playerView?.layoutParams?.height = ViewGroup.LayoutParams.MATCH_PARENT
+            Prefs.SCALE_MODE_FILL -> {
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
+                targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+            Prefs.SCALE_MODE_CROP -> {
+                pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             }
         }
-    }
 
-    /**
-     * 清除 AspectRatioFrameLayout 内部 aspectRatio，恢复为视频原始比例
-     */
-    private fun resetContentFrameAspectRatio(frame: AspectRatioFrameLayout?) {
-        frame?.let { f ->
-            try {
-                val setAspectRatio = f.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
-                val videoSize = exoPlayer?.videoSize
-                if (videoSize != null && videoSize.width > 0 && videoSize.height > 0) {
-                    setAspectRatio.invoke(f, videoSize.width.toFloat() / videoSize.height.toFloat())
-                }
-            } catch (_: Exception) {}
+        val lp = pv.layoutParams
+        if (lp is android.widget.FrameLayout.LayoutParams) {
+            lp.width = targetWidth
+            lp.height = targetHeight
+            lp.gravity = android.view.Gravity.CENTER
+            pv.layoutParams = lp
+        } else {
+            lp.width = targetWidth
+            lp.height = targetHeight
+            pv.layoutParams = lp
         }
     }
 
