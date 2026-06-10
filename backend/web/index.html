@@ -639,15 +639,28 @@
               archLinks.style.display = 'flex';
             }
           } else {
-            errorState.style.display = 'block';
+            showGithubFallback();
           }
         })
         .catch(err => {
           console.error('Failed to fetch update:', err);
-          loader.style.display = 'none';
-          errorState.style.display = 'block';
-          errorState.querySelector('.version-meta').textContent = '无法连接到服务端，请稍后再试';
+          showGithubFallback();
         });
+
+      function showGithubFallback() {
+        loader.style.display = 'none';
+        content.style.display = 'block';
+        versionMeta.textContent = '最新版本 • GitHub 发布';
+        updateLog.innerHTML = '<div style="color:#f59e0b; margin-bottom: 8px;">服务器暂未提供直接下载，请前往 GitHub 获取最新版本</div>' + 
+                              '<li>支持所有的 Android TV 和移动设备</li>' +
+                              '<li>稳定、高效的流媒体播放体验</li>';
+        downloadBtn.href = 'https://github.com/kuai410022283/mediaplayer/releases';
+        downloadBtn.target = '_blank';
+        downloadBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;margin-right:8px;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg> 前往 GitHub 下载';
+        errorState.style.display = 'none';
+        const archLinks = document.getElementById('archLinks');
+        if (archLinks) archLinks.style.display = 'none';
+      }
     });
   </script>
 </body>

@@ -322,10 +322,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var initialBrightness = -1f
+    private var initialVolume = -1
+    private var isAdjusting = false
+    private var adjustMode = 0 // 0: none, 1: brightness, 2: volume
+
     // ── Touch Gestures for Mobile/Tablet ──
     private fun setupTouchGestures() {
         val gestureDetector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: android.view.MotionEvent): Boolean {
+                isAdjusting = false
+                adjustMode = 0
+                val screenWidth = videoLayout?.width ?: 0
+                if (screenWidth > 0) {
+                    if (e.x < screenWidth * 0.15f) {
+                        adjustMode = 1
+                        val lp = window.attributes
+                        initialBrightness = lp.screenBrightness
+                        if (initialBrightness < 0) {
+                            try {
+                                val sysBrightness = android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS)
+                                initialBrightness = sysBrightness / 255f
+                            } catch (e: Exception) {
+                                initialBrightness = 0.5f
+                            }
+                        }
+                    } else if (e.x > screenWidth * 0.85f) {
+                        adjustMode = 2
+                        val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                        initialVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                    }
+                }
                 return true
             }
 
@@ -366,8 +393,40 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
+            override fun onScroll(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                if (e1 == null || e2 == null) return false
+                val deltaY = e1.y - e2.y // 向上滑动为正
+                val screenHeight = videoLayout?.height ?: 1080
+                
+                if (adjustMode != 0) {
+                    if (kotlin.math.abs(deltaY) > 20) {
+                        isAdjusting = true
+                    }
+                    if (isAdjusting) {
+                        if (adjustMode == 1) {
+                            // 调节亮度
+                            val change = deltaY / screenHeight
+                            val lp = window.attributes
+                            lp.screenBrightness = (initialBrightness + change).coerceIn(0.01f, 1f)
+                            window.attributes = lp
+                        } else if (adjustMode == 2) {
+                            // 调节音量
+                            val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                            val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                            val change = (deltaY / screenHeight) * maxVolume
+                            val newVol = (initialVolume + change).toInt().coerceIn(0, maxVolume)
+                            audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, newVol, android.media.AudioManager.FLAG_SHOW_UI)
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+
             override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
+                if (isAdjusting) return false // 如果正在调亮度/音量，则不触发切台
+                
                 val deltaY = e2.y - e1.y
                 val deltaX = e2.x - e1.x
                 
