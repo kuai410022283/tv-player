@@ -154,9 +154,9 @@ func main() {
 	os.MkdirAll("./library/channel_logo", 0755)
 	r.Static("/library/channel_logo", "./library/channel_logo")
 
-	// 广告目录
+	// 开机广告支持
 	os.MkdirAll("./library/ad", 0755)
-	r.Static("/library/ad", "./library/ad")
+	r.Static("/lad", "./library/ad")
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
 	r.Static("/download", "./web/download")
