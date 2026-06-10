@@ -221,7 +221,8 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 
 			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-logo="%s" group-title="%s"%s,%s`+"\n",
 				tvgID, ch.Name, logoURL, ch.GroupName, catchupStr, displayName))
-			sb.WriteString(playURL + "\n")
+			sb.WriteString(playURL)
+			sb.WriteString("\n")
 		}
 	}
 	c.String(http.StatusOK, sb.String())
