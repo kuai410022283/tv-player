@@ -290,88 +290,47 @@ class ExoPlayerHelper(
     }
     
     private fun applyScaleMode() {
-        // 通过内部 AspectRatioFrameLayout 控制精确比例
         val contentFrame = playerView?.findViewById<AspectRatioFrameLayout>(media3R.id.exo_content_frame)
 
         when (currentScaleMode) {
             Prefs.SCALE_MODE_STRETCH -> {
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                // 强制 16:9 比例（与 VLC 实现一致）
                 contentFrame?.let { frame ->
                     try {
                         val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
                         setAspectRatio.invoke(frame, 16f / 9f)
-                    } catch (_: Exception) {
-                        // 降级：通过 layoutParams 强制 16:9
-                        playerView?.post {
-                            val parent = playerView?.parent as? ViewGroup ?: return@post
-                            val targetWidth = playerView?.measuredWidth ?: parent.width
-                            if (targetWidth > 0) {
-                                val lp = playerView?.layoutParams
-                                lp?.height = (targetWidth * 9 / 16).coerceAtLeast(1)
-                                playerView?.layoutParams = lp
-                            }
-                        }
-                    }
+                    } catch (_: Exception) {}
                 }
-            }
-            Prefs.SCALE_MODE_CROP -> {
-                playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                resetContentFrameAspectRatio(contentFrame)
-                resetPlayerViewAspectRatio()
             }
             Prefs.SCALE_MODE_4_3 -> {
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                // 优先通过 AspectRatioFrameLayout.setAspectRatio() 精确控制 4:3 比例
                 contentFrame?.let { frame ->
                     try {
                         val setAspectRatio = frame.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
                         setAspectRatio.invoke(frame, 4f / 3f)
-                    } catch (_: Exception) {
-                        // 降级：通过 layoutParams 强制 4:3
-                        playerView?.post {
-                            val parent = playerView?.parent as? ViewGroup ?: return@post
-                            val targetWidth = playerView?.measuredWidth ?: parent.width
-                            if (targetWidth > 0) {
-                                val lp = playerView?.layoutParams
-                                lp?.height = (targetWidth * 3 / 4).coerceAtLeast(1)
-                                playerView?.layoutParams = lp
-                            }
-                        }
-                    }
+                    } catch (_: Exception) {}
                 }
             }
             else -> {
                 playerView?.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 resetContentFrameAspectRatio(contentFrame)
-                resetPlayerViewAspectRatio()
+                playerView?.layoutParams?.height = ViewGroup.LayoutParams.MATCH_PARENT
             }
         }
     }
 
     /**
      * 清除 AspectRatioFrameLayout 内部 aspectRatio，恢复为视频原始比例
-     * 解决 4:3 → 原始比例 切换后画面仍被强制拉伸/压缩的问题
      */
     private fun resetContentFrameAspectRatio(frame: AspectRatioFrameLayout?) {
         frame?.let { f ->
             try {
                 val setAspectRatio = f.javaClass.getMethod("setAspectRatio", java.lang.Float.TYPE)
-                // 使用视频的实际宽高比，而非设置为 0
-                // 避免某些 Media3 版本中 aspectRatio=0 时 layout 表现异常
                 val videoSize = exoPlayer?.videoSize
                 if (videoSize != null && videoSize.width > 0 && videoSize.height > 0) {
                     setAspectRatio.invoke(f, videoSize.width.toFloat() / videoSize.height.toFloat())
                 }
             } catch (_: Exception) {}
-        }
-    }
-
-    private fun resetPlayerViewAspectRatio() {
-        playerView?.post {
-            val lp = playerView?.layoutParams
-            lp?.height = ViewGroup.LayoutParams.MATCH_PARENT
-            playerView?.layoutParams = lp
         }
     }
 

@@ -1,0 +1,68 @@
+{
+    "logs": [
+        {
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-5:/values-ko/values-ko.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-ko\\values-ko.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
+                    },
+                    "to": {
+                        "startLines": "11",
+                        "startColumns": "4",
+                        "startOffsets": "644",
+                        "endColumns": "100",
+                        "endOffsets": "740"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\0add1a0ac66d04d4a393625a81392a8c\\transformed\\jetified-media3-exoplayer-1.9.1\\res\\values-ko\\values-ko.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,114,172,232,288,360,419,501,581",
+                        "endColumns": "58,57,59,55,71,58,81,79,62",
+                        "endOffsets": "109,167,227,283,355,414,496,576,639"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-merged_res-7:/values-ko/values-ko.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-ko\\values-ko.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
+                    },
+                    "to": {
+                        "startLines": "11",
+                        "startColumns": "4",
+                        "startOffsets": "644",
+                        "endColumns": "100",
+                        "endOffsets": "740"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\0add1a0ac66d04d4a393625a81392a8c\\transformed\\jetified-media3-exoplayer-1.9.1\\res\\values-ko\\values-ko.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,114,172,232,288,360,419,501,581",
+                        "endColumns": "58,57,59,55,71,58,81,79,62",
+                        "endOffsets": "109,167,227,283,355,414,496,576,639"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-jetified-media3-exoplayer-1.9.1-0 C:\Users\kuai\.gradle\caches\transforms-3\0add1a0ac66d04d4a393625a81392a8c\transformed\jetified-media3-exoplayer-1.9.1\res
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-jetified-annotation-experimental-1.3.1-1 C:\Users\kuai\.gradle\caches\transforms-3\3ad097edf705cad35b26a31e0ca9c259\transformed\jetified-annotation-experimental-1.3.1\res
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-lifecycle-runtime-2.3.1-2 C:\Users\kuai\.gradle\caches\transforms-3\a1a5671da33423af052a93ef8552a343\transformed\lifecycle-runtime-2.3.1\res
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-core-1.8.0-3 C:\Users\kuai\.gradle\caches\transforms-3\b16807be399488cb7b2da1b3dcd8d24b\transformed\core-1.8.0\res
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-pngs-4 D:\UGit\tv-player\android\media3-rtsp-patched\build\generated\res\pngs\release
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-resValues-5 D:\UGit\tv-player\android\media3-rtsp-patched\build\generated\res\resValues\release
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-6 D:\UGit\tv-player\android\media3-rtsp-patched\build\intermediates\incremental\release\mergeReleaseResources\merged.dir
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-7 D:\UGit\tv-player\android\media3-rtsp-patched\build\intermediates\incremental\release\mergeReleaseResources\stripped.dir
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-merged_res-8 D:\UGit\tv-player\android\media3-rtsp-patched\build\intermediates\merged_res\release
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-main-9 D:\UGit\tv-player\android\media3-rtsp-patched\src\main\res
+androidx.media3.exoplayer.rtsp.media3-rtsp-patched-release-10 D:\UGit\tv-player\android\media3-rtsp-patched\src\release\res

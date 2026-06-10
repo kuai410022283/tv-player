@@ -7,9 +7,15 @@ android {
     namespace 'com.mediaplayer.app'
     compileSdk 35
 
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
     defaultConfig {
         applicationId "com.mediaplayer.app"
-        minSdk 21
+        minSdk 23
         targetSdk 34
         versionCode 55
         versionName "1.0.55"
@@ -93,12 +99,15 @@ dependencies {
     implementation 'androidx.leanback:leanback-tab:1.1.0-beta01'
 
     // Media3 / ExoPlayer
-    implementation 'androidx.media3:media3-exoplayer:1.2.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.2.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
-    implementation 'androidx.media3:media3-exoplayer-rtsp:1.2.1'
-    implementation 'androidx.media3:media3-ui:1.2.1'
-    implementation 'androidx.media3:media3-common:1.2.1'
+    implementation 'androidx.media3:media3-exoplayer:1.9.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.9.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.9.1'
+    // PATCHED: using local module instead of AAR for RTSP SDP parsing fix
+    // Search for "PATCHED" in :media3-rtsp-patched to see modifications.
+    // To revert: replace with  implementation 'androidx.media3:media3-exoplayer-rtsp:1.9.1'
+    implementation project(':media3-rtsp-patched')
+    implementation 'androidx.media3:media3-ui:1.9.1'
+    implementation 'androidx.media3:media3-common:1.9.1'
     implementation files('libs/lib-decoder-ffmpeg-release.aar')
 
     // VLC Android SDK

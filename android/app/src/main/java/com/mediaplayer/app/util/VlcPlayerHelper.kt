@@ -123,21 +123,6 @@ class VlcPlayerHelper(
         isTransitioning = true
         player.stop()
 
-        when (currentScaleMode) {
-            Prefs.SCALE_MODE_STRETCH -> {
-                player.aspectRatio = "16:9"
-            }
-            Prefs.SCALE_MODE_CROP -> {
-                player.aspectRatio = null
-            }
-            Prefs.SCALE_MODE_4_3 -> {
-                player.aspectRatio = "4:3"
-            }
-            else -> {
-                player.aspectRatio = null
-            }
-        }
-
         val media = Media(libVlc, Uri.parse(url))
         
         // 智能缓存判断逻辑
@@ -171,9 +156,6 @@ class VlcPlayerHelper(
         }
         
         media.addOption(":http-reconnect=true")
-        if (currentScaleMode == Prefs.SCALE_MODE_CROP) {
-            media.addOption(":crop=16:9")
-        }
 
         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         when (decoderMode) {
@@ -226,7 +208,6 @@ class VlcPlayerHelper(
         this.currentScaleMode = scaleMode
         when (scaleMode) {
             Prefs.SCALE_MODE_STRETCH -> mediaPlayer?.aspectRatio = "16:9"
-            Prefs.SCALE_MODE_CROP -> mediaPlayer?.aspectRatio = null
             Prefs.SCALE_MODE_4_3 -> mediaPlayer?.aspectRatio = "4:3"
             else -> mediaPlayer?.aspectRatio = null
         }

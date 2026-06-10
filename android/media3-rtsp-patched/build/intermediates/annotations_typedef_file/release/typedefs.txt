@@ -1,0 +1,2 @@
+D androidx/media3/exoplayer/rtsp/RtspAuthenticationInfo$AuthenticationMechanism
+D androidx/media3/exoplayer/rtsp/RtspMessageChannel$MessageParser$ReadingState

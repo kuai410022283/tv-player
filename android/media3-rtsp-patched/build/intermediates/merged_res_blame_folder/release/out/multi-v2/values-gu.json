@@ -1,0 +1,68 @@
+{
+    "logs": [
+        {
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-merged_res-7:/values-gu/values-gu.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\0add1a0ac66d04d4a393625a81392a8c\\transformed\\jetified-media3-exoplayer-1.9.1\\res\\values-gu\\values-gu.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,125,190,266,334,409,477,576,672",
+                        "endColumns": "69,64,75,67,74,67,98,95,78",
+                        "endOffsets": "120,185,261,329,404,472,571,667,746"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-gu\\values-gu.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
+                    },
+                    "to": {
+                        "startLines": "11",
+                        "startColumns": "4",
+                        "startOffsets": "751",
+                        "endColumns": "100",
+                        "endOffsets": "847"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-5:/values-gu/values-gu.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\0add1a0ac66d04d4a393625a81392a8c\\transformed\\jetified-media3-exoplayer-1.9.1\\res\\values-gu\\values-gu.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,125,190,266,334,409,477,576,672",
+                        "endColumns": "69,64,75,67,74,67,98,95,78",
+                        "endOffsets": "120,185,261,329,404,472,571,667,746"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-gu\\values-gu.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
+                    },
+                    "to": {
+                        "startLines": "11",
+                        "startColumns": "4",
+                        "startOffsets": "751",
+                        "endColumns": "100",
+                        "endOffsets": "847"
+                    }
+                }
+            ]
+        }
+    ]
+}

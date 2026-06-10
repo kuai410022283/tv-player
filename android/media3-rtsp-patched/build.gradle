@@ -1,0 +1,42 @@
+/*
+ * PATCHED MODULE: media3-exoplayer-rtsp (local fork)
+ *
+ * This module is a local fork of AndroidX Media3's RTSP extension module
+ * (androidx.media3:media3-exoplayer-rtsp:1.9.1).
+ *
+ * REASON: ExoPlayer's default RTSP SDP parser rejects certain server formats.
+ * PATCH:  RtspSessionTiming.java — relaxed NPT_RANGE_PATTERN regex.
+ *
+ * TO UPGRADE:
+ *   1. Download new Media3 source: https://github.com/androidx/media/tags
+ *   2. Replace all files under src/main/java/ with the new version's files
+ *   3. Re-apply the patch marked with "PATCHED" comments in modified files
+ *   4. Update version numbers in THIS file (dependencies section)
+ *   5. If Media3 officially fixes the SDP parsing, delete this module and
+ *      revert app/build.gradle back to:
+ *        implementation 'androidx.media3:media3-exoplayer-rtsp:<version>'
+ */
+
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'androidx.media3.exoplayer.rtsp'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 23
+        targetSdk 34
+    }
+}
+
+dependencies {
+    // Same as upstream: androidx.media3:media3-exoplayer-rtsp:1.9.1 build.gradle
+    api 'androidx.media3:media3-exoplayer:1.9.1'
+    implementation 'androidx.annotation:annotation:1.9.1'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    compileOnly 'com.google.errorprone:error_prone_annotations:2.36.0'
+    compileOnly 'org.checkerframework:checker-qual:3.48.4'
+    compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:2.1.0'
+}

@@ -489,8 +489,7 @@ class PlayerActivity : AppCompatActivity() {
 
         // 应用保存的画面比例设置
         val savedScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-        val finalScaleMode = if (savedScaleMode == Prefs.SCALE_MODE_CROP) Prefs.SCALE_MODE_DEFAULT else savedScaleMode
-        playerHelper?.setAspectRatio(finalScaleMode)
+        playerHelper?.setAspectRatio(savedScaleMode)
 
         resolveJob?.cancel()
         resolveJob?.cancel()
