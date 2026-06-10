@@ -130,7 +130,13 @@ class ExoPlayerHelper(
             mediaItemBuilder.setMimeType(mimeType)
         }
         val mediaItem = mediaItemBuilder.build()
-        val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
+        val mediaSource = try {
+            mediaSourceFactory.createMediaSource(mediaItem)
+        } catch (e: Exception) {
+            com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Failed to create media source for: $url", e)
+            listener.onError()
+            return
+        }
         
         exoPlayer?.setMediaSource(mediaSource)
         exoPlayer?.prepare()

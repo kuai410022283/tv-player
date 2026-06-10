@@ -149,6 +149,11 @@ class MainActivity : AppCompatActivity() {
     private var coreRetryLevel = 0
     private var isWatchdogEnabledForCurrentStream = false
     
+    // 数据加载并发锁
+    private var isLoadingData = false
+    // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
+    private var isFirstResume = true
+    
     // Watchdog State
     enum class PlaybackState { IDLE, BUFFERING, PLAYING }
     private var currentPlaybackState = PlaybackState.IDLE
@@ -1005,6 +1010,11 @@ class MainActivity : AppCompatActivity() {
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
         
+        // 防止重复起播：如果已经在播放同一个频道，跳过
+        if (index == currentChannelIndex && playerHelper?.isPlaying() == true) {
+            return
+        }
+        
         // 取消上一个频道的 URL 解析协程，各播放器 play() 内部会自动 stop() 旧流。
         resolveJob?.cancel()
         resolveJob = null
@@ -1528,39 +1538,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadData() {
+        if (isLoadingData) return
+        isLoadingData = true
         lifecycleScope.launch {
-            // 1. 先拉分组列表
-            val realGroups = repo.getGroups().getOrElse { emptyList() }
-            groups = listOf(ChannelGroup(id = 0, name = "全部")) + realGroups
-            groupAdapter.submitList(groups)
-            groupAdapter.setSelected(0)
+            try {
+                // 1. 先拉分组列表
+                val realGroups = repo.getGroups().getOrElse { emptyList() }
+                groups = listOf(ChannelGroup(id = 0, name = "全部")) + realGroups
+                groupAdapter.submitList(groups)
+                groupAdapter.setSelected(0)
 
-            // 2. 按分组并行拉取全量频道（彻底绕过全局 page_size 上限）
-            repo.getAllChannelsByGroups(realGroups).onSuccess { list ->
-                list.forEachIndexed { index, channel ->
-                    channel.globalIndex = index
-                }
-                allChannels = list
-                channelsByGroup = list.groupBy { it.groupId }
-                if (list.isNotEmpty()) {
-                    // 尝试恢复上次播放的频道
-                    val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                    val lastChannelId = prefs.getLong("last_channel_id", -1L)
-                    var targetIndex = 0
-                    if (lastChannelId != -1L) {
-                        val foundIndex = list.indexOfFirst { it.id == lastChannelId }
-                        if (foundIndex != -1) {
-                            targetIndex = foundIndex
-                        }
+                // 2. 按分组并行拉取全量频道（彻底绕过全局 page_size 上限）
+                repo.getAllChannelsByGroups(realGroups).onSuccess { list ->
+                    list.forEachIndexed { index, channel ->
+                        channel.globalIndex = index
                     }
-                    currentGroupId = list[targetIndex].groupId
-                    groupAdapter.setSelected(currentGroupId)
-                    filterChannels(scrollToTop = false)
-                    playTvChannel(targetIndex)
-                    videoLayout?.requestFocus()
+                    allChannels = list
+                    channelsByGroup = list.groupBy { it.groupId }
+                    if (list.isNotEmpty()) {
+                        // 尝试恢复上次播放的频道
+                        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                        val lastChannelId = prefs.getLong("last_channel_id", -1L)
+                        var targetIndex = 0
+                        if (lastChannelId != -1L) {
+                            val foundIndex = list.indexOfFirst { it.id == lastChannelId }
+                            if (foundIndex != -1) {
+                                targetIndex = foundIndex
+                            }
+                        }
+                        currentGroupId = list[targetIndex].groupId
+                        groupAdapter.setSelected(currentGroupId)
+                        filterChannels(scrollToTop = false)
+                        playTvChannel(targetIndex)
+                        videoLayout?.requestFocus()
+                    }
+                }.onFailure {
+                    // handle failure
                 }
-            }.onFailure {
-                // handle failure
+            } finally {
+                isLoadingData = false
             }
         }
     }
@@ -2156,6 +2172,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemUI()
+        
+        // 首次 onResume 由 onCreate 的认证链路负责数据加载，跳过以避免并发
+        if (isFirstResume) {
+            isFirstResume = false
+            return
+        }
+        
         if (settingsChanged || allChannels.isEmpty()) {
             loadData()
             settingsChanged = false
