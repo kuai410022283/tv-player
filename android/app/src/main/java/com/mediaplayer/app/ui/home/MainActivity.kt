@@ -330,6 +330,25 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                var menuHidden = false
+                if (layoutZappingMenu?.visibility == View.VISIBLE) {
+                    uiHandler.removeCallbacks(hideZappingRunnable)
+                    hideZappingRunnable.run()
+                    menuHidden = true
+                }
+                if (layoutEpgMenu?.visibility == View.VISIBLE) {
+                    hideEpgMenu()
+                    menuHidden = true
+                }
+                if (layoutSettingsMenu?.visibility == View.VISIBLE) {
+                    hideSettingsMenu()
+                    menuHidden = true
+                }
+                
+                if (menuHidden) {
+                    return true
+                }
+
                 // 单点：显示 OSD（5s 自动隐藏）
                 showOsd()
                 return true
