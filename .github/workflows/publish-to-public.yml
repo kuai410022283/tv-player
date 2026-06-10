@@ -248,7 +248,7 @@ jobs:
         with:
           registry: ghcr.io
           username: kuai410022283
-          password: ${{ secrets.mediaplayer }}
+          password: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Docker meta
         id: meta
@@ -290,7 +290,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone https://x-access-token:${{ secrets.mediaplayer }}@github.com/kuai410022283/mediaplayer.git public-repo
+          git clone https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/kuai410022283/mediaplayer.git public-repo
           cp README.md public-repo/
           cp -r images public-repo/ || true
           cd public-repo
@@ -307,7 +307,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           repository: kuai410022283/mediaplayer
-          token: ${{ secrets.mediaplayer }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           target_commitish: main
           tag_name: ${{ needs.prepare-release.outputs.version }}
           name: Release ${{ needs.prepare-release.outputs.version }}

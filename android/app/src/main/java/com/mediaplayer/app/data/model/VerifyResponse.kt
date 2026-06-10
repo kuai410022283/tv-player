@@ -7,5 +7,9 @@ data class VerifyResponse(
     @SerializedName("name") val name: String = "",
     @SerializedName("announcement") val announcement: String? = null,
     @SerializedName("announcement_interval") val announcementInterval: Int = 0,
-    @SerializedName("enable_log") val enableLog: Boolean = false
+    @SerializedName("enable_log") val enableLog: Boolean = false,
+    @SerializedName("startup_media_enabled") val startupMediaEnabled: Boolean = false,
+    @SerializedName("startup_media") val startupMedia: String? = null,
+    @SerializedName("startup_duration") val startupDuration: Int = 5,
+    @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0
 )

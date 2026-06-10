@@ -1366,6 +1366,13 @@ async function loadClientSettings() {
       document.getElementById('set-system-announcement-interval').value = setRes.data.system_announcement_interval || '0';
     }
 
+    if (document.getElementById('set-startup-media-url')) {
+      document.getElementById('set-startup-media-enabled').value = setRes.data.startup_media_enabled || 'false';
+      document.getElementById('set-startup-media-url').value = setRes.data.startup_media_url || '';
+      document.getElementById('set-startup-duration').value = setRes.data.startup_duration || '5';
+      document.getElementById('set-startup-skip-after').value = setRes.data.startup_skip_after || '0';
+    }
+
     // EPG 配置
     if (document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
@@ -1429,6 +1436,13 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-system-announcement')) {
     settings.system_announcement = document.getElementById('set-system-announcement').value.trim();
     settings.system_announcement_interval = document.getElementById('set-system-announcement-interval').value;
+  }
+
+  if (document.getElementById('set-startup-media-url')) {
+    settings.startup_media_enabled = document.getElementById('set-startup-media-enabled').value;
+    settings.startup_media_url = document.getElementById('set-startup-media-url').value.trim();
+    settings.startup_duration = document.getElementById('set-startup-duration').value;
+    settings.startup_skip_after = document.getElementById('set-startup-skip-after').value;
   }
 
   if (document.getElementById('set-epg-source-url')) {

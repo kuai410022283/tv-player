@@ -60,7 +60,12 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout"
             android:theme="@style/Theme.MediaPlayer.Player" />
 
-
+        <!-- 开机短视频/广告/欢迎图 -->
+        <activity
+            android:name=".ui.splash.SplashMediaActivity"
+            android:screenOrientation="unspecified"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout"
+            android:theme="@style/Theme.MediaPlayer.Player" />
 
         <!-- 后台播放服务 -->
         <service

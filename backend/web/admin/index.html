@@ -590,6 +590,37 @@
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
+            <h3 style="margin-bottom: 12px;">开机短视频/广告/欢迎图 配置</h3>
+          </div>
+          <div class="form-group">
+            <label>开机广告总开关</label>
+            <select id="set-startup-media-enabled">
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>开机广告媒体 URL</label>
+            <input type="text" id="set-startup-media-url" placeholder="http://example.com/ad.mp4 或 /library/ad/test.jpg">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+              支持常规格式（mp4, mkv, jpg, png, webp），如果填相对路径请将文件放入服务器的 library/ad 目录下。<br>
+              <strong style="color:var(--danger)">强烈不建议填入 m3u8 等直播流，会导致开机严重卡顿。</strong>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>最大展示时长 (秒)</label>
+              <input type="number" id="set-startup-duration" value="5" min="1">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">到达此时长将强制跳入主页，防卡死。</div>
+            </div>
+            <div class="form-group">
+              <label>多少秒后允许跳过 (秒)</label>
+              <input type="number" id="set-startup-skip-after" value="0" min="0">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 立刻可跳过。填大于时长则表示不可跳过。</div>
+            </div>
+          </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+          <div class="form-group">
             <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
           </div>
           <div class="form-row">

@@ -153,6 +153,7 @@ class MainActivity : AppCompatActivity() {
     private var isLoadingData = false
     // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
     private var isFirstResume = true
+    private var hasShownSplash = false
     
     // Watchdog State
     enum class PlaybackState { IDLE, BUFFERING, PLAYING }
@@ -1431,14 +1432,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupDuration: Int, startupSkipAfter: Int) {
+        this.sysAnnouncement = sysAnnouncement
+        this.sysAnnouncementInterval = sysAnnouncementInterval
+        
+        if (startupMediaEnabled && !startupMediaUrl.isNullOrEmpty() && !hasShownSplash) {
+            hasShownSplash = true
+            val intent = android.content.Intent(this, com.mediaplayer.app.ui.splash.SplashMediaActivity::class.java).apply {
+                putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_MEDIA_URL, startupMediaUrl)
+                putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_DURATION, startupDuration)
+                putExtra(com.mediaplayer.app.ui.splash.SplashMediaActivity.EXTRA_SKIP_AFTER, startupSkipAfter)
+            }
+            startActivityForResult(intent, 1001)
+        } else {
+            showContent()
+        }
+    }
+
     private fun checkAuthAndLoad() {
         lifecycleScope.launch {
             if (authManager.isApproved()) {
                 authManager.verify().onSuccess { resp ->
                     if (resp != null) {
-                        sysAnnouncement = resp.announcement
-                        sysAnnouncementInterval = resp.announcementInterval
-                        showContent()
+                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupDuration, resp.startupSkipAfter)
                     } else doRegister()
                 }.onFailure { doRegister() }
             } else {
@@ -1453,9 +1469,7 @@ class MainActivity : AppCompatActivity() {
             authManager.register().onSuccess { result ->
                 when (result.status) {
                     "approved" -> {
-                        sysAnnouncement = result.announcement
-                        sysAnnouncementInterval = result.announcementInterval
-                        showContent()
+                        handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupDuration, result.startupSkipAfter)
                     }
                     "pending" -> {
                         showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
@@ -1494,6 +1508,14 @@ class MainActivity : AppCompatActivity() {
         }
         authPollRunnable = runnable
         authPollHandler.postDelayed(runnable, 10000)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1001) {
+            // 开机广告结束或跳过，继续加载内容
+            showContent()
+        }
     }
 
     private fun showAuthWaiting(message: String, showQr: Boolean = false) {

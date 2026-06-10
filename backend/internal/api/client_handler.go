@@ -46,24 +46,44 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
 	announcementInterval, _ := strconv.Atoi(announcementIntervalStr)
 
+	// 开机短视频/广告
+	startupMediaEnabledStr, _ := h.channelSvc.GetSetting("startup_media_enabled")
+	startupMediaEnabled := startupMediaEnabledStr == "true"
+	startupMedia, _ := h.channelSvc.GetSetting("startup_media_url")
+	startupDurationStr, _ := h.channelSvc.GetSetting("startup_duration")
+	startupDuration, _ := strconv.Atoi(startupDurationStr)
+	if startupDuration == 0 {
+		startupDuration = 5 // 默认5秒防死锁
+	}
+	startupSkipAfterStr, _ := h.channelSvc.GetSetting("startup_skip_after")
+	startupSkipAfter, _ := strconv.Atoi(startupSkipAfterStr)
+
 	if resp.Status == "approved" {
 		ok(c, gin.H{
-			"status":       resp.Status,
-			"client_id":    resp.ClientID,
-			"access_token": resp.AccessToken,
-			"message":      resp.Message,
-			"announcement": announcement,
+			"status":                resp.Status,
+			"client_id":             resp.ClientID,
+			"access_token":          resp.AccessToken,
+			"message":               resp.Message,
+			"announcement":          announcement,
 			"announcement_interval": announcementInterval,
+			"startup_media_enabled": startupMediaEnabled,
+			"startup_media":         startupMedia,
+			"startup_duration":      startupDuration,
+			"startup_skip_after":    startupSkipAfter,
 		})
 	} else {
 		// pending 状态返回 202
 		c.JSON(http.StatusAccepted, models.APIResponse{Code: 202, Message: resp.Message, Data: gin.H{
-			"status":       resp.Status,
-			"client_id":    resp.ClientID,
-			"access_token": resp.AccessToken,
-			"message":      resp.Message,
-			"announcement": announcement,
+			"status":                resp.Status,
+			"client_id":             resp.ClientID,
+			"access_token":          resp.AccessToken,
+			"message":               resp.Message,
+			"announcement":          announcement,
 			"announcement_interval": announcementInterval,
+			"startup_media_enabled": startupMediaEnabled,
+			"startup_media":         startupMedia,
+			"startup_duration":      startupDuration,
+			"startup_skip_after":    startupSkipAfter,
 		}})
 	}
 }
@@ -95,14 +115,30 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
 	announcementInterval, _ := strconv.Atoi(announcementIntervalStr)
 
+	// 开机短视频/广告
+	startupMediaEnabledStr, _ := h.channelSvc.GetSetting("startup_media_enabled")
+	startupMediaEnabled := startupMediaEnabledStr == "true"
+	startupMedia, _ := h.channelSvc.GetSetting("startup_media_url")
+	startupDurationStr, _ := h.channelSvc.GetSetting("startup_duration")
+	startupDuration, _ := strconv.Atoi(startupDurationStr)
+	if startupDuration == 0 {
+		startupDuration = 5 // 默认5秒防死锁
+	}
+	startupSkipAfterStr, _ := h.channelSvc.GetSetting("startup_skip_after")
+	startupSkipAfter, _ := strconv.Atoi(startupSkipAfterStr)
+
 	ok(c, gin.H{
-		"client_id":    client.ID,
-		"name":         client.Name,
-		"max_streams":  client.MaxStreams,
-		"expires_at":   client.ExpiresAt,
-		"announcement": announcement,
+		"client_id":             client.ID,
+		"name":                  client.Name,
+		"max_streams":           client.MaxStreams,
+		"expires_at":            client.ExpiresAt,
+		"announcement":          announcement,
 		"announcement_interval": announcementInterval,
-		"enable_log":   client.EnableLog,
+		"enable_log":            client.EnableLog,
+		"startup_media_enabled": startupMediaEnabled,
+		"startup_media":         startupMedia,
+		"startup_duration":      startupDuration,
+		"startup_skip_after":    startupSkipAfter,
 	})
 }
 

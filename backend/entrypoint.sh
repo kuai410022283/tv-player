@@ -6,7 +6,8 @@ if [ "$(id -u)" = '0' ]; then
     # 确保数据目录与下载目录存在
     mkdir -p /app/data
     mkdir -p /app/web/download
-    mkdir -p /app/library
+    mkdir -p /app/library/channel_logo
+    mkdir -p /app/library/ad
     # 递归修改挂载目录的所有权给 mediaplayer 用户 (UID/GID 1000)
     chown -R mediaplayer:mediaplayer /app/data
     chown -R mediaplayer:mediaplayer /app/web/download

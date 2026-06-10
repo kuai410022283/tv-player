@@ -222,6 +222,12 @@ type ClientRegisterResp struct {
 	ExpiresAt   string `json:"expires_at,omitempty"`
 	Message     string `json:"message"`
 	EnableLog   bool   `json:"enable_log"`
+	
+	// 开机短视频/广告
+	StartupMediaEnabled bool   `json:"startup_media_enabled"`
+	StartupMedia        string `json:"startup_media"`
+	StartupDuration     int    `json:"startup_duration"`
+	StartupSkipAfter    int    `json:"startup_skip_after"`
 }
 
 // 客户端审批请求
