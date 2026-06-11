@@ -56,6 +56,7 @@ public final class RtpPayloadFormat {
   public static final String RTP_MEDIA_PCMU = "PCMU";
   public static final String RTP_MEDIA_VP8 = "VP8";
   public static final String RTP_MEDIA_VP9 = "VP9";
+  public static final String RTP_MEDIA_MP2T = "MP2T";
 
   /** Returns whether the format of a {@link MediaDescription} is supported. */
   /* package */ static boolean isFormatSupported(MediaDescription mediaDescription) {
@@ -77,10 +78,28 @@ public final class RtpPayloadFormat {
       case RTP_MEDIA_PCMU:
       case RTP_MEDIA_VP8:
       case RTP_MEDIA_VP9:
+      case RTP_MEDIA_MP2T:
         return true;
       default:
         return false;
     }
+  }
+
+  /**
+   * Returns whether the {@link MediaDescription} describes an MPEG-2 Transport Stream (MP2T)
+   * over RTP, which requires special handling via {@link TsExtractor}.
+   */
+  public static boolean isMp2tFormat(MediaDescription mediaDescription) {
+    return Ascii.equalsIgnoreCase(
+        mediaDescription.rtpMapAttribute.mediaEncoding, RTP_MEDIA_MP2T);
+  }
+
+  /**
+   * Returns whether the {@link RtpPayloadFormat} describes an MPEG-2 Transport Stream (MP2T)
+   * over RTP, which requires special handling via {@link TsExtractor}.
+   */
+  public static boolean isMp2tFormat(RtpPayloadFormat payloadFormat) {
+    return Ascii.equalsIgnoreCase(payloadFormat.mediaEncoding, RTP_MEDIA_MP2T);
   }
 
   /**
@@ -123,6 +142,8 @@ public final class RtpPayloadFormat {
         return MimeTypes.VIDEO_VP8;
       case RTP_MEDIA_VP9:
         return MimeTypes.VIDEO_VP9;
+      case RTP_MEDIA_MP2T:
+        return MimeTypes.VIDEO_MP2T;
       default:
         throw new IllegalArgumentException(mediaType);
     }

@@ -157,6 +157,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private boolean receivedAuthorizationRequest;
   private boolean hasPendingPauseRequest;
   private long pendingSeekPositionUs;
+  private int currentSetupLocalPort = C.INDEX_UNSET;
 
   /**
    * Creates a new instance.
@@ -206,12 +207,15 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * @throws IOException When failed to open a connection to the supplied {@link Uri}.
    */
   public void start() throws IOException {
+    RtspMessageLogger.d(TAG, "start(): connecting to " + uri);
     try {
       messageChannel.open(getSocket(uri));
     } catch (IOException e) {
+      RtspMessageLogger.e(TAG, "start(): socket open failed", e);
       Util.closeQuietly(messageChannel);
       throw e;
     }
+    RtspMessageLogger.d(TAG, "start(): sending OPTIONS request");
     messageSender.sendOptionsRequest(uri, sessionId);
   }
 
@@ -304,7 +308,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       playbackEventListener.onRtspSetupCompleted();
       return;
     }
-    messageSender.sendSetupRequest(loadInfo.getTrackUri(), loadInfo.getTransport(), sessionId);
+    String transport = loadInfo.getTransport();
+    java.util.regex.Matcher m = java.util.regex.Pattern.compile("client_port=(\\d+)").matcher(transport);
+    if (m.find()) {
+        currentSetupLocalPort = Integer.parseInt(m.group(1));
+    }
+    messageSender.sendSetupRequest(loadInfo.getTrackUri(), transport, sessionId);
   }
 
   private void maybeLogMessage(List<String> message) {
@@ -317,10 +326,19 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private Socket getSocket(Uri uri) throws IOException {
     checkArgument(uri.getHost() != null);
     int rtspPort = uri.getPort() > 0 ? uri.getPort() : DEFAULT_RTSP_PORT;
-    return socketFactory.createSocket(checkNotNull(uri.getHost()), rtspPort);
+    RtspMessageLogger.d(TAG, "getSocket(): Creating socket to host=" + uri.getHost() + " port=" + rtspPort);
+    try {
+        Socket socket = socketFactory.createSocket(checkNotNull(uri.getHost()), rtspPort);
+        RtspMessageLogger.d(TAG, "getSocket(): Socket connected");
+        return socket;
+    } catch (IOException e) {
+        RtspMessageLogger.e(TAG, "getSocket(): Socket connection failed", e);
+        throw e;
+    }
   }
 
   private void dispatchRtspError(Throwable error) {
+    RtspMessageLogger.e(TAG, "dispatchRtspError() called", error);
     RtspPlaybackException playbackException =
         error instanceof RtspPlaybackException
             ? (RtspPlaybackException) error
@@ -747,6 +765,24 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       rtspState = RTSP_STATE_READY;
       sessionId = response.sessionHeader.sessionId;
       sessionTimeoutMs = response.sessionHeader.timeoutMs;
+
+      try {
+          if (response.transport != null && currentSetupLocalPort != C.INDEX_UNSET) {
+              java.util.regex.Matcher sourceMatcher = java.util.regex.Pattern.compile("source=([a-zA-Z0-9\\.\\-]+)").matcher(response.transport);
+              java.util.regex.Matcher portMatcher = java.util.regex.Pattern.compile("server_port=(\\d+)(?:-(\\d+))?").matcher(response.transport);
+              String serverIp = sourceMatcher.find() ? sourceMatcher.group(1) : uri.getHost();
+              if (portMatcher.find() && serverIp != null) {
+                  int serverRtpPort = Integer.parseInt(portMatcher.group(1));
+                  int serverRtcpPort = portMatcher.group(2) != null ? Integer.parseInt(portMatcher.group(2)) : serverRtpPort + 1;
+                  NatPuncher.punch(serverIp, serverRtpPort, currentSetupLocalPort);
+                  NatPuncher.punch(serverIp, serverRtcpPort, currentSetupLocalPort + 1);
+              }
+          }
+      } catch (Exception e) {
+          RtspMessageLogger.e(TAG, "Failed to parse transport for NAT punch", e);
+      }
+      currentSetupLocalPort = C.INDEX_UNSET;
+
       continueSetupRtspTrack();
     }
 

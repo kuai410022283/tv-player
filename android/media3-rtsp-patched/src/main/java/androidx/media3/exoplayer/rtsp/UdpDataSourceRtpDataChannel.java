@@ -53,8 +53,30 @@ import java.io.IOException;
   public String getTransport() {
     int dataPortNumber = getLocalPort();
     checkState(dataPortNumber != C.INDEX_UNSET); // Assert open() is called.
+    
+    try {
+        java.lang.reflect.Field socketField = androidx.media3.datasource.UdpDataSource.class.getDeclaredField("socket");
+        socketField.setAccessible(true);
+        java.net.DatagramSocket socket = (java.net.DatagramSocket) socketField.get(dataSource);
+        if (socket != null) {
+            NatPuncher.sockets.put(dataPortNumber, socket);
+        }
+        if (rtcpChannel != null) {
+            int rtcpPortNumber = rtcpChannel.getLocalPort();
+            if (rtcpPortNumber != C.INDEX_UNSET) {
+                java.net.DatagramSocket rtcpSocket = (java.net.DatagramSocket) socketField.get(rtcpChannel.dataSource);
+                if (rtcpSocket != null) {
+                    NatPuncher.sockets.put(rtcpPortNumber, rtcpSocket);
+                }
+            }
+        }
+    } catch (Exception e) {
+        RtspMessageLogger.e("UdpDataSourceRtpDataChannel", "Failed to extract DatagramSocket for NAT punching", e);
+    }
+
     return Util.formatInvariant(DEFAULT_UDP_TRANSPORT_FORMAT, dataPortNumber, dataPortNumber + 1);
   }
+
 
   @Override
   public int getLocalPort() {
@@ -91,6 +113,16 @@ import java.io.IOException;
 
   @Override
   public void close() {
+    int dataPortNumber = getLocalPort();
+    if (dataPortNumber != C.INDEX_UNSET) {
+        NatPuncher.sockets.remove(dataPortNumber);
+    }
+    if (rtcpChannel != null) {
+        int rtcpPortNumber = rtcpChannel.getLocalPort();
+        if (rtcpPortNumber != C.INDEX_UNSET) {
+            NatPuncher.sockets.remove(rtcpPortNumber);
+        }
+    }
     dataSource.close();
 
     if (rtcpChannel != null) {

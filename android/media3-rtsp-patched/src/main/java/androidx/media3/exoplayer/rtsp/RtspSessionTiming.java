@@ -22,6 +22,8 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Util;
+import java.util.Calendar;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,14 +46,43 @@ import java.util.regex.Pattern;
       Pattern.compile("npt[:=]\\s*([.\\d]+|now)\\s?-\\s?([.\\d]+)?\\s*");
   private static final String START_TIMING_NTP_FORMAT = "npt=%.3f-";
 
+  // Matches clock= format: clock=YYYYMMDDTHHMMSS.FFZ[-YYYYMMDDTHHMMSS.FFZ]
+  // See RFC2326 Section 3.7 for clock time format.
+  private static final Pattern CLOCK_RANGE_PATTERN =
+      Pattern.compile(
+          "clock=(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})(?:\\.(\\d+))?Z"
+              + "-(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})(?:\\.(\\d+))?Z");
+
   private static final long LIVE_START_TIME = 0;
 
   /** Parses an SDP range attribute (RFC2326 Section 3.6). */
   public static RtspSessionTiming parseTiming(String sdpRangeAttribute) throws ParserException {
+    // Try npt format first
+    Matcher matcher = NPT_RANGE_PATTERN.matcher(sdpRangeAttribute);
+    if (matcher.matches()) {
+      return parseNptTiming(matcher, sdpRangeAttribute);
+    }
+
+    // Try clock format (RFC2326 Section 3.7)
+    Matcher clockMatcher = CLOCK_RANGE_PATTERN.matcher(sdpRangeAttribute);
+    if (clockMatcher.matches()) {
+      return parseClockTiming(clockMatcher);
+    }
+
+    // clock= format with only start time
+    if (sdpRangeAttribute.startsWith("clock=")) {
+      // Unrecognized clock format, treat as live
+      return new RtspSessionTiming(/* startTimeMs= */ 0, /* stopTimeMs= */ C.TIME_UNSET);
+    }
+
+    checkManifestExpression(false, /* message= */ sdpRangeAttribute);
+    return DEFAULT;
+  }
+
+  private static RtspSessionTiming parseNptTiming(Matcher matcher, String sdpRangeAttribute)
+      throws ParserException {
     long startTimeMs;
     long stopTimeMs;
-    Matcher matcher = NPT_RANGE_PATTERN.matcher(sdpRangeAttribute);
-    checkManifestExpression(matcher.matches(), /* message= */ sdpRangeAttribute);
 
     @Nullable String startTimeString = matcher.group(1);
     checkManifestExpression(startTimeString != null, /* message= */ sdpRangeAttribute);
@@ -74,6 +105,62 @@ import java.util.regex.Pattern;
     }
 
     return new RtspSessionTiming(startTimeMs, stopTimeMs);
+  }
+
+  /** Parses clock=YYYYMMDDTHHMMSS.FFZ-YYYYMMDDTHHMMSS.FFZ format. */
+  private static RtspSessionTiming parseClockTiming(Matcher matcher) {
+    long startClockMs = parseClockTimeToEpochMs(matcher, /* startGroup= */ 1);
+    long endClockMs = parseClockTimeToEpochMs(matcher, /* startGroup= */ 8);
+
+    // Convert absolute clock times to relative NPT times.
+    // If both are epoch 0, treat as live.
+    if (startClockMs == 0 && endClockMs == 0) {
+      return new RtspSessionTiming(/* startTimeMs= */ 0, /* stopTimeMs= */ C.TIME_UNSET);
+    }
+
+    long durationMs = endClockMs - startClockMs;
+    if (durationMs < 0) {
+      durationMs = C.TIME_UNSET;
+    }
+    return new RtspSessionTiming(/* startTimeMs= */ 0, /* stopTimeMs= */ durationMs);
+  }
+
+  /**
+   * Parses a single clock time string from the matcher groups.
+   *
+   * <p>Groups: year(2), month(2), day(2), T, hour(2), minute(2), second(2), [.fraction], Z
+   */
+  private static long parseClockTimeToEpochMs(Matcher matcher, int startGroup) {
+    try {
+      int year = Integer.parseInt(matcher.group(startGroup));
+      int month = Integer.parseInt(matcher.group(startGroup + 1)) - 1; // Calendar is 0-based
+      int day = Integer.parseInt(matcher.group(startGroup + 2));
+      int hour = Integer.parseInt(matcher.group(startGroup + 3));
+      int minute = Integer.parseInt(matcher.group(startGroup + 4));
+      int second = Integer.parseInt(matcher.group(startGroup + 5));
+
+      Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+      calendar.set(year, month, day, hour, minute, second);
+      calendar.set(Calendar.MILLISECOND, 0);
+
+      long ms = calendar.getTimeInMillis();
+
+      // Handle fractional seconds (group 7 = fraction, offset from startGroup)
+      @Nullable String fraction = matcher.group(startGroup + 6);
+      if (fraction != null) {
+        // Pad/truncate to 3 digits for milliseconds
+        while (fraction.length() < 3) {
+          fraction += "0";
+        }
+        if (fraction.length() > 3) {
+          fraction = fraction.substring(0, 3);
+        }
+        ms += Integer.parseInt(fraction);
+      }
+      return ms;
+    } catch (Exception e) {
+      return 0;
+    }
   }
 
   /** Gets a Range RTSP header for an RTSP PLAY request. */

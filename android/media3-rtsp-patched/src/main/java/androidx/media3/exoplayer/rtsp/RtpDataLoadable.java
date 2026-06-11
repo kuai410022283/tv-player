@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import android.os.Handler;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.exoplayer.upstream.Loader;
@@ -64,6 +65,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     void onTransportReady(String transport, RtpDataChannel rtpDataChannel);
   }
 
+  private static final String TAG = "RtpDataLoadable";
+
   /** The track ID associated with the Loadable. */
   public final int trackId;
 
@@ -76,7 +79,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private final RtpDataChannel.Factory rtpDataChannelFactory;
 
   @Nullable private RtpDataChannel dataChannel;
-  private @MonotonicNonNull RtpExtractor extractor;
+  private @MonotonicNonNull Extractor extractor;
   private @MonotonicNonNull DefaultExtractorInput extractorInput;
 
   private volatile boolean loadCancelled;
@@ -117,8 +120,17 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    */
   public void setTimestamp(long timestamp) {
     if (timestamp != C.TIME_UNSET) {
-      if (!checkNotNull(extractor).hasReadFirstRtpPacket()) {
-        extractor.setFirstTimestamp(timestamp);
+      Extractor e = checkNotNull(extractor);
+      if (e instanceof RtpExtractor) {
+        RtpExtractor rtpExtractor = (RtpExtractor) e;
+        if (!rtpExtractor.hasReadFirstRtpPacket()) {
+          rtpExtractor.setFirstTimestamp(timestamp);
+        }
+      } else if (e instanceof Mp2tRtpExtractor) {
+        Mp2tRtpExtractor mp2tExtractor = (Mp2tRtpExtractor) e;
+        if (!mp2tExtractor.hasReadFirstRtpPacket()) {
+          mp2tExtractor.setFirstTimestamp(timestamp);
+        }
       }
     }
   }
@@ -130,8 +142,17 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    *     C#INDEX_UNSET} if its unavailable.
    */
   public void setSequenceNumber(int sequenceNumber) {
-    if (!checkNotNull(extractor).hasReadFirstRtpPacket()) {
-      extractor.setFirstSequenceNumber(sequenceNumber);
+    Extractor e = checkNotNull(extractor);
+    if (e instanceof RtpExtractor) {
+      RtpExtractor rtpExtractor = (RtpExtractor) e;
+      if (!rtpExtractor.hasReadFirstRtpPacket()) {
+        rtpExtractor.setFirstSequenceNumber(sequenceNumber);
+      }
+    } else if (e instanceof Mp2tRtpExtractor) {
+      Mp2tRtpExtractor mp2tExtractor = (Mp2tRtpExtractor) e;
+      if (!mp2tExtractor.hasReadFirstRtpPacket()) {
+        mp2tExtractor.setFirstSequenceNumber(sequenceNumber);
+      }
     }
   }
 
@@ -151,6 +172,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       if (dataChannel == null) {
         dataChannel = rtpDataChannelFactory.createAndOpenDataChannel(trackId);
         String transport = dataChannel.getTransport();
+        RtspMessageLogger.d(TAG, "Track " + trackId + ": Transport ready, transport=" + transport
+            + " dataChannelType=" + dataChannel.getClass().getSimpleName());
 
         RtpDataChannel finalDataChannel = dataChannel;
         playbackThreadHandler.post(
@@ -159,7 +182,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         extractorInput =
             new DefaultExtractorInput(
                 checkNotNull(dataChannel), /* position= */ 0, /* length= */ C.LENGTH_UNSET);
-        extractor = new RtpExtractor(rtspMediaTrack.payloadFormat, trackId);
+        if (RtpPayloadFormat.isMp2tFormat(rtspMediaTrack.payloadFormat)) {
+          RtspMessageLogger.d(TAG, "Track " + trackId + ": Creating Mp2tRtpExtractor for MP2T stream");
+          extractor = new Mp2tRtpExtractor(trackId);
+        } else {
+          RtspMessageLogger.d(TAG, "Track " + trackId + ": Creating RtpExtractor for "
+              + rtspMediaTrack.payloadFormat.mediaEncoding);
+          extractor = new RtpExtractor(rtspMediaTrack.payloadFormat, trackId);
+        }
         extractor.init(output);
       }
 
@@ -194,7 +224,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * <p>{@link #seekToUs} must be called after the seek is successful.
    */
   public void resetForSeek() {
-    checkNotNull(extractor).preSeek();
+    Extractor e = checkNotNull(extractor);
+    if (e instanceof RtpExtractor) {
+      ((RtpExtractor) e).preSeek();
+    } else if (e instanceof Mp2tRtpExtractor) {
+      ((Mp2tRtpExtractor) e).preSeek();
+    }
   }
 
   /**

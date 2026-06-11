@@ -229,6 +229,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
      * @param message The must of strings representing the serialized RTSP message.
      */
     public void send(List<String> message) {
+      RtspMessageLogger.d(TAG, "Sending RTSP message:\n" + message.toString());
       byte[] data = RtspMessageUtil.convertMessageToByteArray(message);
       senderThreadHandler.post(
           () -> {
@@ -296,7 +297,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     /** Handles an entire RTSP message. */
     private void handleRtspMessage(byte firstByte) throws IOException {
       if (!closed) {
-        messageListener.onRtspMessageReceived(messageParser.parseNext(firstByte, dataInputStream));
+        ImmutableList<String> message = messageParser.parseNext(firstByte, dataInputStream);
+        RtspMessageLogger.d(TAG, "Received RTSP message:\n" + message.toString());
+        messageListener.onRtspMessageReceived(message);
       }
     }
 

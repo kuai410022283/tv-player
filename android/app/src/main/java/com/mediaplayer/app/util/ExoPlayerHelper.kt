@@ -130,8 +130,19 @@ class ExoPlayerHelper(
             mediaItemBuilder.setMimeType(mimeType)
         }
         val mediaItem = mediaItemBuilder.build()
+        
+        // RTSP 流需要使用 RtspMediaSource，而非默认的 ProgressiveMediaSource
+        val isRtsp = url.lowercase().startsWith("rtsp://")
         val mediaSource = try {
-            mediaSourceFactory.createMediaSource(mediaItem)
+            if (isRtsp) {
+                com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Creating RtspMediaSource for: $url")
+                androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
+                    .setTimeoutMs(15000)
+                    .setDebugLoggingEnabled(true)
+                    .createMediaSource(mediaItem)
+            } else {
+                mediaSourceFactory.createMediaSource(mediaItem)
+            }
         } catch (e: Exception) {
             com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Failed to create media source for: $url", e)
             listener.onError()

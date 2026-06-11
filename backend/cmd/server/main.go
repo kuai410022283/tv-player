@@ -156,7 +156,7 @@ func main() {
 
 	// 开机广告支持
 	os.MkdirAll("./library/ad", 0755)
-	r.Static("/lad", "./library/ad")
+	r.Static("/ad", "./library/ad")
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
 	r.Static("/download", "./web/download")
