@@ -336,7 +336,7 @@ class MainActivity : AppCompatActivity() {
                 adjustMode = 0
                 val screenWidth = videoLayout?.width ?: 0
                 if (screenWidth > 0) {
-                    if (e.x < screenWidth * 0.15f) {
+                    if (e.x > screenWidth * 0.05f && e.x < screenWidth * 0.15f) {
                         adjustMode = 1
                         val lp = window.attributes
                         initialBrightness = lp.screenBrightness
@@ -348,7 +348,7 @@ class MainActivity : AppCompatActivity() {
                                 initialBrightness = 0.5f
                             }
                         }
-                    } else if (e.x > screenWidth * 0.85f) {
+                    } else if (e.x < screenWidth * 0.95f && e.x > screenWidth * 0.85f) {
                         adjustMode = 2
                         val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                         initialVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)

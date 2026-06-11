@@ -59,18 +59,14 @@ class PlayerGestureController(
             val absDy = abs(dy)
 
             // 确定主方向
-            if (absDx > absDy && absDx > 50) {
-                // 水平滑动 → 切换频道
-                if (dx > 0) listener.onChannelPrev() else listener.onChannelNext()
-                return true
-            } else if (absDy > absDx && absDy > 30) {
+            if (absDy > absDx && absDy > 30) {
                 // 垂直滑动
                 val screenWidth = context.resources.displayMetrics.widthPixels
-                if (e1.x < screenWidth / 2) {
-                    // 左半屏 → 亮度
+                if (e1.x > screenWidth * 0.05f && e1.x < screenWidth * 0.15f) {
+                    // 左侧 5%~15% → 亮度
                     listener.onBrightnessChange(-dy / 300f)
-                } else {
-                    // 右半屏 → 音量
+                } else if (e1.x < screenWidth * 0.95f && e1.x > screenWidth * 0.85f) {
+                    // 右侧 5%~15% → 音量
                     listener.onVolumeChange(-dy / 300f)
                 }
                 return true
