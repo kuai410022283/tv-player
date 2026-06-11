@@ -292,11 +292,12 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
     channelTotal = chRes.data.total || 0;
     body.innerHTML = chRes.data.items.map((c, i) => {
       let logoHtml = '<span style="color:#999">-</span>';
-      if (localLogoEnabled) {
-        let fallbackAttr = c.logo ? `data-fallback-src="${c.logo}"` : '';
-        logoHtml = `<img data-auth-src="/api/v1/logo?name=${encodeURIComponent(c.epg_channel_id || c.name)}" ${fallbackAttr} loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
-      } else if (c.logo) {
-        logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+      if (c.logo) {
+        if (c.logo.startsWith('/api/v1/logo')) {
+          logoHtml = `<img data-auth-src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+        } else {
+          logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
+        }
       }
       return `<tr>
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>

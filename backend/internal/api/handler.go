@@ -359,6 +359,14 @@ func (h *Handler) ListChannels(c *gin.Context) {
 			}
 			resp.Items = groupedItems
 		}
+	} else {
+		if items, ok := resp.Items.([]models.Channel); ok {
+			strategy := h.logoSvc.GetLogoStrategy()
+			for i := range items {
+				items[i].Logo = h.logoSvc.ResolveLogo(items[i].Name, items[i].EPGChannelID, items[i].Logo, items[i].ID, strategy, "")
+			}
+			resp.Items = items
+		}
 	}
 
 	ok(c, resp)
