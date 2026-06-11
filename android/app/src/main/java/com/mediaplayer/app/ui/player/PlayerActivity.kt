@@ -171,6 +171,13 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 安全地请求横屏方向，规避 Android 8.0 透明主题请求固定方向时的崩溃Bug
+        try {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } catch (e: Exception) {
+            // 忽略 Android 8.0 上的 IllegalStateException
+        }
         
         // 兼容刘海屏/挖孔屏/灵动岛：允许画面延伸到全部屏幕边缘
         // Android 15+ (API 35): ALWAYS 模式确保横屏时灵动岛/长边缺口区域也被覆盖

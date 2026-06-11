@@ -46,6 +46,14 @@ class SplashMediaActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 安全地请求横屏方向，规避 Android 8.0 透明主题请求固定方向时的崩溃Bug
+        try {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } catch (e: Exception) {
+            // 忽略 Android 8.0 上的 IllegalStateException
+        }
+
         setContentView(R.layout.activity_splash_media)
 
         playerView = findViewById(R.id.player_view)
