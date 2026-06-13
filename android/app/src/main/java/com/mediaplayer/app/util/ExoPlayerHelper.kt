@@ -179,12 +179,12 @@ class ExoPlayerHelper(
                 currentCacheMs
             )
         } else {
-            loadControlBuilder.setBufferDurationsMs(1500, 5000, 30, 30)
+            loadControlBuilder.setBufferDurationsMs(15000, 30000, 30, 500)
         }
         val loadControl = loadControlBuilder.build()
 
         val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-            setParameters(buildUponParameters().setTunnelingEnabled(true))
+            setParameters(buildUponParameters())
         }
 
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)

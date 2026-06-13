@@ -37,8 +37,34 @@ func (rb *RingBuffer) Write(p []byte) (n int, err error) {
 func (rb *RingBuffer) Snapshot() []byte {
 	rb.mu.RLock()
 	defer rb.mu.RUnlock()
-	res := make([]byte, len(rb.buf))
-	copy(res, rb.buf)
+	
+	// FCC Optimization: Find the last I-Frame to start the burst cleanly
+	// Search backwards for NALU start code 0x00 00 00 01
+	startIndex := 0
+	for i := len(rb.buf) - 5; i >= 0; i-- {
+		if rb.buf[i] == 0 && rb.buf[i+1] == 0 && rb.buf[i+2] == 0 && rb.buf[i+3] == 1 {
+			nalType := rb.buf[i+4] & 0x1F
+			// H.264: 7 is SPS (usually start of GOP), 5 is IDR
+			if nalType == 7 || nalType == 5 {
+				startIndex = i
+				break
+			}
+			// H.265 (HEVC): NAL unit type is in bits 1-6
+			hevcType := (rb.buf[i+4] & 0x7E) >> 1
+			if hevcType == 32 || hevcType == 33 || hevcType == 19 || hevcType == 20 || hevcType == 21 {
+				startIndex = i
+				break
+			}
+		}
+	}
+
+	snapshotLen := len(rb.buf) - startIndex
+	if snapshotLen <= 0 {
+		return []byte{}
+	}
+	
+	res := make([]byte, snapshotLen)
+	copy(res, rb.buf[startIndex:])
 	return res
 }
 

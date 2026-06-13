@@ -195,27 +195,12 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 		reqCancels[i] = rCancel
 		
 		go func(idx int, targetURL string, reqCtx context.Context) {
-			req, err := http.NewRequestWithContext(reqCtx, "GET", targetURL, nil)
-			if err != nil {
-				resultChan <- raceResult{index: idx, err: err}
-				return
-			}
-			req.Header.Set("User-Agent", ua)
-			for k, v := range headers {
-				req.Header.Set(k, v)
-			}
-			
-			rResp, rErr := sp.client.Do(req)
+			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
 			if rErr != nil {
 				resultChan <- raceResult{index: idx, err: rErr}
 				return
 			}
-			if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
-				resultChan <- raceResult{index: idx, resp: rResp, url: targetURL}
-			} else {
-				rResp.Body.Close()
-				resultChan <- raceResult{index: idx, err: fmt.Errorf("status code %d", rResp.StatusCode)}
-			}
+			resultChan <- raceResult{index: idx, resp: rResp, url: targetURL}
 		}(i, u, rCtx)
 	}
 

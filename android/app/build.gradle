@@ -17,8 +17,8 @@ android {
         applicationId "com.mediaplayer.app"
         minSdk 23
         targetSdk 34
-        versionCode 63
-        versionName "1.0.63"
+        versionCode 64
+        versionName "1.0.64"
     }
 
     signingConfigs {
@@ -50,7 +50,7 @@ android {
         abi {
             enable true
             reset()
-            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64" // 恢复 x86/x86_64 以支持 Android 模拟器
+            include "armeabi-v7a", "arm64-v8a" // 移除 x86/x86_64 以减小 TV 端安装包体积
             universalApk true
         }
     }

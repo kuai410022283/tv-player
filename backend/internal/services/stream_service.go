@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -338,28 +340,13 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		reqCtx, reqCancel := context.WithCancel(r.Context())
 		cancels[i] = reqCancel
 		
-		go func(idx int, targetURL string, ctx context.Context) {
-			req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
-			if err != nil {
-				resultChan <- raceResult{index: idx, err: err}
-				return
-			}
-			req.Header.Set("User-Agent", ua)
-			for k, v := range headers {
-				req.Header.Set(k, v)
-			}
-			
-			rResp, rErr := sp.client.Do(req)
+		go func(idx int, targetURL string, reqCtx context.Context) {
+			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
 			if rErr != nil {
 				resultChan <- raceResult{index: idx, err: rErr}
 				return
 			}
-			if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
-				resultChan <- raceResult{index: idx, resp: rResp, url: targetURL}
-			} else {
-				rResp.Body.Close()
-				resultChan <- raceResult{index: idx, err: fmt.Errorf("status code %d", rResp.StatusCode)}
-			}
+			resultChan <- raceResult{index: idx, resp: rResp, url: targetURL}
 		}(i, u, reqCtx)
 	}
 
@@ -759,4 +746,112 @@ func ParseM3UFile(path string) ([]map[string]string, error) {
 	if err != nil { return nil, err }
 	defer f.Close()
 	return ParseM3U(f)
+}
+
+func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, ua string, headers map[string]string) (*http.Response, error) {
+	if strings.HasPrefix(targetURL, "udp://") || strings.HasPrefix(targetURL, "rtp://") {
+		return openUDPStream(ctx, targetURL)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", ua)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	
+	rResp, rErr := sp.client.Do(req)
+	if rErr != nil {
+		return nil, rErr
+	}
+	if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
+		return rResp, nil
+	}
+	rResp.Body.Close()
+	return nil, fmt.Errorf("status code %d", rResp.StatusCode)
+}
+
+func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
+	isRTP := strings.HasPrefix(rawURL, "rtp://")
+	addrStr := strings.TrimPrefix(rawURL, "udp://")
+	addrStr = strings.TrimPrefix(addrStr, "rtp://")
+	addrStr = strings.TrimPrefix(addrStr, "@")
+
+	addr, err := net.ResolveUDPAddr("udp", addrStr)
+	if err != nil {
+		return nil, err
+	}
+
+	var conn *net.UDPConn
+	if addr.IP.IsMulticast() {
+		conn, err = net.ListenMulticastUDP("udp", nil, addr)
+	} else {
+		conn, err = net.ListenUDP("udp", addr)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// 8MB kernel buffer for UDP to prevent drops
+	conn.SetReadBuffer(8 * 1024 * 1024)
+
+	pr, pw := io.Pipe()
+
+	// Wait for the first packet to confirm health (max 3 seconds)
+	firstBuf := make([]byte, 65536)
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	n, _, err := conn.ReadFromUDP(firstBuf)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("udp stream timeout or error: %w", err)
+	}
+	conn.SetReadDeadline(time.Time{}) // Reset deadline
+
+	go func() {
+		defer conn.Close()
+		defer pw.Close()
+
+		// Write the first packet
+		payload := firstBuf[:n]
+		if isRTP && n > 12 && payload[0]>>6 == 2 {
+			payload = payload[12:]
+		}
+		pw.Write(payload)
+
+		buf := make([]byte, 65536)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			
+			n, _, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			if n > 0 {
+				p := buf[:n]
+				if isRTP && n > 12 && p[0]>>6 == 2 {
+					p = p[12:]
+				}
+				_, wErr := pw.Write(p)
+				if wErr != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	resp := &http.Response{
+		StatusCode: 200,
+		Body:       pr,
+		Header:     make(http.Header),
+		Request:    &http.Request{URL: &url.URL{Scheme: "udp", Host: addrStr}},
+	}
+	// UDP streams are typically MPEG-TS
+	resp.Header.Set("Content-Type", "video/mp2t")
+	return resp, nil
 }
