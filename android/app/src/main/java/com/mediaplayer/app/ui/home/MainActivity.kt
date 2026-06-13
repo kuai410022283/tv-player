@@ -1421,6 +1421,17 @@ class MainActivity : AppCompatActivity() {
                         }
                         return next
                     }
+                    override fun onInterceptFocusSearch(focused: View, direction: Int): View? {
+                        if (direction == View.FOCUS_LEFT) {
+                            val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
+                            if (groupIndex >= 0) {
+                                val groupLm = tvGroupsRv?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                                val targetView = groupLm?.findViewByPosition(groupIndex)
+                                return targetView ?: tvGroupsRv
+                            }
+                        }
+                        return super.onInterceptFocusSearch(focused, direction)
+                    }
                     override fun requestChildRectangleOnScreen(parent: androidx.recyclerview.widget.RecyclerView, child: View, rect: android.graphics.Rect, immediate: Boolean, focusedChildVisible: Boolean): Boolean {
                         rect.top -= child.height * 2
                         rect.bottom += child.height * 2
