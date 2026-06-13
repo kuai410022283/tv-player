@@ -795,19 +795,19 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 	}
 
 	// 8MB kernel buffer for UDP to prevent drops
-	conn.SetReadBuffer(8 * 1024 * 1024)
+	_ = conn.SetReadBuffer(8 * 1024 * 1024)
 
 	pr, pw := io.Pipe()
 
 	// Wait for the first packet to confirm health (max 3 seconds)
 	firstBuf := make([]byte, 65536)
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, _, err := conn.ReadFromUDP(firstBuf)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("udp stream timeout or error: %w", err)
 	}
-	conn.SetReadDeadline(time.Time{}) // Reset deadline
+	_ = conn.SetReadDeadline(time.Time{}) // Reset deadline
 
 	go func() {
 		defer conn.Close()
@@ -818,7 +818,7 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 		if isRTP && n > 12 && payload[0]>>6 == 2 {
 			payload = payload[12:]
 		}
-		pw.Write(payload)
+		_, _ = pw.Write(payload)
 
 		buf := make([]byte, 65536)
 		for {
