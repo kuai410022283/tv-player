@@ -3,10 +3,17 @@ package com.mediaplayer.app.util
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 object StreamResolver {
 
@@ -18,9 +25,37 @@ object StreamResolver {
         .followSslRedirects(false)
         .build()
 
+    private suspend fun executeCallAsync(call: Call): Response = suspendCancellableCoroutine { continuation ->
+        continuation.invokeOnCancellation {
+            call.cancel()
+        }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (continuation.isActive) {
+                    continuation.resumeWithException(e)
+                }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (continuation.isActive) {
+                    continuation.resume(response)
+                } else {
+                    response.close()
+                }
+            }
+        })
+    }
+
     suspend fun resolve(originalUrl: String, userAgent: String?, customHeaders: String?): String {
         return withContext(Dispatchers.IO) {
             var currentUrl = originalUrl
+            
+            // 组播和特殊协议无需解析重定向，直接返回，大幅提升起播速度
+            val lowerUrl = currentUrl.lowercase()
+            if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("p3p://")) {
+                return@withContext currentUrl
+            }
+            
             if (currentUrl.startsWith("/")) {
                 val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
                 currentUrl = serverUrl + currentUrl
@@ -56,13 +91,11 @@ object StreamResolver {
                     // 只要在读取到响应头后立即调用 response.close()，就不会下载响应体，不会浪费带宽。
                     requestBuilder.get()
 
-                    val response = client.newCall(requestBuilder.build()).execute()
+                    val call = client.newCall(requestBuilder.build())
                     
-                    // HTTP 请求返回后检查协程是否已被取消
-                    if (!isActive) {
-                        response.close()
-                        return@withContext currentUrl
-                    }
+                    // 异步挂起执行，如果此时用户切台，协程被取消，底层的 call.cancel() 会立即掐断 TCP 连接
+                    // 极大地释放了服务端的并发连接数限制，避免了起播卡顿
+                    val response = executeCallAsync(call)
                     
                     val code = response.code
                     val isRedirect = code in 300..399

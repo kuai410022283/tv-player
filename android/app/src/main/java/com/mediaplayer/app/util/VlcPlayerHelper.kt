@@ -36,7 +36,6 @@ class VlcPlayerHelper(
         options.add("--audio-time-stretch")
         // 强制 RTSP 使用 TCP 传输，解决 UDP 在 Android/TV 盒子环境下容易丢包或被 NAT 拦截导致无法播放的问题
         options.add("--rtsp-tcp")
-        options.add("--network-synchronisation") // 增加全局容错选项
 
         // We no longer add caching or jitter options globally here because they are applied per-Media based on URL in play().
         // options.add("--network-caching=$cacheMs")
@@ -119,7 +118,7 @@ class VlcPlayerHelper(
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
 
-        // 停止旧播放，防止旧流在新流准备好之前继续输出音频，导致声音重叠
+        // 恢复原版停止旧播放逻辑，防止旧流在新流准备好之前继续输出音频，导致声音重叠
         isTransitioning = true
         player.stop()
 
@@ -140,7 +139,7 @@ class VlcPlayerHelper(
             if (isLocalOrMulticast) {
                 finalCacheMs = 300 // 内网适当提高到 300ms 保证不卡顿
             } else {
-                finalCacheMs = 1500 // 公网流 1500ms，保证足够的抗抖动能力
+                finalCacheMs = 500 // 公网流由 1500ms 降至 500ms，大幅减少切台黑屏时间
             }
             useAggressiveLatency = false // 自动模式下，不再强制开启激进防抖屏蔽
         } else {
@@ -166,6 +165,7 @@ class VlcPlayerHelper(
 
         applyMediaOptions(media, url, userAgent, customHeaders)
         player.media = media
+        media.release() // MediaPlayer retains its own reference
         isTransitioning = false
         player.play()
         applyScaleMode()
@@ -281,6 +281,7 @@ class VlcPlayerHelper(
     }
 
     override fun release() {
+        mediaPlayer?.detachViews()
         mediaPlayer?.release()
         libVlc?.release()
         mediaPlayer = null

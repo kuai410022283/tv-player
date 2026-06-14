@@ -2,6 +2,7 @@ package com.mediaplayer.app.util
 
 import android.content.Context
 import android.net.Uri
+import android.view.View
 import android.view.ViewGroup
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -27,6 +28,7 @@ class ExoPlayerHelper(
     private var playerView: PlayerView? = null
     
     private var isPlayerPlaying = false
+    private var isFirstFrameRendered = false
     private var lastResolution = ""
     
     // Config state
@@ -49,6 +51,8 @@ class ExoPlayerHelper(
         playerView = PlayerView(context).apply {
             useController = false
             setKeepContentOnPlayerReset(true)
+            // 初始隐藏，避免底层 SurfaceView 黑色 surface 闪烁
+            visibility = View.INVISIBLE
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -84,6 +88,9 @@ class ExoPlayerHelper(
         }
 
         isPlayerPlaying = false
+        isFirstFrameRendered = false
+        // 隐藏 PlayerView，避免黑色 surface 在切换播放时闪烁
+        playerView?.visibility = View.INVISIBLE
         exoPlayer?.stop()
 
         applyScaleMode()
@@ -203,6 +210,11 @@ class ExoPlayerHelper(
                         listener.onBuffering(0f)
                     }
                     Player.STATE_READY -> {
+                        // 首帧就绪，显示 PlayerView（消除初始黑帧）
+                        if (!isFirstFrameRendered) {
+                            isFirstFrameRendered = true
+                            playerView?.visibility = View.VISIBLE
+                        }
                         listener.onBuffering(100f)
                         if (exoPlayer?.playWhenReady == true) {
                             if (!isPlayerPlaying) {
@@ -279,6 +291,11 @@ class ExoPlayerHelper(
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (videoSize.width > 0 && videoSize.height > 0) {
+                    // 确保 PlayerView 可见（作为 STATE_READY 的补充）
+                    if (!isFirstFrameRendered) {
+                        isFirstFrameRendered = true
+                        playerView?.visibility = View.VISIBLE
+                    }
                     val audioMime = exoPlayer?.audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
                     val videoMime = exoPlayer?.videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
                     lastResolution = "${videoSize.width}x${videoSize.height}"
