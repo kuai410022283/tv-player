@@ -21,16 +21,16 @@ import (
 
 // StreamProxy manages proxied streams with health checking
 type StreamProxy struct {
-	cfg            *config.StreamConfig
-	mu             sync.RWMutex
-	streams        map[string]*models.ActiveStream
-	cancels        map[string]context.CancelFunc
-	redirectedURLs map[int64]string // 存储每个频道的重定向后基础 URL
-	broadcasters   map[int64]*ChannelBroadcaster
-	bMu            sync.RWMutex
-	client         *http.Client
-	channelSvc     *ChannelService
-	sem            chan struct{} // 并发控制
+	cfg                  *config.StreamConfig
+	mu                   sync.RWMutex
+	streams              map[string]*models.ActiveStream
+	cancels              map[string]context.CancelFunc
+	redirectedURLs       map[int64]string // 存储每个频道的重定向后基础 URL
+	broadcasters         map[int64]*ChannelBroadcaster
+	bMu                  sync.RWMutex
+	client               *http.Client
+	channelSvc           *ChannelService
+	sem                  chan struct{} // 并发控制
 	isHealthCheckRunning bool
 	healthCheckTotal     int
 	healthCheckCurrent   int
@@ -129,7 +129,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		}
 		// 显式告诉服务端不保持连接，配合 DisableKeepAlives 彻底断开
 		req.Close = true
-		
+
 		resp, err := healthClient.Do(req)
 		if err != nil {
 			status.Status = "error"
@@ -212,7 +212,7 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 			delaySecs = 0.5 // 防御底线，最快每 0.5 秒查一次
 		}
 		delay := time.Duration(delaySecs * float64(time.Second))
-		
+
 		sp.mu.Lock()
 		sp.healthCheckDelayMs = int(delay.Milliseconds())
 		sp.mu.Unlock()
@@ -222,7 +222,9 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 			urls := strings.Split(ch.StreamURL, "#")
 			finalStatus := "offline"
 			for _, rawURL := range urls {
-				if strings.TrimSpace(rawURL) == "" { continue }
+				if strings.TrimSpace(rawURL) == "" {
+					continue
+				}
 				status, _ := sp.CheckHealth(ch.ID, rawURL, ch.StreamType)
 				if status.Status == "online" {
 					finalStatus = "online"
@@ -230,11 +232,11 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 				}
 			}
 			_ = sp.channelSvc.UpdateStatus(ch.ID, finalStatus)
-			
+
 			sp.mu.Lock()
 			sp.healthCheckCurrent++
 			sp.mu.Unlock()
-			
+
 			// 平滑休眠
 			time.Sleep(delay)
 		}
@@ -339,7 +341,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	for i, u := range validURLs {
 		reqCtx, reqCancel := context.WithCancel(r.Context())
 		cancels[i] = reqCancel
-		
+
 		go func(idx int, targetURL string, reqCtx context.Context) {
 			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
 			if rErr != nil {
@@ -470,7 +472,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	// buffer capacity 1024 chunks. With a 32KB buffer size, this gives 32MB tolerance per client.
 	chunkChan := make(chan []byte, 1024)
 	errChan := make(chan error, 1)
-	
+
 	// Reader goroutine
 	go func() {
 		defer close(chunkChan)
@@ -511,16 +513,18 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64 = 0
 	hasFlushed := false // 首次 Flush 标志
-	
+
 	writeBuf := make([]byte, 0, 128*1024)
-	
+
 	// Writer loop
 	for {
 		select {
 		case <-r.Context().Done(): // Client disconnected
 			return nil
 		case err := <-errChan:
-			if err == io.EOF { return nil }
+			if err == io.EOF {
+				return nil
+			}
 			return err
 		case chunk, ok := <-chunkChan:
 			if !ok {
@@ -532,9 +536,9 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 				}
 				return nil
 			}
-			
+
 			writeBuf = append(writeBuf, chunk...)
-			
+
 			if !hasFlushed {
 				// 首次数据：立即 Flush，让客户端播放器尽快收到首字节开始解析
 				if len(writeBuf) > 0 {
@@ -563,7 +567,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 					writeBuf = writeBuf[:0]
 				}
 			}
-			
+
 			now := time.Now()
 			if now.Sub(lastUpdate) >= time.Second {
 				if len(writeBuf) > 0 {
@@ -577,7 +581,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 					bytesSinceLastUpdate += int64(n)
 					writeBuf = writeBuf[:0]
 				}
-				
+
 				sp.mu.RLock()
 				if s, ok := sp.streams[sessionID]; ok {
 					s.Mu.Lock()
@@ -653,7 +657,9 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 			line = strings.TrimPrefix(line, "\xef\xbb\xbf")
 			isFirstLine = false
 		}
-		if line == "" { continue }
+		if line == "" {
+			continue
+		}
 
 		if strings.HasPrefix(line, "#EXTM3U") {
 			globalCatchupType = extractAttr(line, "catchup")
@@ -743,7 +749,9 @@ func parseExtInf(line string) map[string]string {
 // ParseM3UFile parses an M3U file from disk
 func ParseM3UFile(path string) ([]map[string]string, error) {
 	f, err := os.Open(filepath.Clean(path))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer f.Close()
 	return ParseM3U(f)
 }
@@ -761,7 +769,7 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	
+
 	rResp, rErr := sp.client.Do(req)
 	if rErr != nil {
 		return nil, rErr
@@ -795,19 +803,19 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 	}
 
 	// 8MB kernel buffer for UDP to prevent drops
-	conn.SetReadBuffer(8 * 1024 * 1024)
+	_ = conn.SetReadBuffer(8 * 1024 * 1024)
 
 	pr, pw := io.Pipe()
 
 	// Wait for the first packet to confirm health (max 3 seconds)
 	firstBuf := make([]byte, 65536)
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, _, err := conn.ReadFromUDP(firstBuf)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("udp stream timeout or error: %w", err)
 	}
-	conn.SetReadDeadline(time.Time{}) // Reset deadline
+	_ = conn.SetReadDeadline(time.Time{}) // Reset deadline
 
 	go func() {
 		defer conn.Close()
@@ -818,7 +826,7 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 		if isRTP && n > 12 && payload[0]>>6 == 2 {
 			payload = payload[12:]
 		}
-		pw.Write(payload)
+		_, _ = pw.Write(payload)
 
 		buf := make([]byte, 65536)
 		for {
@@ -827,7 +835,7 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 				return
 			default:
 			}
-			
+
 			n, _, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				return
