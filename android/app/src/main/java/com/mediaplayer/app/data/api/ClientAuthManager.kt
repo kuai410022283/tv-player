@@ -78,7 +78,7 @@ class ClientAuthManager(private val context: Context) {
         try {
             val token = getToken() ?: return@withContext Result.failure(Exception("无令牌"))
             val response = ApiClient.getService().clientVerify("Bearer $token")
-            if (response.isSuccessful && (response.body()?.code == 0 || response.body()?.code == 200)) {
+            if (response.isSuccessful && response.body()?.code == 0) {
                 val data = response.body()?.data
                 if (data != null) {
                     prefs.edit().putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog).apply()
@@ -99,7 +99,7 @@ class ClientAuthManager(private val context: Context) {
             val token = getToken()
             if (token != null) {
                 val response = ApiClient.getService().clientVerify("Bearer $token")
-                if (response.isSuccessful && (response.body()?.code == 0 || response.body()?.code == 200)) {
+                if (response.isSuccessful && response.body()?.code == 0) {
                     // token 有效 = 已审批
                     prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, "approved").apply()
                     return@withContext Result.success("approved")

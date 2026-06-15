@@ -47,11 +47,6 @@ interface IPlayerHelper {
         fun onPlaying(resolution: String)
         
         /**
-         * Called when video size is obtained. Used as a fallback to transition state to PLAYING if onPlaying is missed.
-         */
-        fun onVideoSizeChanged(width: Int, height: Int)
-
-        /**
          * Called on playback error
          */
         fun onError()

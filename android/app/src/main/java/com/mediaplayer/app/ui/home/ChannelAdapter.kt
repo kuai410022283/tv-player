@@ -24,9 +24,6 @@ class ChannelAdapter(
     var showLogo: Boolean = true
     private var channels: List<Channel> = emptyList()
     private var playingChannelId: Long = -1L
-    
-    fun getChannels(): List<Channel> = channels
-    fun getPlayingChannelId(): Long = playingChannelId
 
     fun setData(list: List<Channel>) {
         this.channels = list

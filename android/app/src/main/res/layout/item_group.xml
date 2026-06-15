@@ -3,18 +3,18 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/item_group_height"
+    android:layout_height="@dimen/dp_80"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingHorizontal="12dp"
+    android:paddingHorizontal="@dimen/dp_12"
     android:background="@drawable/selector_group_item"
     android:focusable="true"
     android:focusableInTouchMode="true">
 
     <View
         android:id="@+id/viewIndicator"
-        android:layout_width="3dp"
-        android:layout_height="24dp"
+        android:layout_width="@dimen/dp_3"
+        android:layout_height="@dimen/dp_32"
         android:background="@color/accent"
         android:visibility="invisible" />
 
@@ -23,8 +23,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/text_group"
-        android:textSize="@dimen/item_group_text"
-        android:layout_marginStart="10dp"
+        android:textSize="@dimen/sp_20"
+        android:layout_marginStart="@dimen/dp_10"
         android:singleLine="true" />
 
 </LinearLayout>

@@ -39,26 +39,15 @@ class PlayerActivity : AppCompatActivity() {
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
         val dm = res.displayMetrics
-        val config = res.configuration
-        
         if (dm.widthPixels > 0 && dm.heightPixels > 0) {
             val shortSide = Math.min(dm.widthPixels, dm.heightPixels)
-            
-            // 嗅探设备类型 (是否为 Android TV)
-            val isTv = (config.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
-            
-            if (isTv) {
-                // TV端：强制映射为 720dp 宽度，产生适合远距离观看的大字号
-                val targetDensity = shortSide / 720f
-                if (Math.abs(dm.density - targetDensity) > 0.01f) {
-                    val targetScaledDensity = targetDensity * (dm.scaledDensity / dm.density)
-                    val targetDensityDpi = (160 * targetDensity).toInt()
-                    dm.density = targetDensity
-                    dm.scaledDensity = targetScaledDensity
-                    dm.densityDpi = targetDensityDpi
-                }
-            } else {
-                // Phone / Pad: 放权给 Android 系统原生 DisplayMetrics 引擎进行缩放适配，不作干预
+            val targetDensity = shortSide / 720f
+            if (Math.abs(dm.density - targetDensity) > 0.01f) {
+                val targetScaledDensity = targetDensity * (dm.scaledDensity / dm.density)
+                val targetDensityDpi = (160 * targetDensity).toInt()
+                dm.density = targetDensity
+                dm.scaledDensity = targetScaledDensity
+                dm.densityDpi = targetDensityDpi
             }
         }
         return res
@@ -339,10 +328,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun initPlayerWithCore(core: Int) {
         val listener = object : com.mediaplayer.app.util.IPlayerHelper.PlayerListener {
-            override fun onVideoSizeChanged(width: Int, height: Int) {
-                // Not needed for PlayerActivity at the moment
-            }
-            
             override fun onBuffering(percent: Float) {
                 runOnUiThread {
                     if (currentPlaybackState != PlaybackState.BUFFERING) {

@@ -3,7 +3,6 @@ package com.mediaplayer.app.util
 import android.content.Context
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.view.View
 import android.view.ViewGroup
 import tv.danmaku.ijk.media.player.IMediaPlayer
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
@@ -20,7 +19,6 @@ class IjkPlayerHelper(
     private var isPlayerPlaying = false
     private var lastResolution = ""
     private var surfaceCreated = false
-    private var isFirstFrameRendered = false
 
     private var currentCacheMs: Int = 0
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
@@ -51,13 +49,12 @@ class IjkPlayerHelper(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            // 初始隐藏 SurfaceView，避免其默认黑色 surface 闪烁
-            visibility = View.INVISIBLE
             holder.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(holder: SurfaceHolder) {
                     surfaceCreated = true
                     ijkPlayer?.let { player ->
                         player.setDisplay(holder)
+                        // 如果 player 已经 prepare 好了但没有 surface，立刻重设显示
                     }
                 }
                 override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
@@ -80,9 +77,6 @@ class IjkPlayerHelper(
         }
 
         isPlayerPlaying = false
-        isFirstFrameRendered = false
-        // 隐藏 SurfaceView，避免底层黑色 surface 在重新播放时闪烁
-        surfaceView?.visibility = View.INVISIBLE
         ijkPlayer?.reset()
         applyPlayerOptions(ijkPlayer!!)
         applyScaleMode()
@@ -171,11 +165,6 @@ class IjkPlayerHelper(
                 it.setDisplay(surfaceView?.holder)
             }
             isPlayerPlaying = true
-            // 视频已准备就绪，显示 SurfaceView（避免黑色闪烁）
-            if (!isFirstFrameRendered) {
-                isFirstFrameRendered = true
-                surfaceView?.visibility = View.VISIBLE
-            }
             val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
             val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
             val info = buildString {
@@ -196,11 +185,6 @@ class IjkPlayerHelper(
             if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
                 listener.onBuffering(0f)
             } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END || what == IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                // 视频开始渲染，确保 SurfaceView 可见
-                if (!isFirstFrameRendered) {
-                    isFirstFrameRendered = true
-                    surfaceView?.visibility = View.VISIBLE
-                }
                 listener.onBuffering(100f)
             }
             false

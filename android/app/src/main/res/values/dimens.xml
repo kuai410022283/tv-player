@@ -1,42 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Zapping Menu Widths (Consistent across all devices as requested) -->
-    <dimen name="menu_zapping_width">400dp</dimen>
-    <dimen name="menu_side_width">300dp</dimen>
-    <dimen name="menu_line_width">350dp</dimen>
-    <dimen name="zapping_groups_width">130dp</dimen>
-    
-    <dimen name="qr_code_size">200dp</dimen>
+    <!-- Manually mapped scaled dimensions -->
+    <dimen name="menu_zapping_width">600dp</dimen>
+    <dimen name="menu_side_width">420dp</dimen>
+    <dimen name="menu_line_width">540dp</dimen>
+    <dimen name="zapping_groups_width">200dp</dimen>
+    <dimen name="qr_code_size">300dp</dimen>
     <dimen name="qr_code_small_size">160dp</dimen>
-    <dimen name="auth_logo_size">64dp</dimen>
-
-    <!-- Component Specific Dimensions (Phone Compact Scale) -->
-    <dimen name="item_channel_height">48dp</dimen>
-    <dimen name="item_channel_text_primary">14sp</dimen>
-    <dimen name="item_channel_text_secondary">11sp</dimen>
-    <dimen name="item_channel_text_index">12sp</dimen>
-
-    <dimen name="item_group_height">40dp</dimen>
-    <dimen name="item_group_text">13sp</dimen>
-
-    <dimen name="item_epg_height">40dp</dimen>
-    <dimen name="item_epg_text_title">14sp</dimen>
-    <dimen name="item_epg_text_time">11sp</dimen>
-    
-    <!-- Legacy generic sizes used in UI (Scaled for Phone) -->
-    <dimen name="size_64">48dp</dimen>
-    <dimen name="size_48">36dp</dimen>
-    <dimen name="size_32">24dp</dimen>
-    <dimen name="size_24">16dp</dimen>
-    
-    <dimen name="text_48">24sp</dimen>
-    <dimen name="text_32">20sp</dimen>
-    <dimen name="text_28">18sp</dimen>
-    <dimen name="text_24">16sp</dimen>
-    <dimen name="text_22">14sp</dimen>
-    <dimen name="text_18">13sp</dimen>
-
-    <!-- Generic dp/sp scales -->
+    <dimen name="auth_logo_size">80dp</dimen>
+    <dimen name="size_64">64dp</dimen>
+    <dimen name="size_48">48dp</dimen>
+    <dimen name="size_32">32dp</dimen>
+    <dimen name="size_24">24dp</dimen>
+    <dimen name="text_48">48sp</dimen>
+    <dimen name="text_32">32sp</dimen>
+    <dimen name="text_28">28sp</dimen>
+    <dimen name="text_24">24sp</dimen>
+    <dimen name="text_22">22sp</dimen>
+    <dimen name="text_18">18sp</dimen>
+    <!-- Auto-generated scaled dimensions -->
     <dimen name="dp_2">2dp</dimen>
     <dimen name="dp_3">3dp</dimen>
     <dimen name="dp_4">4dp</dimen>
@@ -57,7 +39,6 @@
     <dimen name="dp_80">80dp</dimen>
     <dimen name="dp_120">120dp</dimen>
     <dimen name="dp_400">400dp</dimen>
-    
     <dimen name="sp_11">11sp</dimen>
     <dimen name="sp_12">12sp</dimen>
     <dimen name="sp_13">13sp</dimen>

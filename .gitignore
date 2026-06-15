@@ -13,7 +13,6 @@ backend/data/
 *.iml
 .gradle/
 .idea/
-android/.idea
 /local.properties
 /.idea/
 .DS_Store
