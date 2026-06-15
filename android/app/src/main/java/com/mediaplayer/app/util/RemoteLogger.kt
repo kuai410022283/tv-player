@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 object RemoteLogger {
     private const val TAG = "RemoteLogger"
     private const val MAX_FILE_SIZE = 1 * 1024 * 1024 // 1MB 切片
+    private const val MAX_LOG_FILES = 30               // 最大文件数
+    private const val MAX_LOG_DIR_SIZE = 20 * 1024 * 1024 // 20MB 总上限
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isRunning = AtomicBoolean(false)
     private var uploadJob: Job? = null
@@ -31,6 +33,9 @@ object RemoteLogger {
             logDir.mkdirs()
         }
         
+        // 启动时清理过期日志
+        enforceRotation()
+
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
         isEnabled = prefs.getBoolean(Prefs.KEY_ENABLE_LOG, false)
 
@@ -93,8 +98,37 @@ object RemoteLogger {
             val ts = System.currentTimeMillis()
             file = File(logDir, "log_$ts.txt")
             currentLogFile = file
+            enforceRotation()
         }
         return file
+    }
+
+    /** 日志轮转：限制文件数量 <= 30，总大小 <= 20MB */
+    private fun enforceRotation() {
+        try {
+            val files = logDir.listFiles { _, name ->
+                name.endsWith(".txt")
+            }?.toMutableList() ?: return
+            if (files.size <= 1) return
+
+            files.sortBy { it.name }
+
+            // 限制文件数量
+            while (files.size > MAX_LOG_FILES) {
+                val removed = files.removeAt(0)
+                removed.delete()
+            }
+
+            // 限制总大小
+            var totalSize = files.sumOf { it.length() }
+            while (totalSize > MAX_LOG_DIR_SIZE && files.size > 1) {
+                val oldest = files.removeAt(0)
+                totalSize -= oldest.length()
+                oldest.delete()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "日志轮转失败: ${e.message}")
+        }
     }
 
     private fun startUploadTask() {
@@ -116,7 +150,9 @@ object RemoteLogger {
                 currentLogFile = null
             }
 
-            val files = logDir.listFiles { _, name -> name.startsWith("log_") && name.endsWith(".txt") }
+            val files = logDir.listFiles { _, name ->
+                (name.startsWith("log_") || name.startsWith("crash_")) && name.endsWith(".txt")
+            }
             if (files.isNullOrEmpty()) return
 
             val sortedFiles = files.sortedBy { it.name }

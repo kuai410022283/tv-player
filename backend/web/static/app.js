@@ -226,6 +226,12 @@ function showSection(name, el) {
   if (loaders[name]) loaders[name]();
 }
 
+// ═══ Mobile sidebar toggle ═══════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('show');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+
 // ═══ Dashboard ════════════════════════════════════════
 async function loadDashboard() {
   const gen = nextGen('dashboard');

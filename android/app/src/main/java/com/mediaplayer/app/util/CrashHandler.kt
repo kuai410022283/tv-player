@@ -1,7 +1,6 @@
 package com.mediaplayer.app.util
 
 import android.content.Context
-import android.os.Environment
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
@@ -65,16 +64,15 @@ class CrashHandler private constructor() : Thread.UncaughtExceptionHandler {
         try {
             val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
             val fileName = "crash-$timestamp.log"
-            if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
-                val path = context?.getExternalFilesDir("crash")?.absolutePath ?: return
-                val dir = File(path)
-                if (!dir.exists()) {
-                    dir.mkdirs()
-                }
-                val fos = FileOutputStream(File(path, fileName))
-                fos.write(result.toByteArray())
-                fos.close()
+            // 写入 remote_logs/ 目录，由 RemoteLogger 上传任务统一上传
+            val ctx = context ?: return
+            val dir = File(ctx.filesDir, "remote_logs")
+            if (!dir.exists()) {
+                dir.mkdirs()
             }
+            val fos = FileOutputStream(File(dir, fileName))
+            fos.write(result.toByteArray())
+            fos.close()
         } catch (e: Exception) {
             Log.e("CrashHandler", "An error occurred while writing file...", e)
         }
