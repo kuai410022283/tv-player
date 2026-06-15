@@ -20,6 +20,7 @@ class VlcPlayerHelper(
     private var mediaPlayer: MediaPlayer? = null
     private var currentScaleMode: Int = Prefs.SCALE_MODE_DEFAULT
     private var isTransitioning: Boolean = false
+    private var playStartTime: Long = 0L
 
     init {
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
@@ -36,6 +37,8 @@ class VlcPlayerHelper(
         options.add("--audio-time-stretch")
         // 强制 RTSP 使用 TCP 传输，解决 UDP 在 Android/TV 盒子环境下容易丢包或被 NAT 拦截导致无法播放的问题
         options.add("--rtsp-tcp")
+        // 网络流同步：确保音频等待视频就绪后再播放，避免"先出声后出画面"
+        options.add("--network-synchronisation")
 
         // We no longer add caching or jitter options globally here because they are applied per-Media based on URL in play().
         // options.add("--network-caching=$cacheMs")
@@ -56,6 +59,10 @@ class VlcPlayerHelper(
             }
         }
 
+        // 加速起播：减少非网络类缓存、加速解码器初始化
+        options.add("--file-caching=0")
+        options.add("--disc-caching=0")
+
         libVlc = LibVLC(context, options)
         mediaPlayer = MediaPlayer(libVlc)
         mediaPlayer?.attachViews(videoLayout, null, false, false)
@@ -63,9 +70,13 @@ class VlcPlayerHelper(
         mediaPlayer?.setEventListener { event ->
             when (event.type) {
                 MediaPlayer.Event.Buffering -> {
+                    val elapsed = System.currentTimeMillis() - playStartTime
+                    RemoteLogger.i("VLCPlayer", "Buffering: ${event.buffering}% (elapsed: ${elapsed}ms)")
                     listener.onBuffering(event.buffering)
                 }
                 MediaPlayer.Event.Playing -> {
+                    val elapsed = System.currentTimeMillis() - playStartTime
+                    RemoteLogger.i("VLCPlayer", "Playing event fired (elapsed: ${elapsed}ms from play() call)")
                     // 先发送一个基础状态
                     listener.onPlaying("VLC")
                     
@@ -115,12 +126,15 @@ class VlcPlayerHelper(
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
         val player = mediaPlayer ?: return
+        playStartTime = System.currentTimeMillis()
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
 
         // 恢复原版停止旧播放逻辑，防止旧流在新流准备好之前继续输出音频，导致声音重叠
         isTransitioning = true
+        val stopStart = System.currentTimeMillis()
         player.stop()
+        RemoteLogger.i("VLCPlayer", "player.stop() took ${System.currentTimeMillis() - stopStart}ms")
 
         val media = Media(libVlc, Uri.parse(url))
         
@@ -139,7 +153,7 @@ class VlcPlayerHelper(
             if (isLocalOrMulticast) {
                 finalCacheMs = 300 // 内网适当提高到 300ms 保证不卡顿
             } else {
-                finalCacheMs = 500 // 公网流由 1500ms 降至 500ms，大幅减少切台黑屏时间
+                finalCacheMs = 1500 // 公网流保持 1500ms 缓冲，500ms 太小无法抗网络抖动
             }
             useAggressiveLatency = false // 自动模式下，不再强制开启激进防抖屏蔽
         } else {
@@ -155,6 +169,16 @@ class VlcPlayerHelper(
         }
         
         media.addOption(":http-reconnect=true")
+        media.addOption(":http-max-connects=5") // 连接池复用，减少重复握手
+
+        // FFmpeg 探针优化：减少 VLC 内部流分析时间，IPTV 直播流格式简单无需深度探测
+        media.addOption(":avcodec-options=probesize=131072:analyzeduration=500000") // 128KB + 0.5s，VLC 用 : 分隔，不是 ,
+        
+        // HLS 协议专项优化：减少 live edge 分段数量加速起播，增加并发拉取提升稳定性
+        if (url.lowercase().contains(".m3u8")) {
+            media.addOption(":hls-live-edge=2")
+            media.addOption(":hls-max-ts-requests=5")
+        }
 
         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         when (decoderMode) {
@@ -167,6 +191,7 @@ class VlcPlayerHelper(
         player.media = media
         media.release() // MediaPlayer retains its own reference
         isTransitioning = false
+        RemoteLogger.i("VLCPlayer", "play() setup done in ${System.currentTimeMillis() - playStartTime}ms, cacheMs=$finalCacheMs, calling player.play()...")
         player.play()
         applyScaleMode()
     }

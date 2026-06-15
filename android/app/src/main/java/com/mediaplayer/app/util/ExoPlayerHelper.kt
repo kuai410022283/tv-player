@@ -29,6 +29,7 @@ class ExoPlayerHelper(
     
     private var isPlayerPlaying = false
     private var isFirstFrameRendered = false
+    private var playStartTime: Long = 0L
     private var lastResolution = ""
     
     // Config state
@@ -72,6 +73,7 @@ class ExoPlayerHelper(
     private var behindLiveWindowLastTime: Long = 0L
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        playStartTime = System.currentTimeMillis()
         currentUrl = url
         currentUserAgent = userAgent
         currentHeaders = customHeaders
@@ -89,8 +91,8 @@ class ExoPlayerHelper(
 
         isPlayerPlaying = false
         isFirstFrameRendered = false
-        // 隐藏 PlayerView，避免黑色 surface 在切换播放时闪烁
-        playerView?.visibility = View.INVISIBLE
+        // 不隐藏 PlayerView——由 setKeepContentOnPlayerReset(true) 保持上一帧画面，
+        // 直到新首帧渲染，从根本上消除切台黑屏
         exoPlayer?.stop()
 
         applyScaleMode()
@@ -159,6 +161,7 @@ class ExoPlayerHelper(
         exoPlayer?.setMediaSource(mediaSource)
         exoPlayer?.prepare()
         exoPlayer?.play()
+        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "playInternal() setup done in ${System.currentTimeMillis() - playStartTime}ms")
     }
 
     private fun buildPlayer() {
@@ -207,9 +210,11 @@ class ExoPlayerHelper(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "STATE_BUFFERING (elapsed: ${System.currentTimeMillis() - playStartTime}ms)")
                         listener.onBuffering(0f)
                     }
                     Player.STATE_READY -> {
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "STATE_READY (elapsed: ${System.currentTimeMillis() - playStartTime}ms)")
                         // 首帧就绪，显示 PlayerView（消除初始黑帧）
                         if (!isFirstFrameRendered) {
                             isFirstFrameRendered = true

@@ -12,6 +12,12 @@ class KeyDispatcherDelegate(private val activity: MainActivity) {
 
     private var isInputtingChannel = false
     private var channelInputBuffer = java.lang.StringBuilder()
+    
+    // 按键防抖：同一按键 200ms 内重复触发则忽略（解决硬件连发/鬼键问题）
+    private var lastKeyCode = -1
+    private var lastKeyTime = 0L
+    private val KEY_DEBOUNCE_MS = 200L
+    
     private val channelInputRunnable = Runnable {
         isInputtingChannel = false
         val inputNum = channelInputBuffer.toString().toIntOrNull()
@@ -45,6 +51,14 @@ class KeyDispatcherDelegate(private val activity: MainActivity) {
             val keyCode = event.keyCode
             
             com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "User pressed key $keyCode")
+            
+            // 按键防抖：同一按键 200ms 内重复按下则忽略
+            val now = System.currentTimeMillis()
+            if (keyCode == lastKeyCode && (now - lastKeyTime) < KEY_DEBOUNCE_MS) {
+                return true
+            }
+            lastKeyCode = keyCode
+            lastKeyTime = now
 
             // 只要面板处于显示状态，用户的任何按键都应当重置自动隐藏的时间
             if (activity.findViewById<View>(R.id.layoutZappingMenu)?.visibility == View.VISIBLE) {

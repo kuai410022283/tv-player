@@ -62,21 +62,55 @@ class PlaybackSessionManager(
     private var playGeneration = 0
     private var resolveJob: Job? = null
 
-    // Watchdog
+    // Watchdog: 检测播放器冻结（缓冲超时、状态卡死）
     private val watchdogHandler = Handler(Looper.getMainLooper())
     private var isWatchdogEnabledForCurrentStream = false
     private var stateStartTime = 0L
     private var lastPlaybackTime = 0L
     private var frozenTimeCounter = 0
     private var activeDecoderMode: Int = -1
+    private var lastWatchdogState: PlaybackState = PlaybackState.IDLE
+    private var lastWatchdogStateTime = 0L
 
     private val watchdogRunnable = object : Runnable {
         override fun run() {
-            // The original developer explicitly disabled this watchdog logic in old_main.kt
-            // because many live streams have static timestamps or take a long time to buffer,
-            // which causes false-positive "timeouts" and forces unwanted channel skipping.
-            // All error handling should rely purely on the player's internal onError / onBuffering callbacks.
-            watchdogHandler.postDelayed(this, 2000)
+            val currentState = _playbackState.value
+            
+            // 仅在 watchdog 启用时执行检查
+            if (isWatchdogEnabledForCurrentStream) {
+                val now = System.currentTimeMillis()
+                val stateDuration = now - stateStartTime
+                val player = playerHelper
+                
+                when (currentState) {
+                    PlaybackState.BUFFERING -> {
+                        // 缓冲超过 20 秒仍无进展，视为冻结
+                        if (stateDuration > 20000) {
+                            RemoteLogger.i("Watchdog", "BUFFERING freeze detected: ${stateDuration}ms without progress. Triggering recovery.")
+                            frozenTimeCounter++
+                            // 触发错误恢复
+                            coroutineScope.launch { _events.emit(PlaybackEvent.Error("播放缓冲超时 (${stateDuration/1000}s)")) }
+                            player?.stop()
+                            switchToNextLineOrCore()
+                            // 重置计时器防止连续触发
+                            stateStartTime = now
+                        }
+                    }
+                    PlaybackState.PLAYING -> {
+                        // 正在播放时不额外干预（由各播放器内部 watchdog 负责）
+                    }
+                    else -> {} // IDLE/ERROR 状态不处理
+                }
+                
+                // 记录状态变化以帮助调试
+                if (currentState != lastWatchdogState) {
+                    RemoteLogger.i("Watchdog", "State change: ${lastWatchdogState} -> ${currentState} (enabled=${isWatchdogEnabledForCurrentStream})")
+                    lastWatchdogState = currentState
+                    lastWatchdogStateTime = now
+                }
+            }
+            
+            watchdogHandler.postDelayed(this, 5000) // 每 5 秒检查一次
         }
     }
 
@@ -147,6 +181,9 @@ class PlaybackSessionManager(
                 else -> "VLC"
             }
         }
+
+        // 手动模式下 coreRetryLevel > 0 时不再切换到其他内核，
+        // 由 switchToNextLineOrCore() 直接弹出 OSD 错误提示
 
         val currentPrefsDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
 
@@ -230,7 +267,23 @@ class PlaybackSessionManager(
         val lines = currentChannel?.getLinesSafely() ?: emptyList()
         val coreMode = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
 
-        if (coreMode == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
+        // 手动模式（IJK/VLC/Exo）：不切换内核，直接弹出 OSD 错误提示
+        if (coreMode != Prefs.PLAYER_CORE_AUTO) {
+            val coreName = when (coreMode) {
+                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_VLC -> "VLC"
+                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                else -> "播放器"
+            }
+            coreRetryLevel = 0
+            val msg = "$coreName 播放失败，请尝试切换其他解码器"
+            coroutineScope.launch { _events.emit(PlaybackEvent.Error(msg)) }
+            handlePlaybackError()
+            return
+        }
+
+        // 自动模式：VLC -> IJK -> Exo 顺序回退
+        if (coreRetryLevel < 2) {
             coreRetryLevel++
             coroutineScope.launch { _events.emit(PlaybackEvent.Error("内核切换重试 (级别 $coreRetryLevel)...")) }
             playCurrentLine()

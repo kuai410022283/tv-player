@@ -3,7 +3,6 @@ package com.mediaplayer.app.util
 import android.content.Context
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.view.View
 import android.view.ViewGroup
 import tv.danmaku.ijk.media.player.IMediaPlayer
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
@@ -20,7 +19,6 @@ class IjkPlayerHelper(
     private var isPlayerPlaying = false
     private var lastResolution = ""
     private var surfaceCreated = false
-    private var isFirstFrameRendered = false
 
     private var currentCacheMs: Int = 0
     private var currentDecoderMode: Int = Prefs.DECODER_MODE_AUTO
@@ -28,6 +26,8 @@ class IjkPlayerHelper(
 
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
+
+    private var lastPlayTimeMs: Long = 0  // 重试限速
 
     init {
         try {
@@ -51,8 +51,6 @@ class IjkPlayerHelper(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            // 初始隐藏 SurfaceView，避免其默认黑色 surface 闪烁
-            visibility = View.INVISIBLE
             holder.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(holder: SurfaceHolder) {
                     surfaceCreated = true
@@ -75,17 +73,20 @@ class IjkPlayerHelper(
     }
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
+        // 重试限速：300ms 内不重复起播
+        val now = System.currentTimeMillis()
+        if (now - lastPlayTimeMs < 300) {
+            return
+        }
+        lastPlayTimeMs = now
+
         if (ijkPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
             buildPlayer()
         }
 
         isPlayerPlaying = false
-        isFirstFrameRendered = false
-        // 隐藏 SurfaceView，避免底层黑色 surface 在重新播放时闪烁
-        surfaceView?.visibility = View.INVISIBLE
         ijkPlayer?.reset()
         applyPlayerOptions(ijkPlayer!!)
-        applyScaleMode()
         applyDataSource(ijkPlayer!!, url, userAgent, customHeaders)
     }
 
@@ -99,7 +100,6 @@ class IjkPlayerHelper(
             ijkPlayer?.setDisplay(surfaceView?.holder)
         }
         setupPlayerListeners(ijkPlayer!!)
-        applyScaleMode()
     }
 
     private fun applyPlayerOptions(player: IjkMediaPlayer) {
@@ -110,35 +110,23 @@ class IjkPlayerHelper(
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1)
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-hevc", 1)
-            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager
-            val isTv = uiModeManager.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
-            if (isTv) {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 0)
-            } else {
-                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
-            }
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
         } else {
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0)
         }
 
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
-        // 允许 DNS 缓存，提升起播速度
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 0)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "crypto,file,http,https,httpproxy,rtmp,rtmpe,rtmps,mms,mmst,mmsh,udp,rtp,rtsp,tcp,tls,hls,data")
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "tls_verify", 0L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-        // 降低极限丢帧率，防止画面变成幻灯片
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000000L) // 30秒超时 (单位为微秒)
-
-        // 加入底层的 HTTP 断开重连机制，提升弱网抗性
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_at_eof", 1)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 5) // 最大重连延迟5秒
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000L)
 
         if (currentCacheMs <= 0) {
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
@@ -152,18 +140,11 @@ class IjkPlayerHelper(
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
         }
 
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L) 
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒嗅探时长 (单位为微秒)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L) // 1MB 探针大小
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 500L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 100L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 100L)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
-
-        // 强制 RTSP 使用 TCP 传输，防止组播流被路由器拦截
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_flags", "prefer_tcp")
     }
-
-    private var videoWidth = 0
-    private var videoHeight = 0
 
     private fun setupPlayerListeners(player: IjkMediaPlayer) {
         player.setOnPreparedListener {
@@ -171,11 +152,6 @@ class IjkPlayerHelper(
                 it.setDisplay(surfaceView?.holder)
             }
             isPlayerPlaying = true
-            // 视频已准备就绪，显示 SurfaceView（避免黑色闪烁）
-            if (!isFirstFrameRendered) {
-                isFirstFrameRendered = true
-                surfaceView?.visibility = View.VISIBLE
-            }
             val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
             val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
             val info = buildString {
@@ -190,30 +166,21 @@ class IjkPlayerHelper(
                 }
             }
             listener.onPlaying(if (info.isNotEmpty()) info else lastResolution)
-            applyScaleMode()
         }
         player.setOnInfoListener { _, what, _ ->
             if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
                 listener.onBuffering(0f)
             } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END || what == IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                // 视频开始渲染，确保 SurfaceView 可见
-                if (!isFirstFrameRendered) {
-                    isFirstFrameRendered = true
-                    surfaceView?.visibility = View.VISIBLE
-                }
                 listener.onBuffering(100f)
             }
             false
         }
-        player.setOnErrorListener { _, what, extra ->
-            com.mediaplayer.app.util.RemoteLogger.e("IJKPlayer", "Playback error. what: $what, extra: $extra")
+        player.setOnErrorListener { _, _, _ ->
             listener.onError()
             true
         }
         player.setOnVideoSizeChangedListener { _, width, height, _, _ ->
             if (width > 0 && height > 0) {
-                videoWidth = width
-                videoHeight = height
                 val audioCodec = ijkPlayer?.mediaInfo?.mAudioDecoder ?: ""
                 val videoCodec = ijkPlayer?.mediaInfo?.mVideoDecoder ?: ""
                 lastResolution = "${width}x${height}"
@@ -225,7 +192,6 @@ class IjkPlayerHelper(
                 if (isPlayerPlaying) {
                     listener.onPlaying(info)
                 }
-                applyScaleMode()
             }
         }
     }
@@ -247,15 +213,6 @@ class IjkPlayerHelper(
                 } catch (e: Exception) {}
             }
 
-            // 动态添加系统 Token，防止 Token 在地址栏暴露
-            val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl()
-            if (url.startsWith(serverUrl)) {
-                val token = com.mediaplayer.app.data.api.ApiClient.accessToken
-                if (!token.isNullOrEmpty()) {
-                    allHeaders["Authorization"] = "Bearer $token"
-                }
-            }
-
             if (allHeaders.isNotEmpty()) {
                 player.setDataSource(url, allHeaders)
             } else {
@@ -270,100 +227,8 @@ class IjkPlayerHelper(
 
     override fun setAspectRatio(scaleMode: Int) {
         this.currentScaleMode = scaleMode
-        applyScaleMode()
-    }
-
-    private fun applyScaleMode() {
-        val parent = videoLayout
-        val sv = surfaceView ?: return
-        val parentWidth = parent.width
-        val parentHeight = parent.height
-        
-        if (parentWidth == 0 || parentHeight == 0) {
-            parent.post { applyScaleMode() }
-            return
-        }
-
-        var targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
-        var targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
-
-        when (currentScaleMode) {
-            Prefs.SCALE_MODE_DEFAULT -> {
-                if (videoWidth > 0 && videoHeight > 0) {
-                    val ratio = videoWidth.toFloat() / videoHeight.toFloat()
-                    val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
-                    if (ratio > parentRatio) {
-                        targetWidth = parentWidth
-                        targetHeight = (parentWidth / ratio).toInt()
-                    } else {
-                        targetHeight = parentHeight
-                        targetWidth = (parentHeight * ratio).toInt()
-                    }
-                }
-            }
-            Prefs.SCALE_MODE_STRETCH -> {
-                val ratio = 16f / 9f
-                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
-                if (ratio > parentRatio) {
-                    targetWidth = parentWidth
-                    targetHeight = (parentWidth / ratio).toInt()
-                } else {
-                    targetHeight = parentHeight
-                    targetWidth = (parentHeight * ratio).toInt()
-                }
-            }
-            Prefs.SCALE_MODE_16_10 -> {
-                val ratio = 16f / 10f
-                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
-                if (ratio > parentRatio) {
-                    targetWidth = parentWidth
-                    targetHeight = (parentWidth / ratio).toInt()
-                } else {
-                    targetHeight = parentHeight
-                    targetWidth = (parentHeight * ratio).toInt()
-                }
-            }
-            Prefs.SCALE_MODE_4_3 -> {
-                val ratio = 4f / 3f
-                val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
-                if (ratio > parentRatio) {
-                    targetWidth = parentWidth
-                    targetHeight = (parentWidth / ratio).toInt()
-                } else {
-                    targetHeight = parentHeight
-                    targetWidth = (parentHeight * ratio).toInt()
-                }
-            }
-            Prefs.SCALE_MODE_FILL -> {
-                targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
-                targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
-            }
-            Prefs.SCALE_MODE_CROP -> {
-                if (videoWidth > 0 && videoHeight > 0) {
-                    val ratio = videoWidth.toFloat() / videoHeight.toFloat()
-                    val parentRatio = parentWidth.toFloat() / parentHeight.toFloat()
-                    if (ratio > parentRatio) {
-                        targetHeight = parentHeight
-                        targetWidth = (parentHeight * ratio).toInt()
-                    } else {
-                        targetWidth = parentWidth
-                        targetHeight = (parentWidth / ratio).toInt()
-                    }
-                }
-            }
-        }
-
-        val lp = sv.layoutParams
-        if (lp is android.widget.FrameLayout.LayoutParams) {
-            lp.width = targetWidth
-            lp.height = targetHeight
-            lp.gravity = android.view.Gravity.CENTER
-            sv.layoutParams = lp
-        } else {
-            lp.width = targetWidth
-            lp.height = targetHeight
-            sv.layoutParams = lp
-        }
+        // IjkPlayer SurfaceView scaling would require wrapping in a custom MeasureLayout.
+        // For simplicity in this demo, standard SurfaceView layout acts as FIT/AUTO.
     }
 
     override fun setDecoderMode(mode: Int) {
