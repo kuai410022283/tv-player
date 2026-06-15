@@ -275,6 +275,42 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	return sp.serveDirectProxy(channelID, clientID, clientIP, clientName, w, r, ch, targetURL)
 }
 
+// getFlushThreshold returns the protocol-appropriate flush buffer size.
+// Priority: Channel.StreamType > Content-Type detection > URL extension/scheme.
+// Different protocols have different latency vs. TCP efficiency needs.
+func getFlushThreshold(ch *models.Channel, finalURL string) int {
+	// 主信号：Channel StreamType（来自配置或竞速环节 Content-Type 自动识别）
+	st := strings.ToLower(ch.StreamType)
+	// 备选信号：URL 扩展名 / 协议头
+	u := strings.ToLower(finalURL)
+
+	switch {
+	// ── HLS ──
+	case st == "hls" || strings.Contains(u, ".m3u8"):
+		return 16 * 1024 // 16KB: 分段下载，快速吐出降低段加载延迟
+	// ── 直播流 ──
+	case st == "ts" || st == "flv" || st == "octet-stream" ||
+		strings.Contains(u, ".ts") || strings.Contains(u, ".flv"):
+		return 64 * 1024 // 64KB: 直播流，平衡延迟与 TCP 小包效率
+	// ── 低延迟协议 ──
+	case st == "rtsp" || st == "rtmp" ||
+		strings.HasPrefix(u, "rtsp://") || strings.HasPrefix(u, "rtmp://"):
+		return 64 * 1024 // 64KB: 低延迟协议
+	// ── DASH ──
+	case st == "dash":
+		return 64 * 1024 // 64KB: 分段直播，适中即可
+	// ── 文件型媒体 ──
+	case st == "mp4" || st == "mkv" || st == "avi" || st == "mov" || st == "webm" ||
+		strings.Contains(u, ".mp4") || strings.Contains(u, ".mkv") ||
+		strings.Contains(u, ".avi") || strings.Contains(u, ".mov") ||
+		strings.Contains(u, ".webm"):
+		return 128 * 1024 // 128KB: 文件流，不需要低延迟
+	// ── 未知 ──
+	default:
+		return 128 * 1024 // 128KB: 保守兜底
+	}
+}
+
 func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
 	// 并发控制
 	select {
@@ -514,7 +550,9 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	var bytesSinceLastUpdate int64 = 0
 	hasFlushed := false // 首次 Flush 标志
 
-	writeBuf := make([]byte, 0, 128*1024)
+	// 根据协议类型选择 Flush 阈值，降低直播流延迟
+	flushThreshold := getFlushThreshold(ch, finalURL)
+	writeBuf := make([]byte, 0, 128*1024) // 初始容量保持 128KB 减少 realloc
 
 	// Writer loop
 	for {
@@ -554,8 +592,8 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 					hasFlushed = true
 				}
 			} else {
-				// 后续数据：攒够 128KB 再 Flush，减少 TCP 小包写入避免 Wi-Fi 微卡顿
-				if len(writeBuf) >= 128*1024 {
+				// 后续数据：攒够阈值再 Flush，根据协议动态调整减少延迟
+				if len(writeBuf) >= flushThreshold {
 					n, err := w.Write(writeBuf)
 					if err != nil {
 						return err
