@@ -89,6 +89,7 @@ class ExoPlayerHelper(
         applyScaleMode()
 
         val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
         if (userAgent.isNotEmpty()) {
             httpDataSourceFactory.setUserAgent(userAgent)
         }
@@ -231,7 +232,7 @@ class ExoPlayerHelper(
                         }
                     }
                     Player.STATE_ENDED -> {
-                        listener.onError()
+                        listener.onPlaybackCompleted()
                     }
                 }
             }

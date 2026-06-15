@@ -921,6 +921,12 @@ class MainActivity : AppCompatActivity() {
                     handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
+            override fun onPlaybackCompleted() {
+                uiHandler.post {
+                    currentPlaybackState = PlaybackState.IDLE
+                    handlePlaybackCompleted()
+                }
+            }
         }
 
         try {
@@ -990,11 +996,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvSettingsShowLogoValue)?.text = if (show) "显示" else "隐藏"
     }
 
-    private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
+    private fun handlePlaybackCompleted() {
         currentPlaybackState = PlaybackState.IDLE
         progressBuffering?.visibility = View.GONE
 
-        // ===== Catchup 回看流自然结束或出错，不触发自动换源 =====
+        // 回看流自然结束
         if (currentCatchupStartTime != null) {
             tvOsdInfo?.text = "回看播放完毕"
             showOsd()
@@ -1002,9 +1008,17 @@ class MainActivity : AppCompatActivity() {
             currentCatchupChannelIndex = -1
             val channel = allChannels.getOrNull(currentChannelIndex)
             if (channel != null) loadEpgForChannel(channel)
-            com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback ended. No auto-switch.")
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback completed naturally.")
             return
         }
+
+        // 直播流理论上不会自然结束，忽略此事件
+        com.mediaplayer.app.util.RemoteLogger.i("Player", "Live stream STATE_ENDED ignored (should not happen).")
+    }
+
+    private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
+        currentPlaybackState = PlaybackState.IDLE
+        progressBuffering?.visibility = View.GONE
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
@@ -1938,6 +1952,10 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
+    // 按键防抖
+    private var lastDispatchedKeyCode: Int = -1
+    private var lastDispatchedKeyTime: Long = 0L
+
     private var isBouncingFocus = false
 
     private fun bounceFocusBack() {
@@ -1981,6 +1999,14 @@ class MainActivity : AppCompatActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val keyCode = event.keyCode
             
+            // 按键防抖：同一按键 200ms 内重复触发则忽略
+            val now = android.os.SystemClock.uptimeMillis()
+            if (keyCode == lastDispatchedKeyCode && now - lastDispatchedKeyTime < 200) {
+                return true
+            }
+            lastDispatchedKeyCode = keyCode
+            lastDispatchedKeyTime = now
+
             com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "User pressed key $keyCode")
 
             // 只要面板处于显示状态，用户的任何按键都应当重置自动隐藏的时间

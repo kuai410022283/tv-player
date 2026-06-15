@@ -63,7 +63,7 @@ tr:hover td{background:var(--bg3)}
 .filter-bar select:focus, .filter-bar input:focus{border-color:var(--accent)!important}
 
 /* ── Modal ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-overlay.show{opacity:1;pointer-events:all}
 .modal{background:var(--bg2);border-radius:2px;padding:24px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:1px 1px 50px rgba(0,0,0,.3)}
 .modal h3{margin-bottom:20px;font-size:16px;font-weight:400;color:var(--text);border-bottom:1px solid #f0f0f0;padding-bottom:12px}
@@ -108,24 +108,19 @@ tr:hover td{background:var(--bg3)}
 .checkbox-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
 input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
 
-/* ── Mobile sidebar toggle (hidden on desktop) ── */
-.sidebar-toggle{display:none}
-
 /* ── Responsive ── */
 @media(max-width:1024px){
   .stats{grid-template-columns:repeat(2,1fr)}
   .sidebar{width:60px}
   .sidebar .nav-item span,.nav-section,.sidebar-footer{display:none}
   .logo span{display:none}
+  .sidebar.show{width:240px}
+  .sidebar.show .nav-item span,.sidebar.show .nav-section,.sidebar.show .logo span,.sidebar.show .sidebar-footer{display:revert}
 }
 
 /* ── Mobile (<768px) ── */
 @media(max-width:768px){
-  .sidebar-toggle{display:flex;position:fixed;top:12px;left:60px;z-index:200;width:18px;height:44px;align-items:center;justify-content:center;background:var(--side-bg);border:none;border-radius:0 4px 4px 0;cursor:pointer;color:var(--side-text2);transition:left .25s ease}
-  .sidebar.show+.sidebar-toggle{left:240px}
-  .sidebar-arrow{width:12px;height:12px;transition:transform .25s ease;display:block}
-  .sidebar.show+.sidebar-toggle .sidebar-arrow{transform:rotate(180deg)}
-  .sidebar{position:fixed;top:0;left:0;bottom:0;z-index:150;width:60px;transition:width .25s ease}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;z-index:150;width:60px;transition:width .25s ease;cursor:pointer}
   .sidebar.show{width:240px}
   .sidebar.show .nav-item span,.sidebar.show .nav-section,.sidebar.show .logo span,.sidebar.show .sidebar-footer{display:revert}
   .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:140;opacity:0;pointer-events:none;transition:opacity .25s ease}

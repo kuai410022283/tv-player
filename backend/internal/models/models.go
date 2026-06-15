@@ -107,6 +107,7 @@ type SubscriptionChannel struct {
 	IsDirect       bool   `json:"is_direct"`
 	SupportCatchup bool   `json:"support_catchup"`
 	CatchupType    string `json:"catchup_type"`
+	CatchupSource  string `json:"catchup_source"`
 	CatchupDays    int    `json:"catchup_days"`
 }
 

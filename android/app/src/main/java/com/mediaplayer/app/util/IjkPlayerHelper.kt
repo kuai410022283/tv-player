@@ -116,6 +116,9 @@ class IjkPlayerHelper(
         }
 
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "allowed_extensions", "ALL")
+        // HTTPS 协议白名单 + TLS 配置
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "crypto,file,http,https,tcp,tls")
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "tls_verify", "0")
         // 允许 DNS 缓存，提升起播速度
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1)
@@ -193,6 +196,10 @@ class IjkPlayerHelper(
             com.mediaplayer.app.util.RemoteLogger.e("IJKPlayer", "Playback error. what: $what, extra: $extra")
             listener.onError()
             true
+        }
+        player.setOnCompletionListener {
+            com.mediaplayer.app.util.RemoteLogger.i("IJKPlayer", "Playback completed.")
+            listener.onPlaybackCompleted()
         }
         player.setOnVideoSizeChangedListener { _, width, height, _, _ ->
             if (width > 0 && height > 0) {

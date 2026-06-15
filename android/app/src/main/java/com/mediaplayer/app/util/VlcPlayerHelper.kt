@@ -107,7 +107,7 @@ class VlcPlayerHelper(
                 MediaPlayer.Event.EndReached -> {
                     if (!isTransitioning) {
                         com.mediaplayer.app.util.RemoteLogger.i("VLCPlayer", "End of stream reached.")
-                        listener.onError()
+                        listener.onPlaybackCompleted()
                     }
                 }
             }

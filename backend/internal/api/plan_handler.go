@@ -189,6 +189,9 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				catchupType = "default"
 			}
 			catchupStr = fmt.Sprintf(` catchup="%s" catchup-days="%d"`, catchupType, ch.CatchupDays)
+			if ch.CatchupSource != "" {
+				catchupStr += fmt.Sprintf(` catchup-source="%s"`, ch.CatchupSource)
+			}
 		}
 
 		tvgID := ch.EPGChannelID

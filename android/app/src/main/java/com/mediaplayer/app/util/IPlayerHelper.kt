@@ -47,6 +47,11 @@ interface IPlayerHelper {
         fun onPlaying(resolution: String)
         
         /**
+         * Called when playback completes naturally (e.g. catchup stream ended)
+         */
+        fun onPlaybackCompleted()
+
+        /**
          * Called on playback error
          */
         fun onError()

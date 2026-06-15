@@ -385,6 +385,12 @@ class PlayerActivity : AppCompatActivity() {
                     handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
+            override fun onPlaybackCompleted() {
+                handler.post {
+                    currentPlaybackState = PlaybackState.IDLE
+                    handlePlaybackCompleted()
+                }
+            }
         }
         
         when (core) {
@@ -526,7 +532,31 @@ class PlayerActivity : AppCompatActivity() {
         handler.postDelayed(watchdogRunnable, 2000)
     }
 
+    private fun handlePlaybackCompleted() {
+        // 播放自然结束（仅 catchup 回看会触发，直播流不会）
+        currentPlaybackState = PlaybackState.IDLE
+        com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback completed naturally.")
+        tvStatus?.text = "播放已结束"
+        progressBar?.visibility = View.GONE
+    }
+
     private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {
+        // 手动指定内核模式：不做任何重试或自动切换，仅提示用户
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        if (globalCore != Prefs.PLAYER_CORE_AUTO) {
+            val coreName = when (globalCore) {
+                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                else -> "VLC"
+            }
+            currentPlaybackState = PlaybackState.IDLE
+            progressBar?.visibility = View.GONE
+            tvStatus?.text = "当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式"
+            com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
+            return
+        }
+
         retryCount++
         if (retryCount > maxRetries) {
             currentPlaybackState = PlaybackState.IDLE
@@ -550,22 +580,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun executeRetry(isNetworkTimeout: Boolean) {
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-
-        // ===== 手动指定内核模式：不做任何自动切换，仅提示用户 =====
-        if (globalCore != Prefs.PLAYER_CORE_AUTO) {
-            val coreName = when (globalCore) {
-                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                else -> "VLC"
-            }
-            tvStatus?.text = "当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式"
-            com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
-            return
-        }
-
-        if (globalCore == Prefs.PLAYER_CORE_AUTO && coreRetryLevel < 2) {
+        // 智能切换模式下的内核容灾
+        if (coreRetryLevel < 2) {
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
                 1 -> "VLC"
@@ -586,16 +602,6 @@ class PlayerActivity : AppCompatActivity() {
             tvStatus?.text = "当前线路失效，自动切换线路 ${lineIndex + 1}..."
             playCurrentLine()
         } else {
-            val savedCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-            if (savedCore != Prefs.PLAYER_CORE_AUTO && !isNetworkTimeout) {
-                prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO).apply()
-                coreRetryLevel = 0
-                lineIndex = 0
-                tvStatus?.text = "播放内核解码失败，自动切换为智能模式重试"
-                playCurrentLine()
-                return
-            }
-
             coreRetryLevel = 0
             lineIndex = 0
 

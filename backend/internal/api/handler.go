@@ -1,7 +1,6 @@
 package api
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,8 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"regexp"
+	"golang.org/x/crypto/bcrypt"
+
 	"path/filepath"
+	"regexp"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mediaplayer/backend/internal/models"
@@ -301,14 +303,16 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址（相对路径）
 					rawURLs := strings.Split(items[i].StreamURL, "#")
 					for lineIdx, u := range rawURLs {
-						if strings.TrimSpace(u) == "" { continue }
+						if strings.TrimSpace(u) == "" {
+							continue
+						}
 						lineProxyURL := fmt.Sprintf("/api/v1/stream/proxy/%d/play.%s?line=%d", items[i].ID, ext, lineIdx)
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
-							"id":             items[i].ID,
-							"stream_url":     lineProxyURL,
-							"stream_type":    items[i].StreamType,
-							"user_agent":     items[i].UserAgent,
-							"custom_headers": items[i].CustomHeaders,
+							"id":              items[i].ID,
+							"stream_url":      lineProxyURL,
+							"stream_type":     items[i].StreamType,
+							"user_agent":      items[i].UserAgent,
+							"custom_headers":  items[i].CustomHeaders,
 							"support_catchup": items[i].SupportCatchup,
 							"catchup_days":    items[i].CatchupDays,
 						})
@@ -317,13 +321,15 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					// 直连模式下，把 "#" 拼接的多线路拆开下发给客户端，由客户端实现多线路容灾换线
 					rawURLs := strings.Split(items[i].StreamURL, "#")
 					for _, u := range rawURLs {
-						if strings.TrimSpace(u) == "" { continue }
+						if strings.TrimSpace(u) == "" {
+							continue
+						}
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
-							"id":             items[i].ID,
-							"stream_url":     strings.TrimSpace(u),
-							"stream_type":    items[i].StreamType,
-							"user_agent":     items[i].UserAgent,
-							"custom_headers": items[i].CustomHeaders,
+							"id":              items[i].ID,
+							"stream_url":      strings.TrimSpace(u),
+							"stream_type":     items[i].StreamType,
+							"user_agent":      items[i].UserAgent,
+							"custom_headers":  items[i].CustomHeaders,
 							"support_catchup": items[i].SupportCatchup,
 							"catchup_days":    items[i].CatchupDays,
 						})
@@ -348,10 +354,10 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"current_epg": items[i].CurrentEPG,
 						"epg_percent": items[i].EpgPercent,
 
-						"sort_order":  items[i].SortOrder,
+						"sort_order":      items[i].SortOrder,
 						"support_catchup": items[i].SupportCatchup,
 						"catchup_days":    items[i].CatchupDays,
-						"lines":       linesForThisItem,
+						"lines":           linesForThisItem,
 					}
 					groupedItems = append(groupedItems, newGroup)
 					groupMap[nameKey] = len(groupedItems) - 1
@@ -389,7 +395,7 @@ func (h *Handler) GetChannel(c *gin.Context) {
 		// baseURL 已经被去除，全部使用相对路径
 		strategy := h.logoSvc.GetLogoStrategy()
 		ch.Logo = h.logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, "")
-		
+
 		// token 已经被去除，不在这里获取了
 
 		if !ch.IsDirect {
@@ -449,7 +455,7 @@ func (h *Handler) DeleteChannel(c *gin.Context) {
 
 func (h *Handler) BatchChannel(c *gin.Context) {
 	var req struct {
-		IDs    []int64 `json:"ids" binding:"required"`
+		IDs []int64 `json:"ids" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, 400, "参数错误")
@@ -467,7 +473,7 @@ func (h *Handler) BatchChannel(c *gin.Context) {
 func (h *Handler) ProxyStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	subPath := c.Param("path")
-	
+
 	var clientID int64
 	var clientName string
 	if cid, exists := c.Get("client_id"); exists {
@@ -477,7 +483,7 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 		clientName = cname.(string)
 	}
 	clientIP := c.ClientIP()
-	
+
 	var targetURL string
 	if subPath != "" && subPath != "/" && !strings.HasPrefix(subPath, "/play.") {
 		ch, err := h.channelSvc.GetChannel(id, 0)
@@ -493,17 +499,17 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 				// Remove our proxy token before forwarding query params to upstream
 				q := c.Request.URL.Query()
 				q.Del("token")
-				
+
 				// Keep the original upstream query params if this is just resolving a relative path
 				// Note: if the upstream URL already has query params, they might get overwritten if not careful,
 				// but ResolveReference replaces the query if rel has one.
 				if len(q) > 0 {
-				    // Combine with resolved query
-				    resolvedQuery := resolved.Query()
-				    for k, v := range q {
-				        resolvedQuery[k] = v
-				    }
-				    resolved.RawQuery = resolvedQuery.Encode()
+					// Combine with resolved query
+					resolvedQuery := resolved.Query()
+					for k, v := range q {
+						resolvedQuery[k] = v
+					}
+					resolved.RawQuery = resolvedQuery.Encode()
 				}
 				targetURL = resolved.String()
 			}
@@ -523,16 +529,49 @@ func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int6
 	if catchupSource == "" {
 		return streamURL
 	}
-	
+
 	start := time.Unix(startUnix, 0).In(time.Local)
 	end := time.Unix(endUnix, 0).In(time.Local)
-	
+	durationSec := endUnix - startUnix
+	if durationSec < 0 {
+		durationSec = 0
+	}
+
 	source := catchupSource
+	// ${} 格式（兼容旧版）
 	source = strings.ReplaceAll(source, "${(b)yyyyMMddHHmmss}", start.Format("20060102150405"))
 	source = strings.ReplaceAll(source, "${(e)yyyyMMddHHmmss}", end.Format("20060102150405"))
 	source = strings.ReplaceAll(source, "${b}", fmt.Sprintf("%d", startUnix))
 	source = strings.ReplaceAll(source, "${e}", fmt.Sprintf("%d", endUnix))
-	
+	// TIMESTAMP/TIMESTAMPL 格式（xteve 预处理后）
+	source = strings.ReplaceAll(source, "TIMESTAMPL", fmt.Sprintf("%d", endUnix))
+	source = strings.ReplaceAll(source, "TIMESTAMP", fmt.Sprintf("%d", startUnix))
+	// {timestamp}/{utc}/{lutc}/{duration} 格式（XC/IPTV 标准）
+	// 注意：{lutc} 必须在 {utc} 之前替换，否则 {lutc} 中的 utc 部分会被误替换
+	source = strings.ReplaceAll(source, "{timestamp}", fmt.Sprintf("%d", startUnix))
+	source = strings.ReplaceAll(source, "{lutc}", fmt.Sprintf("%d", endUnix))
+	source = strings.ReplaceAll(source, "{utc}", fmt.Sprintf("%d", startUnix))
+	source = strings.ReplaceAll(source, "{duration}", fmt.Sprintf("%d", durationSec))
+	// 分段日期格式 {YYYY}-{MM}-{DD}--{HH}-{mm}-{ss}
+	source = strings.ReplaceAll(source, "{YYYY}", start.Format("2006"))
+	source = strings.ReplaceAll(source, "{MM}", start.Format("01"))
+	source = strings.ReplaceAll(source, "{DD}", start.Format("02"))
+	source = strings.ReplaceAll(source, "{HH}", start.Format("15"))
+	source = strings.ReplaceAll(source, "{mm}", start.Format("04"))
+	source = strings.ReplaceAll(source, "{ss}", start.Format("05"))
+	// XC PHP 风格 {Y}-{m}-{d}:{H}-{M}-{S}
+	source = strings.ReplaceAll(source, "{Y}", start.Format("2006"))
+	source = strings.ReplaceAll(source, "{m}", start.Format("01"))
+	source = strings.ReplaceAll(source, "{d}", start.Format("02"))
+	source = strings.ReplaceAll(source, "{H}", start.Format("15"))
+	source = strings.ReplaceAll(source, "{M}", start.Format("04"))
+	source = strings.ReplaceAll(source, "{S}", start.Format("05"))
+	// {id} 占位符（XC provider）
+	if strings.Contains(source, "{id}") {
+		streamID := extractStreamID(streamURL)
+		source = strings.ReplaceAll(source, "{id}", streamID)
+	}
+
 	separator := ""
 	if !strings.HasPrefix(source, "?") && !strings.HasPrefix(source, "&") {
 		if strings.Contains(streamURL, "?") {
@@ -543,36 +582,75 @@ func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int6
 	} else if strings.HasPrefix(source, "?") && strings.Contains(streamURL, "?") {
 		source = "&" + source[1:]
 	}
-	
+
 	return streamURL + separator + source
+}
+
+// extractStreamID 从 URL 路径中提取数字 ID（用于 XC provider 的 {id} 占位符）
+func extractStreamID(url string) string {
+	parts := strings.Split(url, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		cleaned := strings.TrimSuffix(parts[i], ".m3u8")
+		cleaned = strings.TrimSuffix(cleaned, ".ts")
+		if cleaned != "" && isNumeric(cleaned) {
+			return cleaned
+		}
+	}
+	return ""
+}
+
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *Handler) CatchupStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	startStr := c.Query("start")
 	endStr := c.Query("end")
-	
+
 	startUnix, _ := strconv.ParseInt(startStr, 10, 64)
 	endUnix, _ := strconv.ParseInt(endStr, 10, 64)
-	
+
 	ch, err := h.channelSvc.GetChannel(id, 0)
 	if err != nil {
 		fail(c, 404, "频道不存在")
 		return
 	}
-	
+
 	if !ch.SupportCatchup {
 		fail(c, 400, "该频道不支持回看")
 		return
 	}
-	
+
+	// catchup-days 范围校验（CatchupDays == 0 表示不限制）
+	if ch.CatchupDays > 0 && startUnix > 0 {
+		earliest := time.Now().AddDate(0, 0, -ch.CatchupDays).Unix()
+		if startUnix < earliest {
+			fail(c, 400, fmt.Sprintf("回看时间超出范围（仅支持最近 %d 天）", ch.CatchupDays))
+			return
+		}
+	}
+
+	if startUnix <= 0 || endUnix <= 0 || endUnix <= startUnix {
+		fail(c, 400, "无效的回看时间范围")
+		return
+	}
+
 	targetURL := generateCatchupURL(ch.StreamURL, ch.CatchupSource, startUnix, endUnix)
-	
+
 	if ch.IsDirect {
 		c.Redirect(http.StatusFound, targetURL)
 		return
 	}
-	
+
 	var clientID int64
 	var clientName string
 	if cid, exists := c.Get("client_id"); exists {
@@ -657,7 +735,7 @@ func (h *Handler) UpdateM3USource(c *gin.Context) {
 
 func (h *Handler) ImportM3U(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	
+
 	// 异步后台执行，避免阻塞前端并触发超时
 	go func() {
 		slog.Info("开始后台同步 M3U 源", "source_id", id)
@@ -668,7 +746,7 @@ func (h *Handler) ImportM3U(c *gin.Context) {
 			slog.Info("后台同步 M3U 完成", "source_id", id, "imported_channels", count)
 		}
 	}()
-	
+
 	ok(c, gin.H{"message": "已投递到后台同步中"})
 }
 
@@ -762,7 +840,7 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 		failInternal(c, err, "获取配置失败")
 		return
 	}
-	
+
 	manualUpdate := models.AppUpdateConfig{}
 	if val, ok := settings["update_version_code"]; ok {
 		manualUpdate.VersionCode, _ = strconv.Atoi(val)
@@ -779,7 +857,7 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 	if val, ok := settings["update_force"]; ok {
 		manualUpdate.ForceUpdate = val == "true"
 	}
-	
+
 	// Scan local filesystem
 	requestedArch := c.Query("arch")
 	if requestedArch == "" {
@@ -788,14 +866,14 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 
 	downloadDir := "./web/download"
 	entries, err := os.ReadDir(downloadDir)
-	
+
 	var maxLocalVersionCode int
 	var maxLocalVersionName string
 	var maxLocalFolderName string
-	
+
 	// Format: {versionCode}_{versionName} e.g. 10_v1.0.3
 	re := regexp.MustCompile(`^(\d+)_(.+)$`)
-	
+
 	if err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() {
@@ -821,15 +899,15 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 			VersionName: maxLocalVersionName,
 			ForceUpdate: false, // Default for local files
 		}
-		
+
 		// Find best APK match
 		apkDir := filepath.Join(downloadDir, maxLocalFolderName)
 		apkEntries, _ := os.ReadDir(apkDir)
-		
+
 		var bestApk string
 		var fallbackApk string
 		var anyApk string
-		
+
 		for _, f := range apkEntries {
 			if !f.IsDir() && strings.HasSuffix(f.Name(), ".apk") {
 				anyApk = f.Name()
@@ -840,7 +918,7 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 				}
 			}
 		}
-		
+
 		selectedApk := bestApk
 		if selectedApk == "" {
 			selectedApk = fallbackApk
@@ -848,7 +926,7 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 		if selectedApk == "" {
 			selectedApk = anyApk
 		}
-		
+
 		if selectedApk != "" {
 			baseURL := ""
 			if val, ok := settings["server_url"]; ok && val != "" {
@@ -862,17 +940,17 @@ func (h *Handler) GetAppUpdate(c *gin.Context) {
 			}
 			localUpdate.DownloadURL = baseURL + "/download/" + maxLocalFolderName + "/" + selectedApk
 		}
-		
+
 		// Read version.txt for update log
 		logPath := filepath.Join(apkDir, "version.txt")
 		if logBytes, err := os.ReadFile(logPath); err == nil {
 			localUpdate.UpdateLog = string(logBytes)
 		}
-		
+
 		ok(c, localUpdate)
 		return
 	}
-	
+
 	ok(c, manualUpdate)
 }
 
@@ -882,18 +960,18 @@ func (h *Handler) SetAppUpdate(c *gin.Context) {
 		fail(c, 400, "参数错误")
 		return
 	}
-	
+
 	_ = h.channelSvc.SetSetting("update_version_code", strconv.Itoa(body.VersionCode))
 	_ = h.channelSvc.SetSetting("update_version_name", body.VersionName)
 	_ = h.channelSvc.SetSetting("update_download_url", body.DownloadURL)
 	_ = h.channelSvc.SetSetting("update_log", body.UpdateLog)
-	
+
 	forceVal := "false"
 	if body.ForceUpdate {
 		forceVal = "true"
 	}
 	_ = h.channelSvc.SetSetting("update_force", forceVal)
-	
+
 	ok(c, body)
 }
 
@@ -905,7 +983,7 @@ func (h *Handler) GetEPG(c *gin.Context) {
 		fail(c, 400, "请提供 channel_id")
 		return
 	}
-	
+
 	dateStr := c.Query("date")
 	if dateStr == "" {
 		dateStr = time.Now().Format("2006-01-02")
@@ -913,7 +991,7 @@ func (h *Handler) GetEPG(c *gin.Context) {
 		// 兼容 YYYYMMDD 格式，将其转换为内部使用的 YYYY-MM-DD 格式
 		dateStr = dateStr[:4] + "-" + dateStr[4:6] + "-" + dateStr[6:]
 	}
-	
+
 	programs := h.epgSvc.GetEPG(channelID, dateStr)
 	ok(c, programs)
 }
@@ -965,10 +1043,10 @@ func (h *Handler) GetAdminConfig(c *gin.Context) {
 		failInternal(c, err, "获取配置失败")
 		return
 	}
-	
+
 	// 判断当前密码是否依然是默认密码 "admin123"
 	isDefault := bcrypt.CompareHashAndPassword([]byte(hash), []byte("admin123")) == nil
-	
+
 	ok(c, gin.H{
 		"is_default_password": isDefault,
 	})
