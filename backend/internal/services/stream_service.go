@@ -896,7 +896,7 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 		strings.Contains(strings.ToLower(targetURL), "bean=mgspad")
 
 	// 准备多个 User-Agent 候补列表
-	userAgents := []string{}
+	var userAgents []string
 	if isMigU {
 		// 咪咕源：优先使用 Android MiguVideo App 风格 UA
 		userAgents = []string{
