@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -30,9 +31,9 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 
 	// Create client channel
 	sessionID := fmt.Sprintf("mux-%d-%d-%d", channelID, clientID, time.Now().UnixNano())
-	// Create client channel (16384 chunks 给予约 20MB 的抗网络抖动容忍度)
-	clientChan := make(chan []byte, 16384)
-	
+	// Create client channel (1024 chunks 给予约 ~8MB 的抗网络抖动容忍度，避免慢客户端长时间占压过多内存)
+	clientChan := make(chan []byte, 1024)
+
 	// Create cancel context for killing stream
 	ctx, cancel := context.WithCancel(r.Context())
 
@@ -64,7 +65,7 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 		delete(sp.streams, sessionID)
 		delete(sp.cancels, sessionID)
 		sp.mu.Unlock()
-		
+
 		// Auto cleanup: if no clients left, stop the broadcaster to save upstream bandwidth
 		if cb.ClientCount() == 0 {
 			sp.bMu.Lock()
@@ -93,7 +94,18 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 	}
 
 	// Stream loop
+	// 多路复用 Flush 阈值：动态判断，RTP/UDP 组播用 32KB，普通 TS 用 64KB
+	muxFlushThreshold := 64 * 1024
+	srcLower := strings.ToLower(ch.StreamURL)
+	if strings.Contains(srcLower, "/rtp/") || strings.Contains(srcLower, "/udp/") ||
+		strings.Contains(srcLower, "multicast") || strings.Contains(srcLower, "igmp") ||
+		strings.Contains(srcLower, "239.") || strings.Contains(srcLower, "225.") {
+		muxFlushThreshold = 32 * 1024
+	}
+	slog.Info("stream multiplex mode", "channel_id", channelID, "session", sessionID, "url", cb.URL, "flush_threshold", muxFlushThreshold)
+
 	writeBuf := make([]byte, 0, 128*1024)
+	lastFlush := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,7 +121,10 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 				return nil
 			}
 			writeBuf = append(writeBuf, chunk...)
-			if len(writeBuf) >= 128*1024 {
+
+			// 累积到阈值或 2ms 超时后 Flush，保持流的平滑性
+			shouldFlush := len(writeBuf) >= muxFlushThreshold || time.Since(lastFlush) >= 2*time.Millisecond
+			if shouldFlush {
 				n, err := w.Write(writeBuf)
 				if err != nil {
 					return err
@@ -119,6 +134,7 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 				}
 				bytesSinceLastUpdate += int64(n)
 				writeBuf = writeBuf[:0]
+				lastFlush = time.Now()
 			}
 
 			now := time.Now()
@@ -133,6 +149,7 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 					}
 					bytesSinceLastUpdate += int64(n)
 					writeBuf = writeBuf[:0]
+					lastFlush = time.Now()
 				}
 
 				sp.mu.RLock()
@@ -193,7 +210,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 	for i, u := range validURLs {
 		rCtx, rCancel := context.WithCancel(ctx)
 		reqCancels[i] = rCancel
-		
+
 		go func(idx int, targetURL string, reqCtx context.Context) {
 			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
 			if rErr != nil {
@@ -208,7 +225,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 	var finalURL string
 	var errorsList []string
 	var finalCancel context.CancelFunc
-	
+
 	for i := 0; i < len(validURLs); i++ {
 		res := <-resultChan
 		if res.resp != nil {
@@ -218,7 +235,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 				if res.resp.Request != nil && res.resp.Request.URL != nil {
 					finalURL = res.resp.Request.URL.String()
 				}
-				
+
 				// Self-healing of StreamType
 				if ch.StreamType == "" {
 					contentType := res.resp.Header.Get("Content-Type")
@@ -253,7 +270,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 			errorsList = append(errorsList, res.err.Error())
 		}
 	}
-	
+
 	if resp == nil {
 		cancel()
 		for _, c := range reqCancels {
@@ -267,7 +284,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 	// We got the response and headers!
 	sp.bMu.Lock()
 	defer sp.bMu.Unlock()
-	
+
 	// Double check if another goroutine already created it while we were connecting
 	if existing, ok := sp.broadcasters[channelID]; ok && existing.active {
 		resp.Body.Close()
@@ -288,13 +305,14 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 
 	// Start reader goroutine
 	go func(b *ChannelBroadcaster, body io.ReadCloser) {
+		defer slog.Info("stream multiplex reader stopped", "channel_id", channelID, "url", b.URL)
 		defer body.Close()
 		defer b.Stop()
-		
+
 		bufferSize := 64 * 1024
 		buf := make([]byte, bufferSize)
 		reader := bufio.NewReaderSize(body, bufferSize)
-		
+
 		for {
 			if !b.active {
 				break

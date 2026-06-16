@@ -46,6 +46,8 @@ object Prefs {
     const val KEY_CLIENT_ID = "client_id"
     const val KEY_CLIENT_STATUS = "client_status"
     const val KEY_DEVICE_ID = "device_id"
+    const val KEY_SERVER_URLS = "server_urls"      // JSON 数组，所有服务器地址
+    const val KEY_SERVER_PORT = "config_server_port" // 配置 Web 服务器实际端口
     const val KEY_ENABLE_LOG = "enable_log"
     const val KEY_REVERSE_CHANNEL_KEYS = "reverse_channel_keys"
 }

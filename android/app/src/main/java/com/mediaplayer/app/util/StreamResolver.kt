@@ -25,6 +25,13 @@ object StreamResolver {
                 val serverUrl = com.mediaplayer.app.data.api.ApiClient.getServerUrl().trimEnd('/')
                 currentUrl = serverUrl + currentUrl
             }
+
+            // 代理 URL 不需要探测重定向（直接由播放器带 Token 请求），直接返回
+            if (currentUrl.contains("/api/v1/stream/proxy/") ||
+                currentUrl.contains("/api/v1/stream/catchup/")) {
+                return@withContext currentUrl
+            }
+
             var redirects = 0
             val maxRedirects = 5
 

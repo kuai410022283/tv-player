@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -54,10 +55,22 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
 			Transport: &http.Transport{
+				TLSHandshakeTimeout:   10 * time.Second, // TLS 握手超时（部分 HTTPS 源握手慢）
 				ResponseHeaderTimeout: 30 * time.Second, // 等待上游响应头的最长时间
 				IdleConnTimeout:       90 * time.Second,
 				MaxIdleConns:          100,
 				MaxIdleConnsPerHost:   10,
+			},
+			// 允许跨协议重定向（如 HTTPS→HTTP），限制最大跳数避免循环
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return fmt.Errorf("too many redirects")
+				}
+				// 保持 Referer 随重定向传递
+				if len(via) > 0 {
+					req.Header.Set("Referer", via[len(via)-1].URL.String())
+				}
+				return nil
 			},
 		},
 		sem: make(chan struct{}, maxConcurrent),
@@ -276,34 +289,43 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 }
 
 // getFlushThreshold returns the protocol-appropriate flush buffer size.
-// Priority: Channel.StreamType > Content-Type detection > URL extension/scheme.
+// Priority: Channel.StreamType > Original source URL (ch.StreamURL) > Content-Type detection > finalURL.
 // Different protocols have different latency vs. TCP efficiency needs.
 func getFlushThreshold(ch *models.Channel, finalURL string) int {
 	// 主信号：Channel StreamType（来自配置或竞速环节 Content-Type 自动识别）
 	st := strings.ToLower(ch.StreamType)
-	// 备选信号：URL 扩展名 / 协议头
+	// 核心信号：原始源地址（代理 URL 中不含 /rtp/ 等模式，必须用原始源判断）
+	src := strings.ToLower(ch.StreamURL)
+	// 备选信号：上游实际连接地址（可能经过重定向丢失模式）
 	u := strings.ToLower(finalURL)
+	// 合并判断：原始源 + 实际连接地址
+	allURL := src + " " + u
 
 	switch {
 	// ── HLS ──
-	case st == "hls" || strings.Contains(u, ".m3u8"):
+	case st == "hls" || strings.Contains(allURL, ".m3u8"):
 		return 16 * 1024 // 16KB: 分段下载，快速吐出降低段加载延迟
 	// ── 直播流 ──
 	case st == "ts" || st == "flv" || st == "octet-stream" ||
-		strings.Contains(u, ".ts") || strings.Contains(u, ".flv"):
+		strings.Contains(allURL, ".ts") || strings.Contains(allURL, ".flv"):
 		return 64 * 1024 // 64KB: 直播流，平衡延迟与 TCP 小包效率
 	// ── 低延迟协议 ──
 	case st == "rtsp" || st == "rtmp" ||
+		strings.HasPrefix(src, "rtsp://") || strings.HasPrefix(src, "rtmp://") ||
 		strings.HasPrefix(u, "rtsp://") || strings.HasPrefix(u, "rtmp://"):
 		return 64 * 1024 // 64KB: 低延迟协议
+	// ── RTP-over-HTTP / 组播网关（必须用原始源判断，代理 URL 不含 /rtp/）──
+	case strings.Contains(allURL, "/rtp/") || strings.Contains(allURL, "/udp/") ||
+		strings.Contains(allURL, "multicast") || strings.Contains(allURL, "igmp"):
+		return 32 * 1024 // 32KB: RTP/UDP 实时流，极低延迟
 	// ── DASH ──
 	case st == "dash":
 		return 64 * 1024 // 64KB: 分段直播，适中即可
 	// ── 文件型媒体 ──
 	case st == "mp4" || st == "mkv" || st == "avi" || st == "mov" || st == "webm" ||
-		strings.Contains(u, ".mp4") || strings.Contains(u, ".mkv") ||
-		strings.Contains(u, ".avi") || strings.Contains(u, ".mov") ||
-		strings.Contains(u, ".webm"):
+		strings.Contains(allURL, ".mp4") || strings.Contains(allURL, ".mkv") ||
+		strings.Contains(allURL, ".avi") || strings.Contains(allURL, ".mov") ||
+		strings.Contains(allURL, ".webm"):
 		return 128 * 1024 // 128KB: 文件流，不需要低延迟
 	// ── 未知 ──
 	default:
@@ -405,6 +427,8 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			if resp.Request != nil && resp.Request.URL != nil {
 				finalURL = resp.Request.URL.String()
 			}
+
+			slog.Info("stream proxy upstream connected", "channel_id", channelID, "winner", winnerIdx, "url", finalURL, "status", resp.StatusCode, "content_type", resp.Header.Get("Content-Type"))
 			contentType := resp.Header.Get("Content-Type")
 			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
 				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
@@ -504,122 +528,70 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	}
 	w.WriteHeader(resp.StatusCode)
 
-	// Asynchronous buffering to prevent UDP drops
-	// buffer capacity 1024 chunks. With a 32KB buffer size, this gives 32MB tolerance per client.
-	chunkChan := make(chan []byte, 1024)
-	errChan := make(chan error, 1)
+	// 根据协议类型选择 Flush 阈值
+	flushThreshold := getFlushThreshold(ch, finalURL)
+	isLowLatency := flushThreshold <= 64*1024
 
-	// Reader goroutine
-	go func() {
-		defer close(chunkChan)
-		// Use a much larger read buffer (64KB) to reduce context switches and ensure TCP efficiency
-		bufferSize := 64 * 1024
-		if sp.cfg.BufferSize > bufferSize {
-			bufferSize = sp.cfg.BufferSize
-		}
-		buf := make([]byte, bufferSize)
-		reader := bufio.NewReaderSize(resp.Body, bufferSize)
+	flusher, canFlush := w.(http.Flusher)
+
+	if isLowLatency && canFlush {
+		// ═══════════════════════════════════════════════════════
+		// 低延迟 Pipe 模式：累积写入 + 2ms 超时 Flush，避免小包刷屏
+		// ═══════════════════════════════════════════════════════
+		slog.Info("stream proxy pipe mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "threshold", flushThreshold)
+
+		reader := bufio.NewReaderSize(resp.Body, 64*1024)
+		readBuf := make([]byte, 64*1024)
+		writeBuf := make([]byte, 0, 128*1024)
+		lastUpdate := time.Now()
+		lastFlush := time.Now()
+		var bytesSinceLastUpdate int64 = 0
+		var bytesRead int64 = 0
+
 		for {
-			n, err := reader.Read(buf)
+			n, err := reader.Read(readBuf)
 			if n > 0 {
-				chunkData := make([]byte, n)
-				copy(chunkData, buf[:n])
-				select {
-				case chunkChan <- chunkData:
-				default:
-					// Downstream client is too slow (buffer full).
-					// To protect the server memory, we must abort this client's connection.
-					select {
-					case errChan <- fmt.Errorf("client buffer full, connection too slow"):
-					default:
+				bytesRead += int64(n)
+				writeBuf = append(writeBuf, readBuf[:n]...)
+
+				// 累积到 16KB 或 2ms 超时再 Flush，平衡延迟与 TCP 效率
+				shouldFlush := len(writeBuf) >= 16*1024 || time.Since(lastFlush) >= 2*time.Millisecond
+				if shouldFlush {
+					if _, wErr := w.Write(writeBuf); wErr != nil {
+						slog.Info("stream proxy client disconnected (pipe)", "session", sessionID, "bytes", bytesRead)
+						return nil
 					}
-					return
+					flusher.Flush()
+					bytesSinceLastUpdate += int64(len(writeBuf))
+					writeBuf = writeBuf[:0]
+					lastFlush = time.Now()
 				}
 			}
 			if err != nil {
-				select {
-				case errChan <- err:
-				default:
-				}
-				return
-			}
-		}
-	}()
-
-	lastUpdate := time.Now()
-	var bytesSinceLastUpdate int64 = 0
-	hasFlushed := false // 首次 Flush 标志
-
-	// 根据协议类型选择 Flush 阈值，降低直播流延迟
-	flushThreshold := getFlushThreshold(ch, finalURL)
-	writeBuf := make([]byte, 0, 128*1024) // 初始容量保持 128KB 减少 realloc
-
-	// Writer loop
-	for {
-		select {
-		case <-r.Context().Done(): // Client disconnected
-			return nil
-		case err := <-errChan:
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		case chunk, ok := <-chunkChan:
-			if !ok {
+				// 流结束：刷出残余数据
 				if len(writeBuf) > 0 {
 					w.Write(writeBuf)
-					if f, ok := w.(http.Flusher); ok {
-						f.Flush()
-					}
+					flusher.Flush()
 				}
+				if err == io.EOF {
+					slog.Info("stream proxy upstream EOF (pipe)", "session", sessionID, "bytes", bytesRead)
+					return nil
+				}
+				slog.Error("stream proxy upstream error (pipe)", "session", sessionID, "error", err, "bytes", bytesRead)
+				return err
+			}
+
+			// 客户端断开检测
+			select {
+			case <-r.Context().Done():
+				slog.Info("stream proxy client disconnected (pipe)", "session", sessionID, "bytes", bytesRead)
 				return nil
+			default:
 			}
 
-			writeBuf = append(writeBuf, chunk...)
-
-			if !hasFlushed {
-				// 首次数据：立即 Flush，让客户端播放器尽快收到首字节开始解析
-				if len(writeBuf) > 0 {
-					n, err := w.Write(writeBuf)
-					if err != nil {
-						return err
-					}
-					if f, ok := w.(http.Flusher); ok {
-						f.Flush()
-					}
-					bytesSinceLastUpdate += int64(n)
-					writeBuf = writeBuf[:0]
-					hasFlushed = true
-				}
-			} else {
-				// 后续数据：攒够阈值再 Flush，根据协议动态调整减少延迟
-				if len(writeBuf) >= flushThreshold {
-					n, err := w.Write(writeBuf)
-					if err != nil {
-						return err
-					}
-					if f, ok := w.(http.Flusher); ok {
-						f.Flush()
-					}
-					bytesSinceLastUpdate += int64(n)
-					writeBuf = writeBuf[:0]
-				}
-			}
-
+			// 每秒更新流状态统计
 			now := time.Now()
 			if now.Sub(lastUpdate) >= time.Second {
-				if len(writeBuf) > 0 {
-					n, err := w.Write(writeBuf)
-					if err != nil {
-						return err
-					}
-					if f, ok := w.(http.Flusher); ok {
-						f.Flush()
-					}
-					bytesSinceLastUpdate += int64(n)
-					writeBuf = writeBuf[:0]
-				}
-
 				sp.mu.RLock()
 				if s, ok := sp.streams[sessionID]; ok {
 					s.Mu.Lock()
@@ -630,6 +602,126 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 				sp.mu.RUnlock()
 				bytesSinceLastUpdate = 0
 				lastUpdate = now
+			}
+		}
+	} else {
+		// ═══════════════════════════════════════════════════════
+		// 缓冲模式：适合 HLS/DASH/文件等非实时流
+		// ═══════════════════════════════════════════════════════
+		slog.Info("stream proxy buffered mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "threshold", flushThreshold)
+		chunkChan := make(chan []byte, 1024)
+		errChan := make(chan error, 1)
+
+		go func() {
+			defer close(chunkChan)
+			bufferSize := 64 * 1024
+			if sp.cfg.BufferSize > bufferSize {
+				bufferSize = sp.cfg.BufferSize
+			}
+			buf := make([]byte, bufferSize)
+			reader := bufio.NewReaderSize(resp.Body, bufferSize)
+			for {
+				n, err := reader.Read(buf)
+				if n > 0 {
+					chunkData := make([]byte, n)
+					copy(chunkData, buf[:n])
+					select {
+					case chunkChan <- chunkData:
+					default:
+						select {
+						case errChan <- fmt.Errorf("client buffer full, connection too slow"):
+						default:
+						}
+						return
+					}
+				}
+				if err != nil {
+					select {
+					case errChan <- err:
+					default:
+					}
+					return
+				}
+			}
+		}()
+
+		lastUpdate := time.Now()
+		var bytesSinceLastUpdate int64 = 0
+		hasFlushed := false
+		writeBuf := make([]byte, 0, 128*1024)
+
+		for {
+			select {
+			case <-r.Context().Done():
+				return nil
+			case err := <-errChan:
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			case chunk, ok := <-chunkChan:
+				if !ok {
+					if len(writeBuf) > 0 {
+						w.Write(writeBuf)
+						if canFlush {
+							flusher.Flush()
+						}
+					}
+					return nil
+				}
+
+				writeBuf = append(writeBuf, chunk...)
+
+				if !hasFlushed {
+					if len(writeBuf) > 0 {
+						n, err := w.Write(writeBuf)
+						if err != nil {
+							return err
+						}
+						if canFlush {
+							flusher.Flush()
+						}
+						bytesSinceLastUpdate += int64(n)
+						writeBuf = writeBuf[:0]
+						hasFlushed = true
+					}
+				} else if len(writeBuf) >= flushThreshold {
+					n, err := w.Write(writeBuf)
+					if err != nil {
+						return err
+					}
+					if canFlush {
+						flusher.Flush()
+					}
+					bytesSinceLastUpdate += int64(n)
+					writeBuf = writeBuf[:0]
+				}
+
+				now := time.Now()
+				if now.Sub(lastUpdate) >= time.Second {
+					if len(writeBuf) > 0 {
+						n, err := w.Write(writeBuf)
+						if err != nil {
+							return err
+						}
+						if canFlush {
+							flusher.Flush()
+						}
+						bytesSinceLastUpdate += int64(n)
+						writeBuf = writeBuf[:0]
+					}
+
+					sp.mu.RLock()
+					if s, ok := sp.streams[sessionID]; ok {
+						s.Mu.Lock()
+						s.LastActive = now
+						s.SpeedBytes = bytesSinceLastUpdate
+						s.Mu.Unlock()
+					}
+					sp.mu.RUnlock()
+					bytesSinceLastUpdate = 0
+					lastUpdate = now
+				}
 			}
 		}
 	}
@@ -799,24 +891,84 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 		return openUDPStream(ctx, targetURL)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", ua)
-	for k, v := range headers {
-		req.Header.Set(k, v)
+	// 检测是否为咪咕/华数等需定制 UA 的源（通过 URL 中的 appCode 等参数判断）
+	isMigU := strings.Contains(strings.ToLower(targetURL), "appcode=miguvideo") ||
+		strings.Contains(strings.ToLower(targetURL), "bean=mgspad")
+
+	// 准备多个 User-Agent 候补列表
+	userAgents := []string{}
+	if isMigU {
+		// 咪咕源：优先使用 Android MiguVideo App 风格 UA
+		userAgents = []string{
+			"MiguVideo/9.6.0 (Linux; Android 14; SM-S928B) tv.danmaku.bili",
+			"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
+		}
+	} else {
+		userAgents = []string{ua}
+		if ua != "" {
+			userAgents = append(userAgents,
+				"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
+				"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+			)
+		} else {
+			userAgents = []string{
+				"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
+				"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
+			}
+		}
 	}
 
-	rResp, rErr := sp.client.Do(req)
-	if rErr != nil {
-		return nil, rErr
+	// 最多尝试所有 UA，遇 403/5xx 时重试不同 UA
+	for attempt, currentUA := range userAgents {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 300 * time.Millisecond):
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+		if err != nil {
+			if attempt < len(userAgents)-1 {
+				continue
+			}
+			return nil, err
+		}
+		req.Header.Set("User-Agent", currentUA)
+
+		// 非咪咕源时设置 Referer；咪咕源不设置 Referer（部分源站检查 Referer 是否为空）
+		if !isMigU {
+			req.Header.Set("Referer", targetURL)
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		rResp, rErr := sp.client.Do(req)
+		if rErr != nil {
+			if attempt < len(userAgents)-1 {
+				continue
+			}
+			return nil, rErr
+		}
+		if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
+			return rResp, nil
+		}
+		rResp.Body.Close()
+
+		// 可重试状态码：403 (Forbidden，换 UA 可能绕过)、5xx (Server Error，临时故障)
+		// 不可重试：400、401、404 等（换 UA 无效）
+		if rResp.StatusCode != 403 && rResp.StatusCode < 500 {
+			return nil, fmt.Errorf("status code %d", rResp.StatusCode)
+		}
+		if attempt == len(userAgents)-1 {
+			return nil, fmt.Errorf("status code %d", rResp.StatusCode)
+		}
 	}
-	if rResp.StatusCode >= 200 && rResp.StatusCode < 400 {
-		return rResp, nil
-	}
-	rResp.Body.Close()
-	return nil, fmt.Errorf("status code %d", rResp.StatusCode)
+
+	return nil, fmt.Errorf("all attempts failed")
 }
 
 func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {

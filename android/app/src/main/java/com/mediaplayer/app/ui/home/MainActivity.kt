@@ -43,6 +43,7 @@ import com.mediaplayer.app.util.FocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import com.mediaplayer.app.util.VlcPlayerHelper
 import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.math.max
@@ -83,6 +84,7 @@ class MainActivity : AppCompatActivity() {
     private var progressEpg: ProgressBar? = null
     private var progressBuffering: ProgressBar? = null
     private var videoLayout: android.widget.FrameLayout? = null
+    private var snapshotOverlay: android.widget.ImageView? = null
     
     // EPG Menu
     private var layoutEpgMenu: View? = null
@@ -500,6 +502,17 @@ class MainActivity : AppCompatActivity() {
         videoLayout = findViewById(R.id.videoLayout)
         progressLoading = findViewById(R.id.progressLoading)
 
+        // 切台截帧占位 ImageView：覆盖在 videoLayout 最上层，消除切台黑屏
+        snapshotOverlay = android.widget.ImageView(this).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+        }
+        videoLayout?.addView(snapshotOverlay)
+
         // Settings sidebar
         layoutSettingsMenu = findViewById(R.id.layoutSettingsMenu)
         etSettingsUrl = findViewById(R.id.etSettingsUrl)
@@ -843,7 +856,8 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "配置已保存，重新加载中...", Toast.LENGTH_LONG).show()
                 checkAuthAndLoad()
             }
-            val qrUrl = "http://$ip:9528/"
+            val qrPort = configWebServer?.actualPort ?: 9528
+            val qrUrl = "http://$ip:$qrPort/"
             val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
             ivQrCode?.setImageBitmap(bitmap)
             tvQrConfigHint?.text = "手机扫码快速配置服务器\n或者访问: $qrUrl"
@@ -874,6 +888,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (percent >= 100f || percent == 0f) {
                         progressBuffering?.visibility = View.GONE
+                        dismissSnapshot() // 缓冲完成，移除截帧（兜底音频流）
                     } else {
                         progressBuffering?.visibility = View.VISIBLE
                     }
@@ -884,6 +899,7 @@ class MainActivity : AppCompatActivity() {
                     currentPlaybackState = PlaybackState.PLAYING
                     stateStartTime = System.currentTimeMillis()
                     progressBuffering?.visibility = View.GONE
+                    dismissSnapshot() // 新流首帧到来，移除截帧占位图
                     continuousSkipCount = 0
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -918,6 +934,7 @@ class MainActivity : AppCompatActivity() {
             override fun onError() {
                 uiHandler.post { 
                     currentPlaybackState = PlaybackState.IDLE
+                    dismissSnapshot() // 播放失败也移除截帧
                     handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
@@ -960,12 +977,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupQrConfigServer(onUrlUpdated: () -> Unit) {
         if (configWebServer == null) {
-            configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 9528) { rawUrl ->
+            configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 0) { urls ->
                 runOnUiThread {
-                    val newUrl = com.mediaplayer.app.data.api.ApiClient.formatUrl(rawUrl)
                     val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                    prefs.edit().putString(Prefs.KEY_SERVER_URL, newUrl).apply()
-                    com.mediaplayer.app.data.api.ApiClient.init(newUrl)
+                    saveServerList(urls)
+                    prefs.edit().putString(Prefs.KEY_SERVER_URL, urls.first()).apply()
+                    com.mediaplayer.app.data.api.ApiClient.init(urls.first())
                     authManager.clearAuth()
                     onUrlUpdated()
                 }
@@ -974,7 +991,27 @@ class MainActivity : AppCompatActivity() {
                 configWebServer?.start()
             } catch (e: Exception) {
                 e.printStackTrace()
+                Toast.makeText(this, "配置服务器启动失败", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun saveServerList(urls: List<String>) {
+        val json = com.google.gson.Gson().toJson(urls)
+        getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+            .edit()
+            .putString(Prefs.KEY_SERVER_URLS, json)
+            .apply()
+    }
+
+    private fun getServerList(): List<String> {
+        val json = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+            .getString(Prefs.KEY_SERVER_URLS, null) ?: return emptyList()
+        return try {
+            val arr = com.google.gson.Gson().fromJson(json, Array<String>::class.java)
+            arr.toList().filter { it.isNotEmpty() }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -1089,6 +1126,45 @@ class MainActivity : AppCompatActivity() {
     private var resolveJob: kotlinx.coroutines.Job? = null
     private var playGeneration: Int = 0
 
+    /**
+     * 截取当前 videoLayout 画面作为切台占位图，覆盖在最上层，消除切台黑屏。
+     */
+    private fun captureSnapshot() {
+        val vl = videoLayout ?: return
+        val iv = snapshotOverlay ?: return
+        try {
+            // 使用 PixelCopy（API 26+）截取 SurfaceView 画面
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
+                val copyListener = android.view.PixelCopy.OnPixelCopyFinishedListener { result ->
+                    if (result == android.view.PixelCopy.SUCCESS) {
+                        iv.setImageBitmap(bitmap)
+                        iv.visibility = View.VISIBLE
+                    }
+                }
+                android.view.PixelCopy.request(this.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
+            } else {
+                val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(bitmap)
+                vl.draw(canvas)
+                iv.setImageBitmap(bitmap)
+                iv.visibility = View.VISIBLE
+            }
+        } catch (_: Exception) {
+            // 截帧失败不影响正常切台
+        }
+    }
+
+    /**
+     * 移除切台占位图，显示新流画面。
+     */
+    private fun dismissSnapshot() {
+        snapshotOverlay?.let {
+            it.visibility = View.GONE
+            it.setImageBitmap(null)
+        }
+    }
+
     private fun playTvChannel(index: Int, isAutoSkip: Boolean = false) {
         if (!isAutoSkip) {
             continuousSkipCount = 0
@@ -1194,9 +1270,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (playerHelper == null || !isCoreMatch) {
+            // 跨内核切换前：截帧占位，保存 overlay 引用（removeAllViews 会移除它）
+            captureSnapshot()
             playerHelper?.release()
             videoLayout?.removeAllViews() // 清除旧的视图
             initPlayerWithCore(desiredCore)
+            // 跨内核切换后：重新挂载截帧 ImageView 到新 videoLayout 顶层
+            snapshotOverlay?.let { iv ->
+                if (iv.parent == null) {
+                    videoLayout?.addView(iv)
+                    // 确保覆盖在新建的播放器 Surface 之上
+                }
+            }
+        } else {
+            // 同内核切换：仅截帧，不移除任何视图
+            captureSnapshot()
         }
         progressBuffering?.visibility = View.VISIBLE
 
@@ -1491,24 +1579,55 @@ class MainActivity : AppCompatActivity() {
 
     private fun doRegister() {
         lifecycleScope.launch {
+            val serverList = getServerList()
+            val defaultUrl = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                .getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
+            val candidates = serverList.ifEmpty { listOf(defaultUrl) }
+
             showAuthWaiting("正在注册设备...")
-            authManager.register().onSuccess { result ->
-                when (result.status) {
-                    "approved" -> {
-                        handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter)
+
+            for ((index, serverUrl) in candidates.withIndex()) {
+                val label = if (index == 0) "主服务器 ($serverUrl)" else "备用服务器 $index ($serverUrl)"
+                showAuthWaiting("正在连接$label ...")
+
+                ApiClient.init(serverUrl)
+                authManager.clearAuth()
+
+                val attempt = try {
+                    withTimeout(30_000L) {
+                        authManager.register()
                     }
-                    "pending" -> {
-                        showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
-                        startAuthPolling()
-                    }
-                    "rejected" -> showAuthWaiting("设备注册被拒绝\n请联系管理员")
-                    "banned" -> showAuthWaiting("设备已被封禁\n请联系管理员")
+                } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                    Result.failure(Exception("连接超时"))
                 }
-            }.onFailure { e ->
-                // 无论遇到什么错误（DNS解析失败、404、类型转换错误等），都显示配置二维码和地址，防止用户卡死
-                val showQr = true
-                showAuthWaiting("注册失败: ${e.message}\n\n请检查服务器地址", showQr)
+
+                if (attempt.isSuccess) {
+                    val result = attempt.getOrThrow()
+                    when (result.status) {
+                        "approved" -> {
+                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter)
+                            return@launch
+                        }
+                        "pending" -> {
+                            showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
+                            startAuthPolling()
+                            return@launch
+                        }
+                        "rejected" -> {
+                            showAuthWaiting("设备注册被拒绝\n请联系管理员")
+                            return@launch
+                        }
+                        "banned" -> {
+                            showAuthWaiting("设备已被封禁\n请联系管理员")
+                            return@launch
+                        }
+                    }
+                }
+                // attempt.isFailure → 继续尝试下一台服务器
             }
+
+            // 所有服务器均无法连接
+            showAuthWaiting("所有服务器均无法连接，请检查配置信息", showQr = true)
         }
     }
 
@@ -1557,7 +1676,8 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "配置已保存，正在重试...", Toast.LENGTH_LONG).show()
                     checkAuthAndLoad()
                 }
-                val qrUrl = "http://$ip:9528/"
+                val qrPort = configWebServer?.actualPort ?: 9528
+                val qrUrl = "http://$ip:$qrPort/"
                 val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
                 ivAuthQrCode?.setImageBitmap(bitmap)
                 tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
