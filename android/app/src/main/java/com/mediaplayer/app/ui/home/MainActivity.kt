@@ -608,16 +608,43 @@ class MainActivity : AppCompatActivity() {
         val groupsRv = tvGroupsRv
         val channelsRv = tvChannelsRv
         if (groupsRv != null && channelsRv != null) {
-            FocusHelper.linkHorizontalFocus(groupsRv, channelsRv) {
-                val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
-                if (groupIndex >= 0) {
-                    val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
-                    lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+            FocusHelper.linkHorizontalFocus(groupsRv, channelsRv,
+                onLeftNav = {
+                    val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
+                    if (groupIndex >= 0) {
+                        val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                        lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                },
+                onRightNav = {
+                    // 获取当前焦点所在的分组
+                    val focusedView = groupsRv.findFocus() ?: return@linkHorizontalFocus false
+                    val focusedPos = groupsRv.getChildAdapterPosition(focusedView)
+                    if (focusedPos < 0) return@linkHorizontalFocus false
+                    val focusedGroup = groupAdapter.currentList.getOrNull(focusedPos) ?: return@linkHorizontalFocus false
+
+                    val targetPos = if (focusedGroup.id == currentGroupId) {
+                        // 同一分组 → 聚焦当前播放的频道位置
+                        val playingChannel = allChannels.getOrNull(currentChannelIndex)
+                        val playingId = playingChannel?.id ?: 0L
+                        val pos = filteredChannels.indexOfFirst { it.id == playingId }
+                        if (pos < 0) 0 else pos
+                    } else {
+                        // 不同分组 → 聚焦频道列表第一个
+                        0
+                    }
+
+                    channelsRv.scrollToPosition(targetPos)
+                    channelsRv.post {
+                        val lm = channelsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                        lm?.findViewByPosition(targetPos)?.requestFocus() ?: channelsRv.requestFocus()
+                    }
                     true
-                } else {
-                    false
                 }
-            }
+            )
         }
     }
 
@@ -2119,9 +2146,9 @@ class MainActivity : AppCompatActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val keyCode = event.keyCode
             
-            // 按键防抖：同一按键 200ms 内重复触发则忽略
+            // 按键防抖：同一按键 80ms 内重复触发则忽略
             val now = android.os.SystemClock.uptimeMillis()
-            if (keyCode == lastDispatchedKeyCode && now - lastDispatchedKeyTime < 200) {
+            if (keyCode == lastDispatchedKeyCode && now - lastDispatchedKeyTime < 80) {
                 return true
             }
             lastDispatchedKeyCode = keyCode

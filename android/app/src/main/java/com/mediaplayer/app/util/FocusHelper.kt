@@ -56,16 +56,20 @@ object FocusHelper {
     fun linkHorizontalFocus(
         leftRv: RecyclerView, 
         rightRv: RecyclerView,
-        onLeftNav: (() -> Boolean)? = null
+        onLeftNav: (() -> Boolean)? = null,
+        onRightNav: (() -> Boolean)? = null
     ) {
         leftRv.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    rightRv.requestFocus()
-                    val firstVisible = (rightRv.layoutManager as? LinearLayoutManager)
-                        ?.findFirstVisibleItemPosition() ?: 0
-                    rightRv.getChildAt(firstVisible - (rightRv.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition())
-                        ?.requestFocus()
+                    val handled = onRightNav?.invoke() ?: false
+                    if (!handled) {
+                        rightRv.requestFocus()
+                        val firstVisible = (rightRv.layoutManager as? LinearLayoutManager)
+                            ?.findFirstVisibleItemPosition() ?: 0
+                        rightRv.getChildAt(firstVisible - (rightRv.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition())
+                            ?.requestFocus()
+                    }
                     return@setOnKeyListener true
                 }
                 if (trapVerticalScroll(leftRv, keyCode)) return@setOnKeyListener true

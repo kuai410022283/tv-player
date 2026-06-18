@@ -1,7 +1,5 @@
 FROM golang:1.21-alpine AS builder
 
-RUN apk add --no-cache gcc musl-dev sqlite-dev
-
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
@@ -10,7 +8,11 @@ COPY . .
 
 # 注入版本号
 ARG VERSION=dev
-RUN CGO_ENABLED=1 GOOS=linux go build \
+# TARGETOS / TARGETARCH 由 docker buildx 自动传入（多平台构建）
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} CGO_ENABLED=0 go build \
     -ldflags "-X main.Version=${VERSION}" \
     -o mediaplayer ./cmd/server
 
