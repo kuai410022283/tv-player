@@ -50,4 +50,6 @@ object Prefs {
     const val KEY_SERVER_PORT = "config_server_port" // 配置 Web 服务器实际端口
     const val KEY_ENABLE_LOG = "enable_log"
     const val KEY_REVERSE_CHANNEL_KEYS = "reverse_channel_keys"
+    const val KEY_PLAN_NAME = "plan_name"
+    const val KEY_EXPIRES_AT = "expires_at"
 }

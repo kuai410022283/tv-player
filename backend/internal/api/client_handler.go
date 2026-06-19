@@ -142,6 +142,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"name":                  client.Name,
 		"max_streams":           client.MaxStreams,
 		"expires_at":            client.ExpiresAt,
+		"plan_name":             client.PlanName,
 		"announcement":          announcement,
 		"announcement_interval": announcementInterval,
 		"enable_log":            client.EnableLog,

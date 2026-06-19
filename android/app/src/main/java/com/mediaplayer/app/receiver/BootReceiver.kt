@@ -10,7 +10,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
-            val autoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true) // 默认开启
+            val autoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, false) // 默认关闭
             
             if (autoStart) {
                 val launchIntent = Intent(context, MainActivity::class.java).apply {

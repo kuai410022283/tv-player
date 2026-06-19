@@ -146,8 +146,8 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 	var c models.Client
 	var expiresAt sql.NullTime
-	err := s.db.QueryRow(`SELECT id, name, device_id, device_model, status, max_streams, expires_at, access_token, enable_log FROM clients WHERE access_token=?`, token).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken, &c.EnableLog)
+	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.status, c.max_streams, c.expires_at, c.access_token, c.enable_log, COALESCE(p.name, '') FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.access_token=?`, token).
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken, &c.EnableLog, &c.PlanName)
 	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
 	if err != nil {
 		return nil, fmt.Errorf("无效的令牌")

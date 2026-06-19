@@ -626,14 +626,30 @@ class MainActivity : AppCompatActivity() {
                     if (focusedPos < 0) return@linkHorizontalFocus false
                     val focusedGroup = groupAdapter.currentList.getOrNull(focusedPos) ?: return@linkHorizontalFocus false
 
-                    val targetPos = if (focusedGroup.id == currentGroupId) {
-                        // 同一分组 → 聚焦当前播放的频道位置
-                        val playingChannel = allChannels.getOrNull(currentChannelIndex)
-                        val playingId = playingChannel?.id ?: 0L
-                        val pos = filteredChannels.indexOfFirst { it.id == playingId }
+                    // 立即取消挂起的分组切台防抖任务，防止异步刷新导致焦点错乱
+                    focusDebounceRunnable?.let {
+                        focusDebounceHandler.removeCallbacks(it)
+                        focusDebounceRunnable = null
+                    }
+                    if (currentGroupId != focusedGroup.id) {
+                        currentGroupId = focusedGroup.id
+                        groupAdapter.setSelected(focusedGroup.id)
+                    }
+                    // 强制同步刷新频道列表，确保 filteredChannels 为当前选中分组的数据
+                    filterChannels(scrollToTop = false)
+
+                    val playingChannel = allChannels.getOrNull(currentChannelIndex)
+                    val playingGroupId = playingChannel?.groupId ?: 0L
+
+                    // 判断当前焦点分组是否是正在播放的频道所在分组（若为全部频道 0L 也视为匹配）
+                    val isPlayingGroup = (focusedGroup.id == playingGroupId || focusedGroup.id == 0L)
+
+                    val targetPos = if (isPlayingGroup && playingChannel != null) {
+                        // 回到当前分组选中的频道上
+                        val pos = filteredChannels.indexOfFirst { it.id == playingChannel.id }
                         if (pos < 0) 0 else pos
                     } else {
-                        // 不同分组 → 聚焦频道列表第一个
+                        // 焦点转移到当前分组频道的第一个频道列表项
                         0
                     }
 
@@ -662,6 +678,8 @@ class MainActivity : AppCompatActivity() {
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
         val btnSettingsReverseChannels = findViewById<View>(R.id.btnSettingsReverseChannels)
+        val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
+        val btnSettingsAbout = findViewById<View>(R.id.btnSettingsAbout)
         
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
@@ -698,7 +716,7 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
         }
         var currentScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
-        var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, true)
+        var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, false)
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
 
@@ -773,7 +791,6 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, currentReverseChannels).apply()
         }
 
-        val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
         btnSettingsCheckUpdate?.setOnClickListener {
             com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, true)
         }
@@ -847,6 +864,59 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "未检测到QQ应用，已复制群号: 864744268", Toast.LENGTH_SHORT).show()
             }
         }
+        
+        btnSettingsAbout?.setOnClickListener {
+            showAboutDevice()
+        }
+        btnSettingsAbout?.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                btnSettingsAbout.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start()
+            } else {
+                btnSettingsAbout.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+            }
+        }
+    }
+
+    private fun showAboutDevice() {
+        val layoutAboutDevice = findViewById<View>(R.id.layoutAboutDevice)
+        if (layoutAboutDevice?.visibility == View.VISIBLE) return
+        layoutSettingsMenu?.visibility = View.GONE
+        layoutAboutDevice?.visibility = View.VISIBLE
+        layoutAboutDevice?.requestFocus()
+
+        findViewById<TextView>(R.id.tvAboutOs)?.text = "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})"
+        findViewById<TextView>(R.id.tvAboutHardware)?.text = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+        
+        val cpuAbi = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            android.os.Build.SUPPORTED_ABIS.joinToString(", ")
+        } else {
+            @Suppress("DEPRECATION")
+            android.os.Build.CPU_ABI
+        }
+        findViewById<TextView>(R.id.tvAboutCpu)?.text = cpuAbi
+        
+        val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val mi = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        val totalMemGb = String.format("%.1f GB", mi.totalMem / (1024.0 * 1024.0 * 1024.0))
+        findViewById<TextView>(R.id.tvAboutRam)?.text = totalMemGb
+        
+        findViewById<TextView>(R.id.tvAboutIp)?.text = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress() ?: "未知"
+        
+        val deviceId = com.mediaplayer.app.data.api.ClientAuthManager(this).getDeviceId()
+        findViewById<View>(R.id.rowAboutMac)?.visibility = View.VISIBLE
+        findViewById<TextView>(R.id.tvAboutMac)?.text = deviceId
+        
+        layoutAboutDevice?.setOnClickListener {
+            hideAboutDevice()
+        }
+    }
+
+    private fun hideAboutDevice() {
+        val layoutAboutDevice = findViewById<View>(R.id.layoutAboutDevice)
+        if (layoutAboutDevice?.visibility == View.GONE) return
+        layoutAboutDevice?.visibility = View.GONE
+        showSettingsMenu()
     }
 
     private fun showSettingsMenu() {
@@ -1591,6 +1661,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAuthAndLoad() {
+        // 先停止之前的轮询，避免多个轮询器同时运行
+        authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
+        authPollRunnable = null
+        
         lifecycleScope.launch {
             if (authManager.isApproved()) {
                 authManager.verify().onSuccess { resp ->
@@ -1621,7 +1695,7 @@ class MainActivity : AppCompatActivity() {
                 authManager.clearAuth()
 
                 val attempt = try {
-                    withTimeout(30_000L) {
+                    withTimeout(15_000L) { // 缩短单次超时时间，避免过长等待
                         authManager.register()
                     }
                 } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
@@ -1653,12 +1727,17 @@ class MainActivity : AppCompatActivity() {
                 // attempt.isFailure → 继续尝试下一台服务器
             }
 
-            // 所有服务器均无法连接
-            showAuthWaiting("所有服务器均无法连接，请检查配置信息", showQr = true)
+            // 所有服务器均无法连接，不要死等，开启轮询机制定期重试连接
+            showAuthWaiting("所有服务器均无法连接，15秒后自动重试...\n请检查配置信息", showQr = true)
+            
+            val retryRunnable = Runnable { checkAuthAndLoad() }
+            authPollRunnable = retryRunnable
+            authPollHandler.postDelayed(retryRunnable, 15000)
         }
     }
 
     private fun startAuthPolling() {
+        authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         val runnable = object : Runnable {
             override fun run() {
                 lifecycleScope.launch {
@@ -1670,6 +1749,9 @@ class MainActivity : AppCompatActivity() {
                                     sysAnnouncementInterval = resp.announcementInterval
                                 }
                                 showContent()
+                            }.onFailure { 
+                                // 如果验证失败（如网络抖动），继续轮询不要停
+                                authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
                             }
                             return@launch 
                         }
@@ -2277,6 +2359,9 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                 }
+            } else if (keyCode == KeyEvent.KEYCODE_BACK) {
+                handleBackPress()
+                return true
             }
         }
         return super.dispatchKeyEvent(event)
@@ -2348,11 +2433,24 @@ class MainActivity : AppCompatActivity() {
                         hideLineSelectionMenu()
                         return true
                     }
-                    if (!isMenuVisible) {
+                    if (isMenuVisible) {
+                        // 在菜单显示状态下，如果频道列表有焦点，向左按键转移到对应的分组上
+                        val groupsRv = tvGroupsRv
+                        val channelsRv = tvChannelsRv
+                        if (groupsRv != null && channelsRv != null && channelsRv.hasFocus()) {
+                            val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
+                            if (groupIndex >= 0) {
+                                val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                                lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+                            } else {
+                                groupsRv.requestFocus()
+                            }
+                            return true
+                        }
+                    } else {
                         showZappingMenu(focusOnGroups = false, resetToPlaying = true)
                         return true
                     }
-                    // 如果 isMenuVisible 为 true，不拦截，让焦点能在菜单内部向左移动（从频道到分组）
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (isSettingsVisible) {
@@ -2371,13 +2469,59 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                     if (isMenuVisible) {
-                        if (tvChannelsRv?.hasFocus() == true) {
+                        val groupsRv = tvGroupsRv
+                        val channelsRv = tvChannelsRv
+                        if (channelsRv != null && channelsRv.hasFocus()) {
                             // 如果已经在频道列表（最右侧），再按右键则关闭菜单
                             uiHandler.removeCallbacks(hideZappingRunnable)
                             hideZappingRunnable.run()
                             return true
                         }
-                        // 如果焦点在分组列表，不拦截，让焦点能向右移动到频道列表
+                        if (groupsRv != null && channelsRv != null && groupsRv.hasFocus()) {
+                            // 获取当前焦点所在的分组
+                            val focusedView = groupsRv.findFocus()
+                            if (focusedView != null) {
+                                val focusedPos = groupsRv.getChildAdapterPosition(focusedView)
+                                if (focusedPos >= 0) {
+                                    val focusedGroup = groupAdapter.currentList.getOrNull(focusedPos)
+                                    if (focusedGroup != null) {
+                                        // 立即取消挂起的分组切台防抖任务，防止异步刷新导致焦点错乱
+                                        focusDebounceRunnable?.let {
+                                            focusDebounceHandler.removeCallbacks(it)
+                                            focusDebounceRunnable = null
+                                        }
+                                        if (currentGroupId != focusedGroup.id) {
+                                            currentGroupId = focusedGroup.id
+                                            groupAdapter.setSelected(focusedGroup.id)
+                                        }
+                                        // 强制同步刷新频道列表，确保 filteredChannels 为当前选中分组的数据
+                                        filterChannels(scrollToTop = false)
+
+                                        val playingChannel = allChannels.getOrNull(currentChannelIndex)
+                                        val playingGroupId = playingChannel?.groupId ?: 0L
+
+                                        // 判断当前焦点分组是否是正在播放的频道所在分组（若为全部频道 0L 也视为匹配）
+                                        val isPlayingGroup = (focusedGroup.id == playingGroupId || focusedGroup.id == 0L)
+
+                                        val targetPos = if (isPlayingGroup && playingChannel != null) {
+                                            // 回到当前分组选中的频道上
+                                            val pos = filteredChannels.indexOfFirst { it.id == playingChannel.id }
+                                            if (pos < 0) 0 else pos
+                                        } else {
+                                            // 焦点转移到当前分组频道的第一个频道列表项
+                                            0
+                                        }
+
+                                        channelsRv.scrollToPosition(targetPos)
+                                        channelsRv.post {
+                                            val lm = channelsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                                            lm?.findViewByPosition(targetPos)?.requestFocus() ?: channelsRv.requestFocus()
+                                        }
+                                        return true
+                                    }
+                                }
+                            }
+                        }
                     } else {
                         // 如果菜单未显示，按右键呼出完整 EPG 节目单
                         showEpgMenu()
@@ -2385,24 +2529,8 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_BACK -> {
-                    if (layoutLineMenu?.visibility == View.VISIBLE) {
-                        hideLineSelectionMenu()
-                        return true
-                    } else if (layoutEpgMenu?.visibility == View.VISIBLE) {
-                        hideEpgMenu()
-                        return true
-                    } else if (isSettingsVisible) {
-                        hideSettingsMenu()
-                        return true
-                    } else if (isMenuVisible) {
-                        uiHandler.removeCallbacks(hideZappingRunnable)
-                        hideZappingRunnable.run()
-                        return true
-                    } else {
-                        // 退出确认或者直接退出
-                        finish()
-                        return true
-                    }
+                    handleBackPress()
+                    return true
                 }
             }
             if (isMenuVisible && keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
@@ -2438,6 +2566,48 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onBackPressed() {
+        handleBackPress()
+    }
+
+    private fun handleBackPress() {
+        if (tvAuthWaiting?.visibility == View.VISIBLE) {
+            finish()
+            return
+        }
+        
+        if (layoutSettingsMenu?.visibility == View.VISIBLE) {
+            hideSettingsMenu()
+            return
+        }
+        if (layoutEpgMenu?.visibility == View.VISIBLE) {
+            hideEpgMenu()
+            return
+        }
+        if (layoutLineMenu?.visibility == View.VISIBLE) {
+            hideLineSelectionMenu()
+            return
+        }
+        if (layoutZappingMenu?.visibility == View.VISIBLE) {
+            uiHandler.removeCallbacks(hideZappingRunnable)
+            hideZappingRunnable.run()
+            return
+        }
+        
+        showExitDialog()
+    }
+
+    private fun showExitDialog() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("退出应用")
+            .setMessage("确定要退出媒体播放器吗？")
+            .setPositiveButton("退出") { _, _ ->
+                finish()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     companion object {

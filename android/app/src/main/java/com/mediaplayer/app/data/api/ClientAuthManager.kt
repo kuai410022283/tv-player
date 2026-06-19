@@ -81,7 +81,12 @@ class ClientAuthManager(private val context: Context) {
             if (response.isSuccessful && response.body()?.code == 0) {
                 val data = response.body()?.data
                 if (data != null) {
-                    prefs.edit().putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog).apply()
+                    prefs.edit().apply {
+                        putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog)
+                        putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
+                        putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
+                        apply()
+                    }
                     com.mediaplayer.app.util.RemoteLogger.updateConfig(data.enableLog)
                 }
                 Result.success(data)

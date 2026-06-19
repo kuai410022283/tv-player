@@ -766,7 +766,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsReverseChannels"
-                    android:nextFocusDown="@+id/tvQQGroup">
+                    android:nextFocusDown="@+id/btnSettingsAbout">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -778,6 +778,33 @@
                         android:layout_width="@dimen/dp_20"
                         android:layout_height="@dimen/dp_20"
                         android:src="@android:drawable/ic_popup_sync"
+                        app:tint="#AAAAAA"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsAbout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsCheckUpdate"
+                    android:nextFocusDown="@+id/tvQQGroup">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="关于本机"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_20"
+                        android:layout_height="@dimen/dp_20"
+                        android:src="@android:drawable/ic_dialog_info"
                         app:tint="#AAAAAA"/>
                 </LinearLayout>
             </LinearLayout>
@@ -839,10 +866,90 @@
                 android:gravity="center"
                 android:clickable="true"
                 android:focusable="true"
-                android:nextFocusUp="@+id/btnSettingsCheckUpdate"
+                android:nextFocusUp="@+id/btnSettingsAbout"
                 android:nextFocusDown="@+id/tvQQGroup" />
 
         </LinearLayout>
     </ScrollView>
+
+    <!-- 6. 关于本机弹窗 -->
+    <FrameLayout
+        android:id="@+id/layoutAboutDevice"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:nextFocusLeft="@+id/layoutAboutDevice"
+        android:nextFocusRight="@+id/layoutAboutDevice"
+        android:nextFocusUp="@+id/layoutAboutDevice"
+        android:nextFocusDown="@+id/layoutAboutDevice">
+
+        <LinearLayout
+            android:layout_width="600dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/bg_settings_card"
+            android:padding="32dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="关于本机"
+                android:textColor="@color/accent"
+                android:textSize="@dimen/text_28"
+                android:textStyle="bold"
+                android:layout_marginBottom="24dp"
+                android:gravity="center_horizontal"/>
+
+            <TableLayout
+                android:id="@+id/tableAboutInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal">
+
+                <TableRow android:layout_marginBottom="12dp">
+                    <TextView android:text="系统版本 :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutOs" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold" />
+                </TableRow>
+
+                <TableRow android:layout_marginBottom="12dp">
+                    <TextView android:text="硬件型号 :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutHardware" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold"/>
+                </TableRow>
+
+                <TableRow android:layout_marginBottom="12dp">
+                    <TextView android:text="处理器 :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutCpu" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold"/>
+                </TableRow>
+
+                <TableRow android:layout_marginBottom="12dp">
+                    <TextView android:text="运行内存 :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutRam" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold"/>
+                </TableRow>
+
+                <TableRow android:layout_marginBottom="12dp">
+                    <TextView android:text="本地 IP :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutIp" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold"/>
+                </TableRow>
+
+                <TableRow android:id="@+id/rowAboutMac" android:layout_marginBottom="12dp">
+                    <TextView android:text="MAC 地址 :" android:textColor="#A0A0A0" android:textSize="@dimen/sp_22" android:layout_marginEnd="16dp"/>
+                    <TextView android:id="@+id/tvAboutMac" android:textColor="#FFFFFF" android:textSize="@dimen/sp_22" android:textStyle="bold"/>
+                </TableRow>
+            </TableLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="按返回键或确认键关闭"
+                android:textColor="#88FFFFFF"
+                android:textSize="@dimen/sp_18"
+                android:layout_marginTop="32dp"
+                android:gravity="center_horizontal" />
+        </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>
