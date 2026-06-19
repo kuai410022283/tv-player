@@ -626,17 +626,18 @@ class MainActivity : AppCompatActivity() {
                     if (focusedPos < 0) return@linkHorizontalFocus false
                     val focusedGroup = groupAdapter.currentList.getOrNull(focusedPos) ?: return@linkHorizontalFocus false
 
+                    // 判断是否需要刷新右侧列表
+                    val needsFilter = focusDebounceRunnable != null || currentGroupId != focusedGroup.id
                     // 立即取消挂起的分组切台防抖任务，防止异步刷新导致焦点错乱
                     focusDebounceRunnable?.let {
                         focusDebounceHandler.removeCallbacks(it)
                         focusDebounceRunnable = null
                     }
-                    if (currentGroupId != focusedGroup.id) {
+                    if (needsFilter) {
                         currentGroupId = focusedGroup.id
                         groupAdapter.setSelected(focusedGroup.id)
+                        filterChannels(scrollToTop = false)
                     }
-                    // 强制同步刷新频道列表，确保 filteredChannels 为当前选中分组的数据
-                    filterChannels(scrollToTop = false)
 
                     val playingChannel = allChannels.getOrNull(currentChannelIndex)
                     val playingGroupId = playingChannel?.groupId ?: 0L
@@ -654,9 +655,29 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     channelsRv.scrollToPosition(targetPos)
-                    channelsRv.post {
+                    
+                    val focusAction = Runnable {
                         val lm = channelsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
-                        lm?.findViewByPosition(targetPos)?.requestFocus() ?: channelsRv.requestFocus()
+                        val view = lm?.findViewByPosition(targetPos)
+                        if (view != null) {
+                            view.requestFocus()
+                        } else {
+                            channelsRv.requestFocus()
+                        }
+                    }
+                    
+                    if (needsFilter) {
+                        // 如果列表刚刷新，等待 RecyclerView 布局完成
+                        channelsRv.postDelayed(focusAction, 50)
+                    } else {
+                        val lm = channelsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                        val view = lm?.findViewByPosition(targetPos)
+                        if (view != null) {
+                            view.requestFocus()
+                        } else {
+                            // 视图未就绪(例如刚被滚动入屏)，延时重试
+                            channelsRv.postDelayed(focusAction, 50)
+                        }
                     }
                     true
                 }

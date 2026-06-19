@@ -1000,6 +1000,35 @@ async function toggleClientLog(id, enable) {
   }
 }
 
+async function downloadClientLog(id, deviceId) {
+  const url = `/api/v1/admin/clients/${id}/download-log`;
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('tv_token') }
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      let errMsg = '下载失败';
+      try {
+        const json = JSON.parse(errText);
+        if (json.message) errMsg = json.message;
+      } catch (e) {}
+      toast(errMsg, 'error');
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${deviceId}.log`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    toast('网络错误', 'error');
+  }
+}
+
 let allPlans = [];
 
 async function loadPlans() {

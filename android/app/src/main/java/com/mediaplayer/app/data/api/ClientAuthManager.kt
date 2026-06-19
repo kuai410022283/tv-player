@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.data.model.ClientRegisterResp
+import com.mediaplayer.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -50,7 +51,7 @@ class ClientAuthManager(private val context: Context) {
                 "device_id" to getDeviceId(),
                 "device_model" to Build.MODEL,
                 "device_os" to "Android ${Build.VERSION.RELEASE}",
-                "app_version" to "1.0.0"
+                "app_version" to BuildConfig.VERSION_NAME
             )
             getLocation()?.let {
                 body["note"] = it
@@ -118,7 +119,7 @@ class ClientAuthManager(private val context: Context) {
                 "device_id" to getDeviceId(),
                 "device_model" to Build.MODEL,
                 "device_os" to "Android ${Build.VERSION.RELEASE}",
-                "app_version" to "1.0.0"
+                "app_version" to BuildConfig.VERSION_NAME
             )
             getLocation()?.let {
                 regBody["note"] = it
