@@ -92,7 +92,11 @@ sudo chmod 0755 mediaplayer
 
 ---
 
-
 <p align="center">
   <i>—— “让海量订阅源的聚合管理与播放前所未有的流畅与安全” ——</i>
 </p>
+
+
+## LICENSE
+请遵守[LICENSE](LICENSE)，不得用于任何商业用途。
+
