@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -976,6 +977,88 @@ func (h *Handler) SetAppUpdate(c *gin.Context) {
 	_ = h.channelSvc.SetSetting("update_force", forceVal)
 
 	ok(c, body)
+}
+
+func (h *Handler) PullAppUpdate(c *gin.Context) {
+	var body struct {
+		VersionName string `json:"version_name" binding:"required"`
+		DownloadURL string `json:"download_url" binding:"required"`
+		UpdateLog   string `json:"update_log"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	re := regexp.MustCompile(`(\d+)$`)
+	matches := re.FindStringSubmatch(body.VersionName)
+	var versionCode int
+	if len(matches) > 1 {
+		versionCode, _ = strconv.Atoi(matches[1])
+	}
+	if versionCode == 0 {
+		fail(c, 400, "无法从版本号解析 versionCode")
+		return
+	}
+
+	downloadDir := filepath.Join("web", "download", fmt.Sprintf("%d_%s", versionCode, body.VersionName))
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		fail(c, 500, "创建目录失败")
+		return
+	}
+
+	parts := strings.Split(body.DownloadURL, "/")
+	filename := parts[len(parts)-1]
+	if filename == "" {
+		filename = "update.apk"
+	}
+	apkPath := filepath.Join(downloadDir, filename)
+
+	// 如果文件已存在且大小大于0，则跳过下载，直接复用
+	skipDownload := false
+	if info, err := os.Stat(apkPath); err == nil && info.Size() > 0 {
+		skipDownload = true
+	}
+
+	if !skipDownload {
+		resp, err := http.Get(body.DownloadURL)
+		if err != nil {
+			fail(c, 500, "下载失败: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			fail(c, 500, fmt.Sprintf("下载失败: HTTP %d", resp.StatusCode))
+			return
+		}
+
+		out, err := os.Create(apkPath)
+		if err != nil {
+			fail(c, 500, "创建文件失败: "+err.Error())
+			return
+		}
+		defer out.Close()
+
+		if _, err := io.Copy(out, resp.Body); err != nil {
+			fail(c, 500, "保存文件失败: "+err.Error())
+			return
+		}
+	}
+
+	logPath := filepath.Join(downloadDir, "version.txt")
+	if err := os.WriteFile(logPath, []byte(body.UpdateLog), 0644); err != nil {
+		fail(c, 500, "写入日志失败")
+		return
+	}
+
+	_ = h.channelSvc.SetSetting("update_version_code", strconv.Itoa(versionCode))
+	_ = h.channelSvc.SetSetting("update_version_name", body.VersionName)
+	_ = h.channelSvc.SetSetting("update_log", body.UpdateLog)
+	_ = h.channelSvc.SetSetting("update_download_url", "")
+	_ = h.channelSvc.SetSetting("update_force", "false")
+
+	ok(c, gin.H{"message": "拉取并发布成功"})
 }
 
 // ── EPG ────────────────────────────────────────────────
