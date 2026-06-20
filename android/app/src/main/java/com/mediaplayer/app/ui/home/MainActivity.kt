@@ -2450,9 +2450,6 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                 }
-            } else if (keyCode == KeyEvent.KEYCODE_BACK) {
-                handleBackPress()
-                return true
             }
         }
         return super.dispatchKeyEvent(event)
@@ -2619,10 +2616,6 @@ class MainActivity : AppCompatActivity() {
                         return true
                     }
                 }
-                KeyEvent.KEYCODE_BACK -> {
-                    handleBackPress()
-                    return true
-                }
             }
             if (isMenuVisible && keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
                 uiHandler.removeCallbacks(hideZappingRunnable)
@@ -2669,6 +2662,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
+        val layoutAboutDevice = findViewById<View>(R.id.layoutAboutDevice)
+        if (layoutAboutDevice?.visibility == View.VISIBLE) {
+            hideAboutDevice()
+            return
+        }
+        
         if (layoutSettingsMenu?.visibility == View.VISIBLE) {
             hideSettingsMenu()
             return
@@ -2684,6 +2683,11 @@ class MainActivity : AppCompatActivity() {
         if (layoutZappingMenu?.visibility == View.VISIBLE) {
             uiHandler.removeCallbacks(hideZappingRunnable)
             hideZappingRunnable.run()
+            return
+        }
+        if (layoutOsd?.visibility == View.VISIBLE) {
+            uiHandler.removeCallbacks(hideOsdRunnable)
+            hideOsdRunnable.run()
             return
         }
         
