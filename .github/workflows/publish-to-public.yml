@@ -49,6 +49,7 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
       should_release: ${{ steps.get_version.outputs.SHOULD_RELEASE }}
+      body: ${{ steps.get_version.outputs.RELEASE_BODY }}
     steps:
       - name: Extract Version
         id: get_version
@@ -60,11 +61,21 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+            # Extract text after tag for release notes if available
+            MSG_BODY=$(echo "$COMMIT_MSG" | sed -n '2,$p')
+            echo "RELEASE_BODY<<EOF" >> $GITHUB_OUTPUT
+            echo "$MSG_BODY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           else
             EXTRACTED=$(echo "$COMMIT_MSG" | grep -oP '(?i)Release:\s*\K(v[0-9][^\s]*)' | head -n 1)
             if [ -n "$EXTRACTED" ]; then
               echo "VERSION=$EXTRACTED" >> $GITHUB_OUTPUT
               echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+              # Extract everything after the version match as the release note body
+              MSG_BODY=$(echo "$COMMIT_MSG" | grep -oP '(?i)Release:\s*v[0-9][^\s]*\s*\K(.*)' || true)
+              echo "RELEASE_BODY<<EOF" >> $GITHUB_OUTPUT
+              echo "$MSG_BODY" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
             else
               echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
             fi
@@ -312,6 +323,7 @@ jobs:
           target_commitish: main
           tag_name: ${{ needs.prepare-release.outputs.version }}
           name: Release ${{ needs.prepare-release.outputs.version }}
+          body: ${{ needs.prepare-release.outputs.body }}
           generate_release_notes: true
           files: |
             artifacts/**/*.tar.gz
