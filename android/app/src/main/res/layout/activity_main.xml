@@ -34,14 +34,6 @@
         android:paddingHorizontal="@dimen/dp_24"
         android:orientation="horizontal"
         android:visibility="gone">
-        
-        <ImageView
-            android:layout_width="@dimen/dp_24"
-            android:layout_height="@dimen/dp_24"
-            android:src="@android:drawable/ic_dialog_info"
-            android:layout_marginEnd="@dimen/dp_8"
-            app:tint="@color/accent" />
-
         <TextView
             android:id="@+id/tvAnnouncement"
             android:layout_width="match_parent"
@@ -96,6 +88,15 @@
                 android:textSize="@dimen/text_48"
                 android:textStyle="bold" />
 
+            <TextView
+                android:id="@+id/tvOsdLineInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#AAAAAA"
+                android:textSize="@dimen/text_24"
+                android:layout_marginStart="@dimen/dp_16"
+                tools:text="1/6" />
+
             <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
 
             <!-- 右侧网速、时间、编码等 -->
@@ -108,14 +109,28 @@
                 android:text="1080P | H264 | AC3" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvOsdEpg"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="正在播放: 精彩节目"
-            android:textColor="#DDDDDD"
-            android:textSize="@dimen/text_24"
-            android:layout_marginTop="@dimen/dp_8"/>
+            android:layout_marginTop="@dimen/dp_8"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/tvOsdEpg"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="正在播放: 精彩节目"
+                android:textColor="#DDDDDD"
+                android:textSize="@dimen/text_24" />
+            <TextView
+                android:id="@+id/tvOsdNextEpg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#AAAAAA"
+                android:textSize="@dimen/text_22" />
+        </LinearLayout>
             
         <ProgressBar
             android:id="@+id/progressEpg"
@@ -558,7 +573,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsCore"
-                    android:nextFocusDown="@+id/sbSettingsCache">
+                    android:nextFocusDown="@+id/btnSettingsTimeMode">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -571,6 +586,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="显示"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsTimeMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsShowLogo"
+                    android:nextFocusDown="@+id/sbSettingsCache">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="时间显示"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsTimeModeValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="隐藏"
                         android:textColor="#AAAAAA"
                         android:textSize="@dimen/sp_22"
                         android:layout_marginEnd="@dimen/dp_8"/>
@@ -951,5 +1001,14 @@
                 android:gravity="center_horizontal" />
         </LinearLayout>
     </FrameLayout>
+
+    <!-- 顶部右上角时间悬浮窗 -->
+    <com.mediaplayer.app.ui.widget.TimeOverlayView
+        android:id="@+id/timeOverlayView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="32dp" />
 
 </FrameLayout>

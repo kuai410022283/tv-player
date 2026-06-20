@@ -79,8 +79,10 @@ class MainActivity : AppCompatActivity() {
     private var layoutOsd: View? = null
     private var tvOsdChannelNum: TextView? = null
     private var tvOsdChannelName: TextView? = null
+    private var tvOsdLineInfo: TextView? = null
     private var tvOsdInfo: TextView? = null
     private var tvOsdEpg: TextView? = null
+    private var tvOsdNextEpg: TextView? = null
     private var progressEpg: ProgressBar? = null
     private var progressBuffering: ProgressBar? = null
     private var videoLayout: android.widget.FrameLayout? = null
@@ -219,6 +221,7 @@ class MainActivity : AppCompatActivity() {
 
     private val hideOsdRunnable = Runnable { 
         layoutOsd?.visibility = View.GONE 
+        findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = false
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD GONE")
     }
     private val hideZappingRunnable = Runnable { 
@@ -495,8 +498,10 @@ class MainActivity : AppCompatActivity() {
         layoutOsd = findViewById(R.id.layoutOsd)
         tvOsdChannelNum = findViewById(R.id.tvOsdChannelNum)
         tvOsdChannelName = findViewById(R.id.tvOsdChannelName)
+        tvOsdLineInfo = findViewById(R.id.tvOsdLineInfo)
         tvOsdInfo = findViewById(R.id.tvOsdInfo)
         tvOsdEpg = findViewById(R.id.tvOsdEpg)
+        tvOsdNextEpg = findViewById(R.id.tvOsdNextEpg)
         progressEpg = findViewById(R.id.progressEpg)
         progressBuffering = findViewById(R.id.progressBuffering)
         videoLayout = findViewById(R.id.videoLayout)
@@ -782,6 +787,29 @@ class MainActivity : AppCompatActivity() {
                 channelAdapter.showLogo = currentShowLogo
                 channelAdapter.notifyDataSetChanged()
             }
+        }
+
+        val btnSettingsTimeMode = findViewById<View>(R.id.btnSettingsTimeMode)
+        val tvSettingsTimeModeValue = findViewById<TextView>(R.id.tvSettingsTimeModeValue)
+        val timeOverlayView = findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)
+        var currentTimeMode = prefs.getInt(Prefs.KEY_TIME_SHOW_MODE, Prefs.TIME_SHOW_MODE_HIDDEN)
+        
+        fun updateTimeModeText() {
+            tvSettingsTimeModeValue?.text = when (currentTimeMode) {
+                Prefs.TIME_SHOW_MODE_HIDDEN -> "隐藏"
+                Prefs.TIME_SHOW_MODE_ALWAYS -> "常显"
+                Prefs.TIME_SHOW_MODE_EVERY_HOUR -> "整点"
+                Prefs.TIME_SHOW_MODE_HALF_HOUR -> "半点"
+                else -> "未知"
+            }
+        }
+        updateTimeModeText()
+
+        btnSettingsTimeMode?.setOnClickListener {
+            currentTimeMode = (currentTimeMode + 1) % 4
+            updateTimeModeText()
+            prefs.edit().putInt(Prefs.KEY_TIME_SHOW_MODE, currentTimeMode).apply()
+            timeOverlayView?.refreshMode()
         }
         
         btnSettingsScale?.setOnClickListener {
@@ -1243,6 +1271,7 @@ class MainActivity : AppCompatActivity() {
 
     private var resolveJob: kotlinx.coroutines.Job? = null
     private var playGeneration: Int = 0
+    private var snapshotGeneration: Int = 0
 
     /**
      * 截取当前 videoLayout 画面作为切台占位图，覆盖在最上层，消除切台黑屏。
@@ -1250,14 +1279,17 @@ class MainActivity : AppCompatActivity() {
     private fun captureSnapshot() {
         val vl = videoLayout ?: return
         val iv = snapshotOverlay ?: return
+        val currentGen = ++snapshotGeneration
         try {
-            // 使用 PixelCopy（API 26+）截取 SurfaceView 画面
+            // 使用 PixelCopy（API 26+）获取 SurfaceView 的截图
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val copyListener = android.view.PixelCopy.OnPixelCopyFinishedListener { result ->
                     if (result == android.view.PixelCopy.SUCCESS) {
-                        iv.setImageBitmap(bitmap)
-                        iv.visibility = View.VISIBLE
+                        if (currentGen == snapshotGeneration) {
+                            iv.setImageBitmap(bitmap)
+                            iv.visibility = View.VISIBLE
+                        }
                     }
                 }
                 android.view.PixelCopy.request(this.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
@@ -1265,18 +1297,21 @@ class MainActivity : AppCompatActivity() {
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(bitmap)
                 vl.draw(canvas)
-                iv.setImageBitmap(bitmap)
-                iv.visibility = View.VISIBLE
+                if (currentGen == snapshotGeneration) {
+                    iv.setImageBitmap(bitmap)
+                    iv.visibility = View.VISIBLE
+                }
             }
         } catch (_: Exception) {
-            // 截帧失败不影响正常切台
+            // 截图失败不影响后台
         }
     }
 
     /**
-     * 移除切台占位图，显示新流画面。
+     * 移除后台占位图显示。
      */
     private fun dismissSnapshot() {
+        snapshotGeneration++ // 增加代数，使得任何尚未完成的 PixelCopy 回调作废
         snapshotOverlay?.let {
             it.visibility = View.GONE
             it.setImageBitmap(null)
@@ -1319,6 +1354,8 @@ class MainActivity : AppCompatActivity() {
         if (lines.isEmpty()) return
         if (currentLineIndex >= lines.size) currentLineIndex = 0
         val line = lines[currentLineIndex]
+        
+        tvOsdLineInfo?.text = "${currentLineIndex + 1}/${lines.size}"
         
         tvOsdInfo?.text = if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中..."
         
@@ -1401,8 +1438,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
-            // 同内核切换：仅截帧，不移除任何视图
-            captureSnapshot()
+            // 同内核切换：直接由底层控制缓冲黑屏或保留上一帧，无需上层强加异步截屏。
+            // 防止异步截屏延后出现，覆盖在新频道的首帧上，从而导致“重影”现象。
+            dismissSnapshot()
         }
         progressBuffering?.visibility = View.VISIBLE
 
@@ -1519,6 +1557,14 @@ class MainActivity : AppCompatActivity() {
         if (channel != null) {
             tvOsdChannelNum?.text = String.format("%03d", channel.globalIndex + 1)
             tvOsdChannelName?.text = channel.name
+            
+            val lines = channel.getLinesSafely()
+            if (lines.isNotEmpty()) {
+                val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
+                tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+            } else {
+                tvOsdLineInfo?.text = ""
+            }
         }
         
         // 如果正在播放但 tvOsdInfo 仍卡在"连接中"（播放器未上报分辨率/编码信息），
@@ -1548,6 +1594,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         layoutOsd?.visibility = View.VISIBLE
+        findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = true
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD VISIBLE")
         uiHandler.removeCallbacks(hideOsdRunnable)
         uiHandler.postDelayed(hideOsdRunnable, 5000)
@@ -1566,6 +1613,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             tvOsdEpg?.text = "暂无当前节目信息"
             progressEpg?.progress = 0
+        }
+
+        if (channel.nextEpg.isNotEmpty()) {
+            tvOsdNextEpg?.text = "接下来: ${channel.nextEpg}"
+            tvOsdNextEpg?.visibility = View.VISIBLE
+        } else {
+            tvOsdNextEpg?.text = ""
+            tvOsdNextEpg?.visibility = View.GONE
         }
     }
 
@@ -2089,6 +2144,13 @@ class MainActivity : AppCompatActivity() {
                     val currentChannel = allChannels[currentChannelIndex]
                     tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
                     tvOsdChannelName?.text = currentChannel.name
+                    val lines = currentChannel.getLinesSafely()
+                    if (lines.isNotEmpty()) {
+                        val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
+                        tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+                    } else {
+                        tvOsdLineInfo?.text = ""
+                    }
                 }
             }
         } else {
@@ -2097,6 +2159,13 @@ class MainActivity : AppCompatActivity() {
                  val currentChannel = allChannels[currentChannelIndex]
                  tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
                  tvOsdChannelName?.text = currentChannel.name
+                 val lines = currentChannel.getLinesSafely()
+                 if (lines.isNotEmpty()) {
+                     val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
+                     tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+                 } else {
+                     tvOsdLineInfo?.text = ""
+                 }
              }
         }
     }
@@ -2355,6 +2424,7 @@ class MainActivity : AppCompatActivity() {
                     showOsd()
                     tvOsdChannelNum?.text = channelInputBuffer.toString()
                     tvOsdChannelName?.text = "输入频道号..."
+                    tvOsdLineInfo?.text = ""
                     
                     uiHandler.removeCallbacks(channelInputRunnable)
                     uiHandler.postDelayed(channelInputRunnable, 1500)
@@ -2619,16 +2689,33 @@ class MainActivity : AppCompatActivity() {
         
         showExitDialog()
     }
+    private var exitDialog: android.app.Dialog? = null
 
     private fun showExitDialog() {
-        android.app.AlertDialog.Builder(this)
-            .setTitle("退出应用")
-            .setMessage("确定要退出媒体播放器吗？")
-            .setPositiveButton("退出") { _, _ ->
-                finish()
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        if (exitDialog?.isShowing == true) return
+        
+        exitDialog = android.app.Dialog(this)
+        exitDialog?.setContentView(R.layout.dialog_exit)
+        exitDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        
+        val btnCancel = exitDialog?.findViewById<android.widget.Button>(R.id.btn_cancel)
+        val btnExit = exitDialog?.findViewById<android.widget.Button>(R.id.btn_exit)
+        
+        btnCancel?.setOnClickListener {
+            exitDialog?.dismiss()
+        }
+        
+        btnExit?.setOnClickListener {
+            exitDialog?.dismiss()
+            finish()
+        }
+        
+        exitDialog?.setOnDismissListener {
+            exitDialog = null
+        }
+        
+        exitDialog?.show()
+        btnExit?.requestFocus()
     }
 
     companion object {

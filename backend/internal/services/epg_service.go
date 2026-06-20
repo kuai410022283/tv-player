@@ -525,7 +525,7 @@ func (s *EPGService) GetEPG(channelID string, date string) []models.EPGProgram {
 }
 
 // GetCurrentEPGWithProgress 从内存索引中获取当前正在播放的节目名称和进度百分比
-func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, int) {
+func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, string, int) {
 	s.triggerCrossDayRefresh()
 
 	globalEPGIndex.mu.RLock()
@@ -535,45 +535,48 @@ func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, int) {
 	chIDClean := normalizeChannelName(channelID)
 	now := time.Now()
 
-	// 辅助函数：在一个 dateMap 中查找当前正在播放的节目
-	findProgram := func(dateMap map[string][]models.EPGProgram) (string, int, bool) {
+	findProgram := func(dateMap map[string][]models.EPGProgram) (string, string, int, bool) {
 		for _, progs := range dateMap {
-			for _, p := range progs {
-				// 使用 >= 和 < 包含边界，避免正好压点时不匹配的情况
+			for i, p := range progs {
 				if !now.Before(p.StartTime) && now.Before(p.EndTime) {
 					total := p.EndTime.Sub(p.StartTime).Seconds()
 					elapsed := now.Sub(p.StartTime).Seconds()
+					
+					nextTitle := ""
+					if i+1 < len(progs) {
+						nextTitle = progs[i+1].Title
+					}
+
 					if total > 0 {
 						pct := int((elapsed / total) * 100)
-						return p.Title, pct, true
+						return p.Title, nextTitle, pct, true
 					}
-					return p.Title, 0, true
+					return p.Title, nextTitle, 0, true
 				}
 			}
 		}
-		return "", 0, false
+		return "", "", 0, false
 	}
 
 	// 1. 尝试精确匹配
 	if dateMap, ok := globalEPGIndex.programs[chID]; ok {
-		if title, pct, found := findProgram(dateMap); found {
-			return title, pct
+		if title, nextTitle, pct, found := findProgram(dateMap); found {
+			return title, nextTitle, pct
 		}
 	}
 
-	// 2. 尝试基于统一规则的模糊匹配
 	for key, dateMap := range globalEPGIndex.programs {
 		if key == chID {
-			continue // 已经尝试过精确匹配
+			continue 
 		}
 		if normalizeChannelName(key) == chIDClean {
-			if title, pct, found := findProgram(dateMap); found {
-				return title, pct
+			if title, nextTitle, pct, found := findProgram(dateMap); found {
+				return title, nextTitle, pct
 			}
 		}
 	}
 
-	return "", 0
+	return "", "", 0
 }
 
 // ForceRefresh 强制刷新

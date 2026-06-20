@@ -42,6 +42,7 @@ MediaPlayer 并不是一个普通的本地播放器，而是一套**「服务端
 > 本项目分为**服务端（Backend）**和**客户端（Android App）**两部分。服务端提供核心的流代理、设备管控与后台面板，客户端则安装在电视或机顶盒上提供播放界面。
 
 ### 1. 服务端部署
+#### 方法一：Docker
 通过公开提供的 Docker 镜像，只需一行命令即可在任何 Linux/NAS 环境中快速拉起服务端：
 ```bash
 docker run -d \
@@ -51,6 +52,16 @@ docker run -d \
   ghcr.io/kuai410022283/mediaplayer:latest
 ```
 *(部署完成后，即可通过浏览器访问 Web 管理后台，上传您的 M3U 文件并管理设备。)*
+
+#### 方法二：[飞牛OS应用](https://github.com/Brian099/fn_fpk_packages/blob/main/README.md)
+下载获取mediaplayer.fpk最新客户端，按照说明进行安装
+
+#### 方法三：手动命令安装
+```bash
+sudo chmod 0755 mediaplayer
+./mediaplayer
+
+```
 
 ### 2. 客户端安装
 请前往本仓库的 **[Releases 页面](https://github.com/kuai410022283/mediaplayer/releases)** 下载最新版本的 `mediaplayer-x.x.x-release.apk`。

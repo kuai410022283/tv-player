@@ -226,7 +226,8 @@ function showSection(name, el) {
     streams: loadStreams,
     clients: loadClients,
     'client-logs': loadClientLogs,
-    'client-settings': loadClientSettings
+    'client-settings': loadClientSettings,
+    'update': loadUpdates
   };
   if (loaders[name]) loaders[name]();
 }
@@ -1769,4 +1770,91 @@ function regeneratePlanTokenInput() {
     token += chars[Math.floor(Math.random() * 16)];
   }
   document.getElementById('plan-token').value = token;
+}
+
+// ════ System Update Module ════════════════════════════════════
+let githubReleasesCache = null;
+
+async function loadUpdates() {
+  const currentVersionEl = document.getElementById('sidebar-version');
+  if (currentVersionEl) {
+    document.getElementById('update-current-version').textContent = currentVersionEl.textContent;
+  }
+  
+  if (githubReleasesCache) {
+    renderUpdateReleases(githubReleasesCache);
+    return;
+  }
+
+  document.getElementById('update-loading').style.display = 'block';
+  document.getElementById('update-content').style.display = 'none';
+  document.getElementById('update-error').style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.github.com/repos/kuai410022283/mediaplayer/releases');
+    if (!res.ok) throw new Error('Network response was not ok');
+    githubReleasesCache = await res.json();
+    document.getElementById('update-loading').style.display = 'none';
+    renderUpdateReleases(githubReleasesCache);
+  } catch (e) {
+    document.getElementById('update-loading').style.display = 'none';
+    document.getElementById('update-error').style.display = 'block';
+  }
+}
+
+function renderUpdateReleases(releases) {
+  if (!releases || releases.length === 0) return;
+  document.getElementById('update-content').style.display = 'block';
+  
+  const latestRelease = releases[0];
+  document.getElementById('update-latest-notice').textContent = '最新版本：' + latestRelease.tag_name;
+
+  const tagSelect = document.getElementById('update-tag-select');
+  tagSelect.innerHTML = releases.map((r, i) => `<option value="${i}">${r.tag_name}${i === 0 ? ' (最新)' : ''}</option>`).join('');
+  
+  onUpdateTagChange();
+}
+
+function onUpdateTagChange() {
+  const tagSelect = document.getElementById('update-tag-select');
+  const releaseIndex = parseInt(tagSelect.value);
+  const release = githubReleasesCache[releaseIndex];
+  if (!release) return;
+
+  const assetSelect = document.getElementById('update-asset-select');
+  if (release.assets && release.assets.length > 0) {
+    assetSelect.innerHTML = release.assets.map((a, i) => `<option value="${i}">${formatAssetName(a.name)}</option>`).join('');
+    assetSelect.disabled = false;
+  } else {
+    assetSelect.innerHTML = '<option value="">该版本没有可下载的文件</option>';
+    assetSelect.disabled = true;
+  }
+  onUpdateAssetChange();
+}
+
+function formatAssetName(name) {
+  if (name.includes('.apk')) return `Android 客户端 (APK) [${name}]`;
+  if (name.includes('windows')) return `Windows 服务端 [${name}]`;
+  if (name.includes('linux-amd64')) return `Linux amd64 服务端 [${name}]`;
+  if (name.includes('linux-arm64')) return `Linux arm64 服务端 [${name}]`;
+  if (name.includes('darwin')) return `macOS 服务端 [${name}]`;
+  return name;
+}
+
+function onUpdateAssetChange() {
+  const tagSelect = document.getElementById('update-tag-select');
+  const assetSelect = document.getElementById('update-asset-select');
+  const btn = document.getElementById('btn-update-download');
+  
+  const releaseIndex = parseInt(tagSelect.value);
+  const assetIndex = parseInt(assetSelect.value);
+  
+  if (isNaN(releaseIndex) || isNaN(assetIndex) || !githubReleasesCache[releaseIndex] || !githubReleasesCache[releaseIndex].assets[assetIndex]) {
+    btn.style.display = 'none';
+    return;
+  }
+  
+  const asset = githubReleasesCache[releaseIndex].assets[assetIndex];
+  btn.dataset.href = asset.browser_download_url;
+  btn.style.display = 'inline-flex';
 }

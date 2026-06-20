@@ -279,12 +279,14 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				}
 
 				if items[i].EPGChannelID != "" {
-					title, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].EPGChannelID)
+					title, nextTitle, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].EPGChannelID)
 					items[i].CurrentEPG = title
+					items[i].NextEPG = nextTitle
 					items[i].EpgPercent = pct
 				} else {
-					title, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].Name)
+					title, nextTitle, pct := h.epgSvc.GetCurrentEPGWithProgress(items[i].Name)
 					items[i].CurrentEPG = title
+					items[i].NextEPG = nextTitle
 					items[i].EpgPercent = pct
 				}
 
@@ -352,6 +354,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"logo":        logoURL,
 						"description": items[i].Description,
 						"current_epg": items[i].CurrentEPG,
+						"next_epg":    items[i].NextEPG,
 						"epg_percent": items[i].EpgPercent,
 
 						"sort_order":      items[i].SortOrder,
