@@ -48,7 +48,13 @@
                 android:layout_height="wrap_content"
                 android:textColor="#FFF"
                 android:textSize="@dimen/sp_22"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:maxWidth="@dimen/dp_400"
+                android:singleLine="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="1"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
 
             <TextView
                 android:id="@+id/tvStreamType"
@@ -99,7 +105,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#ccc"
-                android:textSize="@dimen/sp_12" />
+                android:textSize="@dimen/sp_12"
+                android:maxWidth="@dimen/dp_400"
+                android:singleLine="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="1"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
 
             <TextView
                 android:id="@+id/tvEpgNext"
@@ -107,7 +119,13 @@
                 android:layout_height="wrap_content"
                 android:textColor="#888"
                 android:textSize="@dimen/sp_11"
-                android:layout_marginTop="@dimen/dp_2" />
+                android:layout_marginTop="@dimen/dp_2"
+                android:maxWidth="@dimen/dp_400"
+                android:singleLine="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="1"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
         </LinearLayout>
     </LinearLayout>
 

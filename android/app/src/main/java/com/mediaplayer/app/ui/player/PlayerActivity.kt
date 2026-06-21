@@ -678,6 +678,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showChannelInfo() {
         layoutChannelInfo?.visibility = View.VISIBLE
+        tvChannelName?.isSelected = true
         loadEPG()
         handler.removeCallbacks(hideInfoRunnable)
         handler.postDelayed(hideInfoRunnable, 5000)
@@ -688,6 +689,7 @@ class PlayerActivity : AppCompatActivity() {
         if (channel != null && channel.currentEpg.isNotEmpty()) {
             layoutEpg?.visibility = View.VISIBLE
             tvEpgNow?.text = "📺 正在播放: ${channel.currentEpg}"
+            tvEpgNow?.isSelected = true
             tvEpgNext?.text = ""
         } else {
             layoutEpg?.visibility = View.GONE

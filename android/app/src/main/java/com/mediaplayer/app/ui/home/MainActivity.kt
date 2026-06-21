@@ -76,14 +76,7 @@ class MainActivity : AppCompatActivity() {
     private var tvChannelsRv: RecyclerView? = null
     private var tvAuthWaiting: View? = null
     private var layoutZappingMenu: View? = null
-    private var layoutOsd: View? = null
-    private var tvOsdChannelNum: TextView? = null
-    private var tvOsdChannelName: TextView? = null
-    private var tvOsdLineInfo: TextView? = null
-    private var tvOsdInfo: TextView? = null
-    private var tvOsdEpg: TextView? = null
-    private var tvOsdNextEpg: TextView? = null
-    private var progressEpg: ProgressBar? = null
+    private var osdOverlayView: com.mediaplayer.app.ui.widget.OsdOverlayView? = null
     private var progressBuffering: ProgressBar? = null
     private var videoLayout: android.widget.FrameLayout? = null
     private var snapshotOverlay: android.widget.ImageView? = null
@@ -219,11 +212,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val hideOsdRunnable = Runnable { 
-        layoutOsd?.visibility = View.GONE 
-        findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = false
-        com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD GONE")
-    }
+
     private val hideZappingRunnable = Runnable { 
         layoutZappingMenu?.visibility = View.GONE
         activeListArea = "channels"
@@ -495,14 +484,10 @@ class MainActivity : AppCompatActivity() {
         tvChannelsRv = findViewById(R.id.rvChannels)
         tvAuthWaiting = findViewById(R.id.layoutAuthWaiting)
         layoutZappingMenu = findViewById(R.id.layoutZappingMenu)
-        layoutOsd = findViewById(R.id.layoutOsd)
-        tvOsdChannelNum = findViewById(R.id.tvOsdChannelNum)
-        tvOsdChannelName = findViewById(R.id.tvOsdChannelName)
-        tvOsdLineInfo = findViewById(R.id.tvOsdLineInfo)
-        tvOsdInfo = findViewById(R.id.tvOsdInfo)
-        tvOsdEpg = findViewById(R.id.tvOsdEpg)
-        tvOsdNextEpg = findViewById(R.id.tvOsdNextEpg)
-        progressEpg = findViewById(R.id.progressEpg)
+        osdOverlayView = findViewById(R.id.osdOverlayView)
+        osdOverlayView?.onOsdVisibilityChanged = { isVisible ->
+            findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = isVisible
+        }
         progressBuffering = findViewById(R.id.progressBuffering)
         videoLayout = findViewById(R.id.videoLayout)
         progressLoading = findViewById(R.id.progressLoading)
@@ -557,7 +542,7 @@ class MainActivity : AppCompatActivity() {
                     if (isTvMode) {
                         currentCatchupStartTime = prog.startTime
                         currentCatchupChannelIndex = currentChannelIndex
-                        tvOsdInfo?.text = "回看: ${prog.title}"
+                        osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
                         playerHelper?.play(url, ua, headers)
                         hideEpgMenu()
                     } else {
@@ -1072,7 +1057,7 @@ class MainActivity : AppCompatActivity() {
                                 append(coreStr)
                             }
                         }
-                        tvOsdInfo?.text = fullInfo
+                        osdOverlayView?.setInfoText(fullInfo.toString())
                         com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback started successfully. Stream info: $fullInfo")
                     }
                 }
@@ -1185,7 +1170,7 @@ class MainActivity : AppCompatActivity() {
 
         // 回看流自然结束
         if (currentCatchupStartTime != null) {
-            tvOsdInfo?.text = "回看播放完毕"
+            osdOverlayView?.setInfoText("回看播放完毕".toString())
             showOsd()
             currentCatchupStartTime = null
             currentCatchupChannelIndex = -1
@@ -1213,7 +1198,7 @@ class MainActivity : AppCompatActivity() {
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                 else -> "VLC"
             }
-            tvOsdInfo?.text = "当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式"
+            osdOverlayView?.setInfoText("当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式".toString())
             showOsd()
             com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
             return
@@ -1347,17 +1332,17 @@ class MainActivity : AppCompatActivity() {
     private fun playCurrentLineInTv() {
         val channel = allChannels.getOrNull(currentChannelIndex) ?: return
         
-        tvOsdChannelNum?.text = String.format("%03d", channel.globalIndex + 1)
-        tvOsdChannelName?.text = channel.name
+        osdOverlayView?.setChannelNum(String.format("%03d", channel.globalIndex + 1).toString())
+        osdOverlayView?.setChannelName(channel.name.toString())
         
         val lines = channel.getLinesSafely()
         if (lines.isEmpty()) return
         if (currentLineIndex >= lines.size) currentLineIndex = 0
         val line = lines[currentLineIndex]
         
-        tvOsdLineInfo?.text = "${currentLineIndex + 1}/${lines.size}"
+        osdOverlayView?.setLineInfo("${currentLineIndex + 1}/${lines.size}".toString())
         
-        tvOsdInfo?.text = if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中..."
+        osdOverlayView?.setInfoText(if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中...".toString())
         
         // 记忆功能：保存最后播放的频道 ID
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -1555,15 +1540,15 @@ class MainActivity : AppCompatActivity() {
         // 刷新频道号码和名称（来自当前频道，不依赖播放器回调）
         val channel = allChannels.getOrNull(currentChannelIndex)
         if (channel != null) {
-            tvOsdChannelNum?.text = String.format("%03d", channel.globalIndex + 1)
-            tvOsdChannelName?.text = channel.name
+            osdOverlayView?.setChannelNum(String.format("%03d", channel.globalIndex + 1).toString())
+            osdOverlayView?.setChannelName(channel.name.toString())
             
             val lines = channel.getLinesSafely()
             if (lines.isNotEmpty()) {
                 val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
-                tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+                osdOverlayView?.setLineInfo("${safeIndex + 1}/${lines.size}".toString())
             } else {
-                tvOsdLineInfo?.text = ""
+                osdOverlayView?.setLineInfo("".toString())
             }
         }
         
@@ -1572,7 +1557,7 @@ class MainActivity : AppCompatActivity() {
         // 使用 playerHelper?.isPlaying() 而非 currentPlaybackState，以兼容 ExoPlayer
         // （ExoPlayerHelper 只在 onVideoSizeChanged 中调用 onPlaying，无视频尺寸时不回调）
         if (playerHelper?.isPlaying() == true) {
-            val infoText = tvOsdInfo?.text?.toString() ?: ""
+            val infoText = osdOverlayView?.getInfoText() ?: "" ?: ""
             if (infoText.contains("连接中") || infoText.isEmpty()) {
                 val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                 val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -1589,15 +1574,15 @@ class MainActivity : AppCompatActivity() {
                         else -> ""
                     }
                 } ?: ""
-                tvOsdInfo?.text = if (coreStr.isNotEmpty()) "$decoderStr | $coreStr" else decoderStr
+                osdOverlayView?.setInfoText(if (coreStr.isNotEmpty()) "$decoderStr | $coreStr" else decoderStr.toString())
             }
         }
 
-        layoutOsd?.visibility = View.VISIBLE
+        osdOverlayView?.showOsd()
         findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = true
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD VISIBLE")
-        uiHandler.removeCallbacks(hideOsdRunnable)
-        uiHandler.postDelayed(hideOsdRunnable, 5000)
+        osdOverlayView?.removeCallbacks()
+        osdOverlayView?.showOsd()
         
         // 换台时同步触发跑马灯
         if (!sysAnnouncement.isNullOrEmpty() && !marqueeIsVisible) {
@@ -1608,20 +1593,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadEpgForChannel(channel: Channel) {
         if (channel.currentEpg.isNotEmpty()) {
-            tvOsdEpg?.text = "正在播放: ${channel.currentEpg}"
-            progressEpg?.progress = channel.epgPercent
+            osdOverlayView?.setEpgText("正在播放: ${channel.currentEpg}".toString())
+            osdOverlayView?.setEpgProgress(channel.epgPercent)
         } else {
-            tvOsdEpg?.text = "暂无当前节目信息"
-            progressEpg?.progress = 0
+            osdOverlayView?.setEpgText("暂无当前节目信息".toString())
+            osdOverlayView?.setEpgProgress(0)
         }
 
         if (channel.nextEpg.isNotEmpty()) {
-            tvOsdNextEpg?.text = "接下来: ${channel.nextEpg}"
-            tvOsdNextEpg?.visibility = View.VISIBLE
-        } else {
-            tvOsdNextEpg?.text = ""
-            tvOsdNextEpg?.visibility = View.GONE
-        }
+            osdOverlayView?.setNextEpgText("接下来: ${channel.nextEpg}".toString())
+            } else {
+            osdOverlayView?.setNextEpgText("".toString())
+            }
     }
 
     // ═══════════════════════════════════════════════════
@@ -2142,14 +2125,14 @@ class MainActivity : AppCompatActivity() {
                 // Restore OSD to current playing channel info
                 if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
                     val currentChannel = allChannels[currentChannelIndex]
-                    tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
-                    tvOsdChannelName?.text = currentChannel.name
+                    osdOverlayView?.setChannelNum(String.format("%03d", currentChannel.globalIndex + 1).toString())
+                    osdOverlayView?.setChannelName(currentChannel.name.toString())
                     val lines = currentChannel.getLinesSafely()
                     if (lines.isNotEmpty()) {
                         val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
-                        tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+                        osdOverlayView?.setLineInfo("${safeIndex + 1}/${lines.size}".toString())
                     } else {
-                        tvOsdLineInfo?.text = ""
+                        osdOverlayView?.setLineInfo("".toString())
                     }
                 }
             }
@@ -2157,14 +2140,14 @@ class MainActivity : AppCompatActivity() {
              // Restore OSD
              if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
                  val currentChannel = allChannels[currentChannelIndex]
-                 tvOsdChannelNum?.text = String.format("%03d", currentChannel.globalIndex + 1)
-                 tvOsdChannelName?.text = currentChannel.name
+                 osdOverlayView?.setChannelNum(String.format("%03d", currentChannel.globalIndex + 1).toString())
+                 osdOverlayView?.setChannelName(currentChannel.name.toString())
                  val lines = currentChannel.getLinesSafely()
                  if (lines.isNotEmpty()) {
                      val safeIndex = if (currentLineIndex < lines.size) currentLineIndex else 0
-                     tvOsdLineInfo?.text = "${safeIndex + 1}/${lines.size}"
+                     osdOverlayView?.setLineInfo("${safeIndex + 1}/${lines.size}".toString())
                  } else {
-                     tvOsdLineInfo?.text = ""
+                     osdOverlayView?.setLineInfo("".toString())
                  }
              }
         }
@@ -2333,9 +2316,9 @@ class MainActivity : AppCompatActivity() {
                 uiHandler.removeCallbacks(hideZappingRunnable)
                 uiHandler.postDelayed(hideZappingRunnable, 15000)
             }
-            if (layoutOsd?.visibility == View.VISIBLE) {
-                uiHandler.removeCallbacks(hideOsdRunnable)
-                uiHandler.postDelayed(hideOsdRunnable, 5000)
+            if (osdOverlayView?.isOsdVisible() == true) {
+                osdOverlayView?.removeCallbacks()
+                osdOverlayView?.showOsd()
             }
             
             val focusedView = currentFocus
@@ -2422,9 +2405,9 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     showOsd()
-                    tvOsdChannelNum?.text = channelInputBuffer.toString()
-                    tvOsdChannelName?.text = "输入频道号..."
-                    tvOsdLineInfo?.text = ""
+                    osdOverlayView?.setChannelNum(channelInputBuffer.toString().toString())
+                    osdOverlayView?.setChannelName("输入频道号...".toString())
+                    osdOverlayView?.setLineInfo("".toString())
                     
                     uiHandler.removeCallbacks(channelInputRunnable)
                     uiHandler.postDelayed(channelInputRunnable, 1500)
@@ -2685,9 +2668,9 @@ class MainActivity : AppCompatActivity() {
             hideZappingRunnable.run()
             return
         }
-        if (layoutOsd?.visibility == View.VISIBLE) {
-            uiHandler.removeCallbacks(hideOsdRunnable)
-            hideOsdRunnable.run()
+        if (osdOverlayView?.isOsdVisible() == true) {
+            osdOverlayView?.removeCallbacks()
+            osdOverlayView?.hideOsd()
             return
         }
         
@@ -2773,7 +2756,7 @@ class MainActivity : AppCompatActivity() {
         configWebServer?.stop()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
-        uiHandler.removeCallbacks(hideOsdRunnable)
+        osdOverlayView?.removeCallbacks()
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.removeCallbacks(channelInputRunnable)
         uiHandler.removeCallbacks(watchdogRunnable)
