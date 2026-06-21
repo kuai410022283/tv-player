@@ -1232,6 +1232,7 @@ func (h *Handler) GetLogo(c *gin.Context) {
 	}
 
 	if name == "default" || name == "default.png" {
+		c.Header("Cache-Control", "public, max-age=604800")
 		c.File("./library/channel_logo/default.png")
 		return
 	}
@@ -1261,16 +1262,19 @@ func (h *Handler) GetLogo(c *gin.Context) {
 
 	serveLocal := func() bool {
 		if cleanEPG != "" && h.logoSvc.HasLocalLogo(cleanEPG) {
+			c.Header("Cache-Control", "public, max-age=604800")
 			c.File(h.logoSvc.GetLogoPath(cleanEPG))
 			return true
 		}
 		if cleanName != "" && h.logoSvc.HasLocalLogo(cleanName) {
+			c.Header("Cache-Control", "public, max-age=604800")
 			c.File(h.logoSvc.GetLogoPath(cleanName))
 			return true
 		}
 		if chName != "" {
 			cleanChName := h.logoSvc.CleanName(chName)
 			if h.logoSvc.HasLocalLogo(cleanChName) {
+				c.Header("Cache-Control", "public, max-age=604800")
 				c.File(h.logoSvc.GetLogoPath(cleanChName))
 				return true
 			}
@@ -1280,7 +1284,8 @@ func (h *Handler) GetLogo(c *gin.Context) {
 
 	redirectDB := func() bool {
 		if dbLogo != "" {
-			c.Redirect(http.StatusFound, dbLogo)
+			c.Header("Cache-Control", "public, max-age=604800")
+			c.Redirect(http.StatusMovedPermanently, dbLogo)
 			return true
 		}
 		return false
@@ -1311,6 +1316,7 @@ func (h *Handler) GetLogo(c *gin.Context) {
 	}
 
 	// Fallback to default.png
+	c.Header("Cache-Control", "public, max-age=604800")
 	c.File("./library/channel_logo/default.png")
 }
 

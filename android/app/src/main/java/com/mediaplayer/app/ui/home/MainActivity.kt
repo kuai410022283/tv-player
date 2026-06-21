@@ -1180,8 +1180,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 直播流理论上不会自然结束，忽略此事件
-        com.mediaplayer.app.util.RemoteLogger.i("Player", "Live stream STATE_ENDED ignored (should not happen).")
+        // 直播流遇到结束事件，说明网络流已断开(TCP EOF)，执行断线重连 (静默重连，不打扰用户)
+        com.mediaplayer.app.util.RemoteLogger.i("Player", "Live stream STATE_ENDED unexpectedly. Auto reconnecting...")
+        
+        
+        uiHandler.postDelayed({
+            playCurrentLineInTv()
+        }, 1000)
     }
 
     private fun handlePlaybackError(isNetworkTimeout: Boolean = false) {

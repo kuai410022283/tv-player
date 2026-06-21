@@ -308,16 +308,16 @@ func getFlushThreshold(ch *models.Channel, finalURL string) int {
 	// ── 直播流 ──
 	case st == "ts" || st == "flv" || st == "octet-stream" ||
 		strings.Contains(allURL, ".ts") || strings.Contains(allURL, ".flv"):
-		return 64 * 1024 // 64KB: 直播流，平衡延迟与 TCP 小包效率
+		return 512 * 1024 // 512KB: 降低 HTTP Chunk 开销，解决 4K 播放卡顿问题
 	// ── 低延迟协议 ──
 	case st == "rtsp" || st == "rtmp" ||
 		strings.HasPrefix(src, "rtsp://") || strings.HasPrefix(src, "rtmp://") ||
 		strings.HasPrefix(u, "rtsp://") || strings.HasPrefix(u, "rtmp://"):
-		return 64 * 1024 // 64KB: 低延迟协议
+		return 128 * 1024 // 128KB: 低延迟协议
 	// ── RTP-over-HTTP / 组播网关（必须用原始源判断，代理 URL 不含 /rtp/）──
 	case strings.Contains(allURL, "/rtp/") || strings.Contains(allURL, "/udp/") ||
 		strings.Contains(allURL, "multicast") || strings.Contains(allURL, "igmp"):
-		return 32 * 1024 // 32KB: RTP/UDP 实时流，极低延迟
+		return 512 * 1024 // 512KB: RTP/UDP 实时流，大幅增加块大小以支撑 4K 高码率
 	// ── DASH ──
 	case st == "dash":
 		return 64 * 1024 // 64KB: 分段直播，适中即可

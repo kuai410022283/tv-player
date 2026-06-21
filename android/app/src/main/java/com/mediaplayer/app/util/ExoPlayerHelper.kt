@@ -36,6 +36,7 @@ class ExoPlayerHelper(
 
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
+    private var lastBuiltIsLiveStream: Boolean = false
 
     init {
         initPlayerView()
@@ -67,6 +68,10 @@ class ExoPlayerHelper(
     private var behindLiveWindowCount: Int = 0
     private var behindLiveWindowLastTime: Long = 0L
 
+    // Circuit breaker for Audio/Video Decoder Failures
+    private var criticalErrorCount: Int = 0
+    private var criticalErrorLastTime: Long = 0L
+
     override fun play(url: String, userAgent: String, customHeaders: String) {
         currentUrl = url
         currentUserAgent = userAgent
@@ -74,13 +79,19 @@ class ExoPlayerHelper(
         isMimeTypeFallback = false
         behindLiveWindowCount = 0
         behindLiveWindowLastTime = 0L
+        criticalErrorCount = 0
+        criticalErrorLastTime = 0L
         
         playInternal(url, userAgent, customHeaders, null)
     }
 
     private fun playInternal(url: String, userAgent: String, customHeaders: String, mimeType: String?) {
-        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
-            buildPlayer()
+        val isLiveStream = url.lowercase().run { 
+            startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
+            contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
+        }
+        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLiveStream) {
+            buildPlayer(isLiveStream)
         }
 
         isPlayerPlaying = false
@@ -123,13 +134,26 @@ class ExoPlayerHelper(
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
         val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+        // 注入自定义提取器，降低对 TS 流解析的严苛度（允许非 IDR 关键帧起播，增强容错）
+        val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
+            .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
             .setDataSourceFactory(defaultDataSourceFactory)
 
         val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
         if (mimeType != null) {
             mediaItemBuilder.setMimeType(mimeType)
         }
+        
+        // 针对 UDP 或 RTSP 直播源，注入 LiveConfiguration 以优化时钟同步
+        if (isLiveStream) {
+            val liveConfig = MediaItem.LiveConfiguration.Builder()
+                .setMaxPlaybackSpeed(1.02f)
+                .build()
+            mediaItemBuilder.setLiveConfiguration(liveConfig)
+        }
+        
         val mediaItem = mediaItemBuilder.build()
         
         // RTSP 流需要使用 RtspMediaSource，而非默认的 ProgressiveMediaSource
@@ -155,13 +179,35 @@ class ExoPlayerHelper(
         exoPlayer?.play()
     }
 
-    private fun buildPlayer() {
+    private fun buildPlayer(isLiveStream: Boolean) {
         releasePlayer()
 
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
+        lastBuiltIsLiveStream = isLiveStream
 
-        val renderersFactory = DefaultRenderersFactory(context).apply {
+        val renderersFactory = object : DefaultRenderersFactory(context) {
+            override fun buildAudioRenderers(
+                context: Context,
+                extensionRendererMode: Int,
+                mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
+                enableDecoderFallback: Boolean,
+                audioSink: androidx.media3.exoplayer.audio.AudioSink,
+                eventHandler: android.os.Handler,
+                eventListener: androidx.media3.exoplayer.audio.AudioRendererEventListener,
+                out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>
+            ) {
+                super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
+                
+                if (isLiveStream) {
+                    // 拦截官方生成的音频渲染器，套上我们的“防卡死代理壳”
+                    for (i in 0 until out.size) {
+                        out[i] = LenientAudioRendererWrapper(out[i])
+                    }
+                }
+            }
+        }.apply {
+            setEnableDecoderFallback(true) // 开启解码器容错回退机制
             setExtensionRendererMode(
                 when (currentDecoderMode) {
                     Prefs.DECODER_MODE_SOFTWARE -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
@@ -261,7 +307,30 @@ class ExoPlayerHelper(
                     }
                 }
                 
-                // 2. 格式嗅探与重试 (MimeType 降级)
+                // 2. 音视频解码或 AudioTrack 崩溃导致卡死，触发自愈重启 (兜底)
+                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
+                ) {
+                    val now = System.currentTimeMillis()
+                    if (now - criticalErrorLastTime > 60000) {
+                        criticalErrorCount = 0
+                    }
+                    criticalErrorCount++
+                    criticalErrorLastTime = now
+                    
+                    if (criticalErrorCount <= 3) {
+                        com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Audio/Video critical error detected ($criticalErrorCount/3), attempting to recover...", error)
+                        exoPlayer?.seekToDefaultPosition()
+                        exoPlayer?.prepare()
+                        return // 吞掉错误，尝试自愈
+                    } else {
+                        com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Critical error circuit breaker tripped! Throwing error.", error)
+                        criticalErrorCount = 0
+                    }
+                }
+                
+                // 3. 格式嗅探与重试 (MimeType 降级)
                 if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
@@ -426,5 +495,23 @@ class ExoPlayerHelper(
         exoPlayer = null
         isPlayerPlaying = false
         lastResolution = ""
+    }
+}
+
+// 利用 Kotlin 接口委托，零耦合代理官方渲染器，拦截音频主时钟霸权
+private class LenientAudioRendererWrapper(
+    private val wrappedRenderer: androidx.media3.exoplayer.Renderer
+) : androidx.media3.exoplayer.Renderer by wrappedRenderer {
+    
+    override fun getMediaClock(): androidx.media3.exoplayer.MediaClock? {
+        // 【核心补丁】强制返回 null，让 ExoPlayer 退化为使用系统物理时钟。
+        // 这样即使底层 UDP 音频时间戳彻底错乱或丢包导致没有声音输出，视频画面也会匀速继续播放，绝对不会发生冻结卡死。
+        return null
+    }
+
+    override fun isReady(): Boolean {
+        // 如果底层音频没准备好（比如因为源流时间戳损坏导致被丢弃），我们强行让它就绪。
+        // 这样 ExoPlayer 就不会为了等待音频而退回 BUFFERING 状态卡死。视频渲染器会继续渲染画面。
+        return true
     }
 }
