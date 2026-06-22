@@ -298,9 +298,9 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				if !items[i].IsDirect {
 					ext := "ts"
 					switch items[i].StreamType {
-					case "hls", "":
+					case "hls":
 						ext = "m3u8"
-					case "mp4", "flv", "mkv", "mpd":
+					case "m3u8", "mp4", "flv", "mkv", "mpd":
 						ext = items[i].StreamType
 					}
 					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址（相对路径）
@@ -309,7 +309,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						if strings.TrimSpace(u) == "" {
 							continue
 						}
-						lineProxyURL := fmt.Sprintf("/api/v1/stream/proxy/%d/play.%s?line=%d", items[i].ID, ext, lineIdx)
+						lineProxyURL := fmt.Sprintf("/api/v1/stream/proxy/%d/line/%d/play.%s", items[i].ID, lineIdx, ext)
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
 							"id":              items[i].ID,
 							"stream_url":      lineProxyURL,
@@ -403,7 +403,14 @@ func (h *Handler) GetChannel(c *gin.Context) {
 		// token 已经被去除，不在这里获取了
 
 		if !ch.IsDirect {
-			ch.StreamURL = fmt.Sprintf("/api/v1/stream/proxy/%d", ch.ID)
+			ext := "ts"
+			switch ch.StreamType {
+			case "hls":
+				ext = "m3u8"
+			case "m3u8", "mp4", "flv", "mkv", "mpd":
+				ext = ch.StreamType
+			}
+			ch.StreamURL = fmt.Sprintf("/api/v1/stream/proxy/%d/line/0/play.%s", ch.ID, ext)
 		}
 		if ua, headers, err := h.channelSvc.GetInheritedHeaders(ch.ID); err == nil {
 			ch.UserAgent = ua
@@ -478,6 +485,24 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	subPath := c.Param("path")
 
+	// 提取 /line/{idx}/ 的前缀
+	if strings.HasPrefix(subPath, "/line/") {
+		parts := strings.SplitN(subPath[6:], "/", 2)
+		if len(parts) > 0 {
+			lineIdxStr := parts[0]
+			// 修改请求参数，使下游依然能读到 line
+			q := c.Request.URL.Query()
+			q.Set("line", lineIdxStr)
+			c.Request.URL.RawQuery = q.Encode()
+
+			if len(parts) > 1 {
+				subPath = "/" + parts[1]
+			} else {
+				subPath = "/"
+			}
+		}
+	}
+
 	var clientID int64
 	var clientName string
 	if cid, exists := c.Get("client_id"); exists {
@@ -494,7 +519,15 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 		if err == nil && ch.StreamURL != "" {
 			baseURLStr := h.streamProxy.GetRedirectedURL(id)
 			if baseURLStr == "" {
-				baseURLStr = ch.StreamURL
+				// 如果没有记录重定向地址，回退使用原始地址指定的线路
+				rawURLs := strings.Split(ch.StreamURL, "#")
+				lineIdx := 0
+				if lineStr := c.Request.URL.Query().Get("line"); lineStr != "" {
+					if parsedIdx, err := strconv.Atoi(lineStr); err == nil && parsedIdx >= 0 && parsedIdx < len(rawURLs) {
+						lineIdx = parsedIdx
+					}
+				}
+				baseURLStr = strings.TrimSpace(rawURLs[lineIdx])
 			}
 			base, err1 := url.Parse(baseURLStr)
 			rel, err2 := url.Parse(strings.TrimPrefix(subPath, "/"))

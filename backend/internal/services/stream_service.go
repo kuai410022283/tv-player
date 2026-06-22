@@ -433,7 +433,9 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
 				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
 				strings.Contains(strings.ToLower(finalURL), ".m3u8")
-			if isM3U8 {
+			
+			// 只有在主请求（非子路径分片请求）时，才更新该频道的 RedirectedURL
+			if targetURL == "" {
 				sp.SetRedirectedURL(channelID, finalURL)
 			}
 			var actualType string
@@ -938,10 +940,8 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 		}
 		req.Header.Set("User-Agent", currentUA)
 
-		// 非咪咕源时设置 Referer；咪咕源不设置 Referer（部分源站检查 Referer 是否为空）
-		if !isMigU {
-			req.Header.Set("Referer", targetURL)
-		}
+		// 移除强制设置自身为 Referer 的逻辑，避免触发 PHP 防盗链
+		// 自定义 Referer 会由下面的 headers 注入逻辑处理
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}

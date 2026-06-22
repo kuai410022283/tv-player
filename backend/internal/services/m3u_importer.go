@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -327,24 +329,57 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	return len(mergedKeys), nil
 }
 
-func detectStreamType(url string) string {
-	lower := strings.ToLower(url)
-	switch {
-	case strings.Contains(lower, ".m3u8") || strings.Contains(lower, "m3u8"):
-		return "hls"
-	case strings.Contains(lower, ".flv"):
-		return "flv"
-	case strings.HasPrefix(lower, "rtmp://"):
+func detectStreamType(rawURL string) string {
+	lowerURL := strings.ToLower(rawURL)
+
+	// 1. 优先判断特殊协议
+	if strings.HasPrefix(lowerURL, "rtmp://") {
 		return "rtmp"
-	case strings.HasPrefix(lower, "rtsp://"):
+	}
+	if strings.HasPrefix(lowerURL, "rtsp://") {
 		return "rtsp"
-	case strings.Contains(lower, ".mpd"):
+	}
+
+	// 2. 解析 URL
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		// 如果解析失败，采用最保守的降级匹配
+		if strings.Contains(lowerURL, ".m3u8") {
+			return "hls"
+		}
+		return ""
+	}
+
+	// 3. 从 Path 提取精确后缀
+	ext := strings.ToLower(path.Ext(u.Path))
+	switch ext {
+	case ".m3u8":
+		return "hls"
+	case ".flv":
+		return "flv"
+	case ".mpd":
 		return "dash"
-	case strings.Contains(lower, ".mp4"):
+	case ".mp4":
 		return "mp4"
-	case strings.Contains(lower, "/udp/") || strings.Contains(lower, "/rtp/") || strings.HasSuffix(lower, ".ts"):
+	case ".ts":
 		return "ts"
-	default:
+	}
+
+	// 4. 判断 udpxy 等组播特征路径
+	lowerPath := strings.ToLower(u.Path)
+	if strings.Contains(lowerPath, "/udp/") || strings.Contains(lowerPath, "/rtp/") {
+		return "ts"
+	}
+
+	// 5. 降级：如果 Path 没有后缀，可能隐藏在 Query 参数中 (如 ?url=http://.../a.m3u8)
+	lowerQuery := strings.ToLower(u.RawQuery)
+	if strings.Contains(lowerQuery, ".m3u8") || strings.Contains(lowerQuery, "m3u8") {
 		return "hls"
 	}
+	if strings.Contains(lowerQuery, ".flv") || strings.Contains(lowerQuery, "flv") {
+		return "flv"
+	}
+
+	// 6. 无法确定，返回空
+	return ""
 }
