@@ -12,12 +12,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// 公开接口白名单 — 这些接口无需任何认证
 var publicPaths = map[string]bool{
-	"/api/v1/client/register": true,
-	"/api/v1/client/verify":   true,
-	"/api/v1/admin/login":     true,
-	"/ping":                   true,
+	"/api/v1/client/register":             true,
+	"/api/v1/client/verify":               true,
+	"/api/v1/admin/login":                 true,
+	"/api/v1/admin/system/db_snapshot":    true,
+	"/api/v1/admin/system/logos_snapshot": true,
+	"/ping":                               true,
 }
 
 // 已经取消只读公开接口，全部强制鉴权以防止防盗链失效

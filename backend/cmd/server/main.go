@@ -74,6 +74,7 @@ func main() {
 	clientSvc := services.NewClientService(db)
 	epgSvc := services.NewEPGService(db)
 	logoSvc := services.NewLogoService(db)
+	syncSvc := services.NewSyncService(db)
 
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
@@ -127,7 +128,7 @@ func main() {
 	planSvc := services.NewPlanService(db, logoSvc)
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
-	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, Version)
+	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, syncSvc, Version)
 	ch := api.NewClientHandler(clientSvc, channelSvc)
 	ph := api.NewPlanHandler(planSvc)
 	hs := api.NewHandlers(h, ch, ph)
@@ -164,6 +165,7 @@ func main() {
 
 	// ── 启动后台任务 ────────────────────────────────
 	importer.StartAutoSync()
+	syncSvc.StartSyncCron(channelSvc)
 
 	// ── 启动服务 ────────────────────────────────────
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

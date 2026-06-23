@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -119,10 +120,11 @@ type Handler struct {
 	clientSvc   *services.ClientService
 	epgSvc      *services.EPGService
 	logoSvc     *services.LogoService
+	syncSvc     *services.SyncService
 	version     string
 }
 
-func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService, logoSvc *services.LogoService, version string) *Handler {
+func NewHandler(channelSvc *services.ChannelService, streamProxy *services.StreamProxy, importer *services.M3UImporter, clientSvc *services.ClientService, epgSvc *services.EPGService, logoSvc *services.LogoService, syncSvc *services.SyncService, version string) *Handler {
 	return &Handler{
 		channelSvc:  channelSvc,
 		streamProxy: streamProxy,
@@ -130,6 +132,7 @@ func NewHandler(channelSvc *services.ChannelService, streamProxy *services.Strea
 		clientSvc:   clientSvc,
 		epgSvc:      epgSvc,
 		logoSvc:     logoSvc,
+		syncSvc:     syncSvc,
 		version:     version,
 	}
 }
@@ -1365,4 +1368,138 @@ func (h *Handler) TriggerBatchFetchLogos(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 	go h.logoSvc.FetchLogosFromSources(req.Overwrite)
 	ok(c, gin.H{"message": "已在后台启动从源库批量拉取任务"})
+}
+
+// ── Sync ───────────────────────────────────────────────
+
+func (h *Handler) GetDBSnapshot(c *gin.Context) {
+	// Verify sync_serve_token
+	serveToken, _ := h.channelSvc.GetSetting("sync_serve_token")
+	reqToken := c.Query("token")
+	if reqToken == "" {
+		reqToken = c.GetHeader("Authorization")
+		reqToken = strings.TrimPrefix(reqToken, "Bearer ")
+	}
+	
+	if serveToken == "" || reqToken != serveToken {
+		fail(c, 401, "unauthorized sync access")
+		return
+	}
+
+	tempPath := filepath.Join("data", "backup_temp.db")
+	if err := h.syncSvc.Snapshot(tempPath); err != nil {
+		failInternal(c, err, "snapshot failed")
+		return
+	}
+
+	defer os.Remove(tempPath)
+	
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Content-Disposition", "attachment; filename=snapshot.db")
+	c.Header("Content-Type", "application/octet-stream")
+	c.File(tempPath)
+}
+
+func (h *Handler) GetLogosSnapshot(c *gin.Context) {
+	// Verify sync_serve_token
+	serveToken, _ := h.channelSvc.GetSetting("sync_serve_token")
+	reqToken := c.Query("token")
+	if reqToken == "" {
+		reqToken = c.GetHeader("Authorization")
+		reqToken = strings.TrimPrefix(reqToken, "Bearer ")
+	}
+
+	if serveToken == "" || reqToken != serveToken {
+		fail(c, 401, "unauthorized sync access")
+		return
+	}
+
+	dir := "./library/channel_logo"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			ok(c, gin.H{"logos": map[string]string{}})
+			return
+		}
+		failInternal(c, err, "failed to read logo directory")
+		return
+	}
+
+	snapshots := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		
+		filePath := filepath.Join(dir, entry.Name())
+		f, err := os.Open(filePath)
+		if err != nil {
+			continue
+		}
+		
+		h := md5.New()
+		if _, err := io.Copy(h, f); err == nil {
+			snapshots[entry.Name()] = fmt.Sprintf("%x", h.Sum(nil))
+		}
+		f.Close()
+	}
+
+	ok(c, gin.H{"logos": snapshots})
+}
+
+func (h *Handler) SyncFromMaster(c *gin.Context) {
+	var req struct {
+		MasterURL   string `json:"master_url" binding:"required"`
+		MasterToken string `json:"master_token"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "invalid parameters")
+		return
+	}
+
+	if err := h.syncSvc.SyncFromMaster(req.MasterURL, req.MasterToken); err != nil {
+		failInternal(c, err, "sync from master failed: "+err.Error())
+		return
+	}
+
+	ok(c, gin.H{"message": "同步成功"})
+}
+
+func (h *Handler) PingMaster(c *gin.Context) {
+	var req struct {
+		MasterURL string `json:"master_url" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "invalid parameters")
+		return
+	}
+
+	// Remove trailing slash if any
+	masterURL := req.MasterURL
+	for len(masterURL) > 0 && masterURL[len(masterURL)-1] == '/' {
+		masterURL = masterURL[:len(masterURL)-1]
+	}
+
+	apiURL := masterURL + "/ping"
+	httpReq, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		fail(c, 400, "failed to create request: "+err.Error())
+		return
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		fail(c, 400, "主节点连接失败，请检查地址是否正确或网络是否畅通")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fail(c, 400, fmt.Sprintf("主节点返回异常状态码: %d", resp.StatusCode))
+		return
+	}
+
+	ok(c, gin.H{"message": "连接成功"})
 }

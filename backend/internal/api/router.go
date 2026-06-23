@@ -142,6 +142,18 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminSettings.PUT("/password", hs.Handler.UpdateAdminPassword)
 		}
 
+		// 管理端：系统同步
+		// Note: db_snapshot can be called by external standby nodes, so it uses its own auth inside the handler, NOT RequireAdmin.
+		api.GET("/admin/system/db_snapshot", hs.Handler.GetDBSnapshot)
+		api.GET("/admin/system/logos_snapshot", hs.Handler.GetLogosSnapshot)
+
+		adminSystem := api.Group("/admin/system")
+		adminSystem.Use(middleware.RequireAdmin())
+		{
+			adminSystem.POST("/sync_from_master", hs.Handler.SyncFromMaster)
+			adminSystem.POST("/ping-master", hs.Handler.PingMaster)
+		}
+
 		// 管理端：台标管理
 		adminLogo := api.Group("/admin/logo")
 		adminLogo.Use(middleware.RequireAdmin())

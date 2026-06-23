@@ -251,6 +251,13 @@ func createTables(db *sql.DB) error {
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('enable_external_sub', 'false');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('logo_strategy', 'source');
 
+	-- ── Sync settings ───────────────────────────────────
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_enable', 'false');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_master_url', '');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_master_token', '');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_serve_token', '');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_interval_min', '5');
+
 	CREATE TABLE IF NOT EXISTS subscription_plans (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL UNIQUE,
