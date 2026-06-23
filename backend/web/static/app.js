@@ -321,6 +321,11 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const body = document.getElementById('channels-body');
   if (chRes.data && chRes.data.items) {
     channelTotal = chRes.data.total || 0;
+    if (chRes.data.items.length === 0 && channelPage > 1) {
+      channelPage--;
+      loadChannels(search, groupId);
+      return;
+    }
     body.innerHTML = chRes.data.items.map((c, i) => {
       let logoHtml = '<span style="color:#999">-</span>';
       if (c.logo) {
@@ -562,7 +567,16 @@ async function loadGroups() {
   const r = await api('/admin/groups' + q);
   const items = r.data ? r.data.items || [] : [];
   groupTotal = r.data ? r.data.total || 0 : 0;
+
+  if (items.length === 0 && groupPage > 1) {
+    groupPage--;
+    loadGroups();
+    return;
+  }
+
   selectedGroupIds.clear();
+  const checkAllBox = document.getElementById('check-all-groups');
+  if (checkAllBox) checkAllBox.checked = false;
 
   // Merge items into global groups array
   items.forEach(item => {

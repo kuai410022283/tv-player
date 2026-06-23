@@ -834,13 +834,7 @@
             </div>
             <div class="form-group">
               <label>自动同步间隔 (分钟)</label>
-              <select id="set-sync-interval">
-                <option value="5">每 5 分钟</option>
-                <option value="15">每 15 分钟</option>
-                <option value="30">每 30 分钟</option>
-                <option value="60">每 1 小时</option>
-                <option value="720">每 12 小时</option>
-              </select>
+              <input type="number" id="set-sync-interval" min="1" placeholder="请填入分钟数，例如 60（表示1小时），1440（表示24小时）">
             </div>
             <div class="form-actions" style="justify-content:flex-start">
               <button class="btn btn-danger" onclick="forceSyncFromMaster()">强制立即覆盖拉取 (危险操作)</button>

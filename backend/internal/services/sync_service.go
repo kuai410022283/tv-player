@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"crypto/md5"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,7 +51,7 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 		return fmt.Errorf("master URL is empty")
 	}
 
-	downloadPath := filepath.Join("data", "master_sync.db")
+	downloadPath := filepath.Join("data", fmt.Sprintf("master_sync_%d.db", time.Now().UnixNano()))
 	
 	// Ensure data dir exists
 	_ = os.MkdirAll("data", 0755)
@@ -104,20 +106,36 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 	absPath = filepath.ToSlash(absPath)
 
 
-	// 3. Execute transaction
-	tx, err := s.db.Begin()
+	// 3. Obtain a dedicated connection for ATTACH/DETACH
+	ctx := context.Background()
+	conn, err := s.db.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to get database connection: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		// Force the connection to be destroyed instead of returning to the pool.
+		// modernc.org/sqlite caches prepared statements implicitly, which counts as "active statements".
+		// SQLite forbids DETACH when there are active statements, so DETACH always fails silently.
+		// This poisons the connection. Destroying it is the only 100% safe workaround.
+		_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		conn.Close()
+	}()
 
-	_, err = tx.Exec(fmt.Sprintf("ATTACH DATABASE '%s' AS master_db", absPath))
+	// ATTACH must be done on the connection OUTSIDE the transaction
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("ATTACH DATABASE '%s' AS master_db", absPath))
 	if err != nil {
 		return fmt.Errorf("failed to attach master database: %w", err)
 	}
 	defer func() {
-		_, _ = tx.Exec("DETACH DATABASE master_db")
+		_, _ = conn.ExecContext(ctx, "DETACH DATABASE master_db")
 	}()
+
+	// Execute sync transaction on the specific connection
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 
 	queries := []string{
 		"DELETE FROM main.channel_groups",
@@ -232,13 +250,14 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 		f, err := os.Open(filePath)
 		if err == nil {
 			h := md5.New()
-			io.Copy(h, f)
-			f.Close()
-			localHash := fmt.Sprintf("%x", h.Sum(nil))
-			if localHash == masterHash {
-				// Same file, no need to download
-				delete(masterLogos, name)
+			if _, err := io.Copy(h, f); err == nil {
+				localHash := fmt.Sprintf("%x", h.Sum(nil))
+				if localHash == masterHash {
+					// Same file, no need to download
+					delete(masterLogos, name)
+				}
 			}
+			f.Close()
 		}
 	}
 
@@ -258,7 +277,9 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 			filePath := filepath.Join(dir, name)
 			out, err := os.Create(filePath)
 			if err == nil {
-				io.Copy(out, resp.Body)
+				if _, err := io.Copy(out, resp.Body); err != nil {
+					slog.Error("failed to write downloaded logo", "file", name, "error", err)
+				}
 				out.Close()
 			}
 		}
