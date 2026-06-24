@@ -266,7 +266,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 			strategy := h.logoSvc.GetLogoStrategy()
 
 			// 聚合后的列表
-			var groupedItems []map[string]interface{}
+			groupedItems := make([]map[string]interface{}, 0)
 			groupMap := make(map[string]int) // name -> index in groupedItems
 
 			for i := range items {

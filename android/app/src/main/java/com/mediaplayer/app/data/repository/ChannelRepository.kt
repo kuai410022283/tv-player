@@ -74,9 +74,13 @@ class ChannelRepository {
             }
             if (!resp.isSuccessful || resp.body()?.code != 0) break
             val pageData = resp.body()!!.data ?: break
-            result.addAll(pageData.items)
-            // 已取完该分组所有数据则退出
-            if (result.size >= pageData.total) break
+            
+            val fetchedItems = pageData.items ?: emptyList()
+            if (fetchedItems.isEmpty()) break
+            
+            result.addAll(fetchedItems)
+            // 已取完该分组所有数据则退出（通过实际拉取数量与每页数量判断更稳妥）
+            if (fetchedItems.size < PAGE_SIZE || result.size >= pageData.total) break
             page++
         }
         return result

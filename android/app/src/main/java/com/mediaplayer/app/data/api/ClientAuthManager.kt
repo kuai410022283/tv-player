@@ -33,6 +33,10 @@ class ClientAuthManager(private val context: Context) {
 
     fun getStatus(): String? = prefs.getString(Prefs.KEY_CLIENT_STATUS, null)
 
+    fun getPlanName(): String? = prefs.getString(Prefs.KEY_PLAN_NAME, null)
+
+    fun getExpiresAt(): String? = prefs.getString(Prefs.KEY_EXPIRES_AT, null)
+
     fun getClientId(): Long {
         return prefs.getLong(Prefs.KEY_CLIENT_ID, 0)
     }
@@ -106,8 +110,17 @@ class ClientAuthManager(private val context: Context) {
             if (token != null) {
                 val response = ApiClient.getService().clientVerify("Bearer $token")
                 if (response.isSuccessful && response.body()?.code == 0) {
-                    // token 有效 = 已审批
-                    prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, "approved").apply()
+                    val data = response.body()?.data
+                    if (data != null) {
+                        prefs.edit().apply {
+                            putString(Prefs.KEY_CLIENT_STATUS, "approved")
+                            putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
+                            putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
+                            apply()
+                        }
+                    } else {
+                        prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, "approved").apply()
+                    }
                     return@withContext Result.success("approved")
                 }
             }
@@ -151,6 +164,9 @@ class ClientAuthManager(private val context: Context) {
             putLong(Prefs.KEY_CLIENT_ID, resp.clientId)
             putString(Prefs.KEY_CLIENT_STATUS, resp.status)
             putBoolean(Prefs.KEY_ENABLE_LOG, resp.enableLog)
+            if (!resp.expiresAt.isNullOrEmpty()) {
+                putString(Prefs.KEY_EXPIRES_AT, resp.expiresAt)
+            }
             apply()
         }
         com.mediaplayer.app.util.RemoteLogger.updateConfig(resp.enableLog)

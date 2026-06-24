@@ -970,14 +970,30 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {}
         
         val authStatus = when (authManager.getStatus()) {
-            "approved" -> "已授权"
-            "pending" -> "等待审批"
-            "rejected" -> "已拒绝"
-            "banned" -> "已封禁"
-            "expired" -> "已过期"
-            else -> "未注册"
+            "approved" -> {
+                val planName = authManager.getPlanName()
+                var expiresAt = authManager.getExpiresAt()
+                
+                // 格式化时间字符串：只截取到“日” (YYYY-MM-DD)
+                if (!expiresAt.isNullOrEmpty()) {
+                    if (expiresAt.startsWith("0001-01-01")) {
+                        expiresAt = "永久"
+                    } else if (expiresAt.length >= 10) {
+                        expiresAt = expiresAt.substring(0, 10)
+                    }
+                }
+                
+                val pName = if (planName.isNullOrEmpty()) "无" else planName
+                val expTime = if (expiresAt.isNullOrEmpty()) "永久" else expiresAt
+                "套餐: $pName\n过期时间: $expTime"
+            }
+            "pending" -> "授权状态: 等待审批"
+            "rejected" -> "授权状态: 已拒绝"
+            "banned" -> "授权状态: 已封禁"
+            "expired" -> "授权状态: 已过期"
+            else -> "授权状态: 未注册"
         }
-        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId()}\n授权状态: $authStatus"
+        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId()}\n$authStatus"
         
         // --- QR Code Logic ---
         val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()

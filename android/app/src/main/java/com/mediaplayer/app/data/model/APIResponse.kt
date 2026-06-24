@@ -12,7 +12,7 @@ data class PageResponse<T>(
     @SerializedName("total") val total: Long = 0,
     @SerializedName("page") val page: Int = 1,
     @SerializedName("page_size") val pageSize: Int = 20,
-    @SerializedName("items") val items: List<T> = emptyList()
+    @SerializedName("items") val items: List<T>? = emptyList()
 )
 
 data class ClientRegisterResp(
