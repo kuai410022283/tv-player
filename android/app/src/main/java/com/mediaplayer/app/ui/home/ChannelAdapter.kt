@@ -118,8 +118,9 @@ class ChannelAdapter(
             if (item.currentEpg.isNotEmpty()) {
                 tvCurrentEpg.text = item.currentEpg
                 tvCurrentEpg.visibility = View.VISIBLE
-                if (item.epgPercent > 0) {
-                    progressEpgItem.progress = item.epgPercent
+                val dynamicPercent = item.getDynamicEpgPercent()
+                if (dynamicPercent > 0) {
+                    progressEpgItem.progress = dynamicPercent
                     progressEpgItem.visibility = View.VISIBLE
                 } else {
                     progressEpgItem.visibility = View.GONE

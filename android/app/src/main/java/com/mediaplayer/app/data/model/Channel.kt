@@ -44,4 +44,57 @@ data class Channel(
         }
         return emptyList()
     }
+
+    fun getDynamicEpgPercent(): Int {
+        if (currentEpg.isEmpty()) return epgPercent
+        try {
+            val parts = currentEpg.split(" ")
+            if (parts.isNotEmpty()) {
+                val timeRange = parts[0]
+                val times = timeRange.split("-")
+                if (times.size == 2) {
+                    val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                    val start = sdf.parse(times[0])
+                    val end = sdf.parse(times[1])
+                    
+                    if (start != null && end != null) {
+                        val now = java.util.Calendar.getInstance()
+                        val startCal = java.util.Calendar.getInstance().apply { 
+                            time = start
+                            set(now.get(java.util.Calendar.YEAR), now.get(java.util.Calendar.MONTH), now.get(java.util.Calendar.DATE))
+                        }
+                        val endCal = java.util.Calendar.getInstance().apply {
+                            time = end
+                            set(now.get(java.util.Calendar.YEAR), now.get(java.util.Calendar.MONTH), now.get(java.util.Calendar.DATE))
+                        }
+                        
+                        if (endCal.before(startCal)) {
+                            if (now.get(java.util.Calendar.HOUR_OF_DAY) < 12) {
+                                startCal.add(java.util.Calendar.DATE, -1)
+                            } else {
+                                endCal.add(java.util.Calendar.DATE, 1)
+                            }
+                        }
+                        
+                        val startTime = startCal.timeInMillis
+                        val endTime = endCal.timeInMillis
+                        val currentTime = now.timeInMillis
+                        
+                        if (currentTime in startTime..endTime) {
+                            val duration = endTime - startTime
+                            val elapsed = currentTime - startTime
+                            return ((elapsed.toFloat() / duration) * 100).toInt().coerceIn(0, 100)
+                        } else if (currentTime > endTime) {
+                            return 100
+                        } else {
+                            return 0
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore parse errors
+        }
+        return epgPercent
+    }
 }

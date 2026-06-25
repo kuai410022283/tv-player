@@ -1617,7 +1617,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadEpgForChannel(channel: Channel) {
         if (channel.currentEpg.isNotEmpty()) {
             osdOverlayView?.setEpgText("正在播放: ${channel.currentEpg}".toString())
-            osdOverlayView?.setEpgProgress(channel.epgPercent)
+            osdOverlayView?.setEpgProgress(channel.getDynamicEpgPercent())
         } else {
             osdOverlayView?.setEpgText("暂无当前节目信息".toString())
             osdOverlayView?.setEpgProgress(0)
@@ -1636,7 +1636,9 @@ class MainActivity : AppCompatActivity() {
             lastEpgBgRefreshTime = now
             return
         }
-        if (now - lastEpgBgRefreshTime > 300_000L) { // 5 minutes
+        if (now - lastEpgBgRefreshTime < 600_000L) { // 10 minutes
+            return
+        }
             lastEpgBgRefreshTime = now
             val gId = currentGroupId ?: return
             
@@ -1678,9 +1680,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    // ═══════════════════════════════════════════════════
 
     // ═══════════════════════════════════════════════════
     // SHARED LOGIC
