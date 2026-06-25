@@ -162,7 +162,18 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	// M3U 格式 (默认)
 	c.Header("Content-Type", "application/x-mpegurl; charset=utf-8")
 	var sb strings.Builder
-	sb.WriteString("#EXTM3U\n")
+	sb.WriteString("#EXTM3U")
+
+	epgURLs := h.svc.GetEPGSourceURL()
+	if epgURLs != "" {
+		epgURLs = strings.ReplaceAll(epgURLs, "\r\n", ",")
+		epgURLs = strings.ReplaceAll(epgURLs, "\n", ",")
+		epgURLs = strings.Trim(epgURLs, ",")
+		if epgURLs != "" {
+			sb.WriteString(fmt.Sprintf(` x-tvg-url="%s"`, epgURLs))
+		}
+	}
+	sb.WriteString("\n")
 
 	logoSvc := h.svc.GetLogoService()
 	strategy := "source"
@@ -170,7 +181,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		strategy = logoSvc.GetLogoStrategy()
 	}
 
-	for _, ch := range channels {
+	for i, ch := range channels {
 		logoURL := ch.Logo
 		if logoSvc != nil {
 			logoURL = logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, baseURL)
@@ -222,8 +233,9 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s&plan=1", baseURL, ch.ID, ext, lineIdx, token)
 			}
 
-			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-logo="%s" group-title="%s"%s,%s`+"\n",
-				tvgID, ch.Name, logoURL, ch.GroupName, catchupStr, displayName))
+			tvgChno := i + 1
+			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-chno="%d" tvg-name="%s" tvg-logo="%s" group-title="%s"%s,%s`+"\n",
+				tvgID, tvgChno, ch.Name, logoURL, ch.GroupName, catchupStr, displayName))
 			sb.WriteString(playURL)
 			sb.WriteString("\n")
 		}

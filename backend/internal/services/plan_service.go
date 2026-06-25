@@ -21,6 +21,15 @@ func (s *PlanService) GetLogoService() *LogoService {
 	return s.logoSvc
 }
 
+func (s *PlanService) GetEPGSourceURL() string {
+	var urlStr string
+	err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='epg_source_url'`).Scan(&urlStr)
+	if err != nil {
+		return ""
+	}
+	return urlStr
+}
+
 func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {
 	query := `SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM subscription_plans`
 	var args []interface{}
@@ -149,6 +158,9 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		if err := rows.Scan(&m.ID, &m.GroupID, &m.GroupName, &m.Name, &m.Logo,
 			&m.StreamURL, &m.StreamType, &m.EPGChannelID, &isDirect, &supportCatchup, &m.CatchupType, &m.CatchupSource, &m.CatchupDays); err != nil {
 			return nil, err
+		}
+		if m.StreamType == "" {
+			m.StreamType = "ts"
 		}
 		m.IsDirect = isDirect == 1
 		m.SupportCatchup = supportCatchup == 1

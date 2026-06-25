@@ -347,7 +347,7 @@ func detectStreamType(rawURL string) string {
 		if strings.Contains(lowerURL, ".m3u8") {
 			return "hls"
 		}
-		return ""
+		return "ts"
 	}
 
 	// 3. 从 Path 提取精确后缀
@@ -380,6 +380,6 @@ func detectStreamType(rawURL string) string {
 		return "flv"
 	}
 
-	// 6. 无法确定，返回空
-	return ""
+	// 6. 无法确定，返回默认 ts
+	return "ts"
 }

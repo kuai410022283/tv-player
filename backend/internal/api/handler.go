@@ -1191,7 +1191,7 @@ func (h *Handler) UpdateAdminPassword(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.OldPassword)); err != nil {
-		fail(c, 401, "原密码错误")
+		fail(c, 400, "原密码错误")
 		return
 	}
 
