@@ -139,6 +139,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		{
 			adminSettings.POST("/update", hs.Handler.SetAppUpdate)
 			adminSettings.POST("/pull-update", hs.Handler.PullAppUpdate)
+			adminSettings.GET("/pull-update/progress", hs.Handler.PullAppUpdateProgress)
 			adminSettings.PUT("/password", hs.Handler.UpdateAdminPassword)
 		}
 
