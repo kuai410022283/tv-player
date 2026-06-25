@@ -110,6 +110,8 @@ type SubscriptionChannel struct {
 	CatchupType    string `json:"catchup_type"`
 	CatchupSource  string `json:"catchup_source"`
 	CatchupDays    int    `json:"catchup_days"`
+	UserAgent      string `json:"user_agent"`
+	CustomHeaders  string `json:"custom_headers"`
 }
 
 // ── User Settings ──────────────────────────────────────

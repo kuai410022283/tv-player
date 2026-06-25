@@ -18,9 +18,9 @@ data class Channel(
     @SerializedName("name") val name: String = "",
     @SerializedName("logo") val logo: String = "",
     @SerializedName("description") val description: String = "",
-    @SerializedName("current_epg") val currentEpg: String = "",
-    @SerializedName("next_epg") val nextEpg: String = "",
-    @SerializedName("epg_percent") val epgPercent: Int = 0,
+    @SerializedName("current_epg") var currentEpg: String = "",
+    @SerializedName("next_epg") var nextEpg: String = "",
+    @SerializedName("epg_percent") var epgPercent: Int = 0,
 
     @SerializedName("sort_order") val sortOrder: Int = 0,
     @SerializedName("lines") val lines: List<ChannelLine> = emptyList(),

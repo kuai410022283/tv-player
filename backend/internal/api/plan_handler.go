@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -173,6 +174,11 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			sb.WriteString(fmt.Sprintf(` x-tvg-url="%s"`, epgURLs))
 		}
 	}
+	
+	shift := h.svc.GetEPGTimeShift()
+	if shift != 0 {
+		sb.WriteString(fmt.Sprintf(` tvg-shift="%d"`, shift))
+	}
 	sb.WriteString("\n")
 
 	logoSvc := h.svc.GetLogoService()
@@ -190,6 +196,14 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				logoURL = fmt.Sprintf("%s/api/v1/logo?name=%s", baseURL, url.QueryEscape(ch.Name))
 			} else if !strings.HasPrefix(logoURL, "http://") && !strings.HasPrefix(logoURL, "https://") {
 				logoURL = baseURL + logoURL
+			}
+		}
+		
+		if strings.HasPrefix(logoURL, baseURL) {
+			if strings.Contains(logoURL, "?") {
+				logoURL = fmt.Sprintf("%s&token=%s&plan=1", logoURL, token)
+			} else {
+				logoURL = fmt.Sprintf("%s?token=%s&plan=1", logoURL, token)
 			}
 		}
 
@@ -222,6 +236,23 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			var playURL string
 			if ch.IsDirect {
 				playURL = u
+				var kodiHeaders []string
+				if ch.UserAgent != "" {
+					kodiHeaders = append(kodiHeaders, "User-Agent="+ch.UserAgent)
+				}
+				if ch.CustomHeaders != "" {
+					var headersMap map[string]string
+					if err := json.Unmarshal([]byte(ch.CustomHeaders), &headersMap); err == nil {
+						for k, v := range headersMap {
+							if strings.ToLower(k) != "user-agent" {
+								kodiHeaders = append(kodiHeaders, fmt.Sprintf("%s=%s", k, v))
+							}
+						}
+					}
+				}
+				if len(kodiHeaders) > 0 {
+					playURL = playURL + "|" + strings.Join(kodiHeaders, "&")
+				}
 			} else {
 				ext := "ts"
 				switch ch.StreamType {

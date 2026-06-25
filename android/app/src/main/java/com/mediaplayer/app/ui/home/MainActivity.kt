@@ -151,6 +151,7 @@ class MainActivity : AppCompatActivity() {
     // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
     private var isFirstResume = true
     private var hasShownSplash = false
+    private var lastEpgBgRefreshTime = 0L
     
     // Watchdog State
     enum class PlaybackState { IDLE, BUFFERING, PLAYING }
@@ -1558,6 +1559,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showOsd() {
+        checkAndRefreshEpgBg()
         // 刷新频道号码和名称（来自当前频道，不依赖播放器回调）
         val channel = allChannels.getOrNull(currentChannelIndex)
         if (channel != null) {
@@ -1626,6 +1628,56 @@ class MainActivity : AppCompatActivity() {
             } else {
             osdOverlayView?.setNextEpgText("".toString())
             }
+    }
+
+    private fun checkAndRefreshEpgBg() {
+        val now = System.currentTimeMillis()
+        if (lastEpgBgRefreshTime == 0L) {
+            lastEpgBgRefreshTime = now
+            return
+        }
+        if (now - lastEpgBgRefreshTime > 300_000L) { // 5 minutes
+            lastEpgBgRefreshTime = now
+            val gId = currentGroupId ?: return
+            
+            lifecycleScope.launch(Dispatchers.IO) {
+                var page = 1
+                val latestChannels = mutableListOf<Channel>()
+                while (true) {
+                    val resp = try {
+                        ApiClient.getService().getChannels(groupId = gId, page = page, pageSize = 200)
+                    } catch (e: Exception) {
+                        break
+                    }
+                    if (!resp.isSuccessful || resp.body()?.code != 0) break
+                    val pageData = resp.body()!!.data ?: break
+                    val items = pageData.items ?: emptyList()
+                    if (items.isEmpty()) break
+                    latestChannels.addAll(items)
+                    if (items.size < 200 || latestChannels.size >= pageData.total) break
+                    page++
+                }
+                
+                withContext(Dispatchers.Main) {
+                    var updated = false
+                    for (latest in latestChannels) {
+                        val existing = allChannels.find { it.id == latest.id }
+                        if (existing != null) {
+                            if (existing.currentEpg != latest.currentEpg || existing.epgPercent != latest.epgPercent) {
+                                existing.currentEpg = latest.currentEpg
+                                existing.nextEpg = latest.nextEpg
+                                existing.epgPercent = latest.epgPercent
+                                updated = true
+                            }
+                        }
+                    }
+                    if (updated) {
+                        channelAdapter.notifyItemRangeChanged(0, filteredChannels.size, "epg_update")
+                        allChannels.getOrNull(currentChannelIndex)?.let { loadEpgForChannel(it) }
+                    }
+                }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════
@@ -2185,6 +2237,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showZappingMenu(focusOnGroups: Boolean, resetToPlaying: Boolean = false) {
+        checkAndRefreshEpgBg()
         if (layoutZappingMenu?.visibility == View.VISIBLE) return
 
         val playingChannel = if (currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) allChannels[currentChannelIndex] else null

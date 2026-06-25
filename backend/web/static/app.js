@@ -1453,6 +1453,7 @@ async function loadClientSettings() {
     if (document.getElementById('set-epg-source-url')) {
       document.getElementById('set-epg-source-url').value = setRes.data.epg_source_url || '';
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
+      document.getElementById('set-epg-time-shift').value = setRes.data.epg_time_shift || '0';
     }
 
     // 台标配置
@@ -1525,6 +1526,7 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-epg-source-url')) {
     settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
     settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
+    settings.epg_time_shift = document.getElementById('set-epg-time-shift').value || '0';
   }
 
   if (document.getElementById('set-logo-strategy')) {
