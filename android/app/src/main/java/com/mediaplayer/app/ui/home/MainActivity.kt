@@ -2422,13 +2422,27 @@ class MainActivity : AppCompatActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val keyCode = event.keyCode
             
-            // 按键防抖：同一按键 80ms 内重复触发则忽略
+            // 按键防抖：同一按键 60ms 内重复触发则忽略
+            // 注意：TV 遥控器的自动重复间隔通常为 100-110ms，阈值必须高于此值
             val now = android.os.SystemClock.uptimeMillis()
-            if (keyCode == lastDispatchedKeyCode && now - lastDispatchedKeyTime < 80) {
+            if (keyCode == lastDispatchedKeyCode && now - lastDispatchedKeyTime < 60) {
                 return true
             }
             lastDispatchedKeyCode = keyCode
             lastDispatchedKeyTime = now
+
+            // 快速通行：非本应用关注的按键（如音量、电源、未知遥控键等）
+            // 直接交给系统，不执行任何日志或 Handler 操作，防止主线程被淹没
+            val isKnownKey = keyCode in setOf(
+                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_BACK
+            )
+            if (!isKnownKey) {
+                return super.dispatchKeyEvent(event)
+            }
 
             com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "User pressed key $keyCode")
 
