@@ -515,7 +515,9 @@ class PlayerActivity : AppCompatActivity() {
                                     lowerUrl.startsWith("rtp://") || 
                                     lowerUrl.contains(".ts") || 
                                     lowerUrl.contains(".flv") || 
-                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv")
+                                    lowerUrl.contains(".m3u8") || 
+                                    lowerUrl.contains("/stream/proxy/") || 
+                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv", "hls", "m3u8")
             // 对于组播、ts、flv等特殊流，放行看门狗（不检测假死）
             isWatchdogEnabledForCurrentStream = !isMulticastOrLive
             

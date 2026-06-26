@@ -136,6 +136,10 @@ class MainActivity : AppCompatActivity() {
     private var authPollRunnable: Runnable? = null
     private val heartbeatHandler = Handler(Looper.getMainLooper())
     private var heartbeatRunnable: Runnable? = null
+    
+    private val epgTickerHandler = Handler(Looper.getMainLooper())
+    private var epgTickerRunnable: Runnable? = null
+
     private val focusDebounceHandler = Handler(Looper.getMainLooper())
     private var focusDebounceRunnable: Runnable? = null
 
@@ -1467,7 +1471,9 @@ class MainActivity : AppCompatActivity() {
                                     lowerUrl.startsWith("rtp://") || 
                                     lowerUrl.contains(".ts") || 
                                     lowerUrl.contains(".flv") || 
-                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv")
+                                    lowerUrl.contains(".m3u8") || 
+                                    lowerUrl.contains("/stream/proxy/") || 
+                                    streamTypeLower in listOf("ts", "rtp", "udp", "flv", "hls", "m3u8")
             // 对于组播、ts、flv等特殊流，放行看门狗（不检测假死）
             isWatchdogEnabledForCurrentStream = !isMulticastOrLive
             
@@ -1947,6 +1953,7 @@ class MainActivity : AppCompatActivity() {
 
         loadData()
         startHeartbeat()
+        startEpgTicker()
     }
 
     private fun triggerMarquee() {
@@ -1997,6 +2004,47 @@ class MainActivity : AppCompatActivity() {
             // 原生跑马灯运行完毕后自动隐藏，并进入下一轮间隔排期
             uiHandler.postDelayed(hideMarqueeRunnable, displayDuration)
         }
+    }
+
+    private fun startEpgTicker() {
+        epgTickerRunnable?.let { epgTickerHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                // Update OSD if visible
+                if (osdOverlayView?.isOsdVisible() == true) {
+                    val channel = allChannels.getOrNull(currentChannelIndex)
+                    if (channel != null) {
+                        loadEpgForChannel(channel)
+                    }
+                }
+                
+                // Update left sidebar EPG list
+                if (layoutEpgMenu?.visibility == View.VISIBLE) {
+                    epgAdapter.notifyDataSetChanged()
+                }
+                
+                // Update channel list EPG
+                if (tvChannelsRv?.visibility == View.VISIBLE) {
+                    val lm = tvChannelsRv?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                    if (lm != null) {
+                        val first = lm.findFirstVisibleItemPosition()
+                        val last = lm.findLastVisibleItemPosition()
+                        if (first != androidx.recyclerview.widget.RecyclerView.NO_POSITION && last != androidx.recyclerview.widget.RecyclerView.NO_POSITION) {
+                            channelAdapter.notifyItemRangeChanged(first, last - first + 1, "epg_update")
+                        }
+                    }
+                }
+
+                epgTickerHandler.postDelayed(this, 60000) // 1 min
+            }
+        }
+        epgTickerRunnable = runnable
+        epgTickerHandler.postDelayed(runnable, 60000)
+    }
+
+    private fun stopEpgTicker() {
+        epgTickerRunnable?.let { epgTickerHandler.removeCallbacks(it) }
+        epgTickerRunnable = null
     }
 
     private fun startHeartbeat() {
@@ -2829,6 +2877,7 @@ class MainActivity : AppCompatActivity() {
         configWebServer?.stop()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+        stopEpgTicker()
         osdOverlayView?.removeCallbacks()
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.removeCallbacks(channelInputRunnable)

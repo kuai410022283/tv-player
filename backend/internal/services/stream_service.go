@@ -16,9 +16,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mediaplayer/backend/internal/config"
 	"github.com/mediaplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/services/multicast"
+	"github.com/bluenviron/gortsplib/v4"
+	"github.com/bluenviron/gortsplib/v4/pkg/base"
+	"github.com/bluenviron/gortsplib/v4/pkg/description"
+	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/pion/rtp"
 )
+
+var streamBufferPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 128*1024)
+		return &buf
+	},
+}
 
 // StreamProxy manages proxied streams with health checking
 type StreamProxy struct {
@@ -386,6 +400,14 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		return fmt.Errorf("无有效播放线路")
 	}
 
+	firstURL := validURLs[0]
+	if strings.HasPrefix(firstURL, "udp://") || strings.HasPrefix(firstURL, "rtp://") {
+		return sp.serveMulticastProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
+	if strings.HasPrefix(firstURL, "rtsp://") {
+		return sp.serveRtspProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
+
 	type raceResult struct {
 		index int
 		resp  *http.Response
@@ -611,119 +633,90 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		// 缓冲模式：适合 HLS/DASH/文件等非实时流
 		// ═══════════════════════════════════════════════════════
 		slog.Info("stream proxy buffered mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "threshold", flushThreshold)
-		chunkChan := make(chan []byte, 1024)
-		errChan := make(chan error, 1)
 
-		go func() {
-			defer close(chunkChan)
-			bufferSize := 64 * 1024
-			if sp.cfg.BufferSize > bufferSize {
-				bufferSize = sp.cfg.BufferSize
-			}
-			buf := make([]byte, bufferSize)
-			reader := bufio.NewReaderSize(resp.Body, bufferSize)
-			for {
-				n, err := reader.Read(buf)
-				if n > 0 {
-					chunkData := make([]byte, n)
-					copy(chunkData, buf[:n])
-					select {
-					case chunkChan <- chunkData:
-					default:
-						select {
-						case errChan <- fmt.Errorf("client buffer full, connection too slow"):
-						default:
-						}
-						return
-					}
-				}
-				if err != nil {
-					select {
-					case errChan <- err:
-					default:
-					}
-					return
-				}
-			}
-		}()
+		bufferSize := 64 * 1024
+		if sp.cfg.BufferSize > bufferSize {
+			bufferSize = sp.cfg.BufferSize
+		}
+		if bufferSize > 128*1024 {
+			bufferSize = 128 * 1024
+		}
+		
+		bufPtr := streamBufferPool.Get().(*[]byte)
+		buf := (*bufPtr)[:bufferSize]
+		defer streamBufferPool.Put(bufPtr)
+		reader := bufio.NewReaderSize(resp.Body, bufferSize)
+
+		writeBufPtr := streamBufferPool.Get().(*[]byte)
+		writeBuf := (*writeBufPtr)[:0]
+		defer streamBufferPool.Put(writeBufPtr)
 
 		lastUpdate := time.Now()
 		var bytesSinceLastUpdate int64 = 0
 		hasFlushed := false
-		writeBuf := make([]byte, 0, 128*1024)
 
 		for {
 			select {
 			case <-r.Context().Done():
 				return nil
-			case err := <-errChan:
-				if err == io.EOF {
-					return nil
-				}
-				return err
-			case chunk, ok := <-chunkChan:
-				if !ok {
-					if len(writeBuf) > 0 {
-						w.Write(writeBuf)
-						if canFlush {
-							flusher.Flush()
-						}
-					}
-					return nil
-				}
+			default:
+			}
 
-				writeBuf = append(writeBuf, chunk...)
+			n, err := reader.Read(buf)
+			if n > 0 {
+				writeBuf = append(writeBuf, buf[:n]...)
 
 				if !hasFlushed {
 					if len(writeBuf) > 0 {
-						n, err := w.Write(writeBuf)
-						if err != nil {
-							return err
+						wn, wErr := w.Write(writeBuf)
+						if wErr != nil {
+							return nil
 						}
 						if canFlush {
 							flusher.Flush()
 						}
-						bytesSinceLastUpdate += int64(n)
+						bytesSinceLastUpdate += int64(wn)
 						writeBuf = writeBuf[:0]
 						hasFlushed = true
 					}
 				} else if len(writeBuf) >= flushThreshold {
-					n, err := w.Write(writeBuf)
-					if err != nil {
-						return err
+					wn, wErr := w.Write(writeBuf)
+					if wErr != nil {
+						return nil
 					}
 					if canFlush {
 						flusher.Flush()
 					}
-					bytesSinceLastUpdate += int64(n)
+					bytesSinceLastUpdate += int64(wn)
 					writeBuf = writeBuf[:0]
 				}
+			}
 
-				now := time.Now()
-				if now.Sub(lastUpdate) >= time.Second {
-					if len(writeBuf) > 0 {
-						n, err := w.Write(writeBuf)
-						if err != nil {
-							return err
-						}
-						if canFlush {
-							flusher.Flush()
-						}
-						bytesSinceLastUpdate += int64(n)
-						writeBuf = writeBuf[:0]
+			if err != nil {
+				if len(writeBuf) > 0 {
+					w.Write(writeBuf)
+					if canFlush {
+						flusher.Flush()
 					}
-
-					sp.mu.RLock()
-					if s, ok := sp.streams[sessionID]; ok {
-						s.Mu.Lock()
-						s.LastActive = now
-						s.SpeedBytes = bytesSinceLastUpdate
-						s.Mu.Unlock()
-					}
-					sp.mu.RUnlock()
-					bytesSinceLastUpdate = 0
-					lastUpdate = now
 				}
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			}
+
+			now := time.Now()
+			if now.Sub(lastUpdate) >= time.Second {
+				sp.mu.RLock()
+				if s, ok := sp.streams[sessionID]; ok {
+					s.Mu.Lock()
+					s.LastActive = now
+					s.SpeedBytes = bytesSinceLastUpdate
+					s.Mu.Unlock()
+				}
+				sp.mu.RUnlock()
+				bytesSinceLastUpdate = 0
+				lastUpdate = now
 			}
 		}
 	}
@@ -1053,3 +1046,196 @@ func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
 	resp.Header.Set("Content-Type", "video/mp2t")
 	return resp, nil
 }
+
+func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
+	sessionID := fmt.Sprintf("multicast-%d-%s", channelID, uuid.New().String())
+
+	slog.Info("starting multicast proxy", "channel_id", channelID, "url", targetURL)
+
+	reader, err := multicast.NewMulticastReader(r.Context(), targetURL)
+	if err != nil {
+		return fmt.Errorf("failed to open multicast reader: %w", err)
+	}
+	defer reader.Close()
+
+	w.Header().Set("Content-Type", "video/mp2t")
+	w.WriteHeader(http.StatusOK)
+
+	sp.mu.Lock()
+	sp.streams[sessionID] = &models.ActiveStream{
+		Mu:          &sync.RWMutex{},
+		SessionID:   sessionID,
+		ChannelID:   channelID,
+		ChannelName: ch.Name,
+		ClientID:    clientID,
+		ClientName:  clientName,
+		ClientIP:    clientIP,
+		URL:         targetURL,
+		Status:      "playing_multicast",
+		StartedAt:   time.Now(),
+		LastActive:  time.Now(),
+	}
+	sp.cancels[sessionID] = func() {} // dummy cancel
+	sp.mu.Unlock()
+
+	defer func() {
+		sp.mu.Lock()
+		delete(sp.streams, sessionID)
+		delete(sp.cancels, sessionID)
+		sp.mu.Unlock()
+	}()
+
+	flusher, canFlush := w.(http.Flusher)
+	bufPtr := streamBufferPool.Get().(*[]byte)
+	buf := (*bufPtr)[:128*1024]
+	defer streamBufferPool.Put(bufPtr)
+	var bytesRead int64
+
+	lastUpdate := time.Now()
+	var bytesSinceLastUpdate int64
+
+	for {
+		select {
+		case <-r.Context().Done():
+			slog.Info("multicast proxy client disconnected", "session", sessionID)
+			return nil
+		default:
+		}
+
+		n, err := reader.Read(buf)
+		if n > 0 {
+			if _, wErr := w.Write(buf[:n]); wErr != nil {
+				return nil
+			}
+			if canFlush {
+				flusher.Flush()
+			}
+			bytesRead += int64(n)
+			bytesSinceLastUpdate += int64(n)
+		}
+		if err != nil {
+			slog.Error("multicast proxy read error", "session", sessionID, "error", err)
+			return err
+		}
+
+		now := time.Now()
+		if now.Sub(lastUpdate) >= time.Second {
+			sp.mu.RLock()
+			if s, ok := sp.streams[sessionID]; ok {
+				s.Mu.Lock()
+				s.LastActive = now
+				s.SpeedBytes = bytesSinceLastUpdate
+				s.Mu.Unlock()
+			}
+			sp.mu.RUnlock()
+			bytesSinceLastUpdate = 0
+			lastUpdate = now
+		}
+	}
+}
+
+func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
+	sessionID := fmt.Sprintf("rtsp-%d-%s", channelID, uuid.New().String())
+
+	slog.Info("starting rtsp proxy", "channel_id", channelID, "url", targetURL)
+
+	c := &gortsplib.Client{}
+	
+	// Watch for client disconnect to prevent goroutine leak
+	go func() {
+		<-r.Context().Done()
+		c.Close()
+	}()
+	
+	u, err := base.ParseURL(targetURL)
+	if err != nil {
+		return err
+	}
+	
+	err = c.Start(u.Scheme, u.Host)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	desc, _, err := c.Describe(u)
+	if err != nil {
+		return err
+	}
+
+	err = c.SetupAll(desc.BaseURL, desc.Medias)
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "video/mp2t")
+	w.WriteHeader(http.StatusOK)
+
+	sp.mu.Lock()
+	sp.streams[sessionID] = &models.ActiveStream{
+		Mu:          &sync.RWMutex{},
+		SessionID:   sessionID,
+		ChannelID:   channelID,
+		ChannelName: ch.Name,
+		ClientID:    clientID,
+		ClientName:  clientName,
+		ClientIP:    clientIP,
+		URL:         targetURL,
+		Status:      "playing_rtsp",
+		StartedAt:   time.Now(),
+		LastActive:  time.Now(),
+	}
+	sp.cancels[sessionID] = func() { c.Close() }
+	sp.mu.Unlock()
+
+	defer func() {
+		sp.mu.Lock()
+		delete(sp.streams, sessionID)
+		delete(sp.cancels, sessionID)
+		sp.mu.Unlock()
+	}()
+
+	flusher, canFlush := w.(http.Flusher)
+	
+	lastUpdate := time.Now()
+	var bytesSinceLastUpdate int64
+
+	c.OnPacketRTPAny(func(medi *description.Media, forma format.Format, pkt *rtp.Packet) {
+		// Just strip RTP header and write payload assuming it's TS over RTSP or playable raw payload
+		n, wErr := w.Write(pkt.Payload)
+		if wErr != nil {
+			c.Close() // Force stop on client disconnect
+			return
+		}
+		
+		bytesSinceLastUpdate += int64(n)
+		
+		now := time.Now()
+		if now.Sub(lastUpdate) >= time.Millisecond * 100 {
+			if canFlush {
+				flusher.Flush()
+			}
+			
+			if now.Sub(lastUpdate) >= time.Second {
+				sp.mu.RLock()
+				if s, ok := sp.streams[sessionID]; ok {
+					s.Mu.Lock()
+					s.LastActive = now
+					s.SpeedBytes = bytesSinceLastUpdate
+					s.Mu.Unlock()
+				}
+				sp.mu.RUnlock()
+				bytesSinceLastUpdate = 0
+			}
+			lastUpdate = now
+		}
+	})
+
+	_, err = c.Play(nil)
+	if err != nil {
+		return err
+	}
+
+	return c.Wait()
+}
+

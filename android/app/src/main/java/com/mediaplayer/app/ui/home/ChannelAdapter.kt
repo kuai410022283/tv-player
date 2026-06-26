@@ -51,6 +51,19 @@ class ChannelAdapter(
         return ViewHolder(view)
     }
 
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty()) {
+            for (payload in payloads) {
+                if (payload == "epg_update") {
+                    val item = getItem(position)
+                    holder.bindEpgOnly(item)
+                    return
+                }
+            }
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
         val isPlaying = item.id == playingChannelId
@@ -126,7 +139,7 @@ class ChannelAdapter(
                     progressEpgItem.visibility = View.GONE
                 }
             } else {
-                tvCurrentEpg.text = "精彩节目"
+                tvCurrentEpg.text = "暂无节目信息"
                 tvCurrentEpg.visibility = View.VISIBLE
                 progressEpgItem.visibility = View.GONE
             }
@@ -160,6 +173,24 @@ class ChannelAdapter(
 
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
             itemView.isActivated = isPlaying
+        }
+
+        fun bindEpgOnly(item: Channel) {
+            if (item.currentEpg.isNotEmpty()) {
+                tvCurrentEpg.text = item.currentEpg
+                tvCurrentEpg.visibility = View.VISIBLE
+                val dynamicPercent = item.getDynamicEpgPercent()
+                if (dynamicPercent > 0) {
+                    progressEpgItem.progress = dynamicPercent
+                    progressEpgItem.visibility = View.VISIBLE
+                } else {
+                    progressEpgItem.visibility = View.GONE
+                }
+            } else {
+                tvCurrentEpg.text = "暂无节目信息"
+                tvCurrentEpg.visibility = View.VISIBLE
+                progressEpgItem.visibility = View.GONE
+            }
         }
     }
 }
