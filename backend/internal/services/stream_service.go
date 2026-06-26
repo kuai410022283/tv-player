@@ -321,7 +321,8 @@ func getFlushThreshold(ch *models.Channel, finalURL string) int {
 		return 16 * 1024 // 16KB: 分段下载，快速吐出降低段加载延迟
 	// ── 直播流 ──
 	case st == "ts" || st == "flv" || st == "octet-stream" ||
-		strings.Contains(allURL, ".ts") || strings.Contains(allURL, ".flv"):
+		hasPathSuffix(src, ".ts") || hasPathSuffix(src, ".flv") ||
+		hasPathSuffix(u, ".ts") || hasPathSuffix(u, ".flv"):
 		return 512 * 1024 // 512KB: 降低 HTTP Chunk 开销，解决 4K 播放卡顿问题
 	// ── 低延迟协议 ──
 	case st == "rtsp" || st == "rtmp" ||
@@ -345,6 +346,14 @@ func getFlushThreshold(ch *models.Channel, finalURL string) int {
 	default:
 		return 128 * 1024 // 128KB: 保守兜底
 	}
+}
+
+// hasPathSuffix safely parses the URL and checks if its path ends with the given suffix.
+func hasPathSuffix(rawURL, suffix string) bool {
+	if u, err := url.Parse(rawURL); err == nil {
+		return strings.HasSuffix(strings.ToLower(u.Path), suffix)
+	}
+	return false
 }
 
 func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
@@ -469,6 +478,12 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 				actualType = "flv"
 			}
 			if ch.StreamType == "" && actualType != "" {
+				// 类型完全未知，直接写入检测结果
+				ch.StreamType = actualType
+				_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
+			} else if ch.StreamType == "ts" && actualType == "hls" {
+				// URL 无后缀时静态检测兜底为 ts，但 Content-Type 确认是 HLS
+				// 首次播放时自动修正，后续播放直接使用 16KB 低延迟模式
 				ch.StreamType = actualType
 				_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
 			}

@@ -296,7 +296,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 			c.StreamType = "ts"
 		}
 		st := strings.ToLower(c.StreamType)
-		c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp")
+		c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
 		channels = append(channels, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -344,7 +344,7 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 		c.StreamType = "ts"
 	}
 	st := strings.ToLower(c.StreamType)
-	c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp")
+	c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
 	return &c, nil
 }
 

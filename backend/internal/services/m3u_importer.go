@@ -332,25 +332,29 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 func detectStreamType(rawURL string) string {
 	lowerURL := strings.ToLower(rawURL)
 
-	// 1. 优先判断特殊协议
+	// 1. 优先判断特殊非 HTTP 协议（精确前缀匹配，无误判风险）
 	if strings.HasPrefix(lowerURL, "rtmp://") {
 		return "rtmp"
 	}
 	if strings.HasPrefix(lowerURL, "rtsp://") {
 		return "rtsp"
 	}
-
-	// 2. 解析 URL
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		// 如果解析失败，采用最保守的降级匹配
-		if strings.Contains(lowerURL, ".m3u8") {
-			return "hls"
-		}
+	// 明确识别 UDP/RTP 组播协议（原先隐式兜底为 ts，现在显式声明）
+	if strings.HasPrefix(lowerURL, "udp://") || strings.HasPrefix(lowerURL, "rtp://") {
 		return "ts"
 	}
 
-	// 3. 从 Path 提取精确后缀
+	// 2. 解析 URL 结构，提取路径和参数
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		// URL 格式非法，保守降级：只认 .m3u8 后缀，其余返回空（未知）
+		if strings.Contains(lowerURL, ".m3u8") {
+			return "hls"
+		}
+		return ""
+	}
+
+	// 3. 从 Path 提取精确文件后缀（最可靠的判断手段）
 	ext := strings.ToLower(path.Ext(u.Path))
 	switch ext {
 	case ".m3u8":
@@ -363,23 +367,37 @@ func detectStreamType(rawURL string) string {
 		return "mp4"
 	case ".ts":
 		return "ts"
+	case ".mkv":
+		return "mkv"
+	case ".avi":
+		return "avi"
 	}
 
-	// 4. 判断 udpxy 等组播特征路径
+	// 4. 判断 udpxy 等组播代理网关的特征路径（如 /udp/232.x.x.x:1234）
 	lowerPath := strings.ToLower(u.Path)
 	if strings.Contains(lowerPath, "/udp/") || strings.Contains(lowerPath, "/rtp/") {
 		return "ts"
 	}
 
-	// 5. 降级：如果 Path 没有后缀，可能隐藏在 Query 参数中 (如 ?url=http://.../a.m3u8)
-	lowerQuery := strings.ToLower(u.RawQuery)
-	if strings.Contains(lowerQuery, ".m3u8") || strings.Contains(lowerQuery, "m3u8") {
-		return "hls"
-	}
-	if strings.Contains(lowerQuery, ".flv") || strings.Contains(lowerQuery, "flv") {
-		return "flv"
+	// 5. 结构化解析 Query 参数值，避免原始字符串匹配的误判
+	//    例如：?noflv=true 原先会误识别为 flv，现在只匹配参数值中的文件后缀
+	if qParams, qErr := url.ParseQuery(u.RawQuery); qErr == nil {
+		for _, vals := range qParams {
+			for _, v := range vals {
+				lv := strings.ToLower(v)
+				// 参数值本身是一个指向 m3u8 或 flv 的 URL/路径
+				if strings.HasSuffix(lv, ".m3u8") || strings.Contains(lv, "m3u8") {
+					return "hls"
+				}
+				if strings.HasSuffix(lv, ".flv") {
+					return "flv"
+				}
+			}
+		}
 	}
 
-	// 6. 无法确定，返回默认 ts
-	return "ts"
+	// 6. 无法从 URL 静态推断类型，返回空字符串
+	//    调用方应通过 Content-Type 运行时检测（Layer 2）来补全类型
+	return ""
 }
+
