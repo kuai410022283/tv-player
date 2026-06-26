@@ -128,7 +128,7 @@ func (s *EPGService) FetchAndBuildIndex() {
 	refreshHours := 12
 	var refreshHoursStr string
 	if err := s.db.QueryRow(`SELECT value FROM user_settings WHERE key='epg_refresh_hours'`).Scan(&refreshHoursStr); err == nil && refreshHoursStr != "" {
-		fmt.Sscanf(refreshHoursStr, "%d", &refreshHours)
+		_, _ = fmt.Sscanf(refreshHoursStr, "%d", &refreshHours)
 	}
 	if refreshHours <= 0 {
 		refreshHours = 12

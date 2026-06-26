@@ -77,7 +77,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	maxStreams := 2
 	if val, err := s.GetSettingValue("default_max_streams"); err == nil {
-		fmt.Sscanf(val, "%d", &maxStreams)
+		_, _ = fmt.Sscanf(val, "%d", &maxStreams)
 	}
 
 	if autoApprove {
@@ -86,7 +86,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 		// 检查是否配置了默认套餐
 		if val, err := s.GetSettingValue("default_plan_id"); err == nil && val != "" && val != "0" {
 			var pid int64
-			fmt.Sscanf(val, "%d", &pid)
+			_, _ = fmt.Sscanf(val, "%d", &pid)
 			if pid > 0 {
 				var days, pStreams int
 				if err := s.db.QueryRow(`SELECT days, max_streams FROM subscription_plans WHERE id=?`, pid).Scan(&days, &pStreams); err == nil {
@@ -104,7 +104,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 		if planID == 0 {
 			days := 365
 			if val, err := s.GetSettingValue("default_expire_days"); err == nil {
-				fmt.Sscanf(val, "%d", &days)
+				_, _ = fmt.Sscanf(val, "%d", &days)
 			}
 			if days > 0 {
 				t := now.AddDate(0, 0, days)

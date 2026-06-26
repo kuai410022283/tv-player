@@ -521,7 +521,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 
 	if finalURL == "" {
 		if len(errorsList) > 0 {
-			lastErr = fmt.Errorf(strings.Join(errorsList, " | "))
+			lastErr = fmt.Errorf("%s", strings.Join(errorsList, " | "))
 		}
 		if lastErr != nil {
 			return fmt.Errorf("所有线路均失效: %w", lastErr)
