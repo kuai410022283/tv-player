@@ -480,8 +480,13 @@
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg></button>
               </div>
-              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
-                用于生成客户端授权信息、订阅链接以及订阅文件内的播放代理地址。末尾请勿添加斜杠 /。</div>
+              <div style="margin-top: 12px;">
+                <label style="color: var(--text); font-weight: 500; font-size: 13px;">备用服务器外网地址 (Backup URLs)</label>
+                <textarea id="set-server-backup-urls" rows="2" placeholder="填写备用地址，支持多行，每行一个。如：&#10;http://backup1.com&#10;http://backup2.com" style="margin-top:6px"></textarea>
+                <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">可选。当主地址故障时，客户端将按顺序尝试连接备用地址。</div>
+              </div>
+              <div style="font-size: 11px; color: var(--text2); margin-top: 12px;">
+                仅供客户端授权信息以及 m3u8 里的播放地址。末尾不要带 /。</div>
             </div>
 
             <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;">
@@ -489,7 +494,7 @@
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <div
-                style="flex: 1; min-width: 280px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-family: monospace; font-size: 13px; word-break: break-all; color: var(--accent); user-select: all;"
+                style="flex: 1; min-width: 280px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-family: monospace; font-size: 13px; word-break: break-all; white-space: pre-wrap; color: var(--accent); user-select: all;"
                 id="server-base64-text">
                 -
               </div>

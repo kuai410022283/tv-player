@@ -10,6 +10,7 @@ let channelPage = 1, clientPage = 1, groupPage = 1, sourcePage = 1, streamPage =
 const PAGE_SIZE = 20;
 let localLogoEnabled = false;
 let serverUrlSetting = '';
+let serverBackupUrlsSetting = '';
 let enableExternalSubSetting = 'false';
 
 // ═══ API helpers ══════════════════════════════════════
@@ -1499,6 +1500,10 @@ async function loadClientSettings() {
       serverUrlSetting = setRes.data.server_url || '';
       document.getElementById('set-server-url').value = serverUrlSetting;
     }
+    if (document.getElementById('set-server-backup-urls')) {
+      serverBackupUrlsSetting = setRes.data.server_backup_urls || '';
+      document.getElementById('set-server-backup-urls').value = serverBackupUrlsSetting;
+    }
   }
 
   // Update 配置
@@ -1512,9 +1517,16 @@ async function loadClientSettings() {
     }
   }
 
-  // 服务器地址 URL 转 Base64 逻辑
+  // 服务器地址 URL 转 Base64 逻辑 (支持多行备用地址)
   const serverRawUrl = serverUrlSetting || window.location.origin;
-  const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
+  
+  let allUrls = [serverRawUrl];
+  if (serverBackupUrlsSetting) {
+    const backupLines = serverBackupUrlsSetting.split('\n').map(s => s.trim()).filter(s => s);
+    allUrls = allUrls.concat(backupLines);
+  }
+  
+  const serverBase64 = allUrls.map(url => btoa(unescape(encodeURIComponent(url)))).join('\n');
 
   const rawUrlEl = document.getElementById('server-raw-url');
   const base64TextEl = document.getElementById('server-base64-text');
@@ -1526,6 +1538,7 @@ async function saveAllClientSettings() {
   const settings = {
     enable_external_sub: document.getElementById('set-enable-external-sub').value,
     server_url: document.getElementById('set-server-url').value.trim(),
+    server_backup_urls: document.getElementById('set-server-backup-urls') ? document.getElementById('set-server-backup-urls').value.trim() : '',
     enable_url_token: document.getElementById('set-enable-url-token') ? document.getElementById('set-enable-url-token').value : 'false',
     auto_approve: document.getElementById('set-auto-approve').value,
     default_plan_id: document.getElementById('set-default-plan-id').value,
@@ -1568,9 +1581,17 @@ async function saveAllClientSettings() {
   enableExternalSubSetting = settings.enable_external_sub;
   serverUrlSetting = settings.server_url;
 
-  // 更新前端服务器地址与 Base64 授权码预览
+  // 更新前端服务器地址与 Base64 授权码预览 (支持多行备用地址)
+  serverBackupUrlsSetting = settings.server_backup_urls || '';
   const serverRawUrl = serverUrlSetting || window.location.origin;
-  const serverBase64 = btoa(unescape(encodeURIComponent(serverRawUrl)));
+  
+  let allUrls = [serverRawUrl];
+  if (serverBackupUrlsSetting) {
+    const backupLines = serverBackupUrlsSetting.split('\n').map(s => s.trim()).filter(s => s);
+    allUrls = allUrls.concat(backupLines);
+  }
+  
+  const serverBase64 = allUrls.map(url => btoa(unescape(encodeURIComponent(url)))).join('\n');
   const rawUrlEl = document.getElementById('server-raw-url');
   const base64TextEl = document.getElementById('server-base64-text');
   if (rawUrlEl) rawUrlEl.textContent = serverRawUrl;
