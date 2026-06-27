@@ -14,5 +14,7 @@ data class VerifyResponse(
     @SerializedName("startup_duration") val startupDuration: Int = 5,
     @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0,
     @SerializedName("plan_name") val planName: String? = null,
-    @SerializedName("expires_at") val expiresAt: String? = null
+    @SerializedName("expires_at") val expiresAt: String? = null,
+    @SerializedName("global_maintenance") val globalMaintenance: Boolean = false,
+    @SerializedName("is_tester") val isTester: Boolean = false
 )

@@ -922,6 +922,12 @@ async function loadClients() {
       <td>${esc(c.device_model)}<br><span style="font-size:11px;color:var(--text2)">${esc(c.device_os)}</span></td>
       <td style="font-family:monospace;font-size:12px">${esc(c.ip)}</td>
       <td>${badge(c.status)}</td>
+      <td>
+        <label class="switch" style="transform: scale(0.8)">
+          <input type="checkbox" onchange="toggleTester(${c.id}, this.checked)" ${c.is_tester ? 'checked' : ''}>
+          <span class="slider"></span>
+        </label>
+      </td>
       <td>${fmtExpiresAt(c.expires_at)}</td>
       <td>${c.total_play_minutes}分钟</td>
       <td>${timeAgo(c.last_seen)}</td>
@@ -1302,6 +1308,19 @@ async function unbanClient(id) {
   loadClients();
 }
 
+async function toggleTester(id, isTester) {
+  try {
+    await api(`/admin/clients/${id}/tester`, {
+      method: 'POST',
+      body: JSON.stringify({ is_tester: isTester })
+    });
+    toast(isTester ? '已设为测试机' : '已取消测试机');
+  } catch (err) {
+    console.error(err);
+    loadClients(); // revert checkbox visually
+  }
+}
+
 async function deleteClient(id) {
   if (!confirm('确定删除此设备？删除后无法恢复。')) return;
   await api(`/admin/clients/${id}`, { method: 'DELETE' });
@@ -1441,6 +1460,10 @@ async function loadClientSettings() {
       document.getElementById('set-system-announcement-interval').value = setRes.data.system_announcement_interval || '0';
     }
 
+    if (document.getElementById('set-maintenance-mode')) {
+      document.getElementById('set-maintenance-mode').checked = (setRes.data.maintenance_mode === 'true');
+    }
+
     if (document.getElementById('set-startup-media-url')) {
       document.getElementById('set-startup-media-enabled').value = setRes.data.startup_media_enabled || 'false';
       document.getElementById('set-startup-media-url').value = setRes.data.startup_media_url || '';
@@ -1513,6 +1536,10 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-system-announcement')) {
     settings.system_announcement = document.getElementById('set-system-announcement').value.trim();
     settings.system_announcement_interval = document.getElementById('set-system-announcement-interval').value;
+  }
+
+  if (document.getElementById('set-maintenance-mode')) {
+    settings.maintenance_mode = document.getElementById('set-maintenance-mode').checked ? 'true' : 'false';
   }
 
   if (document.getElementById('set-startup-media-url')) {

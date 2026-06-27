@@ -62,6 +62,9 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	startupSkipAfterStr, _ := h.channelSvc.GetSetting("startup_skip_after")
 	startupSkipAfter, _ := strconv.Atoi(startupSkipAfterStr)
 
+	maintenanceModeStr, _ := h.channelSvc.GetSetting("maintenance_mode")
+	globalMaintenance := maintenanceModeStr == "true"
+
 	if resp.Status == "approved" {
 		ok(c, gin.H{
 			"status":                resp.Status,
@@ -75,6 +78,8 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"startup_media_type":    startupMediaType,
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
+			"global_maintenance":    globalMaintenance,
+			"is_tester":             resp.IsTester,
 		})
 	} else {
 		// pending 状态返回 202
@@ -90,6 +95,8 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"startup_media_type":    startupMediaType,
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
+			"global_maintenance":    globalMaintenance,
+			"is_tester":             resp.IsTester,
 		}})
 	}
 }
@@ -137,6 +144,9 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	startupSkipAfterStr, _ := h.channelSvc.GetSetting("startup_skip_after")
 	startupSkipAfter, _ := strconv.Atoi(startupSkipAfterStr)
 
+	maintenanceModeStr, _ := h.channelSvc.GetSetting("maintenance_mode")
+	globalMaintenance := maintenanceModeStr == "true"
+
 	ok(c, gin.H{
 		"client_id":             client.ID,
 		"name":                  client.Name,
@@ -151,6 +161,8 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"startup_media_type":    startupMediaType,
 		"startup_duration":      startupDuration,
 		"startup_skip_after":    startupSkipAfter,
+		"global_maintenance":    globalMaintenance,
+		"is_tester":             client.IsTester,
 	})
 }
 
@@ -456,6 +468,22 @@ func (h *ClientHandler) UpdateLogConfig(c *gin.Context) {
 		return
 	}
 	ok(c, gin.H{"message": "配置已更新"})
+}
+
+func (h *ClientHandler) SetTester(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var body struct {
+		IsTester bool `json:"is_tester"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.clientSvc.SetTester(id, body.IsTester); err != nil {
+		failInternal(c, err, "设置测试机失败")
+		return
+	}
+	ok(c, gin.H{"message": "设置成功"})
 }
 
 func (h *ClientHandler) DownloadLog(c *gin.Context) {

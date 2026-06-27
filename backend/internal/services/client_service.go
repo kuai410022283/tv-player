@@ -37,8 +37,8 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 	// 检查是否已注册
 	var existing models.Client
 	var nullExpiresAt sql.NullTime
-	err := s.db.QueryRow(`SELECT id, status, access_token, expires_at, enable_log FROM clients WHERE device_id=?`, req.DeviceID).
-		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt, &existing.EnableLog)
+	err := s.db.QueryRow(`SELECT id, status, access_token, expires_at, enable_log, is_tester FROM clients WHERE device_id=?`, req.DeviceID).
+		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt, &existing.EnableLog, &existing.IsTester)
 	if nullExpiresAt.Valid { existing.ExpiresAt = nullExpiresAt.Time }
 
 	if err == nil {
@@ -51,6 +51,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 			Status:   existing.Status,
 			Message:  statusMessage(existing.Status),
 			EnableLog: existing.EnableLog,
+			IsTester:  existing.IsTester,
 		}
 
 		if existing.Status == "approved" && existing.AccessToken != "" {
@@ -146,8 +147,8 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 	var c models.Client
 	var expiresAt sql.NullTime
-	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.status, c.max_streams, c.expires_at, c.access_token, c.enable_log, COALESCE(p.name, '') FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.access_token=?`, token).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken, &c.EnableLog, &c.PlanName)
+	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.status, c.max_streams, c.expires_at, c.access_token, c.enable_log, c.is_tester, COALESCE(p.name, '') FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.access_token=?`, token).
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken, &c.EnableLog, &c.IsTester, &c.PlanName)
 	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
 	if err != nil {
 		return nil, fmt.Errorf("无效的令牌")
@@ -302,6 +303,19 @@ func (s *ClientService) UpdateLogConfig(clientID int64, enableLog bool) error {
 	return nil
 }
 
+func (s *ClientService) SetTester(clientID int64, isTester bool) error {
+	_, err := s.db.Exec(`UPDATE clients SET is_tester=?, updated_at=? WHERE id=?`, isTester, time.Now(), clientID)
+	if err != nil {
+		return err
+	}
+	state := "设为测试机"
+	if !isTester {
+		state = "取消测试机"
+	}
+	s.AddLog(clientID, "tester_updated", 0, "", "", "管理员将其" + state)
+	return nil
+}
+
 // ── 查询 ───────────────────────────────────────────────
 
 func (s *ClientService) List(status string, search string, p *models.PageRequest) (*models.PageResponse, error) {
@@ -326,7 +340,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.Replace(where, "status", "c.status", -1)), queryArgs...)
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.Replace(where, "status", "c.status", -1)), queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +351,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 		var c models.Client
 		var expiresAt, lastSeen sql.NullTime
 		var approvedBy, rejectReason, reqNote sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.EnableLog, &c.CreatedAt, &c.UpdatedAt, &c.PlanName); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.EnableLog, &c.IsTester, &c.CreatedAt, &c.UpdatedAt, &c.PlanName); err != nil {
 			return nil, err
 		}
 		if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
@@ -366,8 +380,8 @@ func (s *ClientService) GetByID(id int64) (*models.Client, error) {
 	var c models.Client
 	var expiresAt, lastSeen sql.NullTime
 	var approvedBy, rejectReason, reqNote sql.NullString
-	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.access_token, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.id=?`, id).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.EnableLog, &c.CreatedAt, &c.UpdatedAt, &c.PlanName)
+	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.access_token, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.id=?`, id).
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.AccessToken, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.EnableLog, &c.IsTester, &c.CreatedAt, &c.UpdatedAt, &c.PlanName)
 	if err != nil {
 		return nil, err
 	}
@@ -385,8 +399,8 @@ func (s *ClientService) GetByID(id int64) (*models.Client, error) {
 
 func (s *ClientService) GetByToken(token string) (*models.Client, error) {
 	var c models.Client
-	err := s.db.QueryRow(`SELECT id, name, device_id, status, enable_log FROM clients WHERE access_token=?`, token).
-		Scan(&c.ID, &c.Name, &c.DeviceID, &c.Status, &c.EnableLog)
+	err := s.db.QueryRow(`SELECT id, name, device_id, status, enable_log, is_tester FROM clients WHERE access_token=?`, token).
+		Scan(&c.ID, &c.Name, &c.DeviceID, &c.Status, &c.EnableLog, &c.IsTester)
 	if err != nil {
 		return nil, err
 	}

@@ -204,6 +204,7 @@ type Client struct {
 	TotalPlayMin int64     `json:"total_play_minutes" db:"total_play_minutes"` // 累计播放分钟
 	RequestNote  string    `json:"request_note,omitempty" db:"request_note"` // 申请备注
 	EnableLog    bool      `json:"enable_log" db:"enable_log"`               // 是否采集日志
+	IsTester     bool      `json:"is_tester" db:"is_tester"`                 // 是否为测试设备
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -227,6 +228,10 @@ type ClientRegisterResp struct {
 	Message     string `json:"message"`
 	EnableLog   bool   `json:"enable_log"`
 	
+	// 维护与测试标识
+	GlobalMaintenance bool `json:"global_maintenance"`
+	IsTester          bool `json:"is_tester"`
+
 	// 开机短视频/广告
 	StartupMediaEnabled bool   `json:"startup_media_enabled"`
 	StartupMedia        string `json:"startup_media"`

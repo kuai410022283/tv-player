@@ -208,6 +208,7 @@ func createTables(db *sql.DB) error {
 		total_play_minutes INTEGER DEFAULT 0,
 		request_note TEXT DEFAULT '',
 		enable_log INTEGER DEFAULT 0,
+		is_tester INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -304,6 +305,7 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN is_tester INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
 
 	return err

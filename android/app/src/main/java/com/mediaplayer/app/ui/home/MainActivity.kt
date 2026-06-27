@@ -1779,7 +1779,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int) {
+    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, isTester: Boolean) {
+        if (globalMaintenance && !isTester) {
+            showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
+            // 如果已在播放，停止播放并清除UI
+            playerHelper?.release()
+            startAuthPolling()
+            return
+        }
+
         this.sysAnnouncement = sysAnnouncement
         this.sysAnnouncementInterval = sysAnnouncementInterval
         
@@ -1806,7 +1814,7 @@ class MainActivity : AppCompatActivity() {
             if (authManager.isApproved()) {
                 authManager.verify().onSuccess { resp ->
                     if (resp != null) {
-                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter)
+                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.isTester)
                     } else doRegister()
                 }.onFailure { doRegister() }
             } else {
@@ -1843,7 +1851,7 @@ class MainActivity : AppCompatActivity() {
                     val result = attempt.getOrThrow()
                     when (result.status) {
                         "approved" -> {
-                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter)
+                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.isTester)
                             return@launch
                         }
                         "pending" -> {
@@ -1884,6 +1892,12 @@ class MainActivity : AppCompatActivity() {
                                 if (resp != null) {
                                     sysAnnouncement = resp.announcement
                                     sysAnnouncementInterval = resp.announcementInterval
+                                    if (resp.globalMaintenance && !resp.isTester) {
+                                        showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
+                                        playerHelper?.release()
+                                        authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
+                                        return@onSuccess
+                                    }
                                 }
                                 showContent()
                             }.onFailure { 
@@ -2053,7 +2067,16 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 lifecycleScope.launch {
                     try {
-                        authManager.verify()
+                        authManager.verify().onSuccess { resp ->
+                            if (resp != null && resp.globalMaintenance && !resp.isTester) {
+                                // 进入维护模式，切断播放并转入轮询
+                                showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
+                                playerHelper?.release()
+                                heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+                                heartbeatRunnable = null
+                                startAuthPolling()
+                            }
+                        }
                     } catch (_: Exception) {}
                 }
                 heartbeatHandler.postDelayed(this, 3 * 60 * 1000) // 每3分钟心跳

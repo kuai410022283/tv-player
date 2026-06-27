@@ -28,5 +28,7 @@ data class ClientRegisterResp(
     @SerializedName("startup_media") val startupMedia: String? = null,
     @SerializedName("startup_media_type") val startupMediaType: String = "image",
     @SerializedName("startup_duration") val startupDuration: Int = 5,
-    @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0
+    @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0,
+    @SerializedName("global_maintenance") val globalMaintenance: Boolean = false,
+    @SerializedName("is_tester") val isTester: Boolean = false
 )

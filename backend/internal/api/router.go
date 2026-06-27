@@ -105,6 +105,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			clients.GET("/:id/logs", hs.ClientHandler.GetLogs)
 			clients.POST("/:id/log-config", hs.ClientHandler.UpdateLogConfig)
 			clients.GET("/:id/download-log", hs.ClientHandler.DownloadLog)
+			clients.POST("/:id/tester", hs.ClientHandler.SetTester)
 			clients.DELETE("/:id", hs.ClientHandler.Delete)
 			clients.POST("/batch", hs.ClientHandler.Batch)
 		}
