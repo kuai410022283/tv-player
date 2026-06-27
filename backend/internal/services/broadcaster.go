@@ -4,74 +4,90 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 )
 
-// RingBuffer is a simple thread-safe byte buffer for caching stream bursts
-type RingBuffer struct {
-	buf []byte
-	max int
-	mu  sync.RWMutex
+type TimeChunk struct {
+	Data      []byte
+	Timestamp time.Time
 }
 
-func NewRingBuffer(max int) *RingBuffer {
-	return &RingBuffer{
-		buf: make([]byte, 0, max),
-		max: max,
+// TimeBasedBuffer caches chunks of data and evicts them based on time
+type TimeBasedBuffer struct {
+	chunks    []TimeChunk
+	retention time.Duration
+	mu        sync.RWMutex
+}
+
+func NewTimeBasedBuffer(retention time.Duration) *TimeBasedBuffer {
+	return &TimeBasedBuffer{
+		chunks:    make([]TimeChunk, 0),
+		retention: retention,
 	}
 }
 
-func (rb *RingBuffer) Write(p []byte) (n int, err error) {
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
+func (tb *TimeBasedBuffer) Write(p []byte) (n int, err error) {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
 
-	rb.buf = append(rb.buf, p...)
-	if len(rb.buf) > rb.max {
-		cut := len(rb.buf) - rb.max
-		// Shift elements to the left to reuse capacity
-		copy(rb.buf, rb.buf[cut:])
-		rb.buf = rb.buf[:rb.max]
+	chunk := make([]byte, len(p))
+	copy(chunk, p)
+
+	tb.chunks = append(tb.chunks, TimeChunk{
+		Data:      chunk,
+		Timestamp: time.Now(),
+	})
+
+	cutoff := time.Now().Add(-tb.retention)
+	validIdx := -1
+	for i, c := range tb.chunks {
+		if c.Timestamp.After(cutoff) {
+			validIdx = i
+			break
+		}
 	}
+	
+	if validIdx == -1 {
+		// All chunks are old
+		tb.chunks = make([]TimeChunk, 0)
+	} else if validIdx > 0 {
+		// Create a new slice to allow old chunks to be GC'd
+		newLen := len(tb.chunks) - validIdx
+		newChunks := make([]TimeChunk, newLen)
+		copy(newChunks, tb.chunks[validIdx:])
+		tb.chunks = newChunks
+	}
+
 	return len(p), nil
 }
 
-func (rb *RingBuffer) Snapshot() []byte {
-	rb.mu.RLock()
-	defer rb.mu.RUnlock()
+func (tb *TimeBasedBuffer) Snapshot() []byte {
+	tb.mu.RLock()
+	defer tb.mu.RUnlock()
 	
-	// FCC Optimization: Find the last I-Frame to start the burst cleanly
-	// Search backwards for NALU start code 0x00 00 00 01
-	startIndex := 0
-	for i := len(rb.buf) - 5; i >= 0; i-- {
-		if rb.buf[i] == 0 && rb.buf[i+1] == 0 && rb.buf[i+2] == 0 && rb.buf[i+3] == 1 {
-			nalType := rb.buf[i+4] & 0x1F
-			// H.264: 7 is SPS (usually start of GOP), 5 is IDR
-			if nalType == 7 || nalType == 5 {
-				startIndex = i
-				break
-			}
-			// H.265 (HEVC): NAL unit type is in bits 1-6
-			hevcType := (rb.buf[i+4] & 0x7E) >> 1
-			if hevcType == 32 || hevcType == 33 || hevcType == 19 || hevcType == 20 || hevcType == 21 {
-				startIndex = i
-				break
-			}
-		}
+	var totalLen int
+	for _, c := range tb.chunks {
+		totalLen += len(c.Data)
 	}
-
-	snapshotLen := len(rb.buf) - startIndex
-	if snapshotLen <= 0 {
+	
+	if totalLen == 0 {
 		return []byte{}
 	}
 	
-	res := make([]byte, snapshotLen)
-	copy(res, rb.buf[startIndex:])
+	res := make([]byte, totalLen)
+	offset := 0
+	for _, c := range tb.chunks {
+		copy(res[offset:], c.Data)
+		offset += len(c.Data)
+	}
+	
 	return res
 }
 
-func (rb *RingBuffer) Clear() {
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
-	rb.buf = rb.buf[:0]
+func (tb *TimeBasedBuffer) Clear() {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.chunks = make([]TimeChunk, 0)
 }
 
 // ChannelBroadcaster multiplexes a single upstream stream to multiple clients
@@ -79,7 +95,7 @@ type ChannelBroadcaster struct {
 	ChannelID int64
 	URL       string
 	Header    http.Header
-	buffer    *RingBuffer
+	buffer    *TimeBasedBuffer
 	clients   map[string]chan []byte
 	mu        sync.RWMutex
 	cancel    context.CancelFunc
@@ -91,7 +107,7 @@ func NewChannelBroadcaster(channelID int64, targetURL string, header http.Header
 		ChannelID: channelID,
 		URL:       targetURL,
 		Header:    header,
-		buffer:    NewRingBuffer(8 * 1024 * 1024), // 8MB burst buffer，解决起播慢问题
+		buffer:    NewTimeBasedBuffer(3500 * time.Millisecond), // 3.5s burst buffer
 		clients:   make(map[string]chan []byte),
 		cancel:    cancel,
 		active:    true,

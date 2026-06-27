@@ -151,7 +151,7 @@ class IjkPlayerHelper(
 
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L) 
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒嗅探时长 (单位为微秒)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L) // 1MB 探针大小
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 512L * 1024L) // 512KB 探针大小，配合 FCC 缓存瞬间出画
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
 
         // 强制 RTSP 使用 TCP 传输，防止组播流被路由器拦截
