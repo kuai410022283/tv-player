@@ -24,7 +24,7 @@ func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, erro
 	query := `
 		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), COALESCE(g.enable_multiplex, 0), g.created_at, g.updated_at,
 		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.is_hidden = 0) AS channel_count,
-		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.is_hidden = 0 AND c.stream_type NOT IN ('ts', 'flv', 'rtmp', 'rtsp')) AS non_mux_count
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.is_hidden = 0 AND COALESCE(c.stream_type, '') NOT IN ('ts', 'flv', 'rtmp', 'rtsp', 'octet-stream')) AS non_mux_count
 		FROM channel_groups g
 	`
 	var args []interface{}
@@ -60,7 +60,8 @@ func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, erro
 		}
 
 		g.IsDirect = isDirect == 1
-		g.CanMultiplex = (g.ChannelCount > 0 && nonMux == 0)
+		g.CanMultiplex = (g.ChannelCount - nonMux > 0)
+		g.NonMuxCount = nonMux
 		groups = append(groups, g)
 	}
 	if err := rows.Err(); err != nil {
@@ -194,7 +195,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 	rows, err := s.db.Query(fmt.Sprintf(`
 		SELECT id, name, COALESCE(icon, ''), sort_order, is_direct, COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), COALESCE(enable_multiplex, 0), created_at, updated_at,
 		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id) AS channel_count,
-		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id AND c.stream_type NOT IN ('ts', 'flv', 'rtmp', 'rtsp')) AS non_mux_count
+		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id AND COALESCE(c.stream_type, '') NOT IN ('ts', 'flv', 'rtmp', 'rtsp', 'octet-stream')) AS non_mux_count
 		FROM channel_groups %s 
 		ORDER BY CASE WHEN name = '未分类' THEN 1 ELSE 0 END, sort_order, id 
 		LIMIT ? OFFSET ?`, where), queryArgs...)
@@ -210,7 +211,8 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 		if err := rows.Scan(&m.ID, &m.Name, &m.Icon, &m.SortOrder, &m.IsDirect, &m.Source, &m.UserAgent, &m.CustomHeaders, &m.EnableMultiplex, &m.CreatedAt, &m.UpdatedAt, &m.ChannelCount, &nonMux); err != nil {
 			return nil, err
 		}
-		m.CanMultiplex = (m.ChannelCount > 0 && nonMux == 0)
+		m.CanMultiplex = (m.ChannelCount - nonMux > 0)
+		m.NonMuxCount = nonMux
 		items = append(items, m)
 	}
 
@@ -219,7 +221,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 
 // ── Channels ───────────────────────────────────────────
 
-func (s *ChannelService) ListChannels(groupID int64, search string, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
+func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *int, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
 	p.Normalize()
 	var whereClauses []string
 	var queryArgs []interface{}
@@ -232,6 +234,14 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 		JOIN clients cl ON pgr.plan_id = cl.plan_id AND cl.id = ?
 		`
 		queryArgs = append(queryArgs, clientID)
+	}
+
+	if muxSupport != nil {
+		if *muxSupport == 1 {
+			whereClauses = append(whereClauses, "COALESCE(c.stream_type, '') IN ('ts', 'flv', 'rtmp', 'rtsp', 'octet-stream')")
+		} else {
+			whereClauses = append(whereClauses, "COALESCE(c.stream_type, '') NOT IN ('ts', 'flv', 'rtmp', 'rtsp', 'octet-stream')")
+		}
 	}
 
 	whereClauses = append(whereClauses, "c.is_hidden = 0")
@@ -292,9 +302,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, p *models.Pa
 		if lastCheck.Valid {
 			c.LastCheck = lastCheck.Time
 		}
-		if c.StreamType == "" {
-			c.StreamType = "ts"
-		}
+
 		st := strings.ToLower(c.StreamType)
 		c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
 		channels = append(channels, c)
@@ -340,9 +348,7 @@ func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, 
 	if lastCheck.Valid {
 		c.LastCheck = lastCheck.Time
 	}
-	if c.StreamType == "" {
-		c.StreamType = "ts"
-	}
+
 	st := strings.ToLower(c.StreamType)
 	c.CanMultiplex = (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
 	return &c, nil

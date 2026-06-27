@@ -19,6 +19,7 @@ type ChannelGroup struct {
 	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
 	EnableMultiplex int    `json:"enable_multiplex" db:"enable_multiplex"`
 	CanMultiplex bool      `json:"can_multiplex" db:"-"`
+	NonMuxCount  int       `json:"non_mux_count" db:"-"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }

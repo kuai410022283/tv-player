@@ -244,15 +244,23 @@ func (h *Handler) BatchGroup(c *gin.Context) {
 func (h *Handler) ListChannels(c *gin.Context) {
 	groupID, _ := strconv.ParseInt(c.Query("group_id"), 10, 64)
 	search := c.Query("search")
+	muxSupportStr := c.Query("mux_support")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	var muxSupport *int
+	if muxSupportStr != "" {
+		if val, err := strconv.Atoi(muxSupportStr); err == nil {
+			muxSupport = &val
+		}
+	}
 
 	p := &models.PageRequest{Page: page, PageSize: pageSize}
 	var clientID int64
 	if id, exists := c.Get("client_id"); exists {
 		clientID = id.(int64)
 	}
-	resp, err := h.channelSvc.ListChannels(groupID, search, p, clientID)
+	resp, err := h.channelSvc.ListChannels(groupID, search, muxSupport, p, clientID)
 	if err != nil {
 		failInternal(c, err, "获取频道列表失败")
 		return
@@ -1266,7 +1274,7 @@ func (h *Handler) UpdateAdminPassword(c *gin.Context) {
 
 func (h *Handler) GetStats(c *gin.Context) {
 	p := &models.PageRequest{Page: 1, PageSize: 1}
-	totalResp, _ := h.channelSvc.ListChannels(0, "", p, 0)
+	totalResp, _ := h.channelSvc.ListChannels(0, "", nil, p, 0)
 	totalChannels := int64(0)
 	if totalResp != nil {
 		totalChannels = totalResp.Total

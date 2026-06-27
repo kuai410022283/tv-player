@@ -141,8 +141,23 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 			DisableKeepAlives: true,
 		},
 	}
+
+	if streamType == "" {
+		lowerURL := strings.ToLower(url)
+		if strings.HasPrefix(lowerURL, "rtmp://") {
+			streamType = "rtmp"
+			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+		} else if strings.HasPrefix(lowerURL, "rtsp://") {
+			streamType = "rtsp"
+			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+		} else if strings.HasPrefix(lowerURL, "udp://") || strings.HasPrefix(lowerURL, "rtp://") {
+			streamType = "udp"
+			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+		}
+	}
+
 	switch streamType {
-	case "hls", "mp4", "dash", "flv", "ts":
+	case "hls", "mp4", "dash", "flv", "ts", "":
 		// 很多 IPTV 服务端会拦截 HEAD 请求 (返回 405/403)，因此改用 GET，并加入基础 UA 伪装
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -167,13 +182,35 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			status.Status = "online"
+
+			// Detect stream type
+			finalURL := resp.Request.URL.String()
+			contentType := resp.Header.Get("Content-Type")
+			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
+				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
+				strings.Contains(strings.ToLower(finalURL), ".m3u8")
+			
+			var actualType string
+			if isM3U8 {
+				actualType = "hls"
+			} else if strings.Contains(strings.ToLower(contentType), "video/mp2t") || strings.Contains(strings.ToLower(contentType), "octet-stream") {
+				actualType = "ts"
+			} else if strings.Contains(strings.ToLower(contentType), "flv") {
+				actualType = "flv"
+			}
+
+			if streamType == "" && actualType != "" {
+				_ = sp.channelSvc.UpdateStreamType(channelID, actualType)
+			} else if streamType == "ts" && actualType == "hls" {
+				_ = sp.channelSvc.UpdateStreamType(channelID, actualType)
+			}
 		} else {
 			status.Status = "offline"
 			status.ErrorMsg = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		}
-	case "rtmp", "rtsp":
-		// For RTMP/RTSP, we just try a TCP connection
-		status.Status = "online" // simplified; real impl would use ffmpeg probe
+	case "rtmp", "rtsp", "udp":
+		// For RTMP/RTSP/UDP, we just mark as online (simplified; real impl would use ffmpeg probe)
+		status.Status = "online"
 	default:
 		status.Status = "unknown"
 	}
@@ -209,7 +246,7 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 
 		for {
 			p := &models.PageRequest{Page: page, PageSize: pageSize}
-			resp, err := sp.channelSvc.ListChannels(0, "", p, 0)
+			resp, err := sp.channelSvc.ListChannels(0, "", nil, p, 0)
 			if err != nil || resp == nil {
 				break
 			}

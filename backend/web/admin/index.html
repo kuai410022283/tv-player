@@ -223,7 +223,7 @@
                 <th>EPG匹配ID</th>
                 <th>分组</th>
                 <th>来源</th>
-                <th>类型</th>
+                <th>直连模式</th>
                 <th>状态</th>
                 <th>复用状态</th>
 
@@ -259,7 +259,9 @@
                 <th>排序</th>
                 <th>来源</th>
                 <th>直连模式</th>
-                <th>复用状态</th>
+                <th>批量复用</th>
+                <th>支持复用</th>
+                <th>不支持复用</th>
                 <th>频道数</th>
                 <th>操作</th>
               </tr>
@@ -923,16 +925,21 @@
           </datalist>
         </div>
         <div class="form-group"><label>直连模式</label>
-          <select id="ch-is-direct">
-            <option value="true">开启 (默认，省宽带)</option>
-            <option value="false">关闭 (经代理加密源)</option>
-          </select>
+          <div style="margin-top: 8px;">
+            <label class="switch">
+              <input type="checkbox" id="ch-is-direct">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
-        <div class="form-group" id="ch-multiplex-group"><label>启用线路复用 (限直连关闭+可复用流)</label>
-          <select id="ch-enable-multiplex">
-            <option value="0">关闭</option>
-            <option value="1">开启 (多用户共享单条线路)</option>
-          </select>
+        <div class="form-group" id="ch-multiplex-group">
+          <label>复用流 (需直连关闭+代理分发)</label>
+          <div style="margin-top: 8px;">
+            <label class="switch">
+              <input type="checkbox" id="ch-enable-multiplex">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
         <div class="form-group"><label>Logo URL</label>
           <div class="input-with-copy"><input type="text" id="ch-logo"><button class="btn-copy" type="button"
@@ -963,21 +970,25 @@
 
     <div class="modal-overlay" id="group-modal">
       <div class="modal">
-        <h3>添加分组</h3>
+        <h3 id="group-modal-title">添加分组</h3>
         <input type="hidden" id="grp-edit-id">
         <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
         <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
         <div class="form-group"><label>所有频道直连模式</label>
-          <select id="grp-is-direct">
-            <option value="true">开启 (默认，省宽带)</option>
-            <option value="false">关闭 (经代理加密源)</option>
-          </select>
+          <div style="margin-top: 8px;">
+            <label class="switch">
+              <input type="checkbox" id="grp-is-direct">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
         <div class="form-group" id="grp-multiplex-group"><label>批量线路复用 (限全组支持复用)</label>
-          <select id="grp-enable-multiplex">
-            <option value="0">关闭</option>
-            <option value="1">开启 (统一切换组内频道为复用)</option>
-          </select>
+          <div style="margin-top: 8px;">
+            <label class="switch">
+              <input type="checkbox" id="grp-enable-multiplex">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
         <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
             placeholder="留空使用订阅源或系统默认"></div>

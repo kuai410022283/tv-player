@@ -485,8 +485,8 @@ class PlayerActivity : AppCompatActivity() {
                 else -> "VLC"
             }
         }
-        
-        tvStreamType?.text = "${type.uppercase()} ($coreText)"
+        val displayType = if (type.isEmpty()) "AUTO" else type.uppercase()
+        tvStreamType?.text = "$displayType ($coreText)"
         
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper

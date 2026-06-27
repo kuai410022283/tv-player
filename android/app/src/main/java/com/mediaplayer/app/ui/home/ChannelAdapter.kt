@@ -147,7 +147,7 @@ class ChannelAdapter(
             // 右侧流类型角标
             val lines = item.getLinesSafely()
             val streamType = if (lines.isNotEmpty()) lines[0].streamType else item.legacyStreamType
-            tvTypeBadge.text = streamType.uppercase()
+            tvTypeBadge.text = if (streamType.isEmpty()) "AUTO" else streamType.uppercase()
             tvTypeBadge.visibility = View.VISIBLE
 
             if (showLogo) {

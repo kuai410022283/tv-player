@@ -1425,8 +1425,8 @@ class MainActivity : AppCompatActivity() {
                 else -> "VLC"
             }
         }
-        
-        findViewById<android.widget.TextView>(com.mediaplayer.app.R.id.tvStreamType)?.text = "${line.streamType.uppercase()} ($coreText)"
+        val displayType = if (line.streamType.isEmpty()) "AUTO" else line.streamType.uppercase()
+        findViewById<android.widget.TextView>(com.mediaplayer.app.R.id.tvStreamType)?.text = "$displayType ($coreText)"
 
         // 判断当前已经实例化的 playerHelper 是否与所需的一致
         val isCoreMatch = when (desiredCore) {
@@ -1519,8 +1519,8 @@ class MainActivity : AppCompatActivity() {
                 ).apply {
                     val margin8 = resources.getDimensionPixelSize(R.dimen.dp_8)
                     setMargins(0, margin8, 0, margin8)
-                }
-                text = "线路 ${index + 1} (${line.streamType.uppercase()})"
+                val displayType = if (line.streamType.isEmpty()) "AUTO" else line.streamType.uppercase()
+                text = "线路 ${index + 1} ($displayType)"
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.sp_18))
                 val pad32 = resources.getDimensionPixelSize(R.dimen.dp_32)
                 val pad24 = resources.getDimensionPixelSize(R.dimen.dp_24)
@@ -1531,8 +1531,9 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundResource(R.drawable.selector_channel_item)
                 
                 if (index == currentLineIndex) {
+                    val displayType = if (line.streamType.isEmpty()) "AUTO" else line.streamType.uppercase()
                     setTextColor(android.graphics.Color.parseColor("#FFC107"))
-                    text = "线路 ${index + 1} (${line.streamType.uppercase()}) - 当前"
+                    text = "线路 ${index + 1} ($displayType) - 当前"
                 } else {
                     setTextColor(android.graphics.Color.WHITE)
                 }
