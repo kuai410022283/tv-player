@@ -1519,6 +1519,7 @@ class MainActivity : AppCompatActivity() {
                 ).apply {
                     val margin8 = resources.getDimensionPixelSize(R.dimen.dp_8)
                     setMargins(0, margin8, 0, margin8)
+                }
                 val displayType = if (line.streamType.isEmpty()) "AUTO" else line.streamType.uppercase()
                 text = "线路 ${index + 1} ($displayType)"
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.sp_18))
