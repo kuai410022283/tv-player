@@ -39,7 +39,7 @@ async function api(path, opts = {}) {
 
   const headers = { 'Content-Type': 'application/json' };
   if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
-  showLoading();
+  if (!opts.silent) showLoading();
   try {
     const res = await fetch(API + path, { headers, ...opts });
     let data = {};
@@ -57,11 +57,11 @@ async function api(path, opts = {}) {
     return data;
   } catch (e) {
     // AbortError 是主动取消，不属于错误，静默处理
-    if (e.name === 'AbortError') { hideLoading(); throw e; }
-    toast('请求失败: ' + e.message, 'error');
+    if (e.name === 'AbortError') { if (!opts.silent) hideLoading(); throw e; }
+    if (!opts.silent) toast('请求失败: ' + e.message, 'error');
     throw e;
   } finally {
-    hideLoading();
+    if (!opts.silent) hideLoading();
   }
 }
 
@@ -809,10 +809,17 @@ async function deleteGroup(id, source, name, count) {
 }
 
 let sourcesList = [];
-async function loadSources() {
-  const r = await api('/m3u');
+let syncPollTimeout = null;
+
+async function loadSources(silent = false) {
+  const r = await api('/m3u', { silent: silent });
   sourcesList = r.data || [];
   renderSourcesTable();
+
+  if (syncPollTimeout) clearTimeout(syncPollTimeout);
+  if (sourcesList.some(s => s.sync_status === 'syncing')) {
+    syncPollTimeout = setTimeout(() => loadSources(true), 3000);
+  }
 }
 
 function renderSourcesTable() {
@@ -829,7 +836,12 @@ function renderSourcesTable() {
       <td><strong>${esc(s.name)}</strong></td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
       <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
-      <td>${fmtDate(s.last_sync)}</td>
+      <td>
+        ${s.sync_status === 'syncing' ? '<span style="color:var(--primary); font-weight:500">🔄 正在同步...</span>' : 
+          s.sync_status === 'error' ? `<span style="color:#ff4d4f;cursor:help;font-weight:500" title="${esc(s.sync_error)}">❌ 同步失败</span><div style="font-size:11px;color:var(--text3);margin-top:2px" title="${esc(s.sync_error)}">${esc(s.sync_error).length > 20 ? esc(s.sync_error).substring(0, 20) + '...' : esc(s.sync_error)}</div>` : 
+          s.sync_status === 'idle' && s.last_sync ? `<span style="color:#52c41a;font-weight:500">✅ 正常</span><div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtDate(s.last_sync)}</div>` : 
+          `<span style="color:var(--text3)">未同步</span>`}
+      </td>
       <td><div class="btn-group">
         <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">同步</button>
         <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">编辑</button>
@@ -900,15 +912,16 @@ async function saveSource() {
 }
 
 async function importSource(id) {
-  toast('已发起后台同步...');
-  const r = await api(`/m3u/${id}/import`, { method: 'POST' });
-  if (r.data && r.data.message) {
-    toast(r.data.message, 'success');
-  } else {
-    toast('失败', 'error');
+  toast('已发起后台同步指令...');
+  try {
+    const r = await api(`/m3u/${id}/import`, { method: 'POST' });
+    if (r.data && r.data.message) {
+      toast(r.data.message, 'success');
+    }
+  } catch (e) {
+    toast('指令下发失败: ' + e.message, 'error');
   }
-  // 3秒后刷新列表查看同步状态
-  setTimeout(loadSources, 3000);
+  loadSources(true);
 }
 
 async function deleteSource(id) {

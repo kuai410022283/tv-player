@@ -143,6 +143,8 @@ type M3USource struct {
 	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
 	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
 	LastSync     time.Time `json:"last_sync,omitempty" db:"last_sync"`
+	SyncStatus   string    `json:"sync_status" db:"sync_status"` // idle, syncing, error
+	SyncError    string    `json:"sync_error,omitempty" db:"sync_error"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
@@ -238,6 +240,9 @@ type ClientRegisterResp struct {
 	StartupMedia        string `json:"startup_media"`
 	StartupDuration     int    `json:"startup_duration"`
 	StartupSkipAfter    int    `json:"startup_skip_after"`
+
+	// 备用服务器分发 (Seed Node Distribution)
+	BackupServers []string `json:"backup_servers,omitempty"`
 }
 
 // 客户端审批请求

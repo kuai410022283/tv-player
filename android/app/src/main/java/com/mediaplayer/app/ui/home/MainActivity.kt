@@ -1781,13 +1781,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, isTester: Boolean) {
+    private fun resolveUrl(input: String): String {
+        try {
+            val bytes = android.util.Base64.decode(input, android.util.Base64.DEFAULT)
+            val decoded = String(bytes, Charsets.UTF_8).trim()
+            if (decoded.startsWith("http://") || decoded.startsWith("https://")) {
+                return decoded
+            }
+        } catch (e: Exception) {
+            // 解码失败（说明本来就是明文或格式不对），忽略异常
+        }
+        return input.trim()
+    }
+
+    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, backupServers: List<String>?, isTester: Boolean) {
         if (globalMaintenance && !isTester) {
             showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
             // 如果已在播放，停止播放并清除UI
             playerHelper?.release()
             startAuthPolling()
             return
+        }
+
+        if (!backupServers.isNullOrEmpty()) {
+            val localList = getServerList().toMutableList()
+            val currentServer = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                .getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
+
+            // 按照优先级进行合并：
+            // 优先级 1. 当前正在使用的主服务器 (currentServer)
+            // 优先级 2. 用户原来手动输入的本地列表 (localList)
+            // 优先级 3. 服务器最新下发的备用列表，追加在最后 (backupServers)
+            val mergedList = mutableListOf<String>()
+            mergedList.add(currentServer)
+            mergedList.addAll(localList)
+            
+            // 对服务器下发的每一个节点进行智能解码转换 (支持 Base64 或明文)
+            val resolvedBackupServers = backupServers.map { resolveUrl(it) }
+            mergedList.addAll(resolvedBackupServers)
+            
+            // 去重操作 (distinct 会保留第一次出现的元素，抛弃后面的重复项)
+            // 这完美保证了“用户原来的优先，服务器追加在后”的规则
+            val finalList = mergedList.filter { it.isNotBlank() }.distinct()
+            saveServerList(finalList)
         }
 
         this.sysAnnouncement = sysAnnouncement
@@ -1814,11 +1850,52 @@ class MainActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             if (authManager.isApproved()) {
-                authManager.verify().onSuccess { resp ->
-                    if (resp != null) {
-                        handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.isTester)
-                    } else doRegister()
-                }.onFailure { doRegister() }
+                val serverList = getServerList()
+                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                val defaultUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
+                val candidates = serverList.ifEmpty { listOf(defaultUrl) }
+
+                var maintenanceResp: com.mediaplayer.app.data.model.VerifyResponse? = null
+
+                for ((index, serverUrl) in candidates.withIndex()) {
+                    val label = if (index == 0) "主服务器" else "备用服务器 $index"
+                    showAuthWaiting("正在验证$label ...")
+
+                    ApiClient.init(serverUrl)
+
+                    val attempt = try {
+                        withTimeout(15_000L) {
+                            authManager.verify()
+                        }
+                    } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                        Result.failure(Exception("连接超时"))
+                    }
+
+                    if (attempt.isSuccess) {
+                        val resp = attempt.getOrNull()
+                        if (resp != null) {
+                            if (resp.globalMaintenance && !resp.isTester) {
+                                // 该服务器处于维护模式，记录下来并尝试下一个备用服务器
+                                maintenanceResp = resp
+                                continue
+                            } else {
+                                // 验证成功且未在维护，保存该有效服务器配置并直接进入
+                                prefs.edit().putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
+                                return@launch
+                            }
+                        }
+                    }
+                }
+
+                // 循环结束，没有找到可用且非维护状态的服务器
+                if (maintenanceResp != null) {
+                    // 说明至少有一个连通了，但处于维护状态。统一展示维护界面。
+                    handleAuthSuccess(maintenanceResp.announcement, maintenanceResp.announcementInterval, maintenanceResp.startupMediaEnabled, maintenanceResp.startupMedia, maintenanceResp.startupMediaType, maintenanceResp.startupDuration, maintenanceResp.startupSkipAfter, maintenanceResp.globalMaintenance, maintenanceResp.backupServers, maintenanceResp.isTester)
+                } else {
+                    // 全部超时或网络错误，回退到注册重试流程
+                    doRegister()
+                }
             } else {
                 doRegister()
             }
@@ -1853,7 +1930,7 @@ class MainActivity : AppCompatActivity() {
                     val result = attempt.getOrThrow()
                     when (result.status) {
                         "approved" -> {
-                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.isTester)
+                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.backupServers, result.isTester)
                             return@launch
                         }
                         "pending" -> {

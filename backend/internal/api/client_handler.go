@@ -1,12 +1,14 @@
 package api
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,6 +67,17 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	maintenanceModeStr, _ := h.channelSvc.GetSetting("maintenance_mode")
 	globalMaintenance := maintenanceModeStr == "true"
 
+	backupServersStr, _ := h.channelSvc.GetSetting("server_backup_urls")
+	var backupServers []string
+	if backupServersStr != "" {
+		for _, s := range strings.Split(backupServersStr, "\n") {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				encoded := base64.StdEncoding.EncodeToString([]byte(trimmed))
+				backupServers = append(backupServers, encoded)
+			}
+		}
+	}
+
 	if resp.Status == "approved" {
 		ok(c, gin.H{
 			"status":                resp.Status,
@@ -79,6 +92,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
 			"global_maintenance":    globalMaintenance,
+			"backup_servers":        backupServers,
 			"is_tester":             resp.IsTester,
 		})
 	} else {
@@ -96,6 +110,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"startup_duration":      startupDuration,
 			"startup_skip_after":    startupSkipAfter,
 			"global_maintenance":    globalMaintenance,
+			"backup_servers":        backupServers,
 			"is_tester":             resp.IsTester,
 		}})
 	}
@@ -147,6 +162,17 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	maintenanceModeStr, _ := h.channelSvc.GetSetting("maintenance_mode")
 	globalMaintenance := maintenanceModeStr == "true"
 
+	backupServersStr, _ := h.channelSvc.GetSetting("server_backup_urls")
+	var backupServers []string
+	if backupServersStr != "" {
+		for _, s := range strings.Split(backupServersStr, "\n") {
+			if trimmed := strings.TrimSpace(s); trimmed != "" {
+				encoded := base64.StdEncoding.EncodeToString([]byte(trimmed))
+				backupServers = append(backupServers, encoded)
+			}
+		}
+	}
+
 	ok(c, gin.H{
 		"client_id":             client.ID,
 		"name":                  client.Name,
@@ -162,6 +188,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"startup_duration":      startupDuration,
 		"startup_skip_after":    startupSkipAfter,
 		"global_maintenance":    globalMaintenance,
+		"backup_servers":        backupServers,
 		"is_tester":             client.IsTester,
 	})
 }

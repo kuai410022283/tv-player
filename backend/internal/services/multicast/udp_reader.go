@@ -127,11 +127,16 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 
 		data := (*r.buffer)[:nRead]
 
-		if !r.isRTP {
+		// 智能动态检测 RTP：TS 流同步字节为 0x47 (01000111)。RTP v2 头部首字节为 0x80 (10xxxxxx)。
+		// 掩码 &0xC0 下可以完美区分。哪怕源地址写的是 udp://，只要检测到 RTP 头，就自动开启脱壳逻辑。
+		isRTPPacket := len(data) >= 12 && (data[0]&0xC0) == 0x80
+
+		if !isRTPPacket && !r.isRTP {
+			// 不是 RTP 格式，且不是 rtp:// 协议，按裸流透传
 			return r.emitPayload(p, data)
 		}
 
-		if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
+		if isRTPPacket {
 			seq := uint16(data[2])<<8 | uint16(data[3])
 			payloadStart := 12
 			payloadStart += int(data[0]&0x0F) * 4 // CSRC headers

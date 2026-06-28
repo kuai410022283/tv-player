@@ -184,6 +184,8 @@ func createTables(db *sql.DB) error {
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
 		last_sync DATETIME,
+		sync_status TEXT DEFAULT 'idle',
+		sync_error TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -307,6 +309,8 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN is_tester INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_status TEXT DEFAULT 'idle';")
+	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_error TEXT DEFAULT '';")
 
 	return err
 }

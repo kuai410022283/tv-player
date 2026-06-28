@@ -567,7 +567,7 @@ func (s *ChannelService) GetAllSettings() (map[string]string, error) {
 // ── M3U Sources ────────────────────────────────────────
 
 func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
-	rows, err := s.db.Query(`SELECT id, name, url, auto_sync, sync_interval, COALESCE(user_agent, ''), COALESCE(custom_headers, ''), last_sync, created_at FROM m3u_sources ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, url, auto_sync, sync_interval, COALESCE(user_agent, ''), COALESCE(custom_headers, ''), last_sync, COALESCE(sync_status, 'idle'), COALESCE(sync_error, ''), created_at FROM m3u_sources ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +579,7 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 		var autoSync int
 		var syncInterval int
 		var lastSync sql.NullTime
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &syncInterval, &m.UserAgent, &m.CustomHeaders, &lastSync, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &autoSync, &syncInterval, &m.UserAgent, &m.CustomHeaders, &lastSync, &m.SyncStatus, &m.SyncError, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		m.AutoSync = autoSync == 1

@@ -23,7 +23,15 @@ func NewM3UImporter(channelSvc *ChannelService) *M3UImporter {
 }
 
 // ImportFromURL fetches and imports an M3U source
-func (imp *M3UImporter) ImportFromURL(sourceID int64) (int, error) {
+func (imp *M3UImporter) ImportFromURL(sourceID int64) (count int, err error) {
+	_, _ = imp.channelSvc.db.Exec("UPDATE m3u_sources SET sync_status='syncing', sync_error='' WHERE id=?", sourceID)
+	defer func() {
+		if err != nil {
+			_, _ = imp.channelSvc.db.Exec("UPDATE m3u_sources SET sync_status='error', sync_error=? WHERE id=?", err.Error(), sourceID)
+		} else {
+			_, _ = imp.channelSvc.db.Exec("UPDATE m3u_sources SET sync_status='idle', sync_error='', last_sync=? WHERE id=?", time.Now(), sourceID)
+		}
+	}()
 	sources, err := imp.channelSvc.ListM3USources()
 	if err != nil {
 		return 0, err
@@ -83,11 +91,7 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (int, error) {
 		return 0, err
 	}
 
-	count, err := imp.importChannels(channels, sourceID, source.Name, source.UserAgent, source.CustomHeaders)
-	if err == nil {
-		// 更新特定源的同步时间
-		_, _ = imp.channelSvc.db.Exec("UPDATE m3u_sources SET last_sync=? WHERE id=?", time.Now(), sourceID)
-	}
+	count, err = imp.importChannels(channels, sourceID, source.Name, source.UserAgent, source.CustomHeaders)
 	return count, err
 }
 
