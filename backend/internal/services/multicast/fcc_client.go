@@ -119,7 +119,7 @@ func (c *FCCClient) handshakeTelecom(localPort int) error {
 }
 
 func (c *FCCClient) Read(p []byte) (int, error) {
-	c.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = c.conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	n, _, err := c.conn.ReadFromUDP(*c.buffer)
 	if err != nil {
 		return 0, err
@@ -151,8 +151,8 @@ func (c *FCCClient) Close() error {
 	if c.rtspConn != nil {
 		// Send TEARDOWN to Huawei FCC server
 		req := fmt.Sprintf("TEARDOWN rtsp://%s/ RTSP/1.0\r\nCSeq: 2\r\n\r\n", c.fccServerIP)
-		c.rtspConn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
-		c.rtspConn.Write([]byte(req))
+		_ = c.rtspConn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
+		_, _ = c.rtspConn.Write([]byte(req))
 		c.rtspConn.Close()
 		c.rtspConn = nil
 	}
@@ -189,7 +189,7 @@ func (c *FCCClient) handshakeHuawei(localPort int) error {
 
 	// Read RTSP response to see what the server says
 	respBuf := make([]byte, 1024)
-	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	n, err := conn.Read(respBuf)
 	if err == nil && n > 0 {
 		slog.Info("FCC Huawei RTSP Response", "response", string(respBuf[:n]))

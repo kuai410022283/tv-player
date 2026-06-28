@@ -129,7 +129,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 		for {
 			// Drain multicast socket into jitter buffer (non-blocking)
 			for {
-				r.conn.SetReadDeadline(time.Now())
+				_ = r.conn.SetReadDeadline(time.Now())
 				nRead, _, err := r.conn.ReadFromUDP(*r.buffer)
 				if err != nil {
 					break // Would block

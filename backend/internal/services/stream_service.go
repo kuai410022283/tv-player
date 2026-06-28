@@ -1042,8 +1042,8 @@ func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL strin
 		var portStart, portEnd int = 40000, 40050
 		pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 		pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
-		if pStart != "" { fmt.Sscanf(pStart, "%d", &portStart) }
-		if pEnd != "" { fmt.Sscanf(pEnd, "%d", &portEnd) }
+		if pStart != "" { _, _ = fmt.Sscanf(pStart, "%d", &portStart) }
+		if pEnd != "" { _, _ = fmt.Sscanf(pEnd, "%d", &portEnd) }
 
 		fc, err := multicast.NewFCCClient(ctx, fccServer, portStart, portEnd, targetURL, fccType)
 		if err != nil {
@@ -1118,8 +1118,8 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			var portStart, portEnd int = 40000, 40050
 			pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 			pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
-			if pStart != "" { fmt.Sscanf(pStart, "%d", &portStart) }
-			if pEnd != "" { fmt.Sscanf(pEnd, "%d", &portEnd) }
+			if pStart != "" { _, _ = fmt.Sscanf(pStart, "%d", &portStart) }
+			if pEnd != "" { _, _ = fmt.Sscanf(pEnd, "%d", &portEnd) }
 
 			// Try to connect FCC
 			fc, err := multicast.NewFCCClient(r.Context(), fccServer, portStart, portEnd, targetURL, fccType)
