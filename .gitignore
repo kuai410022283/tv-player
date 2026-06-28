@@ -56,3 +56,6 @@ android/app/build/outputs/apk/release/*.apk
 test.txt
 *.m3u
 !android/app/src/main/jniLibs/*/*.so
+
+# other
+other

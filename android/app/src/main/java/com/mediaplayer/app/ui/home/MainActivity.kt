@@ -693,6 +693,8 @@ class MainActivity : AppCompatActivity() {
         btnSettingsCore = findViewById(R.id.btnSettingsCore)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
+        val btnSettingsAudioPassthrough = findViewById<View>(R.id.btnSettingsAudioPassthrough)
+        val tvSettingsAudioPassthroughValue = findViewById<TextView>(R.id.tvSettingsAudioPassthroughValue)
         val btnSettingsReverseChannels = findViewById<View>(R.id.btnSettingsReverseChannels)
         val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
         val btnSettingsAbout = findViewById<View>(R.id.btnSettingsAbout)
@@ -735,6 +737,11 @@ class MainActivity : AppCompatActivity() {
         var currentAutoStart = prefs.getBoolean(Prefs.KEY_AUTO_START, false)
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
+        var currentAudioPassthrough = prefs.getBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, false)
+
+        fun updateAudioPassthroughText(enabled: Boolean) {
+            tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
+        }
 
         updateDecoderText(currentDecoderMode)
         updateCoreText(currentCore)
@@ -742,6 +749,14 @@ class MainActivity : AppCompatActivity() {
         updateAutoStartText(currentAutoStart)
         updateShowLogoText(currentShowLogo)
         updateReverseChannelsText(currentReverseChannels)
+        updateAudioPassthroughText(currentAudioPassthrough)
+        
+        btnSettingsAudioPassthrough?.setOnClickListener {
+            currentAudioPassthrough = !currentAudioPassthrough
+            updateAudioPassthroughText(currentAudioPassthrough)
+            prefs.edit().putBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, currentAudioPassthrough).apply()
+            Toast.makeText(this, "音频直通设置已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+        }
         
         btnSettingsDecoder?.setOnClickListener {
             currentDecoderMode = when (currentDecoderMode) {
@@ -1094,6 +1109,37 @@ class MainActivity : AppCompatActivity() {
                 uiHandler.post {
                     currentPlaybackState = PlaybackState.IDLE
                     handlePlaybackCompleted()
+                }
+            }
+            override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
+                uiHandler.post {
+                    val badges = mutableListOf<String>()
+                    if (badgeInfo.is4K) badges.add("4K")
+                    if (badgeInfo.isDolbyVision) badges.add("杜比视界")
+                    else if (badgeInfo.isHdr10) badges.add("HDR10")
+                    else if (badgeInfo.isHlg) badges.add("HLG")
+                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
+                    
+                    if (badges.isNotEmpty()) {
+                        osdOverlayView?.setInfoText(badges.joinToString(" | "))
+                    } else if (badgeInfo.videoCodec.isNotEmpty()) {
+                        // 修正回退逻辑：将编解码器无缝插入到分辨率之后，保留原来的"硬解"等信息，防止分隔符冲突
+                        val currentInfo = osdOverlayView?.getInfoText() ?: ""
+                        if (!currentInfo.contains(badgeInfo.videoCodec)) {
+                            val parts = currentInfo.split(" | ")
+                            val enhanced = buildString {
+                                append(parts.firstOrNull() ?: "")
+                                append(" | ${badgeInfo.videoCodec}")
+                                if (badgeInfo.audioCodec.isNotEmpty()) {
+                                    append(" | ${badgeInfo.audioCodec}")
+                                }
+                                for (i in 1 until parts.size) {
+                                    append(" | ${parts[i]}")
+                                }
+                            }
+                            osdOverlayView?.setInfoText(enhanced.toString())
+                        }
+                    }
                 }
             }
         }
@@ -1909,6 +1955,8 @@ class MainActivity : AppCompatActivity() {
                 .getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
             val candidates = serverList.ifEmpty { listOf(defaultUrl) }
 
+            var maintenanceResult: com.mediaplayer.app.data.model.ClientRegisterResp? = null
+
             showAuthWaiting("正在注册设备...")
 
             for ((index, serverUrl) in candidates.withIndex()) {
@@ -1930,8 +1978,17 @@ class MainActivity : AppCompatActivity() {
                     val result = attempt.getOrThrow()
                     when (result.status) {
                         "approved" -> {
-                            handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.backupServers, result.isTester)
-                            return@launch
+                            if (result.globalMaintenance && !result.isTester) {
+                                // 注册服务器处于维护模式，记录下来并尝试下一个备用服务器
+                                maintenanceResult = result
+                                continue
+                            } else {
+                                // 注册成功且未在维护，保存该有效服务器配置并直接进入
+                                getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
+                                    .putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.backupServers, result.isTester)
+                                return@launch
+                            }
                         }
                         "pending" -> {
                             showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
@@ -1949,6 +2006,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 // attempt.isFailure → 继续尝试下一台服务器
+            }
+
+            // 循环结束，没有找到可用且非维护状态的服务器
+            if (maintenanceResult != null) {
+                // 至少有一个连通了，但处于维护状态。统一展示维护界面。
+                handleAuthSuccess(maintenanceResult.announcement, maintenanceResult.announcementInterval, maintenanceResult.startupMediaEnabled, maintenanceResult.startupMedia, maintenanceResult.startupMediaType, maintenanceResult.startupDuration, maintenanceResult.startupSkipAfter, maintenanceResult.globalMaintenance, maintenanceResult.backupServers, maintenanceResult.isTester)
+                return@launch
             }
 
             // 所有服务器均无法连接，不要死等，开启轮询机制定期重试连接

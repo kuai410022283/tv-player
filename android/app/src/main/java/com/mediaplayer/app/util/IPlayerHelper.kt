@@ -55,5 +55,20 @@ interface IPlayerHelper {
          * Called on playback error
          */
         fun onError()
+
+        /**
+         * Called when media format details are extracted
+         */
+        fun onMediaInfoReady(badgeInfo: StreamBadgeInfo) {}
     }
 }
+
+data class StreamBadgeInfo(
+    val isDolbyVision: Boolean = false,
+    val isHdr10: Boolean = false,
+    val isHlg: Boolean = false,
+    val isDolbyAtmos: Boolean = false,
+    val is4K: Boolean = false,
+    val audioCodec: String = "",
+    val videoCodec: String = ""
+)

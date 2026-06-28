@@ -22,6 +22,9 @@ object Prefs {
     const val DECODER_MODE_HARDWARE = 1
     const val DECODER_MODE_SOFTWARE = 2
     
+    // 音频直通开关
+    const val KEY_AUDIO_PASSTHROUGH = "audio_passthrough"
+    
     // 播放内核
     const val KEY_PLAYER_CORE = "player_core"
     const val PLAYER_CORE_AUTO = 0

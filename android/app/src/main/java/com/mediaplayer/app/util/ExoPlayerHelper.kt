@@ -90,6 +90,10 @@ class ExoPlayerHelper(
             startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
             contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
         }
+        
+        // 每次起播前探测一下当前电视/盒子的 HDR 体质
+        HdrCapabilitiesHelper.printHdrInfo(context)
+
         if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLiveStream) {
             buildPlayer(isLiveStream)
         }
@@ -198,6 +202,7 @@ class ExoPlayerHelper(
                 eventListener: androidx.media3.exoplayer.audio.AudioRendererEventListener,
                 out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>
             ) {
+                // 使用官方默认配置的 audioSink (其内置了大量机型兼容修复)，实现更安全的 Passthrough 握手
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
                 if (isLiveStream) {
@@ -232,12 +237,28 @@ class ExoPlayerHelper(
         val loadControl = loadControlBuilder.build()
 
         val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-            setParameters(buildUponParameters())
+            setParameters(buildUponParameters()
+                // 允许自动切换视频分辨率以匹配电视面板
+                .setAllowVideoMixedMimeTypeAdaptiveness(true)
+            )
         }
+
+        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+        val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
+
+        val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
+            .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+            .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+            .setSpatializationBehavior(
+                if (isPassthroughEnabled) androidx.media3.common.C.SPATIALIZATION_BEHAVIOR_AUTO
+                else androidx.media3.common.C.SPATIALIZATION_BEHAVIOR_NEVER
+            )
+            .build()
 
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
+            .setAudioAttributes(audioAttributes, true)
             .build()
             
         playerView?.player = exoPlayer
@@ -275,6 +296,27 @@ class ExoPlayerHelper(
                                     }
                                 }
                                 listener.onPlaying(info)
+
+                                val vMime = videoFormat?.sampleMimeType ?: ""
+                                val aMime = audioFormat?.sampleMimeType ?: ""
+                                val colorInfo = videoFormat?.colorInfo
+                                
+                                val is4K = (videoFormat?.width ?: 0) >= 3840
+                                val isHdr10 = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_ST2084
+                                val isHlg = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_HLG
+                                val isDolbyVision = vMime == "video/dolby-vision" || videoFormat?.codecs?.contains("dvh1") == true || videoFormat?.codecs?.contains("dvhe") == true
+                                val isDolbyAtmos = aMime == "audio/eac3-joc" || audioFormat?.codecs?.contains("joc") == true
+                                
+                                val badgeInfo = com.mediaplayer.app.util.StreamBadgeInfo(
+                                    isDolbyVision = isDolbyVision,
+                                    isHdr10 = isHdr10,
+                                    isHlg = isHlg,
+                                    isDolbyAtmos = isDolbyAtmos,
+                                    is4K = is4K,
+                                    audioCodec = aMime.substringAfter("/").uppercase(),
+                                    videoCodec = vMime.substringAfter("/").uppercase()
+                                )
+                                listener.onMediaInfoReady(badgeInfo)
                             }
                         }
                     }
