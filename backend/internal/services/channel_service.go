@@ -112,12 +112,12 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var name string
-	err = tx.QueryRow("SELECT name FROM channel_groups WHERE id = ?", id).Scan(&name)
+	var name, source string
+	err = tx.QueryRow("SELECT name, COALESCE(source, '') FROM channel_groups WHERE id = ?", id).Scan(&name, &source)
 	if err != nil {
 		return err
 	}
-	if name == "未分类" {
+	if name == "未分类" && source == "手动" {
 		return fmt.Errorf("默认分组不能删除")
 	}
 
@@ -143,9 +143,9 @@ func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
 	defer func() { _ = tx.Rollback() }()
 
 	for _, id := range ids {
-		var name string
-		err = tx.QueryRow("SELECT name FROM channel_groups WHERE id = ?", id).Scan(&name)
-		if err != nil || name == "未分类" {
+		var name, source string
+		err = tx.QueryRow("SELECT name, COALESCE(source, '') FROM channel_groups WHERE id = ?", id).Scan(&name, &source)
+		if err != nil || (name == "未分类" && source == "手动") {
 			continue // 忽略不存在或不能删除的默认分组
 		}
 		

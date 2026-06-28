@@ -653,7 +653,7 @@ async function loadGroups() {
   });
 
   document.getElementById('groups-body').innerHTML = items.map((g, i) => {
-    const isDefault = g.name === '未分类';
+    const isDefault = g.name === '未分类' && (!g.source || g.source === '手动');
     return `<tr>
     <td>${isDefault ? '' : `<input type="checkbox" class="group-check" value="${g.id}" onchange="updateSelectedGroups()">`}</td>
     <td style="color:var(--text3)">${(groupPage - 1) * PAGE_SIZE + i + 1}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
