@@ -37,8 +37,7 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 	// Create cancel context for killing stream
 	ctx, cancel := context.WithCancel(r.Context())
 
-	// Add client
-	cb.AddClient(sessionID, clientChan)
+	// Stream tracking state setup
 
 	// Update stream state for tracking
 	sp.mu.Lock()
@@ -80,8 +79,8 @@ func (sp *StreamProxy) serveMultiplex(channelID int64, clientID int64, clientIP 
 	var bytesSinceLastUpdate int64 = 0
 	lastUpdate := time.Now()
 
-	// Send burst cache (FCC)
-	snapshot := cb.buffer.Snapshot()
+	// Add client and get burst cache atomically (FCC) to avoid repeating packets causing A/V desync
+	snapshot := cb.AddClientAndGetSnapshot(sessionID, clientChan)
 	if len(snapshot) > 0 {
 		n, err := w.Write(snapshot)
 		if err != nil {

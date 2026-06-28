@@ -114,10 +114,12 @@ func NewChannelBroadcaster(channelID int64, targetURL string, header http.Header
 	}
 }
 
-func (cb *ChannelBroadcaster) AddClient(sessionID string, ch chan []byte) {
+func (cb *ChannelBroadcaster) AddClientAndGetSnapshot(sessionID string, ch chan []byte) []byte {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
+	snapshot := cb.buffer.Snapshot()
 	cb.clients[sessionID] = ch
+	return snapshot
 }
 
 func (cb *ChannelBroadcaster) RemoveClient(sessionID string) {
@@ -133,11 +135,13 @@ func (cb *ChannelBroadcaster) ClientCount() int {
 }
 
 func (cb *ChannelBroadcaster) Broadcast(data []byte) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
 	_, _ = cb.buffer.Write(data)
 	
 	var slowClients []string
 
-	cb.mu.RLock()
 	for sessionID, ch := range cb.clients {
 		select {
 		case ch <- data:
@@ -146,17 +150,14 @@ func (cb *ChannelBroadcaster) Broadcast(data []byte) {
 			slowClients = append(slowClients, sessionID)
 		}
 	}
-	cb.mu.RUnlock()
 
 	if len(slowClients) > 0 {
-		cb.mu.Lock()
 		for _, sessionID := range slowClients {
 			if ch, ok := cb.clients[sessionID]; ok {
 				close(ch)
 				delete(cb.clients, sessionID)
 			}
 		}
-		cb.mu.Unlock()
 	}
 }
 
