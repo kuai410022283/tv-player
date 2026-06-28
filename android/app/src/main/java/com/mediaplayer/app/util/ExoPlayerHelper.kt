@@ -99,10 +99,11 @@ class ExoPlayerHelper(
 
         applyScaleMode()
 
-        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
+        val okHttpClient = com.mediaplayer.app.util.PlayerNetworkHelper.getPlayerOkHttpClient()
+        val okHttpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(okHttpClient)
+        
         if (userAgent.isNotEmpty()) {
-            httpDataSourceFactory.setUserAgent(userAgent)
+            okHttpDataSourceFactory.setUserAgent(userAgent)
         }
         
         val headers = HashMap<String, String>()
@@ -127,12 +128,12 @@ class ExoPlayerHelper(
         }
 
         if (headers.isNotEmpty()) {
-            httpDataSourceFactory.setDefaultRequestProperties(headers)
+            okHttpDataSourceFactory.setDefaultRequestProperties(headers)
         }
 
-        // 使用 DefaultDataSource.Factory 包装 HttpDataSource，
+        // 使用 DefaultDataSource.Factory 包装 OkHttpDataSource，
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
-        val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, httpDataSourceFactory)
+        val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
         // 注入自定义提取器，降低对 TS 流解析的严苛度（允许非 IDR 关键帧起播，增强容错）
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
