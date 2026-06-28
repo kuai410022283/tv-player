@@ -520,6 +520,8 @@ function showAddChannelModal() {
   document.getElementById('ch-multiplex-group').style.display = 'none';
   document.getElementById('ch-user-agent').value = '';
   document.getElementById('ch-headers').value = '';
+  document.getElementById('ch-fcc').value = '';
+  document.getElementById('ch-fcc-type').value = '';
   showModal('channel-modal');
 }
 
@@ -535,7 +537,9 @@ async function saveChannel() {
     is_direct: document.getElementById('ch-is-direct').checked,
     enable_multiplex: document.getElementById('ch-enable-multiplex').checked ? 1 : 0,
     user_agent: document.getElementById('ch-user-agent').value,
-    custom_headers: document.getElementById('ch-headers').value
+    custom_headers: document.getElementById('ch-headers').value,
+    fcc: document.getElementById('ch-fcc').value,
+    fcc_type: document.getElementById('ch-fcc-type').value
   };
   if (!d.name || !d.stream_url) { toast('请填写名称和流地址', 'error'); return; }
   if (d.custom_headers) {
@@ -568,6 +572,8 @@ async function editChannel(id) {
   document.getElementById('ch-multiplex-group').style.display = c.can_multiplex ? 'block' : 'none';
   document.getElementById('ch-user-agent').value = c.user_agent || '';
   document.getElementById('ch-headers').value = c.custom_headers || '';
+  document.getElementById('ch-fcc').value = c.fcc || '';
+  document.getElementById('ch-fcc-type').value = c.fcc_type || '';
   document.getElementById('channel-modal-title').textContent = '编辑频道';
   showModal('channel-modal');
 }
@@ -1605,6 +1611,14 @@ async function loadClientSettings() {
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
       document.getElementById('set-epg-time-shift').value = setRes.data.epg_time_shift || '0';
     }
+    
+    if (document.getElementById('set-fcc-enabled')) {
+      document.getElementById('set-fcc-enabled').value = setRes.data.fcc_enabled || 'false';
+      document.getElementById('set-fcc-port-start').value = setRes.data.fcc_port_start || '40000';
+      document.getElementById('set-fcc-port-end').value = setRes.data.fcc_port_end || '40050';
+      document.getElementById('set-fcc-default-server').value = setRes.data.fcc_default_server || '';
+      document.getElementById('set-fcc-type').value = setRes.data.fcc_type || 'telecom';
+    }
 
     // 台标配置
     if (document.getElementById('set-logo-strategy')) {
@@ -1693,6 +1707,14 @@ async function saveAllClientSettings() {
     settings.epg_source_url = document.getElementById('set-epg-source-url').value.trim();
     settings.epg_refresh_hours = document.getElementById('set-epg-refresh-hours').value;
     settings.epg_time_shift = document.getElementById('set-epg-time-shift').value || '0';
+  }
+
+  if (document.getElementById('set-fcc-enabled')) {
+    settings.fcc_enabled = document.getElementById('set-fcc-enabled').value;
+    settings.fcc_port_start = document.getElementById('set-fcc-port-start').value;
+    settings.fcc_port_end = document.getElementById('set-fcc-port-end').value;
+    settings.fcc_default_server = document.getElementById('set-fcc-default-server').value.trim();
+    settings.fcc_type = document.getElementById('set-fcc-type').value;
   }
 
   if (document.getElementById('set-logo-strategy')) {

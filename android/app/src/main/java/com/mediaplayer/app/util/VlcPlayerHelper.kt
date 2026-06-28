@@ -130,17 +130,13 @@ class VlcPlayerHelper(
         var useAggressiveLatency = false
         if (cacheMs == 0) { // 自动模式
             val lowerUrl = url.lowercase()
-            val isLocalOrMulticast = lowerUrl.startsWith("udp://") || 
-                                     lowerUrl.startsWith("rtp://") || 
-                                     lowerUrl.contains("://192.168.") || 
-                                     lowerUrl.contains("://10.") || 
-                                     lowerUrl.contains("://172.") || 
-                                     lowerUrl.contains("://180.141.") || // 典型电信IPTV
-                                     lowerUrl.contains("://127.0.")
-            if (isLocalOrMulticast) {
-                finalCacheMs = 300 // 内网适当提高到 300ms 保证不卡顿
+            // 砍掉所有繁琐的 IP 判断，只认原生组播协议
+            val isMulticast = lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://")
+            
+            if (isMulticast) {
+                finalCacheMs = 300 // 原生组播流 300ms 保证秒换台
             } else {
-                finalCacheMs = 1500 // 公网流 1500ms，保证足够的抗抖动能力
+                finalCacheMs = 1500 // HTTP/HTTPS流(含内网代理和公网直连) 1500ms 保证抗抖动
             }
             useAggressiveLatency = false // 自动模式下，不再强制开启激进防抖屏蔽
         } else {

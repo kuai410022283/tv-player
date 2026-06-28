@@ -212,7 +212,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 		reqCancels[i] = rCancel
 
 		go func(idx int, targetURL string, reqCtx context.Context) {
-			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
+			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers, ch)
 			if rErr != nil {
 				resultChan <- raceResult{index: idx, err: rErr}
 				return

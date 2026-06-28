@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -469,7 +468,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		cancels[i] = reqCancel
 
 		go func(idx int, targetURL string, reqCtx context.Context) {
-			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers)
+			rResp, rErr := sp.openStreamTarget(reqCtx, targetURL, ua, headers, ch)
 			if rErr != nil {
 				resultChan <- raceResult{index: idx, err: rErr}
 				return
@@ -913,7 +912,7 @@ func parseExtInf(line string) map[string]string {
 	}
 
 	// Extract attributes
-	attrs := []string{"tvg-id", "tvg-name", "tvg-logo", "group-title", "tvg-chno", "catchup", "catchup-source", "catchup-days"}
+	attrs := []string{"tvg-id", "tvg-name", "tvg-logo", "group-title", "tvg-chno", "catchup", "catchup-source", "catchup-days", "fcc", "fcc-type"}
 	for _, attr := range attrs {
 		val := extractAttr(line, attr)
 		if val != "" {
@@ -933,9 +932,9 @@ func ParseM3UFile(path string) ([]map[string]string, error) {
 	return ParseM3U(f)
 }
 
-func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, ua string, headers map[string]string) (*http.Response, error) {
+func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, ua string, headers map[string]string, ch *models.Channel) (*http.Response, error) {
 	if strings.HasPrefix(targetURL, "udp://") || strings.HasPrefix(targetURL, "rtp://") {
-		return openUDPStream(ctx, targetURL)
+		return sp.openUDPStreamWithFCC(ctx, targetURL, ch)
 	}
 
 	// 检测是否为咪咕/华数等需定制 UA 的源（通过 URL 中的 appCode 等参数判断）
@@ -1016,85 +1015,63 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 	return nil, fmt.Errorf("all attempts failed")
 }
 
-func openUDPStream(ctx context.Context, rawURL string) (*http.Response, error) {
-	isRTP := strings.HasPrefix(rawURL, "rtp://")
-	addrStr := strings.TrimPrefix(rawURL, "udp://")
+func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL string, ch *models.Channel) (*http.Response, error) {
+	var fccClient *multicast.FCCClient
+
+	fccServer := ch.Fcc
+	fccTypeStr := ch.FccType
+
+	// Fallback to global settings if empty
+	if fccServer == "" {
+		globalEnabled, _ := sp.channelSvc.GetSetting("fcc_enabled")
+		if globalEnabled == "true" {
+			fccServer, _ = sp.channelSvc.GetSetting("fcc_default_server")
+		}
+	}
+
+	if fccServer != "" {
+		if fccTypeStr == "" {
+			fccTypeStr, _ = sp.channelSvc.GetSetting("fcc_type")
+			if fccTypeStr == "" {
+				fccTypeStr = string(multicast.FccTypeTelecom)
+			}
+		}
+		fccType := multicast.FccType(fccTypeStr)
+		slog.Info("FCC Config Evaluated (openUDP)", "fccServer", fccServer, "fccType", fccTypeStr, "ch.Fcc", ch.Fcc, "ch.FccType", ch.FccType)
+
+		var portStart, portEnd int = 40000, 40050
+		pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
+		pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
+		if pStart != "" { fmt.Sscanf(pStart, "%d", &portStart) }
+		if pEnd != "" { fmt.Sscanf(pEnd, "%d", &portEnd) }
+
+		fc, err := multicast.NewFCCClient(ctx, fccServer, portStart, portEnd, targetURL, fccType)
+		if err != nil {
+			slog.Warn("fcc initialization failed, falling back to pure multicast", "error", err)
+		} else {
+			fccClient = fc
+		}
+	}
+
+	mreader, err := multicast.NewMulticastReader(ctx, targetURL, fccClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join multicast: %w", err)
+	}
+
+	// We don't need a separate goroutine to close the reader, NewMulticastReader respects context.
+
+
+	addrStr := strings.TrimPrefix(targetURL, "udp://")
 	addrStr = strings.TrimPrefix(addrStr, "rtp://")
 	addrStr = strings.TrimPrefix(addrStr, "@")
-
-	addr, err := net.ResolveUDPAddr("udp", addrStr)
-	if err != nil {
-		return nil, err
-	}
-
-	var conn *net.UDPConn
-	if addr.IP.IsMulticast() {
-		conn, err = net.ListenMulticastUDP("udp", nil, addr)
-	} else {
-		conn, err = net.ListenUDP("udp", addr)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// 8MB kernel buffer for UDP to prevent drops
-	_ = conn.SetReadBuffer(8 * 1024 * 1024)
-
-	pr, pw := io.Pipe()
-
-	// Wait for the first packet to confirm health (max 3 seconds)
-	firstBuf := make([]byte, 65536)
-	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	n, _, err := conn.ReadFromUDP(firstBuf)
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("udp stream timeout or error: %w", err)
-	}
-	_ = conn.SetReadDeadline(time.Time{}) // Reset deadline
-
-	go func() {
-		defer conn.Close()
-		defer pw.Close()
-
-		// Write the first packet
-		payload := firstBuf[:n]
-		if isRTP && n > 12 && payload[0]>>6 == 2 {
-			payload = payload[12:]
-		}
-		_, _ = pw.Write(payload)
-
-		buf := make([]byte, 65536)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			n, _, err := conn.ReadFromUDP(buf)
-			if err != nil {
-				return
-			}
-			if n > 0 {
-				p := buf[:n]
-				if isRTP && n > 12 && p[0]>>6 == 2 {
-					p = p[12:]
-				}
-				_, wErr := pw.Write(p)
-				if wErr != nil {
-					return
-				}
-			}
-		}
-	}()
-
+	reqURL, _ := url.Parse("udp://" + addrStr)
+	
 	resp := &http.Response{
 		StatusCode: 200,
-		Body:       pr,
+		Body:       mreader,
 		Header:     make(http.Header),
-		Request:    &http.Request{URL: &url.URL{Scheme: "udp", Host: addrStr}},
+		Request:    &http.Request{URL: reqURL},
 	}
-	// UDP streams are typically MPEG-TS
 	resp.Header.Set("Content-Type", "video/mp2t")
 	return resp, nil
 }
@@ -1104,7 +1081,57 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 
 	slog.Info("starting multicast proxy", "channel_id", channelID, "url", targetURL)
 
-	reader, err := multicast.NewMulticastReader(r.Context(), targetURL)
+	// Catch-up / Time-shift Bypass
+	isCatchup := r.URL.Query().Get("playseek") != "" || r.URL.Query().Get("starttime") != "" || r.URL.Query().Get("catchup") != ""
+	isLiveMulticast := strings.HasPrefix(targetURL, "udp://") || strings.HasPrefix(targetURL, "rtp://")
+	
+	var fccClient *multicast.FCCClient
+	if !isCatchup && isLiveMulticast {
+		// 1. URL Query
+		fccServer := r.URL.Query().Get("fcc")
+		fccTypeStr := r.URL.Query().Get("fcc-type")
+		
+		// 2. Fallback to channel settings if query is empty
+		if fccServer == "" && ch != nil && ch.Fcc != "" {
+			fccServer = ch.Fcc
+			fccTypeStr = ch.FccType
+		}
+
+		// 3. Fallback to global settings
+		if fccServer == "" {
+			globalEnabled, _ := sp.channelSvc.GetSetting("fcc_enabled")
+			if globalEnabled == "true" {
+				fccServer, _ = sp.channelSvc.GetSetting("fcc_default_server")
+			}
+		}
+
+		if fccServer != "" {
+			if fccTypeStr == "" {
+				fccTypeStr, _ = sp.channelSvc.GetSetting("fcc_type")
+				if fccTypeStr == "" {
+					fccTypeStr = string(multicast.FccTypeTelecom)
+				}
+			}
+			fccType := multicast.FccType(fccTypeStr)
+			slog.Info("FCC Config Evaluated", "fccServer", fccServer, "fccType", fccTypeStr, "ch.FccType", ch.FccType)
+
+			var portStart, portEnd int = 40000, 40050
+			pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
+			pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
+			if pStart != "" { fmt.Sscanf(pStart, "%d", &portStart) }
+			if pEnd != "" { fmt.Sscanf(pEnd, "%d", &portEnd) }
+
+			// Try to connect FCC
+			fc, err := multicast.NewFCCClient(r.Context(), fccServer, portStart, portEnd, targetURL, fccType)
+			if err != nil {
+				slog.Warn("fcc initialization failed, falling back to pure multicast", "error", err)
+			} else {
+				fccClient = fc
+			}
+		}
+	}
+
+	reader, err := multicast.NewMulticastReader(r.Context(), targetURL, fccClient)
 	if err != nil {
 		return fmt.Errorf("failed to open multicast reader: %w", err)
 	}

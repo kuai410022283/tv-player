@@ -53,6 +53,8 @@ type Channel struct {
 	CatchupSource  string   `json:"catchup_source,omitempty" db:"catchup_source"`
 	CatchupDays    int      `json:"catchup_days,omitempty" db:"catchup_days"`
 	EnableMultiplex int     `json:"enable_multiplex" db:"enable_multiplex"`
+	Fcc            string   `json:"fcc,omitempty" db:"fcc"`
+	FccType        string   `json:"fcc_type,omitempty" db:"fcc_type"`
 	CanMultiplex bool       `json:"can_multiplex" db:"-"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
@@ -113,6 +115,8 @@ type SubscriptionChannel struct {
 	CatchupDays    int    `json:"catchup_days"`
 	UserAgent      string `json:"user_agent"`
 	CustomHeaders  string `json:"custom_headers"`
+	Fcc            string `json:"fcc,omitempty"`
+	FccType        string `json:"fcc_type,omitempty"`
 }
 
 // ── User Settings ──────────────────────────────────────

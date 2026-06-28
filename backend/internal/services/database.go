@@ -49,9 +49,13 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc_type TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT ''`)
+	// Ensure fcc_type setting exists for existing databases
+	_, _ = db.Exec(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom')`)
 
 	// 自动为已有空 Token 的套餐生成 Token 凭证
 	if rows, err := db.Query("SELECT id FROM subscription_plans WHERE subscription_token = '' OR subscription_token IS NULL"); err == nil {
@@ -96,7 +100,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 			"ALTER TABLE channel_groups_new RENAME TO channel_groups;",
 			"PRAGMA foreign_keys=on;",
 		}
-		
+
 		for _, q := range queries {
 			if _, errMigrate := db.Exec(q); errMigrate != nil {
 				fmt.Println("Warning: channel_groups migration failed on query:", q, "Error:", errMigrate)
@@ -151,6 +155,8 @@ func createTables(db *sql.DB) error {
 		catchup_source TEXT DEFAULT '',
 		catchup_days INTEGER DEFAULT 0,
 		enable_multiplex INTEGER DEFAULT 0,
+		fcc TEXT DEFAULT '',
+		fcc_type TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -260,6 +266,11 @@ func createTables(db *sql.DB) error {
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_master_token', '');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_serve_token', '');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('sync_interval_min', '5');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_enabled', 'false');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_port_start', '40000');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_port_end', '45000');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_default_server', '');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom');
 
 	CREATE TABLE IF NOT EXISTS subscription_plans (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -3,6 +3,7 @@ package multicast
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"strconv"
@@ -38,9 +39,13 @@ type MulticastReader struct {
 	nextSeq   uint16
 	hasSeq    bool
 	mu        sync.Mutex
+
+	fccClient *FCCClient
+	fccActive bool
+	fccFirstPkt bool
 }
 
-func NewMulticastReader(ctx context.Context, rawURL string) (*MulticastReader, error) {
+func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient) (*MulticastReader, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid multicast url: %w", err)
@@ -84,9 +89,11 @@ func NewMulticastReader(ctx context.Context, rawURL string) (*MulticastReader, e
 	bufPtr := udpBufferPool.Get().(*[]byte)
 
 	return &MulticastReader{
-		conn:   conn,
-		buffer: bufPtr,
-		isRTP:  u.Scheme == "rtp",
+		conn:      conn,
+		buffer:    bufPtr,
+		isRTP:     u.Scheme == "rtp",
+		fccClient: fccClient,
+		fccActive: fccClient != nil,
 	}, nil
 }
 
@@ -117,7 +124,60 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	// 3. Read from UDP loop
+	// 3. FCC Merge Loop (if active)
+	if r.fccActive {
+		for {
+			// Drain multicast socket into jitter buffer (non-blocking)
+			for {
+				r.conn.SetReadDeadline(time.Now())
+				nRead, _, err := r.conn.ReadFromUDP(*r.buffer)
+				if err != nil {
+					break // Would block
+				}
+				data := (*r.buffer)[:nRead]
+				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
+					r.processMulticastPacket(data, nRead)
+				}
+			}
+
+			// Read from FCC socket
+			nRead, err := r.fccClient.Read(*r.buffer)
+			if err == nil && nRead > 0 {
+				if !r.fccFirstPkt {
+					r.fccFirstPkt = true
+					slog.Info("🎉 FCC stream burst received successfully, instant playback started!")
+				}
+
+				data := (*r.buffer)[:nRead]
+				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
+					seq := uint16(data[2])<<8 | uint16(data[3])
+					
+					// Check if multicast has caught up
+					if r.hasSeq && r.nextSeq > seq && (r.nextSeq - seq) < 1000 {
+						// Multicast has caught up
+						r.fccActive = false
+						r.fccClient.Close()
+						slog.Info("✅ FCC stream successfully merged with multicast stream")
+						break
+					} else {
+						// Emit FCC packet
+						payloadStart, payloadLength := extractRTPPayload(data, nRead)
+						if payloadLength > 0 {
+							return r.emitPayload(p, data[payloadStart:payloadStart+payloadLength])
+						}
+					}
+				}
+			} else {
+				// FCC timeout or error
+				r.fccActive = false
+				r.fccClient.Close()
+				slog.Warn("⚠️ FCC receive failed or timed out, falling back to pure multicast", "error", err)
+				break
+			}
+		}
+	}
+
+	// 4. Read from UDP loop (Normal Multicast)
 	for {
 		_ = r.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		nRead, _, err := r.conn.ReadFromUDP(*r.buffer)
@@ -138,19 +198,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 
 		if isRTPPacket {
 			seq := uint16(data[2])<<8 | uint16(data[3])
-			payloadStart := 12
-			payloadStart += int(data[0]&0x0F) * 4 // CSRC headers
-			if (data[0] & 0x10) != 0 {            // Extension header
-				if len(data) >= payloadStart+4 {
-					extLen := int(data[payloadStart+2])<<8 | int(data[payloadStart+3])
-					payloadStart += 4 + 4*extLen
-				}
-			}
-
-			payloadLength := nRead - payloadStart
-			if (data[0] & 0x20) != 0 { // Padding
-				payloadLength -= int(data[nRead-1])
-			}
+			payloadStart, payloadLength := extractRTPPayload(data, nRead)
 
 			if payloadLength <= 0 || payloadStart+payloadLength > nRead {
 				payloadStart = 0
@@ -248,5 +296,61 @@ func (r *MulticastReader) Close() error {
 	if r.conn != nil {
 		return r.conn.Close()
 	}
+	if r.fccClient != nil {
+		r.fccClient.Close()
+	}
 	return nil
+}
+
+func extractRTPPayload(data []byte, nRead int) (int, int) {
+	if len(data) < 12 {
+		return 0, nRead
+	}
+	payloadStart := 12
+	payloadStart += int(data[0]&0x0F) * 4 // CSRC headers
+	if (data[0] & 0x10) != 0 {            // Extension header
+		if len(data) >= payloadStart+4 {
+			extLen := int(data[payloadStart+2])<<8 | int(data[payloadStart+3])
+			payloadStart += 4 + 4*extLen
+		}
+	}
+
+	payloadLength := nRead - payloadStart
+	if (data[0] & 0x20) != 0 { // Padding
+		payloadLength -= int(data[nRead-1])
+	}
+	return payloadStart, payloadLength
+}
+
+func (r *MulticastReader) processMulticastPacket(data []byte, nRead int) {
+	seq := uint16(data[2])<<8 | uint16(data[3])
+	payloadStart, payloadLength := extractRTPPayload(data, nRead)
+
+	if payloadLength <= 0 || payloadStart+payloadLength > nRead {
+		return
+	}
+
+	if !r.hasSeq {
+		r.nextSeq = seq
+		r.hasSeq = true
+		return
+	}
+
+	diff := seqDiff(seq, r.nextSeq)
+	if diff < 0 && diff > -1000 {
+		return // Late packet, drop
+	} else if diff > 1000 {
+		r.nextSeq = seq
+		for i := 0; i < maxJitterPackets; i++ {
+			r.jitterValid[i] = false
+		}
+	}
+
+	idx := seq % maxJitterPackets
+	if payloadLength <= 2048 {
+		copy(r.jitterBuf[idx][:], data[payloadStart:payloadStart+payloadLength])
+		r.jitterLen[idx] = payloadLength
+		r.jitterSeq[idx] = seq
+		r.jitterValid[idx] = true
+	}
 }
