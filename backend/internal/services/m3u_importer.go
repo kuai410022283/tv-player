@@ -135,7 +135,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	// 1. 预先处理所有分组，按 "来源+分组名" 作为复合键隔离，不同来源的同名分组各自独立
 	// 格式: "source|name" -> groupID
 	groupCache := make(map[string]int64)
-	existingGroups, _ := imp.channelSvc.ListGroups(0)
+	existingGroups, _ := imp.channelSvc.ListGroups(0, true)
 	for _, g := range existingGroups {
 		cacheKey := g.Source + "|" + g.Name
 		groupCache[cacheKey] = g.ID

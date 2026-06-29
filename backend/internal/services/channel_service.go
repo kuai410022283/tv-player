@@ -20,7 +20,7 @@ func NewChannelService(db *sql.DB) *ChannelService {
 
 // ── Groups ─────────────────────────────────────────────
 
-func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, error) {
+func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models.ChannelGroup, error) {
 	query := `
 		SELECT g.id, g.name, COALESCE(g.icon, ''), g.sort_order, g.is_direct, COALESCE(g.source, '手动'), COALESCE(g.user_agent, ''), COALESCE(g.custom_headers, ''), COALESCE(g.enable_multiplex, 0), g.created_at, g.updated_at,
 		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = g.id AND c.is_hidden = 0) AS channel_count,
@@ -55,7 +55,7 @@ func (s *ChannelService) ListGroups(clientID int64) ([]models.ChannelGroup, erro
 		}
 		
 		// 客户端不显示空分组（没有可见频道的组）
-		if g.ChannelCount == 0 {
+		if !includeEmpty && g.ChannelCount == 0 {
 			continue
 		}
 

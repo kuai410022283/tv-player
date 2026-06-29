@@ -1114,32 +1114,39 @@ class MainActivity : AppCompatActivity() {
             override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
                 uiHandler.post {
                     val badges = mutableListOf<String>()
-                    if (badgeInfo.is4K) badges.add("4K")
                     if (badgeInfo.isDolbyVision) badges.add("杜比视界")
                     else if (badgeInfo.isHdr10) badges.add("HDR10")
                     else if (badgeInfo.isHlg) badges.add("HLG")
-                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
                     
-                    if (badges.isNotEmpty()) {
-                        osdOverlayView?.setInfoText(badges.joinToString(" | "))
-                    } else if (badgeInfo.videoCodec.isNotEmpty()) {
-                        // 修正回退逻辑：将编解码器无缝插入到分辨率之后，保留原来的"硬解"等信息，防止分隔符冲突
-                        val currentInfo = osdOverlayView?.getInfoText() ?: ""
-                        if (!currentInfo.contains(badgeInfo.videoCodec)) {
-                            val parts = currentInfo.split(" | ")
-                            val enhanced = buildString {
-                                append(parts.firstOrNull() ?: "")
-                                append(" | ${badgeInfo.videoCodec}")
-                                if (badgeInfo.audioCodec.isNotEmpty()) {
-                                    append(" | ${badgeInfo.audioCodec}")
-                                }
-                                for (i in 1 until parts.size) {
-                                    append(" | ${parts[i]}")
-                                }
+                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
+                    else if (badgeInfo.isDolbyAudio) badges.add("杜比音效")
+                    
+                    if (badgeInfo.isDts) badges.add("DTS")
+                    
+                    if (badgeInfo.videoCodec.isNotEmpty()) badges.add(badgeInfo.videoCodec)
+                    if (badgeInfo.audioCodec.isNotEmpty()) badges.add(badgeInfo.audioCodec)
+                    
+                    val uniqueBadges = badges.distinct()
+                    
+                    val currentInfo = osdOverlayView?.getInfoText() ?: ""
+                    val parts = currentInfo.split(" | ").toMutableList()
+                    val res = if (parts.isNotEmpty() && parts[0].contains("x")) parts.removeAt(0) else ""
+                    
+                    val enhanced = buildString {
+                        if (res.isNotEmpty()) append(res)
+                        
+                        if (uniqueBadges.isNotEmpty()) {
+                            if (isNotEmpty()) append(" | ")
+                            append(uniqueBadges.joinToString(" | "))
+                        }
+                        
+                        for (p in parts) {
+                            if (p.isNotBlank() && !uniqueBadges.contains(p)) {
+                                append(" | ").append(p)
                             }
-                            osdOverlayView?.setInfoText(enhanced.toString())
                         }
                     }
+                    osdOverlayView?.setInfoText(enhanced)
                 }
             }
         }
@@ -1841,14 +1848,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, backupServers: List<String>?, isTester: Boolean) {
-        if (globalMaintenance && !isTester) {
-            showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
-            // 如果已在播放，停止播放并清除UI
-            playerHelper?.release()
-            startAuthPolling()
-            return
-        }
-
         if (!backupServers.isNullOrEmpty()) {
             val localList = getServerList().toMutableList()
             val currentServer = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -1870,6 +1869,17 @@ class MainActivity : AppCompatActivity() {
             // 这完美保证了“用户原来的优先，服务器追加在后”的规则
             val finalList = mergedList.filter { it.isNotBlank() }.distinct()
             saveServerList(finalList)
+        }
+
+        if (globalMaintenance && !isTester) {
+            showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = false)
+            // 如果已在播放，停止播放并清除UI
+            playerHelper?.release()
+            authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
+            val retryRunnable = Runnable { checkAuthAndLoad() }
+            authPollRunnable = retryRunnable
+            authPollHandler.postDelayed(retryRunnable, 15000)
+            return
         }
 
         this.sysAnnouncement = sysAnnouncement
@@ -2033,16 +2043,10 @@ class MainActivity : AppCompatActivity() {
                         if (status == "approved") { 
                             authManager.verify().onSuccess { resp ->
                                 if (resp != null) {
-                                    sysAnnouncement = resp.announcement
-                                    sysAnnouncementInterval = resp.announcementInterval
-                                    if (resp.globalMaintenance && !resp.isTester) {
-                                        showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
-                                        playerHelper?.release()
-                                        authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
-                                        return@onSuccess
-                                    }
+                                    handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
+                                } else {
+                                    showContent()
                                 }
-                                showContent()
                             }.onFailure { 
                                 // 如果验证失败（如网络抖动），继续轮询不要停
                                 authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
@@ -2212,12 +2216,12 @@ class MainActivity : AppCompatActivity() {
                     try {
                         authManager.verify().onSuccess { resp ->
                             if (resp != null && resp.globalMaintenance && !resp.isTester) {
-                                // 进入维护模式，切断播放并转入轮询
-                                showAuthWaiting("系统维护中，请稍后再试...", showQr = false)
+                                // 进入维护模式，切断播放并转入全量探测主备服务器
+                                showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = false)
                                 playerHelper?.release()
                                 heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
                                 heartbeatRunnable = null
-                                startAuthPolling()
+                                checkAuthAndLoad()
                             }
                         }
                     } catch (_: Exception) {}

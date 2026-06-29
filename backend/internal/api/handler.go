@@ -160,7 +160,8 @@ func (h *Handler) ListGroups(c *gin.Context) {
 	if cid, exists := c.Get("client_id"); exists {
 		clientID = cid.(int64)
 	}
-	groups, err := h.channelSvc.ListGroups(clientID)
+	isAdmin := c.GetString("auth_type") == "admin"
+	groups, err := h.channelSvc.ListGroups(clientID, isAdmin)
 	if err != nil {
 		failInternal(c, err, "获取分组列表失败")
 		return

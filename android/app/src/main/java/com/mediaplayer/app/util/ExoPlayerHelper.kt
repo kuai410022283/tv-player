@@ -301,18 +301,20 @@ class ExoPlayerHelper(
                                 val aMime = audioFormat?.sampleMimeType ?: ""
                                 val colorInfo = videoFormat?.colorInfo
                                 
-                                val is4K = (videoFormat?.width ?: 0) >= 3840
                                 val isHdr10 = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_ST2084
                                 val isHlg = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_HLG
                                 val isDolbyVision = vMime == "video/dolby-vision" || videoFormat?.codecs?.contains("dvh1") == true || videoFormat?.codecs?.contains("dvhe") == true
                                 val isDolbyAtmos = aMime == "audio/eac3-joc" || audioFormat?.codecs?.contains("joc") == true
+                                val isDolbyAudio = !isDolbyAtmos && (aMime.contains("ac3") || aMime.contains("eac3") || aMime == "audio/true-hd" || audioFormat?.codecs?.contains("ac-3", ignoreCase = true) == true)
+                                val isDts = aMime.contains("dts") || audioFormat?.codecs?.contains("dts", ignoreCase = true) == true
                                 
                                 val badgeInfo = com.mediaplayer.app.util.StreamBadgeInfo(
                                     isDolbyVision = isDolbyVision,
                                     isHdr10 = isHdr10,
                                     isHlg = isHlg,
                                     isDolbyAtmos = isDolbyAtmos,
-                                    is4K = is4K,
+                                    isDolbyAudio = isDolbyAudio,
+                                    isDts = isDts,
                                     audioCodec = aMime.substringAfter("/").uppercase(),
                                     videoCodec = vMime.substringAfter("/").uppercase()
                                 )

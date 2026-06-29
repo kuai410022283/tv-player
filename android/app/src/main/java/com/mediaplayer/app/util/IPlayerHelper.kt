@@ -68,7 +68,8 @@ data class StreamBadgeInfo(
     val isHdr10: Boolean = false,
     val isHlg: Boolean = false,
     val isDolbyAtmos: Boolean = false,
-    val is4K: Boolean = false,
+    val isDolbyAudio: Boolean = false,
+    val isDts: Boolean = false,
     val audioCodec: String = "",
     val videoCodec: String = ""
 )

@@ -394,31 +394,39 @@ class PlayerActivity : AppCompatActivity() {
             override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
                 runOnUiThread {
                     val badges = mutableListOf<String>()
-                    if (badgeInfo.is4K) badges.add("4K")
                     if (badgeInfo.isDolbyVision) badges.add("杜比视界")
                     else if (badgeInfo.isHdr10) badges.add("HDR10")
                     else if (badgeInfo.isHlg) badges.add("HLG")
-                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
                     
-                    if (badges.isNotEmpty()) {
-                        tvResolution?.text = badges.joinToString(" | ")
-                    } else if (badgeInfo.videoCodec.isNotEmpty()) {
-                        val currentInfo = tvResolution?.text?.toString() ?: ""
-                        if (!currentInfo.contains(badgeInfo.videoCodec)) {
-                            val parts = currentInfo.split(" | ")
-                            val enhanced = buildString {
-                                append(parts.firstOrNull() ?: "")
-                                append(" | ${badgeInfo.videoCodec}")
-                                if (badgeInfo.audioCodec.isNotEmpty()) {
-                                    append(" | ${badgeInfo.audioCodec}")
-                                }
-                                for (i in 1 until parts.size) {
-                                    append(" | ${parts[i]}")
-                                }
+                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
+                    else if (badgeInfo.isDolbyAudio) badges.add("杜比音效")
+                    
+                    if (badgeInfo.isDts) badges.add("DTS")
+                    
+                    if (badgeInfo.videoCodec.isNotEmpty()) badges.add(badgeInfo.videoCodec)
+                    if (badgeInfo.audioCodec.isNotEmpty()) badges.add(badgeInfo.audioCodec)
+                    
+                    val uniqueBadges = badges.distinct()
+                    
+                    val currentInfo = tvResolution?.text?.toString() ?: ""
+                    val parts = currentInfo.split(" | ").toMutableList()
+                    val res = if (parts.isNotEmpty() && parts[0].contains("x")) parts.removeAt(0) else ""
+                    
+                    val enhanced = buildString {
+                        if (res.isNotEmpty()) append(res)
+                        
+                        if (uniqueBadges.isNotEmpty()) {
+                            if (isNotEmpty()) append(" | ")
+                            append(uniqueBadges.joinToString(" | "))
+                        }
+                        
+                        for (p in parts) {
+                            if (p.isNotBlank() && !uniqueBadges.contains(p)) {
+                                append(" | ").append(p)
                             }
-                            tvResolution?.text = enhanced.toString()
                         }
                     }
+                    tvResolution?.text = enhanced
                 }
             }
         }
