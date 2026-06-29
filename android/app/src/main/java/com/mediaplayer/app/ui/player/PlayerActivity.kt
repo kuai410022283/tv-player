@@ -497,7 +497,9 @@ class PlayerActivity : AppCompatActivity() {
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 
+        var needsRebuildDelay = false
         if (playerHelper == null || !isCoreMatch) {
+            needsRebuildDelay = true
             playerHelper?.release()
             videoLayout?.removeAllViews() // 清除旧的视图
             initPlayerWithCore(desiredCore)
@@ -508,10 +510,11 @@ class PlayerActivity : AppCompatActivity() {
         playerHelper?.setAspectRatio(savedScaleMode)
 
         resolveJob?.cancel()
-        resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
             // 解决主备切换等场景下，过快重建播放器导致硬件解码器耗尽/死锁的问题
-            kotlinx.coroutines.delay(200)
+            if (needsRebuildDelay) {
+                kotlinx.coroutines.delay(200)
+            }
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(url, userAgent, customHeaders)
             
             val lowerUrl = finalUrl.lowercase()

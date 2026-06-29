@@ -1453,7 +1453,9 @@ class MainActivity : AppCompatActivity() {
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 
+        var needsRebuildDelay = false
         if (playerHelper == null || !isCoreMatch) {
+            needsRebuildDelay = true
             // 跨内核切换前：截帧占位，保存 overlay 引用（removeAllViews 会移除它）
             captureSnapshot()
             playerHelper?.release()
@@ -1476,7 +1478,9 @@ class MainActivity : AppCompatActivity() {
         resolveJob = lifecycleScope.launch {
             val gen = ++playGeneration
             // 解决主备切换等场景下，过快重建播放器导致硬件解码器耗尽/死锁的问题
-            kotlinx.coroutines.delay(200)
+            if (needsRebuildDelay) {
+                kotlinx.coroutines.delay(200)
+            }
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
             
             // 如果在此期间又发生了切台，放弃本次播放，防止旧 resolve 协程覆盖新频道
@@ -2041,34 +2045,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showAuthWaiting(message: String, showQr: Boolean = false) {
+    private fun showAuthWaiting(message: String, showQr: Boolean? = null) {
         if (isTvMode) {
             tvAuthWaiting?.visibility = View.VISIBLE
             findViewById<TextView>(R.id.tvAuthStatus)?.text = message
         }
         
-        if (showQr) {
+        val actualShowQr = showQr ?: (layoutAuthQrConfig?.visibility == View.VISIBLE)
+        
+        if (actualShowQr) {
             val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
             if (ip != null) {
                 setupQrConfigServer {
                     Toast.makeText(this@MainActivity, "配置已保存，正在重试...", Toast.LENGTH_LONG).show()
                     checkAuthAndLoad()
                 }
-                val qrPort = configWebServer?.actualPort ?: 9528
-                val qrUrl = "http://$ip:$qrPort/"
-                val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
-                ivAuthQrCode?.setImageBitmap(bitmap)
-                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
-                tvAuthQrConfigHint?.setOnClickListener {
-                    try {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
-                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                
+                if (layoutAuthQrConfig?.visibility != View.VISIBLE) {
+                    val qrPort = configWebServer?.actualPort ?: 9528
+                    val qrUrl = "http://$ip:$qrPort/"
+                    val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+                    ivAuthQrCode?.setImageBitmap(bitmap)
+                    tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
+                    tvAuthQrConfigHint?.setOnClickListener {
+                        try {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
+                    layoutAuthQrConfig?.visibility = View.VISIBLE
                 }
-                layoutAuthQrConfig?.visibility = View.VISIBLE
             }
         } else {
             layoutAuthQrConfig?.visibility = View.GONE
@@ -2208,6 +2217,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadData() {
         if (isLoadingData) return
         isLoadingData = true
+        progressBuffering?.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
                 // 1. 先拉分组列表
