@@ -40,9 +40,14 @@ type MulticastReader struct {
 	hasSeq    bool
 	mu        sync.Mutex
 
-	fccClient *FCCClient
-	fccActive bool
+	fccClient   *FCCClient
+	fccActive   bool
 	fccFirstPkt bool
+
+	// Delayed Multicast Join fields
+	mcastIP   net.IP
+	mcastPort int
+	mcastJoined bool
 }
 
 func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient) (*MulticastReader, error) {
@@ -66,35 +71,55 @@ func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient
 		return nil, fmt.Errorf("invalid multicast ip: %s", host)
 	}
 
+	bufPtr := udpBufferPool.Get().(*[]byte)
+
+	reader := &MulticastReader{
+		buffer:      bufPtr,
+		isRTP:       u.Scheme == "rtp",
+		fccClient:   fccClient,
+		fccActive:   fccClient != nil,
+		mcastIP:     mcastIP,
+		mcastPort:   port,
+		mcastJoined: false,
+	}
+
+	// If FCC is not active, or if it's Telecom (Telecom doesn't usually use Sync Notification), we join immediately
+	// Actually, let's just join immediately if FCC is not active. If active, we'll join via Sync Notification or timeout.
+	if !reader.fccActive {
+		if err := reader.joinMulticast(); err != nil {
+			return nil, err
+		}
+	}
+
+	return reader, nil
+}
+
+func (r *MulticastReader) joinMulticast() error {
+	if r.mcastJoined {
+		return nil
+	}
+	
 	addr := &net.UDPAddr{
-		IP:   mcastIP,
-		Port: port,
+		IP:   r.mcastIP,
+		Port: r.mcastPort,
 	}
 
 	var conn *net.UDPConn
-	if mcastIP.IsMulticast() {
+	var err error
+	if r.mcastIP.IsMulticast() {
 		conn, err = net.ListenMulticastUDP("udp", nil, addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to join multicast group: %w", err)
-		}
 	} else {
 		conn, err = net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to listen on udp: %w", err)
-		}
+	}
+	if err != nil {
+		return fmt.Errorf("failed to bind multicast udp: %w", err)
 	}
 
 	_ = conn.SetReadBuffer(4 * 1024 * 1024)
-
-	bufPtr := udpBufferPool.Get().(*[]byte)
-
-	return &MulticastReader{
-		conn:      conn,
-		buffer:    bufPtr,
-		isRTP:     u.Scheme == "rtp",
-		fccClient: fccClient,
-		fccActive: fccClient != nil,
-	}, nil
+	r.conn = conn
+	r.mcastJoined = true
+	slog.Info("Joined multicast group", "ip", r.mcastIP.String(), "port", r.mcastPort)
+	return nil
 }
 
 // seqDiff computes the forward difference taking uint16 wraparound into account
@@ -128,33 +153,71 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 	if r.fccActive {
 		for {
 			// Drain multicast socket into jitter buffer (non-blocking)
-			for {
-				_ = r.conn.SetReadDeadline(time.Now())
-				nRead, _, err := r.conn.ReadFromUDP(*r.buffer)
-				if err != nil {
-					break // Would block
-				}
-				data := (*r.buffer)[:nRead]
-				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
-					r.processMulticastPacket(data, nRead)
+			if r.mcastJoined && r.conn != nil {
+				for {
+					_ = r.conn.SetReadDeadline(time.Now())
+					nRead, _, err := r.conn.ReadFromUDP(*r.buffer)
+					if err != nil {
+						break // Would block
+					}
+					data := (*r.buffer)[:nRead]
+					if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
+						r.processMulticastPacket(data, nRead)
+					}
 				}
 			}
 
 			// Read from FCC socket
 			nRead, err := r.fccClient.Read(*r.buffer)
+			
+			// Handle Redirect
+			if redirectErr, ok := err.(*FCCRedirectError); ok {
+				slog.Info("FCC Redirected", "new_ip", redirectErr.NewIP, "new_port", redirectErr.NewPort)
+				r.fccClient.Close()
+				newFccIP := fmt.Sprintf("%s:%d", redirectErr.NewIP, redirectErr.NewPort)
+				newFccClient, err := NewFCCClient(context.Background(), newFccIP, 10000, 60000, fmt.Sprintf("udp://%s:%d", r.mcastIP.String(), r.mcastPort), r.fccClient.fccType)
+				if err == nil {
+					r.fccClient = newFccClient
+				} else {
+					slog.Warn("FCC Redirect failed, joining multicast", "err", err)
+					r.fccActive = false
+					_ = r.joinMulticast()
+					break
+				}
+				continue
+			}
+
+			// Handle Sync Notification
+			if _, ok := err.(*FCCSyncNotification); ok {
+				slog.Info("FCC Sync Notification received, joining multicast group")
+				_ = r.joinMulticast()
+				continue
+			}
+
 			if err == nil && nRead > 0 {
 				if !r.fccFirstPkt {
 					r.fccFirstPkt = true
 					slog.Info("🎉 FCC stream burst received successfully, instant playback started!")
+					// For Telecom or if Sync Notification never arrives, set a 1-second timeout to join multicast
+					go func() {
+						time.Sleep(1 * time.Second)
+						r.mu.Lock()
+						if !r.mcastJoined {
+							slog.Info("FCC Sync timeout, joining multicast anyway")
+							_ = r.joinMulticast()
+						}
+						r.mu.Unlock()
+					}()
 				}
 
 				data := (*r.buffer)[:nRead]
 				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
 					seq := uint16(data[2])<<8 | uint16(data[3])
 					
-					// Check if multicast has caught up
-					if r.hasSeq && r.nextSeq > seq && (r.nextSeq - seq) < 1000 {
-						// Multicast has caught up
+					// Check if multicast has caught up.
+					// We only check if r.mcastJoined is true, and we have received some multicast seqs.
+					if r.mcastJoined && r.hasSeq && r.nextSeq > seq && (r.nextSeq - seq) < 1000 {
+						// Multicast has caught up, seamless transition!
 						r.fccActive = false
 						r.fccClient.Close()
 						slog.Info("✅ FCC stream successfully merged with multicast stream")
@@ -163,15 +226,23 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 						// Emit FCC packet
 						payloadStart, payloadLength := extractRTPPayload(data, nRead)
 						if payloadLength > 0 {
+							// Update nextSeq to track our position in the burst
+							if !r.hasSeq {
+								r.nextSeq = seq + 1
+								r.hasSeq = true
+							} else if seq >= r.nextSeq && (seq - r.nextSeq) < 1000 {
+								r.nextSeq = seq + 1
+							}
 							return r.emitPayload(p, data[payloadStart:payloadStart+payloadLength])
 						}
 					}
 				}
 			} else {
-				// FCC timeout or error
+				// FCC timeout or error (other than redirect/sync)
 				r.fccActive = false
 				r.fccClient.Close()
 				slog.Warn("⚠️ FCC receive failed or timed out, falling back to pure multicast", "error", err)
+				_ = r.joinMulticast()
 				break
 			}
 		}

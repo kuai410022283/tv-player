@@ -2126,6 +2126,13 @@ async function pullUpdateToServer(btn) {
   const originalText = btn.textContent;
   btn.textContent = '准备下载...';
   btn.disabled = true;
+  
+  const btnCancel = document.getElementById('btn-update-cancel');
+  if (btnCancel) {
+    btnCancel.style.display = 'inline-flex';
+    btnCancel.disabled = false;
+    btnCancel.textContent = '停止下载';
+  }
 
   const proxySelect = document.getElementById('update-proxy-select');
   const proxyUrl = proxySelect ? proxySelect.value : "";
@@ -2150,6 +2157,7 @@ async function pullUpdateToServer(btn) {
       alert('操作失败: ' + (data.message || '未知错误'));
       btn.textContent = originalText;
       btn.disabled = false;
+      if (btnCancel) btnCancel.style.display = 'none';
       return;
     }
 
@@ -2167,11 +2175,13 @@ async function pullUpdateToServer(btn) {
              clearInterval(pollInterval);
              btn.textContent = originalText;
              btn.disabled = false;
+             if (btnCancel) btnCancel.style.display = 'none';
              alert('下载并发布成功！');
           } else if (state.status === "error") {
              clearInterval(pollInterval);
              btn.textContent = originalText;
              btn.disabled = false;
+             if (btnCancel) btnCancel.style.display = 'none';
              alert('下载失败: ' + state.message);
           }
         }
@@ -2182,6 +2192,35 @@ async function pullUpdateToServer(btn) {
     alert('请求错误: ' + e.message);
     btn.textContent = originalText;
     btn.disabled = false;
+    if (btnCancel) btnCancel.style.display = 'none';
+  }
+}
+
+async function cancelPullUpdateToServer() {
+  const btnCancel = document.getElementById('btn-update-cancel');
+  if (btnCancel) {
+    btnCancel.disabled = true;
+    btnCancel.textContent = '正在取消...';
+  }
+  try {
+    const res = await fetch(API + '/admin/settings/pull-update/cancel', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    const data = await res.json();
+    if (!res.ok || data.code !== 0) {
+      alert('取消失败: ' + (data.message || '未知错误'));
+      if (btnCancel) {
+        btnCancel.disabled = false;
+        btnCancel.textContent = '停止下载';
+      }
+    }
+  } catch (e) {
+    alert('请求错误: ' + e.message);
+    if (btnCancel) {
+      btnCancel.disabled = false;
+      btnCancel.textContent = '停止下载';
+    }
   }
 }
 

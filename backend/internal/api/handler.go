@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -1032,6 +1035,8 @@ type updateTaskState struct {
 }
 
 var pullUpdateState atomic.Value // stores updateTaskState
+var pullUpdateCancel context.CancelFunc
+var pullUpdateMutex sync.Mutex
 
 type progressWriter struct {
 	total   int64
@@ -1070,7 +1075,21 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 
 	pullUpdateState.Store(updateTaskState{Status: "downloading", Progress: 0})
 
+	pullUpdateMutex.Lock()
+	ctx, cancel := context.WithCancel(context.Background())
+	pullUpdateCancel = cancel
+	pullUpdateMutex.Unlock()
+
 	go func() {
+		defer func() {
+			pullUpdateMutex.Lock()
+			if pullUpdateCancel != nil {
+				pullUpdateCancel()
+				pullUpdateCancel = nil
+			}
+			pullUpdateMutex.Unlock()
+		}()
+
 		defer func() {
 			if r := recover(); r != nil {
 				pullUpdateState.Store(updateTaskState{Status: "error", Message: fmt.Sprintf("Panic: %v", r)})
@@ -1107,9 +1126,18 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 		}
 
 		if !skipDownload {
-			resp, err := http.Get(body.DownloadURL)
+			req, err := http.NewRequestWithContext(ctx, "GET", body.DownloadURL, nil)
 			if err != nil {
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载失败: " + err.Error()})
+				pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建请求失败: " + err.Error()})
+				return
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载已取消"})
+				} else {
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载失败: " + err.Error()})
+				}
 				return
 			}
 			defer resp.Body.Close()
@@ -1157,6 +1185,19 @@ func (h *Handler) PullAppUpdateProgress(c *gin.Context) {
 		return
 	}
 	ok(c, state)
+}
+
+func (h *Handler) CancelPullAppUpdate(c *gin.Context) {
+	pullUpdateMutex.Lock()
+	defer pullUpdateMutex.Unlock()
+	
+	if pullUpdateCancel != nil {
+		pullUpdateCancel()
+		pullUpdateCancel = nil
+		ok(c, gin.H{"message": "已发送取消指令"})
+		return
+	}
+	fail(c, 400, "当前没有正在进行的下载")
 }
 
 // ── EPG ────────────────────────────────────────────────

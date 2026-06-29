@@ -357,9 +357,9 @@ class PlayerActivity : AppCompatActivity() {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
                         val decoderStr = when (decoderMode) {
-                            Prefs.DECODER_MODE_HARDWARE -> "硬解"
-                            Prefs.DECODER_MODE_SOFTWARE -> "软解"
-                            else -> "自动解码"
+                            Prefs.DECODER_MODE_HARDWARE -> "HW"
+                            Prefs.DECODER_MODE_SOFTWARE -> "SW"
+                            else -> "Auto"
                         }
                         val coreStr = tvStreamType?.text?.toString() ?: ""
                         
@@ -392,42 +392,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
             override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
-                runOnUiThread {
-                    val badges = mutableListOf<String>()
-                    if (badgeInfo.isDolbyVision) badges.add("杜比视界")
-                    else if (badgeInfo.isHdr10) badges.add("HDR10")
-                    else if (badgeInfo.isHlg) badges.add("HLG")
-                    
-                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
-                    else if (badgeInfo.isDolbyAudio) badges.add("杜比音效")
-                    
-                    if (badgeInfo.isDts) badges.add("DTS")
-                    
-                    if (badgeInfo.videoCodec.isNotEmpty()) badges.add(badgeInfo.videoCodec)
-                    if (badgeInfo.audioCodec.isNotEmpty()) badges.add(badgeInfo.audioCodec)
-                    
-                    val uniqueBadges = badges.distinct()
-                    
-                    val currentInfo = tvResolution?.text?.toString() ?: ""
-                    val parts = currentInfo.split(" | ").toMutableList()
-                    val res = if (parts.isNotEmpty() && parts[0].contains("x")) parts.removeAt(0) else ""
-                    
-                    val enhanced = buildString {
-                        if (res.isNotEmpty()) append(res)
-                        
-                        if (uniqueBadges.isNotEmpty()) {
-                            if (isNotEmpty()) append(" | ")
-                            append(uniqueBadges.joinToString(" | "))
-                        }
-                        
-                        for (p in parts) {
-                            if (p.isNotBlank() && !uniqueBadges.contains(p)) {
-                                append(" | ").append(p)
-                            }
-                        }
-                    }
-                    tvResolution?.text = enhanced
-                }
+                // 面向发烧友/PT玩家：在此丢弃通俗的中文标签，保留 onPlaying 时最初提取的底层原始媒体流参数。
             }
         }
         
@@ -545,6 +510,8 @@ class PlayerActivity : AppCompatActivity() {
         resolveJob?.cancel()
         resolveJob?.cancel()
         resolveJob = lifecycleScope.launch {
+            // 解决主备切换等场景下，过快重建播放器导致硬件解码器耗尽/死锁的问题
+            kotlinx.coroutines.delay(200)
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(url, userAgent, customHeaders)
             
             val lowerUrl = finalUrl.lowercase()

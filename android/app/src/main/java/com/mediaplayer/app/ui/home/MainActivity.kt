@@ -1072,9 +1072,9 @@ class MainActivity : AppCompatActivity() {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
                         val decoderStr = when (decoderMode) {
-                            Prefs.DECODER_MODE_HARDWARE -> "硬解"
-                            Prefs.DECODER_MODE_SOFTWARE -> "软解"
-                            else -> "自动解码"
+                            Prefs.DECODER_MODE_HARDWARE -> "HW"
+                            Prefs.DECODER_MODE_SOFTWARE -> "SW"
+                            else -> "Auto"
                         }
                         val coreStr = when (core) {
                             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
@@ -1112,42 +1112,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
-                uiHandler.post {
-                    val badges = mutableListOf<String>()
-                    if (badgeInfo.isDolbyVision) badges.add("杜比视界")
-                    else if (badgeInfo.isHdr10) badges.add("HDR10")
-                    else if (badgeInfo.isHlg) badges.add("HLG")
-                    
-                    if (badgeInfo.isDolbyAtmos) badges.add("全景声")
-                    else if (badgeInfo.isDolbyAudio) badges.add("杜比音效")
-                    
-                    if (badgeInfo.isDts) badges.add("DTS")
-                    
-                    if (badgeInfo.videoCodec.isNotEmpty()) badges.add(badgeInfo.videoCodec)
-                    if (badgeInfo.audioCodec.isNotEmpty()) badges.add(badgeInfo.audioCodec)
-                    
-                    val uniqueBadges = badges.distinct()
-                    
-                    val currentInfo = osdOverlayView?.getInfoText() ?: ""
-                    val parts = currentInfo.split(" | ").toMutableList()
-                    val res = if (parts.isNotEmpty() && parts[0].contains("x")) parts.removeAt(0) else ""
-                    
-                    val enhanced = buildString {
-                        if (res.isNotEmpty()) append(res)
-                        
-                        if (uniqueBadges.isNotEmpty()) {
-                            if (isNotEmpty()) append(" | ")
-                            append(uniqueBadges.joinToString(" | "))
-                        }
-                        
-                        for (p in parts) {
-                            if (p.isNotBlank() && !uniqueBadges.contains(p)) {
-                                append(" | ").append(p)
-                            }
-                        }
-                    }
-                    osdOverlayView?.setInfoText(enhanced)
-                }
+                // 面向发烧友/PT玩家：在此丢弃通俗的中文标签，保留 onPlaying 时最初提取的底层原始媒体流参数。
             }
         }
 
@@ -1510,6 +1475,8 @@ class MainActivity : AppCompatActivity() {
 
         resolveJob = lifecycleScope.launch {
             val gen = ++playGeneration
+            // 解决主备切换等场景下，过快重建播放器导致硬件解码器耗尽/死锁的问题
+            kotlinx.coroutines.delay(200)
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
             
             // 如果在此期间又发生了切台，放弃本次播放，防止旧 resolve 协程覆盖新频道
@@ -1646,9 +1613,9 @@ class MainActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                 val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
                 val decoderStr = when (decoderMode) {
-                    Prefs.DECODER_MODE_HARDWARE -> "硬解"
-                    Prefs.DECODER_MODE_SOFTWARE -> "软解"
-                    else -> "自动解码"
+                    Prefs.DECODER_MODE_HARDWARE -> "HW"
+                    Prefs.DECODER_MODE_SOFTWARE -> "SW"
+                    else -> "Auto"
                 }
                 val coreStr = playerHelper?.let {
                     when (it) {
@@ -1853,7 +1820,6 @@ class MainActivity : AppCompatActivity() {
             val currentServer = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                 .getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
 
-            // 按照优先级进行合并：
             // 优先级 1. 当前正在使用的主服务器 (currentServer)
             // 优先级 2. 用户原来手动输入的本地列表 (localList)
             // 优先级 3. 服务器最新下发的备用列表，追加在最后 (backupServers)
@@ -1872,9 +1838,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (globalMaintenance && !isTester) {
-            showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = false)
+            showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = true)
             // 如果已在播放，停止播放并清除UI
             playerHelper?.release()
+            playerHelper = null
             authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
             val retryRunnable = Runnable { checkAuthAndLoad() }
             authPollRunnable = retryRunnable
@@ -2045,6 +2012,10 @@ class MainActivity : AppCompatActivity() {
                                 if (resp != null) {
                                     handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
                                 } else {
+                                    // 即使获取配置失败，既然通过了 checkStatus 也要保存当前成功的备用节点
+                                    getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
+                                        .putString(Prefs.KEY_SERVER_URL, com.mediaplayer.app.data.api.ApiClient.getServerUrl())
+                                        .apply()
                                     showContent()
                                 }
                             }.onFailure { 
@@ -2217,8 +2188,9 @@ class MainActivity : AppCompatActivity() {
                         authManager.verify().onSuccess { resp ->
                             if (resp != null && resp.globalMaintenance && !resp.isTester) {
                                 // 进入维护模式，切断播放并转入全量探测主备服务器
-                                showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = false)
+                                showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = true)
                                 playerHelper?.release()
+                                playerHelper = null
                                 heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
                                 heartbeatRunnable = null
                                 checkAuthAndLoad()
