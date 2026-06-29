@@ -20,11 +20,11 @@ const (
 
 type FCCClient struct {
 	conn       *net.UDPConn
-	rtspConn   net.Conn
 	buffer     *[]byte
 	serverAddr *net.UDPAddr
 	mcastAddr  *net.UDPAddr
 	fccServerIP string
+	fccType     FccType
 }
 
 func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPortEnd int, targetMulticast string, fccType FccType) (*FCCClient, error) {
@@ -70,6 +70,7 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 		mcastAddr:   mcastAddr,
 		fccServerIP: fccServerIP,
 		buffer:      udpBufferPool.Get().(*[]byte),
+		fccType:     fccType,
 	}
 
 	if fccType == FccTypeHuawei {
@@ -148,55 +149,59 @@ func (c *FCCClient) Close() error {
 		udpBufferPool.Put(c.buffer)
 		c.buffer = nil
 	}
-	if c.rtspConn != nil {
-		// Send TEARDOWN to Huawei FCC server
-		req := fmt.Sprintf("TEARDOWN rtsp://%s/ RTSP/1.0\r\nCSeq: 2\r\n\r\n", c.fccServerIP)
-		_ = c.rtspConn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
-		_, _ = c.rtspConn.Write([]byte(req))
-		c.rtspConn.Close()
-		c.rtspConn = nil
-	}
 	if c.conn != nil {
+		if c.fccType == FccTypeHuawei && c.fccServerIP != "" {
+			termPk := make([]byte, 16)
+			termPk[0] = 0x80 | 9 // V=2, FMT=9
+			termPk[1] = 205
+			binary.BigEndian.PutUint16(termPk[2:4], 3) // Length=3
+			ip4 := c.mcastAddr.IP.To4()
+			if ip4 != nil {
+				copy(termPk[8:12], ip4)
+			}
+			termPk[12] = 0x01 // Status: joined multicast successfully
+			_, _ = c.conn.WriteToUDP(termPk, c.serverAddr)
+		}
 		return c.conn.Close()
 	}
 	return nil
 }
 
 func (c *FCCClient) handshakeHuawei(localPort int) error {
-	// TCP connect to FCC server (IP:PORT)
-	conn, err := net.DialTimeout("tcp", c.fccServerIP, 1*time.Second)
+	pk := make([]byte, 32)
+	
+	// 1. RTCP Header
+	pk[0] = 0x80 | 5 // V=2, P=0, FMT=5
+	pk[1] = 205      // PT=205
+	binary.BigEndian.PutUint16(pk[2:4], 7) // Length = 7
+
+	// 2. Media Source SSRC (Multicast IP)
+	ip4 := c.mcastAddr.IP.To4()
+	if ip4 == nil {
+		return fmt.Errorf("multicast address must be IPv4")
+	}
+	copy(pk[8:12], ip4)
+
+	// 3. Local IP
+	localIP := net.ParseIP("0.0.0.0").To4()
+	if tempConn, err := net.Dial("udp", c.serverAddr.String()); err == nil {
+		if udpAddr, ok := tempConn.LocalAddr().(*net.UDPAddr); ok {
+			localIP = udpAddr.IP.To4()
+		}
+		tempConn.Close()
+	}
+	copy(pk[20:24], localIP)
+
+	// 4. Client Port and Flags
+	binary.BigEndian.PutUint16(pk[24:26], uint16(localPort))
+	binary.BigEndian.PutUint16(pk[26:28], 0x8000)
+	binary.BigEndian.PutUint32(pk[28:32], 0x20000000)
+
+	_, err := c.conn.WriteToUDP(pk, c.serverAddr)
 	if err != nil {
-		return fmt.Errorf("huawei fcc tcp dial failed: %w", err)
+		return fmt.Errorf("failed to send FCC huawei request: %w", err)
 	}
-	c.rtspConn = conn
-
-	// Construct Huawei RTSP SETUP request
-	// Include FccIP and FccPort in the URL as per Huawei specs
-	rtspUrl := fmt.Sprintf("rtsp://%s/PLTV/88888888/224/3221225618/10000100000000060000000000000000_0.smil?FccIP=%s&FccPort=%d&FccMac=00:11:22:33:44:55",
-		c.fccServerIP, c.mcastAddr.IP.String(), c.mcastAddr.Port)
-
-	req := fmt.Sprintf("SETUP %s RTSP/1.0\r\n"+
-		"CSeq: 1\r\n"+
-		"Transport: RTP/AVP;unicast;client_port=%d-%d\r\n\r\n",
-		rtspUrl, localPort, localPort+1)
-
-	if err := conn.SetWriteDeadline(time.Now().Add(1 * time.Second)); err != nil {
-		return err
-	}
-	if _, err := conn.Write([]byte(req)); err != nil {
-		return fmt.Errorf("failed to send huawei rtsp setup: %w", err)
-	}
-
-	// Read RTSP response to see what the server says
-	respBuf := make([]byte, 1024)
-	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-	n, err := conn.Read(respBuf)
-	if err == nil && n > 0 {
-		slog.Info("FCC Huawei RTSP Response", "response", string(respBuf[:n]))
-	} else {
-		slog.Warn("FCC Huawei RTSP No Response or Error", "error", err)
-	}
-
-	slog.Info("FCC Huawei RTSP handshake sent", "localPort", localPort, "server", c.fccServerIP, "mcast", c.mcastAddr.String())
+	
+	slog.Debug("FCC Huawei (FMT 5) handshake sent", "localPort", localPort, "server", c.serverAddr.String(), "mcast", c.mcastAddr.String())
 	return nil
 }
