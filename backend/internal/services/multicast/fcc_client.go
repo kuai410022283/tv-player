@@ -20,6 +20,7 @@ const (
 
 type FCCClient struct {
 	conn       *net.UDPConn
+	signalConn *net.UDPConn
 	buffer     *[]byte
 	serverAddr *net.UDPAddr
 	mcastAddr  *net.UDPAddr
@@ -48,12 +49,29 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 
 
 	var conn *net.UDPConn
+	var signalConn *net.UDPConn
 	var localPort int
+
 	// Try binding to a port in the configured range
 	for port := fccPortStart; port <= fccPortEnd; port++ {
+		// Huawei strictly requires paired ports (media=even, signal=odd=media+1)
+		if fccType == FccTypeHuawei && port%2 != 0 {
+			continue // Skip odd ports for media
+		}
+
 		addr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: port}
 		conn, err = net.ListenUDP("udp", addr)
 		if err == nil {
+			if fccType == FccTypeHuawei {
+				// Try binding the adjacent signal port
+				sigAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: port + 1}
+				signalConn, err = net.ListenUDP("udp", sigAddr)
+				if err != nil {
+					conn.Close()
+					conn = nil
+					continue // Try the next even port
+				}
+			}
 			localPort = port
 			break
 		}
@@ -66,6 +84,7 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 
 	client := &FCCClient{
 		conn:        conn,
+		signalConn:  signalConn,
 		serverAddr:  serverAddr,
 		mcastAddr:   mcastAddr,
 		fccServerIP: fccServerIP,
@@ -160,7 +179,15 @@ func (c *FCCClient) Close() error {
 				copy(termPk[8:12], ip4)
 			}
 			termPk[12] = 0x01 // Status: joined multicast successfully
-			_, _ = c.conn.WriteToUDP(termPk, c.serverAddr)
+			// Send termination from the signal port
+			if c.signalConn != nil {
+				_, _ = c.signalConn.WriteToUDP(termPk, c.serverAddr)
+			} else {
+				_, _ = c.conn.WriteToUDP(termPk, c.serverAddr)
+			}
+		}
+		if c.signalConn != nil {
+			c.signalConn.Close()
 		}
 		return c.conn.Close()
 	}
@@ -192,16 +219,26 @@ func (c *FCCClient) handshakeHuawei(localPort int) error {
 	}
 	copy(pk[20:24], localIP)
 
-	// 4. Client Port and Flags
-	binary.BigEndian.PutUint16(pk[24:26], uint16(localPort))
+	// 4. Client Signal Port and Flags
+	// For Huawei, localPort is the media port (even). Signal port is media port + 1 (odd).
+	signalPort := localPort + 1
+	binary.BigEndian.PutUint16(pk[24:26], uint16(signalPort))
 	binary.BigEndian.PutUint16(pk[26:28], 0x8000)
 	binary.BigEndian.PutUint32(pk[28:32], 0x20000000)
 
-	_, err := c.conn.WriteToUDP(pk, c.serverAddr)
+	var err error
+	if c.signalConn != nil {
+		// Send the request FROM the signal socket
+		_, err = c.signalConn.WriteToUDP(pk, c.serverAddr)
+	} else {
+		// Fallback
+		_, err = c.conn.WriteToUDP(pk, c.serverAddr)
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to send FCC huawei request: %w", err)
 	}
 	
-	slog.Debug("FCC Huawei (FMT 5) handshake sent", "localPort", localPort, "server", c.serverAddr.String(), "mcast", c.mcastAddr.String())
+	slog.Debug("FCC Huawei (FMT 5) handshake sent", "mediaPort", localPort, "signalPort", signalPort, "server", c.serverAddr.String(), "mcast", c.mcastAddr.String())
 	return nil
 }
