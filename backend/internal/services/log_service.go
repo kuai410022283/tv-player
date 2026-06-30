@@ -38,12 +38,18 @@ func (s *LogService) ReadLogIncremental(path string, cursor int64, maxRead int64
 		if start < 0 {
 			start = 0
 		}
-		file.Seek(start, io.SeekStart)
+		if _, err := file.Seek(start, io.SeekStart); err != nil {
+			return "", cursor, err
+		}
 	} else if cursor > fileSize {
 		// Log rotated or truncated
-		file.Seek(0, io.SeekStart)
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return "", cursor, err
+		}
 	} else {
-		file.Seek(cursor, io.SeekStart)
+		if _, err := file.Seek(cursor, io.SeekStart); err != nil {
+			return "", cursor, err
+		}
 	}
 
 	data, err := io.ReadAll(file)

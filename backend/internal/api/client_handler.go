@@ -456,7 +456,9 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 
 	// Check size (5MB limit)
 	if stat, err := os.Stat(logPath); err == nil && stat.Size() > 5*1024*1024 {
-		os.Rename(logPath, logPath+".bak")
+		if err := os.Rename(logPath, logPath+".bak"); err != nil {
+			slog.Warn("Failed to rotate log file", "error", err)
+		}
 	}
 
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
