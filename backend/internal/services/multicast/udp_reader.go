@@ -198,24 +198,36 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 				if !r.fccFirstPkt {
 					r.fccFirstPkt = true
 					slog.Info("🎉 FCC stream burst received successfully, instant playback started!")
-					// For Telecom or if Sync Notification never arrives, set a 1-second timeout to join multicast
-					go func() {
-						time.Sleep(1 * time.Second)
-						r.mu.Lock()
-						if !r.mcastJoined {
-							slog.Info("FCC Sync timeout, joining multicast anyway")
-							_ = r.joinMulticast()
+					// 立即加入组播
+					if !r.mcastJoined {
+						slog.Info("FCC: Joining multicast group immediately after receiving first burst")
+						_ = r.joinMulticast()
+					}
+					// 输出第一个FCC包的数据，然后立即切换到组播
+					data := (*r.buffer)[:nRead]
+					if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
+						payloadStart, payloadLength := extractRTPPayload(data, nRead)
+						if payloadLength > 0 {
+							// 标记FCC完成，切换到组播模式
+							r.fccActive = false
+							r.fccClient.Close()
+							slog.Info("✅ FCC completed, switching to multicast stream")
+							return r.emitPayload(p, data[payloadStart:payloadStart+payloadLength])
 						}
-						r.mu.Unlock()
-					}()
+					}
+					// 如果第一个包无法解析，直接切换到组播
+					r.fccActive = false
+					r.fccClient.Close()
+					slog.Info("✅ FCC completed, switching to multicast stream")
+					break
 				}
 
+				// 后续的FCC包也处理，但主要目的是等待组播追上
 				data := (*r.buffer)[:nRead]
 				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
 					seq := uint16(data[2])<<8 | uint16(data[3])
 					
 					// Check if multicast has caught up.
-					// We only check if r.mcastJoined is true, and we have received some multicast seqs.
 					if r.mcastJoined && r.hasSeq && r.nextSeq > seq && (r.nextSeq - seq) < 1000 {
 						// Multicast has caught up, seamless transition!
 						r.fccActive = false
@@ -226,7 +238,6 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 						// Emit FCC packet
 						payloadStart, payloadLength := extractRTPPayload(data, nRead)
 						if payloadLength > 0 {
-							// Update nextSeq to track our position in the burst
 							if !r.hasSeq {
 								r.nextSeq = seq + 1
 								r.hasSeq = true
@@ -238,7 +249,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 					}
 				}
 			} else {
-				// FCC timeout or error (other than redirect/sync)
+				// FCC timeout or error
 				r.fccActive = false
 				r.fccClient.Close()
 				slog.Warn("⚠️ FCC receive failed or timed out, falling back to pure multicast", "error", err)

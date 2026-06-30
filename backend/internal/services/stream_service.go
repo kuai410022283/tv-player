@@ -1087,17 +1087,26 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	
 	var fccClient *multicast.FCCClient
 	if !isCatchup && isLiveMulticast {
-		// 1. URL Query
-		fccServer := r.URL.Query().Get("fcc")
-		fccTypeStr := r.URL.Query().Get("fcc-type")
+		// 1. Parse FCC parameters from targetURL (channel URL)
+		var fccServer, fccTypeStr string
+		if parsedURL, err := url.Parse(targetURL); err == nil {
+			fccServer = parsedURL.Query().Get("fcc")
+			fccTypeStr = parsedURL.Query().Get("fcc-type")
+		}
 		
-		// 2. Fallback to channel settings if query is empty
+		// 2. Override with HTTP request query parameters if present
+		if reqFcc := r.URL.Query().Get("fcc"); reqFcc != "" {
+			fccServer = reqFcc
+			fccTypeStr = r.URL.Query().Get("fcc-type")
+		}
+		
+		// 3. Fallback to channel settings if still empty
 		if fccServer == "" && ch != nil && ch.Fcc != "" {
 			fccServer = ch.Fcc
 			fccTypeStr = ch.FccType
 		}
 
-		// 3. Fallback to global settings
+		// 4. Fallback to global settings
 		if fccServer == "" {
 			globalEnabled, _ := sp.channelSvc.GetSetting("fcc_enabled")
 			if globalEnabled == "true" {
@@ -1113,7 +1122,11 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 				}
 			}
 			fccType := multicast.FccType(fccTypeStr)
-			slog.Info("FCC Config Evaluated", "fccServer", fccServer, "fccType", fccTypeStr, "ch.FccType", ch.FccType)
+			
+			// 获取公网IP配置
+			publicIP, _ := sp.channelSvc.GetSetting("fcc_public_ip")
+			
+			slog.Info("FCC Config Evaluated", "fccServer", fccServer, "fccType", fccTypeStr, "ch.FccType", ch.FccType, "publicIP", publicIP)
 
 			var portStart, portEnd int = 40000, 40050
 			pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
@@ -1122,7 +1135,7 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			if pEnd != "" { _, _ = fmt.Sscanf(pEnd, "%d", &portEnd) }
 
 			// Try to connect FCC
-			fc, err := multicast.NewFCCClient(r.Context(), fccServer, portStart, portEnd, targetURL, fccType)
+			fc, err := multicast.NewFCCClient(r.Context(), fccServer, portStart, portEnd, targetURL, fccType, publicIP)
 			if err != nil {
 				slog.Warn("fcc initialization failed, falling back to pure multicast", "error", err)
 			} else {
