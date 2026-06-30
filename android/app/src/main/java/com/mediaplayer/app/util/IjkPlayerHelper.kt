@@ -123,8 +123,13 @@ class IjkPlayerHelper(
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-        // 降低极限丢帧率，防止画面变成幻灯片
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1)
+        // 降低极限丢帧率，防止画面变成幻灯片 (优化至 5)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5L)
+        
+        // 纯解码性能优化（对 Go 后端绝对安全）
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_CODEC, "skip_loop_filter", 48L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", 1L)
+        player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec_mpeg4", 1L)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
