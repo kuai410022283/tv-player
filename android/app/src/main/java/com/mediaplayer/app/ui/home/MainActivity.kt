@@ -122,7 +122,8 @@ class MainActivity : AppCompatActivity() {
 
     // ── Data ──
     private var groups = listOf<ChannelGroup>()
-    private var allChannels = listOf<Channel>()
+    private var allChannels: MutableList<Channel> = mutableListOf()
+    private var channelIndexById = HashMap<Long, Channel>() // ID 索引，加速查找
     private var channelsByGroup: Map<Long, List<Channel>> = emptyMap()
     private var filteredChannels = listOf<Channel>()
     private var currentGroupId = 0L
@@ -1695,7 +1696,8 @@ class MainActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     var updated = false
                     for (latest in latestChannels) {
-                        val existing = allChannels.find { it.id == latest.id }
+                        // 使用 HashMap O(1) 查找替代 List O(n) 查找
+                        val existing = channelIndexById[latest.id]
                         if (existing != null) {
                             if (existing.currentEpg != latest.currentEpg || existing.epgPercent != latest.epgPercent) {
                                 existing.currentEpg = latest.currentEpg
@@ -2256,33 +2258,69 @@ class MainActivity : AppCompatActivity() {
                 groupAdapter.submitList(groups)
                 groupAdapter.setSelected(0)
 
-                // 2. 按分组并行拉取全量频道（彻底绕过全局 page_size 上限）
-                repo.getAllChannelsByGroups(realGroups).onSuccess { list ->
-                    list.forEachIndexed { index, channel ->
-                        channel.globalIndex = index
-                    }
-                    allChannels = list
-                    channelsByGroup = list.groupBy { it.groupId }
-                    if (list.isNotEmpty()) {
-                        // 尝试恢复上次播放的频道
-                        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                        val lastChannelId = prefs.getLong("last_channel_id", -1L)
-                        var targetIndex = 0
-                        if (lastChannelId != -1L) {
-                            val foundIndex = list.indexOfFirst { it.id == lastChannelId }
-                            if (foundIndex != -1) {
-                                targetIndex = foundIndex
-                            }
+                // 2. 懒加载频道：先显示首页数据，后台继续加载剩余
+                var isFirstEmission = true
+                repo.loadChannelsLazy(realGroups).collect { newChannels ->
+                    if (isFirstEmission) {
+                        // 首页数据：立即显示，让用户看到内容
+                        isFirstEmission = false
+                        allChannels = newChannels.toMutableList()
+                        channelsByGroup = newChannels.groupBy { it.groupId }
+                        
+                        // 构建 ID 索引
+                        channelIndexById.clear()
+                        newChannels.forEach { channelIndexById[it.id] = it }
+                        
+                        // 设置全局索引
+                        newChannels.forEachIndexed { index, channel ->
+                            channel.globalIndex = index
                         }
-                        currentGroupId = list[targetIndex].groupId
-                        groupAdapter.setSelected(currentGroupId)
-                        filterChannels(scrollToTop = false)
-                        playTvChannel(targetIndex)
-                        videoLayout?.requestFocus()
+                        
+                        if (newChannels.isNotEmpty()) {
+                            // 尝试恢复上次播放的频道
+                            val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                            val lastChannelId = prefs.getLong("last_channel_id", -1L)
+                            var targetIndex = 0
+                            if (lastChannelId != -1L) {
+                                val foundIndex = newChannels.indexOfFirst { it.id == lastChannelId }
+                                if (foundIndex != -1) {
+                                    targetIndex = foundIndex
+                                }
+                            }
+                            currentGroupId = newChannels[targetIndex].groupId
+                            groupAdapter.setSelected(currentGroupId)
+                            filterChannels(scrollToTop = false)
+                            playTvChannel(targetIndex)
+                            videoLayout?.requestFocus()
+                        }
+                        
+                        progressBuffering?.visibility = View.GONE
+                    } else {
+                        // 增量数据：合并到现有列表
+                        val uniqueNewChannels = newChannels.filter { channelIndexById[it.id] == null }
+                        
+                        if (uniqueNewChannels.isNotEmpty()) {
+                            val startIndex = allChannels.size
+                            allChannels.addAll(uniqueNewChannels)
+                            
+                            // 更新 ID 索引
+                            uniqueNewChannels.forEach { channelIndexById[it.id] = it }
+                            
+                            // 更新全局索引
+                            uniqueNewChannels.forEachIndexed { index, channel ->
+                                channel.globalIndex = startIndex + index
+                            }
+                            
+                            // 更新分组映射
+                            channelsByGroup = allChannels.groupBy { it.groupId }
+                            
+                            // 刷新当前显示的列表
+                            filterChannels(scrollToTop = false)
+                        }
                     }
-                }.onFailure {
-                    // handle failure
                 }
+            } catch (e: Exception) {
+                progressBuffering?.visibility = View.GONE
             } finally {
                 isLoadingData = false
             }

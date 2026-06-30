@@ -8,6 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
@@ -16,7 +19,8 @@ import kotlinx.coroutines.withContext
 class ChannelRepository {
 
     companion object {
-        private const val PAGE_SIZE = 200 // 与后端 page_size 上限对齐
+        private const val PAGE_SIZE = 500 // 每页大小
+        private const val FIRST_PAGE_SIZE = 500 // 首页快速加载大小
     }
 
     /** 获取所有分组 */
@@ -31,6 +35,87 @@ class ChannelRepository {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * 懒加载频道：先返回首页数据用于快速显示，后台继续加载剩余数据。
+     *
+     * @param groups 已获取的分组列表（不含"全部"虚拟分组 id=0）
+     * @return Flow，第一项是首页数据（快速显示），后续项是增量数据（后台加载）
+     */
+    fun loadChannelsLazy(
+        groups: List<ChannelGroup>
+    ): Flow<List<Channel>> = flow {
+        // 1. 并行拉取每个分组的首页数据（500条/组）
+        val firstPageChannels = coroutineScope {
+            groups.map { group ->
+                async { fetchFirstPageForGroup(group.id) }
+            }.awaitAll()
+        }.flatten()
+
+        // 立即发射首页数据，UI 可以马上显示
+        emit(firstPageChannels)
+
+        // 2. 后台继续加载每个分组的剩余数据
+        val remainingChannels = coroutineScope {
+            groups.map { group ->
+                async { fetchRemainingChannels(group.id) }
+            }.awaitAll()
+        }.flatten()
+
+        // 发射增量数据
+        if (remainingChannels.isNotEmpty()) {
+            emit(remainingChannels)
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * 拉取单个分组的首页数据（第一页）
+     */
+    private suspend fun fetchFirstPageForGroup(groupId: Long): List<Channel> {
+        return try {
+            val resp = ApiClient.getService().getChannels(
+                groupId = groupId,
+                page = 1,
+                pageSize = FIRST_PAGE_SIZE
+            )
+            if (resp.isSuccessful && resp.body()?.code == 0) {
+                resp.body()!!.data?.items ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * 拉取单个分组的剩余数据（第2页及以后）
+     */
+    private suspend fun fetchRemainingChannels(groupId: Long): List<Channel> {
+        val result = mutableListOf<Channel>()
+        var page = 2 // 从第2页开始
+        while (true) {
+            val resp = try {
+                ApiClient.getService().getChannels(
+                    groupId = groupId,
+                    page = page,
+                    pageSize = PAGE_SIZE
+                )
+            } catch (e: Exception) {
+                break
+            }
+            if (!resp.isSuccessful || resp.body()?.code != 0) break
+            val pageData = resp.body()!!.data ?: break
+
+            val fetchedItems = pageData.items ?: emptyList()
+            if (fetchedItems.isEmpty()) break
+
+            result.addAll(fetchedItems)
+            if (fetchedItems.size < PAGE_SIZE || result.size >= pageData.total) break
+            page++
+        }
+        return result
     }
 
     /**

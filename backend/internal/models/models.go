@@ -162,7 +162,7 @@ type PageRequest struct {
 func (p *PageRequest) Normalize() {
 	if p.Page < 1 { p.Page = 1 }
 	if p.PageSize < 1 { p.PageSize = 20 }
-	if p.PageSize > 500 { p.PageSize = 500 }
+	if p.PageSize > 5000 { p.PageSize = 5000 } // 支持大分页，提升7000+频道场景加载速度
 }
 
 type PageResponse struct {

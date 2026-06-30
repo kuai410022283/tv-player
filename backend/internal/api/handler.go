@@ -278,16 +278,23 @@ func (h *Handler) ListChannels(c *gin.Context) {
 
 			strategy := h.logoSvc.GetLogoStrategy()
 
+			// 批量获取所有频道的继承头信息（替代 N+1 查询）
+			channelIDs := make([]int64, len(items))
+			for i := range items {
+				channelIDs[i] = items[i].ID
+			}
+			headerMap, _ := h.channelSvc.BatchGetInheritedHeaders(channelIDs)
+
 			// 聚合后的列表
 			groupedItems := make([]map[string]interface{}, 0)
 			groupMap := make(map[string]int) // name -> index in groupedItems
 
 			for i := range items {
-				// 无论直连还是代理模式，客户端都拿取继承所得的 UA 与 CustomHeaders 方便统一标准播放
-				if ua, headers, err := h.channelSvc.GetInheritedHeaders(items[i].ID); err == nil {
-					items[i].UserAgent = ua
-					if len(headers) > 0 {
-						if b, err := json.Marshal(headers); err == nil {
+				// 使用批量查询的结果
+				if info, ok := headerMap[items[i].ID]; ok {
+					items[i].UserAgent = info.UA
+					if len(info.Headers) > 0 {
+						if b, err := json.Marshal(info.Headers); err == nil {
 							items[i].CustomHeaders = string(b)
 						}
 					} else {

@@ -162,6 +162,12 @@ func createTables(db *sql.DB) error {
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
 	);
 
+	-- 频道表索引：优化按分组查询和隐藏过滤
+	CREATE INDEX IF NOT EXISTS idx_channels_group_id ON channels(group_id);
+	CREATE INDEX IF NOT EXISTS idx_channels_is_hidden ON channels(is_hidden);
+	CREATE INDEX IF NOT EXISTS idx_channels_group_hidden ON channels(group_id, is_hidden);
+	CREATE INDEX IF NOT EXISTS idx_channels_sort_order ON channels(group_id, sort_order);
+
 	DROP TABLE IF EXISTS epg_programs;
 
 	CREATE TABLE IF NOT EXISTS play_history (

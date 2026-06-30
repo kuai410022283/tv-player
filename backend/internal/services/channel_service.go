@@ -37,7 +37,7 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 		`
 		args = append(args, clientID)
 	}
-	
+
 	query += ` ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id`
 
 	rows, err := s.db.Query(query, args...)
@@ -53,14 +53,14 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 		if err := rows.Scan(&g.ID, &g.Name, &g.Icon, &g.SortOrder, &isDirect, &g.Source, &g.UserAgent, &g.CustomHeaders, &g.EnableMultiplex, &g.CreatedAt, &g.UpdatedAt, &g.ChannelCount, &nonMux); err != nil {
 			return nil, err
 		}
-		
+
 		// 客户端不显示空分组（没有可见频道的组）
 		if !includeEmpty && g.ChannelCount == 0 {
 			continue
 		}
 
 		g.IsDirect = isDirect == 1
-		g.CanMultiplex = (g.ChannelCount - nonMux > 0)
+		g.CanMultiplex = (g.ChannelCount-nonMux > 0)
 		g.NonMuxCount = nonMux
 		groups = append(groups, g)
 	}
@@ -73,8 +73,12 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 func (s *ChannelService) CreateGroup(g *models.ChannelGroup) error {
 	now := time.Now()
 	direct := 0
-	if g.IsDirect { direct = 1 }
-	if g.Source == "" { g.Source = "手动" }
+	if g.IsDirect {
+		direct = 1
+	}
+	if g.Source == "" {
+		g.Source = "手动"
+	}
 	res, err := s.db.Exec(`INSERT INTO channel_groups (name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		g.Name, g.Icon, g.SortOrder, direct, g.Source, g.UserAgent, g.CustomHeaders, g.EnableMultiplex, now, now)
 	if err != nil {
@@ -88,19 +92,27 @@ func (s *ChannelService) CreateGroup(g *models.ChannelGroup) error {
 
 func (s *ChannelService) UpdateGroup(g *models.ChannelGroup) error {
 	direct := 0
-	if g.IsDirect { direct = 1 }
-	
+	if g.IsDirect {
+		direct = 1
+	}
+
 	tx, err := s.db.Begin()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(`UPDATE channel_groups SET name=?, icon=?, sort_order=?, is_direct=?, user_agent=?, custom_headers=?, enable_multiplex=?, updated_at=? WHERE id=?`,
 		g.Name, g.Icon, g.SortOrder, direct, g.UserAgent, g.CustomHeaders, g.EnableMultiplex, time.Now(), g.ID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	// 同步修改分组下所有频道的直连和复用设置
 	_, err = tx.Exec(`UPDATE channels SET is_direct=?, enable_multiplex=? WHERE group_id=?`, direct, g.EnableMultiplex, g.ID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -148,7 +160,7 @@ func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
 		if err != nil || (name == "未分类" && source == "手动") {
 			continue // 忽略不存在或不能删除的默认分组
 		}
-		
+
 		_, err = tx.Exec("DELETE FROM channels WHERE group_id = ?", id)
 		if err != nil {
 			return err
@@ -191,7 +203,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	
+
 	rows, err := s.db.Query(fmt.Sprintf(`
 		SELECT id, name, COALESCE(icon, ''), sort_order, is_direct, COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), COALESCE(enable_multiplex, 0), created_at, updated_at,
 		       (SELECT COUNT(*) FROM channels c WHERE c.group_id = channel_groups.id) AS channel_count,
@@ -211,7 +223,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 		if err := rows.Scan(&m.ID, &m.Name, &m.Icon, &m.SortOrder, &m.IsDirect, &m.Source, &m.UserAgent, &m.CustomHeaders, &m.EnableMultiplex, &m.CreatedAt, &m.UpdatedAt, &m.ChannelCount, &nonMux); err != nil {
 			return nil, err
 		}
-		m.CanMultiplex = (m.ChannelCount - nonMux > 0)
+		m.CanMultiplex = (m.ChannelCount-nonMux > 0)
 		m.NonMuxCount = nonMux
 		items = append(items, m)
 	}
@@ -276,12 +288,12 @@ func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs = append(queryArgs, p.PageSize, offset)
-	
+
 	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
 		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
 		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), COALESCE(c.fcc, ''), COALESCE(c.fcc_type, ''), c.created_at, c.updated_at ` +
 		baseQuery + where + ` ORDER BY c.sort_order LIMIT ? OFFSET ?`
-		
+
 	rows, err := s.db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, err
@@ -368,6 +380,11 @@ func (s *ChannelService) GetInheritedHeaders(channelID int64) (string, map[strin
 		_ = s.db.QueryRow("SELECT COALESCE(user_agent, ''), COALESCE(custom_headers, '') FROM channel_groups WHERE id = ?", groupID).Scan(&gpUA, &gpHeaders)
 	}
 
+	return s.computeInheritedHeaders(chUA, chHeaders, gpUA, gpHeaders)
+}
+
+// computeInheritedHeaders 合并频道和分组的 UA/Headers
+func (s *ChannelService) computeInheritedHeaders(chUA, chHeaders, gpUA, gpHeaders string) (string, map[string]string, error) {
 	// Determine final UA
 	finalUA := "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player" // Global default
 	if chUA != "" {
@@ -393,6 +410,125 @@ func (s *ChannelService) GetInheritedHeaders(channelID int64) (string, map[strin
 	return finalUA, finalHeaders, nil
 }
 
+// BatchGetInheritedHeaders 批量获取多个频道的继承头信息，避免 N+1 查询
+// 返回 map[channelID]struct{UA, Headers}
+type InheritedHeaderInfo struct {
+	UA      string
+	Headers map[string]string
+}
+
+const sqliteMaxBatchSize = 500 // SQLite IN 子句安全批次大小
+
+func (s *ChannelService) BatchGetInheritedHeaders(channelIDs []int64) (map[int64]*InheritedHeaderInfo, error) {
+	if len(channelIDs) == 0 {
+		return nil, nil
+	}
+
+	type channelInfo struct {
+		groupID   int64
+		chUA      string
+		chHeaders string
+	}
+	channelMap := make(map[int64]*channelInfo, len(channelIDs))
+	groupIDs := make(map[int64]bool)
+
+	// 分批查询频道，避免 SQLite IN 子句参数限制
+	for i := 0; i < len(channelIDs); i += sqliteMaxBatchSize {
+		end := i + sqliteMaxBatchSize
+		if end > len(channelIDs) {
+			end = len(channelIDs)
+		}
+		batch := channelIDs[i:end]
+
+		placeholders := make([]string, len(batch))
+		args := make([]interface{}, len(batch))
+		for j, id := range batch {
+			placeholders[j] = "?"
+			args[j] = id
+		}
+
+		query := fmt.Sprintf(
+			"SELECT id, group_id, COALESCE(user_agent, ''), COALESCE(custom_headers, '') FROM channels WHERE id IN (%s)",
+			strings.Join(placeholders, ","),
+		)
+
+		rows, err := s.db.Query(query, args...)
+		if err != nil {
+			return nil, err
+		}
+
+		for rows.Next() {
+			var id, groupID int64
+			var chUA, chHeaders string
+			if err := rows.Scan(&id, &groupID, &chUA, &chHeaders); err != nil {
+				continue
+			}
+			channelMap[id] = &channelInfo{groupID: groupID, chUA: chUA, chHeaders: chHeaders}
+			if groupID > 0 {
+				groupIDs[groupID] = true
+			}
+		}
+		rows.Close()
+	}
+
+	// 批量查询分组的 UA/Headers（分组数量通常很少，不需要分批）
+	groupHeaderMap := make(map[int64]struct{ ua, headers string })
+	if len(groupIDs) > 0 {
+		gidList := make([]int64, 0, len(groupIDs))
+		for gid := range groupIDs {
+			gidList = append(gidList, gid)
+		}
+
+		// 分组数量通常远小于频道数量，但为安全起见也分批
+		for i := 0; i < len(gidList); i += sqliteMaxBatchSize {
+			end := i + sqliteMaxBatchSize
+			if end > len(gidList) {
+				end = len(gidList)
+			}
+			batch := gidList[i:end]
+
+			placeholders := make([]string, len(batch))
+			args := make([]interface{}, len(batch))
+			for j, gid := range batch {
+				placeholders[j] = "?"
+				args[j] = gid
+			}
+
+			query := fmt.Sprintf(
+				"SELECT id, COALESCE(user_agent, ''), COALESCE(custom_headers, '') FROM channel_groups WHERE id IN (%s)",
+				strings.Join(placeholders, ","),
+			)
+
+			rows, err := s.db.Query(query, args...)
+			if err == nil {
+				for rows.Next() {
+					var gid int64
+					var ua, headers string
+					if err := rows.Scan(&gid, &ua, &headers); err == nil {
+						groupHeaderMap[gid] = struct{ ua, headers string }{ua: ua, headers: headers}
+					}
+				}
+				rows.Close()
+			}
+		}
+	}
+
+	// 合并结果
+	result := make(map[int64]*InheritedHeaderInfo, len(channelIDs))
+	for id, chInfo := range channelMap {
+		gpUA, gpHeaders := "", ""
+		if gh, ok := groupHeaderMap[chInfo.groupID]; ok {
+			gpUA = gh.ua
+			gpHeaders = gh.headers
+		}
+
+		ua, headers, _ := s.computeInheritedHeaders(chInfo.chUA, chInfo.chHeaders, gpUA, gpHeaders)
+		result[id] = &InheritedHeaderInfo{UA: ua, Headers: headers}
+	}
+
+	return result, nil
+}
+
 func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	// 校验流地址，防止 SSRF
 	if err := ValidateStreamURL(c.StreamURL); err != nil {
@@ -401,10 +537,18 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 
 	now := time.Now()
 	hid, dir, catchup := 0, 0, 0
-	if c.IsHidden { hid = 1 }
-	if c.IsDirect { dir = 1 }
-	if c.SupportCatchup { catchup = 1 }
-	if c.Source == "" { c.Source = "手动" }
+	if c.IsHidden {
+		hid = 1
+	}
+	if c.IsDirect {
+		dir = 1
+	}
+	if c.SupportCatchup {
+		catchup = 1
+	}
+	if c.Source == "" {
+		c.Source = "手动"
+	}
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
@@ -426,9 +570,15 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 	}
 
 	hid, dir, catchup := 0, 0, 0
-	if c.IsHidden { hid = 1 }
-	if c.IsDirect { dir = 1 }
-	if c.SupportCatchup { catchup = 1 }
+	if c.IsHidden {
+		hid = 1
+	}
+	if c.IsDirect {
+		dir = 1
+	}
+	if c.SupportCatchup {
+		catchup = 1
+	}
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
@@ -598,8 +748,12 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 func (s *ChannelService) AddM3USource(m *models.M3USource) error {
 	now := time.Now()
 	autoSyncInt := 0
-	if m.AutoSync { autoSyncInt = 1 }
-	if m.SyncInterval <= 0 { m.SyncInterval = 12 }
+	if m.AutoSync {
+		autoSyncInt = 1
+	}
+	if m.SyncInterval <= 0 {
+		m.SyncInterval = 12
+	}
 	res, err := s.db.Exec(`INSERT INTO m3u_sources (name, url, auto_sync, sync_interval, user_agent, custom_headers, created_at) VALUES (?,?,?,?,?,?,?)`, m.Name, m.URL, autoSyncInt, m.SyncInterval, m.UserAgent, m.CustomHeaders, now)
 	if err != nil {
 		return err
@@ -611,8 +765,12 @@ func (s *ChannelService) AddM3USource(m *models.M3USource) error {
 
 func (s *ChannelService) UpdateM3USource(m *models.M3USource) error {
 	autoSyncInt := 0
-	if m.AutoSync { autoSyncInt = 1 }
-	if m.SyncInterval <= 0 { m.SyncInterval = 12 }
+	if m.AutoSync {
+		autoSyncInt = 1
+	}
+	if m.SyncInterval <= 0 {
+		m.SyncInterval = 12
+	}
 	_, err := s.db.Exec(`UPDATE m3u_sources SET name=?, url=?, auto_sync=?, sync_interval=?, user_agent=?, custom_headers=? WHERE id=?`, m.Name, m.URL, autoSyncInt, m.SyncInterval, m.UserAgent, m.CustomHeaders, m.ID)
 	return err
 }

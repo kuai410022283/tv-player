@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"gopkg.in/natefinch/lumberjack.v2"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/mediaplayer/backend/internal/api"
@@ -20,6 +20,7 @@ import (
 	"github.com/mediaplayer/backend/internal/config"
 	"github.com/mediaplayer/backend/internal/middleware"
 	"github.com/mediaplayer/backend/internal/services"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Version 由编译时注入: go build -ldflags "-X main.Version=v1.0.0"
@@ -102,6 +103,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
+	r.Use(gzipMiddleware()) // 启用 gzip 压缩，优化大数据量传输
 
 	// 初始化 JWT（传入过期小时数）
 	api.InitSecret(cfg.Auth.Secret, cfg.Auth.AdminPassword, cfg.Auth.ExpireH)
@@ -274,4 +276,43 @@ func startClientExpiry(clientSvc *services.ClientService, stop <-chan struct{}) 
 			}
 		}
 	}
+}
+
+// gzipMiddleware 返回一个简单的 gzip 压缩中间件
+func gzipMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 检查客户端是否支持 gzip
+		if !strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
+			c.Next()
+			return
+		}
+
+		// 跳过流媒体代理和文件下载
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/api/v1/stream") ||
+			strings.HasPrefix(path, "/library") ||
+			strings.HasPrefix(path, "/download") {
+			c.Next()
+			return
+		}
+
+		// 设置 gzip writer
+		c.Header("Content-Encoding", "gzip")
+		c.Header("Vary", "Accept-Encoding")
+
+		gz := gzip.NewWriter(c.Writer)
+		defer gz.Close()
+
+		c.Writer = &gzipResponseWriter{ResponseWriter: c.Writer, Writer: gz}
+		c.Next()
+	}
+}
+
+type gzipResponseWriter struct {
+	gin.ResponseWriter
+	Writer io.Writer
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
 }
