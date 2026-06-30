@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/mediaplayer/backend/internal/api/handlers"
 	"github.com/mediaplayer/backend/internal/middleware"
 )
 
@@ -9,10 +10,11 @@ type Handlers struct {
 	*Handler
 	*ClientHandler
 	PlanHandler *PlanHandler
+	LogHandler  *handlers.LogHandler
 }
 
-func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler) *Handlers {
-	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph}
+func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler, lh *handlers.LogHandler) *Handlers {
+	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph, LogHandler: lh}
 }
 
 func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
@@ -86,6 +88,16 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		{
 			adminRoot.POST("/settings", hs.Handler.SetSetting)
 			adminRoot.GET("/stats", hs.Handler.GetStats)
+
+			adminLogs := adminRoot.Group("/admin/logs")
+			{
+				adminLogs.GET("/backend", hs.LogHandler.GetBackendLogs)
+				adminLogs.GET("/backend/export", hs.LogHandler.ExportBackendLogs)
+				adminLogs.GET("/clients", hs.LogHandler.ListClientLogs)
+				adminLogs.GET("/clients/:id", hs.LogHandler.GetClientLog)
+				adminLogs.GET("/clients/:id/export", hs.LogHandler.ExportClientLog)
+				adminLogs.DELETE("/clients/:id", hs.LogHandler.DeleteClientLog)
+			}
 		}
 
 		// 管理端：客户端管理

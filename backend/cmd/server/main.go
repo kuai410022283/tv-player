@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,9 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"gopkg.in/natefinch/lumberjack.v2"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/mediaplayer/backend/internal/api"
+	"github.com/mediaplayer/backend/internal/api/handlers"
 	"github.com/mediaplayer/backend/internal/config"
 	"github.com/mediaplayer/backend/internal/middleware"
 	"github.com/mediaplayer/backend/internal/services"
@@ -32,7 +35,18 @@ func main() {
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logLevel = slog.LevelDebug
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+
+	os.MkdirAll("./data/logs", 0755)
+	logFile := &lumberjack.Logger{
+		Filename:   "./data/logs/backend.log",
+		MaxSize:    10, // megabytes
+		MaxBackups: 3,
+		MaxAge:     7, //days
+		Compress:   true,
+	}
+
+	mw := io.MultiWriter(os.Stdout, logFile)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(mw, &slog.HandlerOptions{
 		Level: logLevel,
 	})))
 
@@ -75,6 +89,7 @@ func main() {
 	epgSvc := services.NewEPGService(db)
 	logoSvc := services.NewLogoService(db)
 	syncSvc := services.NewSyncService(db)
+	logSvc := services.NewLogService()
 
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
@@ -109,7 +124,7 @@ func main() {
 	// ── 安全响应头 ──────────────────────────────────
 	r.Use(func(c *gin.Context) {
 		c.Header("X-Content-Type-Options", "nosniff")
-		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "no-referrer")
 		// CSP: 允许 inline script (管理后台需要) + 同源资源
@@ -129,9 +144,10 @@ func main() {
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
 	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, syncSvc, Version)
-	ch := api.NewClientHandler(clientSvc, channelSvc)
+	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc)
 	ph := api.NewPlanHandler(planSvc)
-	hs := api.NewHandlers(h, ch, ph)
+	lh := handlers.NewLogHandler(logSvc)
+	hs := api.NewHandlers(h, ch, ph, lh)
 
 	// ── 公开 API（无需认证，独立限流）───────────────
 	public := r.Group("/api/v1")

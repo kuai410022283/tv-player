@@ -19,10 +19,11 @@ import (
 type ClientHandler struct {
 	clientSvc  *services.ClientService
 	channelSvc *services.ChannelService
+	logSvc     *services.LogService
 }
 
-func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService) *ClientHandler {
-	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc}
+func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService, logSvc *services.LogService) *ClientHandler {
+	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc, logSvc: logSvc}
 }
 
 // ── 客户端：注册 ───────────────────────────────────────
@@ -453,6 +454,11 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 	os.MkdirAll("library/logs", 0755)
 	logPath := fmt.Sprintf("library/logs/%s.log", client.DeviceID)
 
+	// Check size (5MB limit)
+	if stat, err := os.Stat(logPath); err == nil && stat.Size() > 5*1024*1024 {
+		os.Rename(logPath, logPath+".bak")
+	}
+
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		slog.Error("打开日志文件失败", "error", err)
@@ -529,3 +535,4 @@ func (h *ClientHandler) DownloadLog(c *gin.Context) {
 
 	c.FileAttachment(logPath, fmt.Sprintf("%s.log", client.DeviceID))
 }
+

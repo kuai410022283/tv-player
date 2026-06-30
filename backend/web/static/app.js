@@ -234,7 +234,13 @@ function showSection(name, el) {
     'client-logs': loadClientLogs,
     'client-settings': loadClientSettings,
     'update': loadUpdates,
-    'sync': loadSyncSettings
+    'sync': loadSyncSettings,
+    'system-logs': () => {
+      const iframe = document.getElementById('logs-iframe');
+      if (iframe && (iframe.src === 'about:blank' || iframe.src.endsWith('blank'))) {
+        iframe.src = '/admin/logs_viewer.html';
+      }
+    }
   };
   if (loaders[name]) loaders[name]();
 }
