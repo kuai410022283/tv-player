@@ -26,8 +26,22 @@ class ChannelAdapter(
     private var playingChannelId: Long = -1L
 
     fun setData(list: List<Channel>) {
-        this.channels = list
-        notifyDataSetChanged()
+        val oldList = this.channels
+        val newList = list
+        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = oldList.size
+            override fun getNewListSize() = newList.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                return oldList[oldItemPosition].id == newList[newItemPosition].id
+            }
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val o = oldList[oldItemPosition]
+                val n = newList[newItemPosition]
+                return o.name == n.name && o.logo == n.logo && o.currentEpg == n.currentEpg
+            }
+        })
+        this.channels = newList
+        diffResult.dispatchUpdatesTo(this)
     }
 
     override fun getItemCount(): Int = channels.size

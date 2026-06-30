@@ -1906,8 +1906,12 @@ class MainActivity : AppCompatActivity() {
                                 maintenanceResp = resp
                                 continue
                             } else {
-                                // 验证成功且未在维护，保存该有效服务器配置并直接进入
-                                prefs.edit().putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                // 验证成功且未在维护，直接进入
+                                // 注意：只有主服务器（index==0）才更新 KEY_SERVER_URL，
+                                // 备用服务器成功时不覆盖，保证主服务器恢复后下次优先切回
+                                if (index == 0) {
+                                    prefs.edit().putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                }
                                 handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
                                 return@launch
                             }
@@ -1964,9 +1968,13 @@ class MainActivity : AppCompatActivity() {
                                 maintenanceResult = result
                                 continue
                             } else {
-                                // 注册成功且未在维护，保存该有效服务器配置并直接进入
-                                getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
-                                    .putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                // 注册成功且未在维护，直接进入
+                                // 注意：只有主服务器（index==0）才更新 KEY_SERVER_URL，
+                                // 备用服务器成功时不覆盖，保证主服务器恢复后下次优先切回
+                                if (index == 0) {
+                                    getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
+                                        .putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
+                                }
                                 handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.backupServers, result.isTester)
                                 return@launch
                             }
@@ -2188,23 +2196,44 @@ class MainActivity : AppCompatActivity() {
         epgTickerRunnable = null
     }
 
+    private var heartbeatFailCount = 0
+
     private fun startHeartbeat() {
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+        heartbeatFailCount = 0
         val runnable = object : Runnable {
             override fun run() {
                 lifecycleScope.launch {
                     try {
-                        authManager.verify().onSuccess { resp ->
-                            if (resp != null && resp.globalMaintenance && !resp.isTester) {
-                                // 进入维护模式，切断播放并转入全量探测主备服务器
-                                showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = true)
-                                playerHelper?.release()
-                                playerHelper = null
-                                heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
-                                heartbeatRunnable = null
-                                checkAuthAndLoad()
+                        authManager.verify()
+                            .onSuccess { resp ->
+                                heartbeatFailCount = 0 // 连接成功，重置失败计数
+                                if (resp != null && resp.globalMaintenance && !resp.isTester) {
+                                    // 进入维护模式，切断播放并转入全量探测主备服务器
+                                    showAuthWaiting("系统维护中，正在寻找可用服务器...", showQr = true)
+                                    playerHelper?.release()
+                                    playerHelper = null
+                                    heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+                                    heartbeatRunnable = null
+                                    checkAuthAndLoad()
+                                }
                             }
-                        }
+                            .onFailure {
+                                // 服务器网络故障/崩溃/超时（非维护模式，而是直接断联）
+                                heartbeatFailCount++
+                                if (heartbeatFailCount >= 2) {
+                                    // 连续 2 次心跳失败（约 6 分钟），确认服务器不可达
+                                    // 触发全量主备探测，自动切换到下一个可用服务器
+                                    heartbeatFailCount = 0
+                                    showAuthWaiting("当前服务器连接中断，正在寻找可用服务器...", showQr = true)
+                                    playerHelper?.release()
+                                    playerHelper = null
+                                    heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
+                                    heartbeatRunnable = null
+                                    checkAuthAndLoad()
+                                }
+                                // 第 1 次失败时不立即切换，等待下次心跳重试（避免网络抖动误触发）
+                            }
                     } catch (_: Exception) {}
                 }
                 heartbeatHandler.postDelayed(this, 3 * 60 * 1000) // 每3分钟心跳
@@ -2213,6 +2242,7 @@ class MainActivity : AppCompatActivity() {
         heartbeatRunnable = runnable
         heartbeatHandler.postDelayed(runnable, 3 * 60 * 1000)
     }
+
 
     private fun loadData() {
         if (isLoadingData) return
