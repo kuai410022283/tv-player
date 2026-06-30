@@ -56,6 +56,9 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 	addrStr := strings.TrimPrefix(targetMulticast, "udp://")
 	addrStr = strings.TrimPrefix(addrStr, "rtp://")
 	addrStr = strings.TrimPrefix(addrStr, "@")
+	if idx := strings.Index(addrStr, "?"); idx != -1 {
+		addrStr = addrStr[:idx]
+	}
 
 	mcastAddr, err := net.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
