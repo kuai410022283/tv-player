@@ -183,7 +183,7 @@ func (s *ChannelService) BatchUpdateGroupSort(items []struct {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare("UPDATE channel_groups SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
 	if err != nil {
@@ -221,7 +221,7 @@ func (s *ChannelService) ReorderAllGroups() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare("UPDATE channel_groups SET sort_order = ? WHERE id = ?")
 	if err != nil {
