@@ -492,7 +492,7 @@ func (s *ChannelService) ReorderChannels(groupID int64, source string) error {
 	defer func() { _ = stmt.Close() }()
 
 	for i, id := range ids {
-		if _, err := stmt.Exec(i*10000, id); err != nil {
+		if _, err := stmt.Exec(i, id); err != nil {
 			return err
 		}
 	}
@@ -500,14 +500,14 @@ func (s *ChannelService) ReorderChannels(groupID int64, source string) error {
 	return tx.Commit()
 }
 
-// GetNextChannelSortOrder 获取指定 group_id + source 下的最大 sort_order + 10000
+// GetNextChannelSortOrder 获取指定 group_id + source 下的最大 sort_order + 1
 func (s *ChannelService) GetNextChannelSortOrder(groupID int64, source string) int {
 	var maxOrder int
 	err := s.db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM channels WHERE group_id = ? AND source = ?`, groupID, source).Scan(&maxOrder)
 	if err != nil {
 		return 0
 	}
-	return maxOrder + 10000
+	return maxOrder + 1
 }
 
 func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, error) {

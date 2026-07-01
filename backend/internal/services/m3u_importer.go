@@ -304,7 +304,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			keptIDs[channelID] = true
 		} else {
 			// 插入新频道
-			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, i*10000)
+			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, i)
 			if err == nil {
 				imported++
 				if newID, err := res.LastInsertId(); err == nil {
