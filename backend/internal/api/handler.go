@@ -265,11 +265,41 @@ func (h *Handler) BatchSortGroups(c *gin.Context) {
 	ok(c, nil)
 }
 
+func (h *Handler) BatchSortChannels(c *gin.Context) {
+	var req struct {
+		Items []struct {
+			ID    int64 `json:"id"`
+			Order int   `json:"sort_order"`
+		} `json:"items" binding:"required"`
+		GroupID int64  `json:"group_id"`
+		Source  string `json:"source"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.channelSvc.BatchUpdateChannelSort(req.Items, req.GroupID, req.Source); err != nil {
+		failInternal(c, err, "批量排序失败")
+		return
+	}
+	ok(c, nil)
+}
+
+func (h *Handler) GetChannelSources(c *gin.Context) {
+	sources, err := h.channelSvc.GetDistinctSources()
+	if err != nil {
+		failInternal(c, err, "获取来源列表失败")
+		return
+	}
+	ok(c, sources)
+}
+
 // ── Channels ───────────────────────────────────────────
 
 func (h *Handler) ListChannels(c *gin.Context) {
 	groupID, _ := strconv.ParseInt(c.Query("group_id"), 10, 64)
 	search := c.Query("search")
+	source := c.Query("source")
 	muxSupportStr := c.Query("mux_support")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -286,7 +316,7 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	if id, exists := c.Get("client_id"); exists {
 		clientID = id.(int64)
 	}
-	resp, err := h.channelSvc.ListChannels(groupID, search, muxSupport, p, clientID)
+	resp, err := h.channelSvc.ListChannels(groupID, search, source, muxSupport, p, clientID)
 	if err != nil {
 		failInternal(c, err, "获取频道列表失败")
 		return
@@ -478,6 +508,14 @@ func (h *Handler) CreateChannel(c *gin.Context) {
 		fail(c, 400, "参数错误")
 		return
 	}
+	// source 默认值
+	if ch.Source == "" {
+		ch.Source = "手动"
+	}
+	// 自动分配 sort_order（追加到同分组+来源的末尾）
+	if ch.SortOrder == 0 {
+		ch.SortOrder = h.channelSvc.GetNextChannelSortOrder(ch.GroupID, ch.Source)
+	}
 	if err := h.channelSvc.CreateChannel(&ch); err != nil {
 		failInternal(c, err, "创建频道失败")
 		return
@@ -506,6 +544,7 @@ func (h *Handler) DeleteChannel(c *gin.Context) {
 		failInternal(c, err, "删除频道失败")
 		return
 	}
+	_ = h.channelSvc.ReorderChannels(0, "")
 	ok(c, nil)
 }
 
@@ -521,6 +560,7 @@ func (h *Handler) BatchChannel(c *gin.Context) {
 		failInternal(c, err, "批量删除失败")
 		return
 	}
+	_ = h.channelSvc.ReorderChannels(0, "")
 	ok(c, nil)
 }
 
@@ -1345,7 +1385,7 @@ func (h *Handler) UpdateAdminPassword(c *gin.Context) {
 
 func (h *Handler) GetStats(c *gin.Context) {
 	p := &models.PageRequest{Page: 1, PageSize: 1}
-	totalResp, _ := h.channelSvc.ListChannels(0, "", nil, p, 0)
+	totalResp, _ := h.channelSvc.ListChannels(0, "", "", nil, p, 0)
 	totalChannels := int64(0)
 	if totalResp != nil {
 		totalChannels = totalResp.Total

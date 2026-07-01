@@ -153,11 +153,11 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		cacheKey := sourceName + "|" + groupName
 		if _, ok := groupCache[cacheKey]; !ok {
 			newGroup := &models.ChannelGroup{
-				Name: groupName, 
-				SortOrder: len(groupCache), 
-				IsDirect: true,
-				Source: sourceName,
-				UserAgent: sourceUA,
+				Name:          groupName,
+				SortOrder:     len(groupCache),
+				IsDirect:      true,
+				Source:        sourceName,
+				UserAgent:     sourceUA,
 				CustomHeaders: sourceHeaders,
 			}
 			if err := imp.channelSvc.CreateGroup(newGroup); err == nil {
@@ -240,7 +240,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, fcc, fcc_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, fcc, fcc_type, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return 0, err
 	}
@@ -287,7 +287,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			supportCatchup = 1
 		}
 		catchupSource := ch["catchup-source"]
-		
+
 		catchupDays := 0
 		if days, err := strconv.Atoi(ch["catchup-days"]); err == nil && days > 0 {
 			catchupDays = days
@@ -304,7 +304,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			keptIDs[channelID] = true
 		} else {
 			// 插入新频道
-			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType)
+			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, i*10000)
 			if err == nil {
 				imported++
 				if newID, err := res.LastInsertId(); err == nil {
@@ -407,4 +407,3 @@ func detectStreamType(rawURL string) string {
 	//    调用方应通过 Content-Type 运行时检测（Layer 2）来补全类型
 	return ""
 }
-

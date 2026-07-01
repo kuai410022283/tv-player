@@ -245,7 +245,7 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 
 		for {
 			p := &models.PageRequest{Page: page, PageSize: pageSize}
-			resp, err := sp.channelSvc.ListChannels(0, "", nil, p, 0)
+			resp, err := sp.channelSvc.ListChannels(0, "", "", nil, p, 0)
 			if err != nil || resp == nil {
 				break
 			}

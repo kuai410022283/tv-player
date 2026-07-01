@@ -140,6 +140,14 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminGroups.PUT("/sort", hs.Handler.BatchSortGroups)
 		}
 
+		// 管理端：频道排序
+		adminChannels := api.Group("/admin/channels")
+		adminChannels.Use(middleware.RequireAdmin())
+		{
+			adminChannels.PUT("/sort", hs.Handler.BatchSortChannels)
+			adminChannels.GET("/sources", hs.Handler.GetChannelSources)
+		}
+
 		// 管理端：EPG 管理
 		adminEpg := api.Group("/admin/epg")
 		adminEpg.Use(middleware.RequireAdmin())

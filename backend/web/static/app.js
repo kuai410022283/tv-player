@@ -225,7 +225,7 @@ function showSection(name, el) {
 
   const loaders = {
     dashboard: loadDashboard,
-    channels: loadChannels,
+    channels: () => { loadChannels(); loadChannelSources(); },
     groups: loadGroups,
     plans: loadPlans,
     sources: loadSources,
@@ -310,17 +310,20 @@ let channelTotal = 0;
 
 let currentChannelSearch = '';
 let currentChannelGroupId = 0;
+let currentChannelSource = '';
 let currentMuxSupport = null;
 
-async function loadChannels(search = currentChannelSearch, groupId = currentChannelGroupId, muxSupport = currentMuxSupport) {
+async function loadChannels(search = currentChannelSearch, groupId = currentChannelGroupId, source = currentChannelSource, muxSupport = currentMuxSupport) {
   currentChannelSearch = search;
   currentChannelGroupId = groupId;
+  currentChannelSource = source;
   currentMuxSupport = muxSupport;
   const gen = nextGen('channels');
 
   let q = `?page=${channelPage}&page_size=${PAGE_SIZE}`;
   if (search) q += `&search=${encodeURIComponent(search)}`;
   if (groupId > 0) q += `&group_id=${groupId}`;
+  if (source) q += `&source=${encodeURIComponent(source)}`;
   if (muxSupport !== null) q += `&mux_support=${muxSupport}`;
 
   const [chRes, grpRes] = await Promise.all([api('/channels' + q), api('/groups', { cache: 'no-store' })]).catch(() => []);
@@ -333,7 +336,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
     channelTotal = chRes.data.total || 0;
     if (chRes.data.items.length === 0 && channelPage > 1) {
       channelPage--;
-      loadChannels(search, groupId, currentMuxSupport);
+      loadChannels(search, groupId, source, currentMuxSupport);
       return;
     }
     body.innerHTML = chRes.data.items.map((c, i) => {
@@ -345,11 +348,13 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
           logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
         }
       }
-      return `<tr>
+      return `<tr data-id="${c.id}" data-source="${esc(c.source || '手动')}" data-group-id="${c.group_id}">
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
+      <td><span class="drag-handle" title="拖拽排序">⠿</span></td>
       <td style="color:var(--text3)">${(channelPage - 1) * PAGE_SIZE + i + 1}</td>
       <td>${logoHtml}</td>
       <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
+      <td style="color:var(--text3)">${c.sort_order}</td>
       <td>${c.epg_channel_id ? esc(c.epg_channel_id) : '<span style="color:#999">-</span>'}</td>
       <td>${gm[c.group_id] || '-'}</td>
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
@@ -399,6 +404,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / PAGE_SIZE));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage');
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
+  initChannelSort();
 
   // 每次加载频道列表时，触发一次状态轮询
   pollHealthCheckStatus();
@@ -480,8 +486,10 @@ function searchChannels() {
   clearTimeout(window._st);
   window._st = setTimeout(() => {
     channelPage = 1;
-    currentChannelGroupId = 0; // Reset group filter on new text search
+    currentChannelGroupId = 0;
+    currentChannelSource = '';
     currentMuxSupport = null;
+    document.getElementById('channel-source-filter').value = '';
     loadChannels(document.getElementById('channel-search').value);
   }, 300);
 }
@@ -491,9 +499,10 @@ function filterChannelsByGroup(groupId, groupName, sourceName) {
   currentChannelGroupId = groupId;
   currentMuxSupport = null;
   currentChannelSearch = '';
+  currentChannelSource = '';
   document.getElementById('channel-search').value = '';
+  document.getElementById('channel-source-filter').value = '';
   showSection('channels');
-  // Highlight the group name in search bar placeholder or show a toast
   document.getElementById('channel-search').placeholder = `已过滤: [${sourceName}] ${groupName} ...`;
   loadChannels();
 }
@@ -503,11 +512,98 @@ function filterChannelsByGroupMux(groupId, groupName, sourceName, muxSupport) {
   currentChannelGroupId = groupId;
   currentMuxSupport = muxSupport;
   currentChannelSearch = '';
+  currentChannelSource = '';
   document.getElementById('channel-search').value = '';
+  document.getElementById('channel-source-filter').value = '';
   showSection('channels');
   let muxDesc = muxSupport === 1 ? '支持复用' : '不支持复用';
   document.getElementById('channel-search').placeholder = `已过滤: [${sourceName}] ${groupName} (${muxDesc}) ...`;
   loadChannels();
+}
+
+function filterChannelsBySource(source) {
+  channelPage = 1;
+  currentChannelSource = source;
+  document.getElementById('channel-search').value = '';
+  loadChannels();
+}
+
+// ── 频道来源筛选下拉框加载 ──
+async function loadChannelSources() {
+  try {
+    const res = await api('/admin/channels/sources', { silent: true });
+    if (res && res.data) {
+      const select = document.getElementById('channel-source-filter');
+      if (select) {
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">全部来源</option>' +
+          res.data.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+        select.value = currentVal;
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// ── 频道拖拽排序 ──
+function initChannelSort() {
+  const tbody = document.getElementById('channels-body');
+  if (!tbody || typeof Sortable === 'undefined') return;
+  if (window._channelSortable) { window._channelSortable.destroy(); window._channelSortable = null; }
+  // 搜索状态下不初始化拖拽
+  const searchVal = document.getElementById('channel-search')?.value.trim();
+  if (searchVal) return;
+  window._channelSortable = new Sortable(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    onMove: function(evt) {
+      // 只允许在同一来源+分组内拖拽
+      const dragged = evt.dragged;
+      const related = evt.related;
+      return dragged.dataset.source === related.dataset.source
+          && dragged.dataset.groupId === related.dataset.groupId;
+    },
+    onEnd: function(evt) {
+      // 记录被拖拽的来源+分组
+      window._draggedSource = evt.item.dataset.source;
+      window._draggedGroupId = evt.item.dataset.groupId;
+      document.getElementById('btn-save-channel-sort').style.display = 'inline-block';
+    }
+  });
+}
+
+async function saveChannelOrder() {
+  const tbody = document.getElementById('channels-body');
+  const rows = tbody.querySelectorAll('tr');
+  const draggedSource = window._draggedSource;
+  const draggedGroupId = window._draggedGroupId;
+  const items = [];
+  let index = 0;
+  rows.forEach((row) => {
+    const id = parseInt(row.getAttribute('data-id'));
+    if (isNaN(id)) return;
+    // 只保存被拖拽的来源+分组块
+    if (row.dataset.source === draggedSource && row.dataset.groupId === draggedGroupId) {
+      items.push({ id: id, sort_order: index });
+      index++;
+    }
+  });
+  if (items.length === 0) return;
+  try {
+    await api('/admin/channels/sort', {
+      method: 'PUT',
+      body: JSON.stringify({
+        items: items,
+        group_id: currentChannelGroupId || 0,
+        source: currentChannelSource || ''
+      })
+    });
+    toast('排序已保存');
+    document.getElementById('btn-save-channel-sort').style.display = 'none';
+    loadChannels();
+  } catch (e) {
+    toast('保存排序失败: ' + (e.message || e), 'error');
+    loadChannels();
+  }
 }
 
 function showAddChannelModal() {
@@ -529,6 +625,7 @@ function showAddChannelModal() {
   document.getElementById('ch-headers').value = '';
   document.getElementById('ch-fcc').value = '';
   document.getElementById('ch-fcc-type').value = '';
+  document.getElementById('ch-sort').value = '0';
   showModal('channel-modal');
 }
 
@@ -546,7 +643,8 @@ async function saveChannel() {
     user_agent: document.getElementById('ch-user-agent').value,
     custom_headers: document.getElementById('ch-headers').value,
     fcc: document.getElementById('ch-fcc').value,
-    fcc_type: document.getElementById('ch-fcc-type').value
+    fcc_type: document.getElementById('ch-fcc-type').value,
+    sort_order: parseInt(document.getElementById('ch-sort').value) || 0
   };
   if (!d.name || !d.stream_url) { toast('请填写名称和流地址', 'error'); return; }
   if (d.custom_headers) {
@@ -582,6 +680,7 @@ async function editChannel(id) {
   document.getElementById('ch-headers').value = c.custom_headers || '';
   document.getElementById('ch-fcc').value = c.fcc || '';
   document.getElementById('ch-fcc-type').value = c.fcc_type || '';
+  document.getElementById('ch-sort').value = c.sort_order || 0;
   document.getElementById('channel-modal-title').textContent = '编辑频道';
   showModal('channel-modal');
 }

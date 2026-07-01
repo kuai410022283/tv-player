@@ -297,7 +297,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 
 // ── Channels ───────────────────────────────────────────
 
-func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *int, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
+func (s *ChannelService) ListChannels(groupID int64, search string, source string, muxSupport *int, p *models.PageRequest, clientID int64) (*models.PageResponse, error) {
 	p.Normalize()
 	var whereClauses []string
 	var queryArgs []interface{}
@@ -325,6 +325,10 @@ func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *
 	if groupID > 0 {
 		whereClauses = append(whereClauses, "c.group_id = ?")
 		queryArgs = append(queryArgs, groupID)
+	}
+	if source != "" {
+		whereClauses = append(whereClauses, "c.source = ?")
+		queryArgs = append(queryArgs, source)
 	}
 	if search != "" {
 		switch search {
@@ -356,7 +360,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *
 	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
 		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
 		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), COALESCE(c.fcc, ''), COALESCE(c.fcc_type, ''), c.created_at, c.updated_at ` +
-		baseQuery + where + ` ORDER BY c.sort_order LIMIT ? OFFSET ?`
+		baseQuery + where + ` ORDER BY c.source, c.group_id, c.sort_order, c.id LIMIT ? OFFSET ?`
 
 	rows, err := s.db.Query(query, queryArgs...)
 	if err != nil {
@@ -387,6 +391,113 @@ func (s *ChannelService) ListChannels(groupID int64, search string, muxSupport *
 		return nil, err
 	}
 	return &models.PageResponse{Total: total, Page: p.Page, PageSize: p.PageSize, Items: channels}, nil
+}
+
+// GetDistinctSources 获取所有不重复的频道来源列表
+func (s *ChannelService) GetDistinctSources() ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT source FROM channels WHERE is_hidden = 0 ORDER BY source`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var sources []string
+	for rows.Next() {
+		var src string
+		if err := rows.Scan(&src); err != nil {
+			return nil, err
+		}
+		sources = append(sources, src)
+	}
+	return sources, rows.Err()
+}
+
+// BatchUpdateChannelSort 批量更新频道排序（按来源+分组隔离）
+func (s *ChannelService) BatchUpdateChannelSort(items []struct {
+	ID    int64 `json:"id"`
+	Order int   `json:"sort_order"`
+}, groupID int64, source string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare("UPDATE channels SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = stmt.Close() }()
+
+	for _, item := range items {
+		if _, err := stmt.Exec(item.Order, item.ID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ReorderChannels 按 group_id + source 重新排序频道（消除 sort_order 空洞）
+func (s *ChannelService) ReorderChannels(groupID int64, source string) error {
+	where := "WHERE is_hidden = 0"
+	args := []interface{}{}
+	if groupID > 0 {
+		where += " AND group_id = ?"
+		args = append(args, groupID)
+	}
+	if source != "" {
+		where += " AND source = ?"
+		args = append(args, source)
+	}
+
+	rows, err := s.db.Query(`SELECT id FROM channels `+where+` ORDER BY sort_order, id`, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare("UPDATE channels SET sort_order = ? WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = stmt.Close() }()
+
+	for i, id := range ids {
+		if _, err := stmt.Exec(i*10000, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// GetNextChannelSortOrder 获取指定 group_id + source 下的最大 sort_order + 10000
+func (s *ChannelService) GetNextChannelSortOrder(groupID int64, source string) int {
+	var maxOrder int
+	err := s.db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM channels WHERE group_id = ? AND source = ?`, groupID, source).Scan(&maxOrder)
+	if err != nil {
+		return 0
+	}
+	return maxOrder + 10000
 }
 
 func (s *ChannelService) GetChannel(id int64, clientID int64) (*models.Channel, error) {

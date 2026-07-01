@@ -219,6 +219,10 @@
         <div class="header">
           <h1>频道管理</h1>
           <div class="search">
+            <button class="btn btn-primary btn-sm" id="btn-save-channel-sort" style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveChannelOrder()">💾 保存排序</button>
+            <select id="channel-source-filter" onchange="filterChannelsBySource(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
+              <option value="">全部来源</option>
+            </select>
             <input type="text" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
             <button class="btn btn-ghost" id="btn-health-check" onclick="showModal('health-check-modal')"
               style="background:var(--accent);color:white;border:none;">健康检查</button>
@@ -231,9 +235,11 @@
             <thead>
               <tr>
                 <th width="40"><input type="checkbox" id="check-all-channels" onchange="toggleAllChannels(this)"></th>
+                <th width="40"></th>
                 <th width="60">序号</th>
                 <th>台标</th>
                 <th>名称</th>
+                <th>排序</th>
                 <th>EPG匹配ID</th>
                 <th>分组</th>
                 <th>来源</th>
@@ -1053,6 +1059,7 @@
             <option value="huawei">华为 (Huawei UDP)</option>
           </select>
         </div>
+        <div class="form-group"><label>排序</label><input type="number" id="ch-sort" value="0" placeholder="数字越小越靠前"></div>
         <div class="form-actions">
           <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
           <button class="btn btn-primary" onclick="saveChannel()">保存</button>
