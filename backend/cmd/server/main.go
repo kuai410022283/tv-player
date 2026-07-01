@@ -92,6 +92,13 @@ func main() {
 	syncSvc := services.NewSyncService(db)
 	logSvc := services.NewLogService()
 
+	// ── 读取设置并初始化本地文件开关 ────────────────
+	if settings, err := channelSvc.GetAllSettings(); err == nil {
+		if v, ok := settings["allow_local_file"]; ok {
+			services.AllowLocalFile = v == "true" || v == "1"
+		}
+	}
+
 	// ── 启动后台任务 ─────────────────────────────────
 	stop := make(chan struct{})
 	go startClientExpiry(clientSvc, stop)

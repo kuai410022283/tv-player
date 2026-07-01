@@ -1655,6 +1655,11 @@ async function loadClientSettings() {
       serverBackupUrlsSetting = setRes.data.server_backup_urls || '';
       document.getElementById('set-server-backup-urls').value = serverBackupUrlsSetting;
     }
+
+    // 本地文件路径开关
+    if (document.getElementById('set-allow-local-file')) {
+      document.getElementById('set-allow-local-file').value = setRes.data.allow_local_file || 'false';
+    }
   }
 
   // Update 配置
@@ -1734,6 +1739,11 @@ async function saveAllClientSettings() {
   if (document.getElementById('set-logo-strategy')) {
     settings.logo_strategy = document.getElementById('set-logo-strategy').value;
     settings.local_logo_urls = document.getElementById('set-local-logo-urls').value.trim();
+  }
+
+  // 本地文件路径开关
+  if (document.getElementById('set-allow-local-file')) {
+    settings.allow_local_file = document.getElementById('set-allow-local-file').value;
   }
 
   for (const [k, v] of Object.entries(settings)) {

@@ -690,7 +690,16 @@ func (s *ChannelService) GetSetting(key string) (string, error) {
 
 func (s *ChannelService) SetSetting(key, value string) error {
 	_, err := s.db.Exec(`INSERT OR REPLACE INTO user_settings (key, value) VALUES (?,?)`, key, value)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 特殊处理：更新本地文件开关
+	if key == "allow_local_file" {
+		AllowLocalFile = value == "true" || value == "1"
+	}
+
+	return nil
 }
 
 func (s *ChannelService) GetAllSettings() (map[string]string, error) {
