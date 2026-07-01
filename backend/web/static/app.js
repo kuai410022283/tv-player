@@ -668,8 +668,11 @@ async function loadGroups() {
 
   document.getElementById('groups-body').innerHTML = items.map((g, i) => {
     const isDefault = g.name === '未分类' && (!g.source || g.source === '手动');
-    return `<tr>
+    const rowClass = isDefault ? 'no-drag' : '';
+    const dragHandle = isDefault ? '<span style="color:var(--text2);font-size:11px">锁定</span>' : '<span class="drag-handle" title="拖拽排序">⠿</span>';
+    return `<tr data-id="${g.id}" class="${rowClass}">
     <td>${isDefault ? '' : `<input type="checkbox" class="group-check" value="${g.id}" onchange="updateSelectedGroups()">`}</td>
+    <td>${dragHandle}</td>
     <td style="color:var(--text3)">${(groupPage - 1) * PAGE_SIZE + i + 1}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
     <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
     <td><label class="switch" style="transform: scale(0.8); margin: 0">
@@ -694,13 +697,72 @@ async function loadGroups() {
   const grpTotalPages = Math.max(1, Math.ceil(groupTotal / PAGE_SIZE));
   renderPagination('groups-pagination', groupPage, grpTotalPages, 'groupGoToPage');
   document.getElementById('groups-info').textContent = `共 ${groupTotal} 个分组`;
+  initGroupSort();
 }
 
 function groupGoToPage(p) {
   const grpTotalPages = Math.max(1, Math.ceil(groupTotal / PAGE_SIZE));
   if (p >= 1 && p <= grpTotalPages) { groupPage = p; loadGroups(); }
 }
-function searchGroups() { clearTimeout(window._gt); window._gt = setTimeout(() => { groupPage = 1; loadGroups(); }, 300); }
+function searchGroups() {
+  clearTimeout(window._gt);
+  window._gt = setTimeout(() => {
+    groupPage = 1;
+    loadGroups();
+    // 搜索时禁用拖拽，清空搜索后恢复
+    const searchVal = document.getElementById('group-search').value.trim();
+    if (searchVal && window._groupSortable) {
+      window._groupSortable.option('disabled', true);
+    }
+  }, 300);
+}
+
+// ── 分组拖拽排序 ──
+function initGroupSort() {
+  const tbody = document.getElementById('groups-body');
+  if (!tbody || typeof Sortable === 'undefined') return;
+  if (window._groupSortable) { window._groupSortable.destroy(); window._groupSortable = null; }
+  // 搜索状态下不初始化拖拽
+  const searchVal = document.getElementById('group-search')?.value.trim();
+  if (searchVal) return;
+  window._groupSortable = new Sortable(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    filter: '.no-drag',
+    onEnd: function() {
+      document.getElementById('btn-save-sort').style.display = 'inline-block';
+    }
+  });
+}
+
+async function saveGroupOrder() {
+  const tbody = document.getElementById('groups-body');
+  const rows = tbody.querySelectorAll('tr');
+  const items = [];
+  rows.forEach((row, i) => {
+    const id = parseInt(row.getAttribute('data-id'));
+    if (!isNaN(id) && !row.classList.contains('no-drag')) {
+      items.push({ id: id, sort_order: (groupPage - 1) * PAGE_SIZE + i });
+    }
+  });
+  // "未分类" 固定 sort_order = 99999
+  rows.forEach(row => {
+    if (row.classList.contains('no-drag')) {
+      const id = parseInt(row.getAttribute('data-id'));
+      if (!isNaN(id)) items.push({ id: id, sort_order: 99999 });
+    }
+  });
+  if (items.length === 0) return;
+  try {
+    await api('/admin/groups/sort', { method: 'PUT', body: JSON.stringify({ items }) });
+    toast('排序已保存');
+    document.getElementById('btn-save-sort').style.display = 'none';
+    loadGroups();
+  } catch (e) {
+    toast('保存排序失败: ' + (e.message || e), 'error');
+    loadGroups();
+  }
+}
 
 function toggleAllGroups(el) {
   document.querySelectorAll('.group-check').forEach(cb => { cb.checked = el.checked; });

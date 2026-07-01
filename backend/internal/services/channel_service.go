@@ -174,6 +174,70 @@ func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
 	return tx.Commit()
 }
 
+// BatchUpdateGroupSort 批量更新分组排序
+func (s *ChannelService) BatchUpdateGroupSort(items []struct {
+	ID    int64 `json:"id"`
+	Order int   `json:"sort_order"`
+}) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("UPDATE channel_groups SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, item := range items {
+		if _, err := stmt.Exec(item.Order, item.ID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ReorderAllGroups 重新排序所有分组（删除后调用，消除 sort_order 空洞）
+func (s *ChannelService) ReorderAllGroups() error {
+	rows, err := s.db.Query(`SELECT id FROM channel_groups ORDER BY CASE WHEN name = '未分类' THEN 1 ELSE 0 END, sort_order, id`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("UPDATE channel_groups SET sort_order = ? WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for i, id := range ids {
+		if _, err := stmt.Exec(i, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (*models.PageResponse, error) {
 	p.Normalize()
 	where := "WHERE 1=1"

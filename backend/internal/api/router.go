@@ -137,6 +137,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		adminGroups.Use(middleware.RequireAdmin())
 		{
 			adminGroups.GET("", hs.Handler.AdminListGroups)
+			adminGroups.PUT("/sort", hs.Handler.BatchSortGroups)
 		}
 
 		// 管理端：EPG 管理

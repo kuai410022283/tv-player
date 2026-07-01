@@ -221,6 +221,8 @@ func (h *Handler) DeleteGroup(c *gin.Context) {
 		failInternal(c, err, "删除分组失败")
 		return
 	}
+	// 删除后重新排序，消除 sort_order 空洞
+	_ = h.channelSvc.ReorderAllGroups()
 	ok(c, nil)
 }
 
@@ -239,6 +241,26 @@ func (h *Handler) BatchGroup(c *gin.Context) {
 			failInternal(c, err, "批量删除失败")
 			return
 		}
+		// 删除后重新排序，消除 sort_order 空洞
+		_ = h.channelSvc.ReorderAllGroups()
+	}
+	ok(c, nil)
+}
+
+func (h *Handler) BatchSortGroups(c *gin.Context) {
+	var req struct {
+		Items []struct {
+			ID    int64 `json:"id"`
+			Order int   `json:"sort_order"`
+		} `json:"items" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.channelSvc.BatchUpdateGroupSort(req.Items); err != nil {
+		failInternal(c, err, "批量排序失败")
+		return
 	}
 	ok(c, nil)
 }
@@ -1197,7 +1219,7 @@ func (h *Handler) PullAppUpdateProgress(c *gin.Context) {
 func (h *Handler) CancelPullAppUpdate(c *gin.Context) {
 	pullUpdateMutex.Lock()
 	defer pullUpdateMutex.Unlock()
-	
+
 	if pullUpdateCancel != nil {
 		pullUpdateCancel()
 		pullUpdateCancel = nil
@@ -1490,7 +1512,7 @@ func (h *Handler) GetDBSnapshot(c *gin.Context) {
 		reqToken = c.GetHeader("Authorization")
 		reqToken = strings.TrimPrefix(reqToken, "Bearer ")
 	}
-	
+
 	if serveToken == "" || reqToken != serveToken {
 		fail(c, 401, "unauthorized sync access")
 		return
@@ -1503,7 +1525,7 @@ func (h *Handler) GetDBSnapshot(c *gin.Context) {
 	}
 
 	defer os.Remove(tempPath)
-	
+
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Disposition", "attachment; filename=snapshot.db")
@@ -1541,13 +1563,13 @@ func (h *Handler) GetLogosSnapshot(c *gin.Context) {
 		if entry.IsDir() {
 			continue
 		}
-		
+
 		filePath := filepath.Join(dir, entry.Name())
 		f, err := os.Open(filePath)
 		if err != nil {
 			continue
 		}
-		
+
 		h := md5.New()
 		if _, err := io.Copy(h, f); err == nil {
 			snapshots[entry.Name()] = fmt.Sprintf("%x", h.Sum(nil))
