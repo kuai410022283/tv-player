@@ -490,6 +490,16 @@
               服务器授权与网络配置
             </h3>
 
+            <!-- 服务器名称配置 -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label style="color: var(--text); font-weight: 500; font-size: 13px;">服务器名称</label>
+              <input type="text" id="set-server-name" placeholder="例如：我的电视服务器 (留空则客户端不显示)"
+                maxlength="20" style="height: 38px; margin-top: 6px;"
+                oninput="this.value=this.value.replace(/[^a-zA-Z0-9\u4e00-\u9fa5\s]/g,'')">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
+                最多 20 个字符，仅支持中文、英文、数字、空格。留空时客户端不显示服务器名称。</div>
+            </div>
+
             <!-- 服务器域名/地址配置 -->
             <div class="form-group" style="margin-bottom: 16px;">
               <label style="color: var(--text); font-weight: 500; font-size: 13px;">自定义服务器外网域名/地址 (Server URL)</label>

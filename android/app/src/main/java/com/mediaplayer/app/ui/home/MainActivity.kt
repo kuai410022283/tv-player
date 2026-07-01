@@ -1010,7 +1010,9 @@ class MainActivity : AppCompatActivity() {
                 
                 val pName = if (planName.isNullOrEmpty()) "无" else planName
                 val expTime = if (expiresAt.isNullOrEmpty()) "永久" else expiresAt
-                "套餐: $pName\n过期时间: $expTime"
+                val serverName = authManager.getServerName()
+                val serverLine = if (!serverName.isNullOrEmpty()) "$serverName\n" else ""
+                "${serverLine}套餐: $pName\n过期时间: $expTime"
             }
             "pending" -> "授权状态: 等待审批"
             "rejected" -> "授权状态: 已拒绝"

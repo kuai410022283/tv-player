@@ -1919,6 +1919,9 @@ async function loadClientSettings() {
     }
 
     // 服务器网络配置
+    if (document.getElementById('set-server-name')) {
+      document.getElementById('set-server-name').value = setRes.data.server_name || '';
+    }
     if (document.getElementById('set-enable-external-sub')) {
       const isExternalSub = setRes.data.enable_external_sub || 'false';
       enableExternalSubSetting = isExternalSub;
@@ -1968,7 +1971,16 @@ async function loadClientSettings() {
 }
 
 async function saveAllClientSettings() {
+  // 服务器名称验证：只允许中文、英文、数字、空格，最多20字符
+  let serverName = '';
+  if (document.getElementById('set-server-name')) {
+    serverName = document.getElementById('set-server-name').value.trim();
+    serverName = serverName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5\s]/g, '').substring(0, 20);
+    document.getElementById('set-server-name').value = serverName;
+  }
+
   const settings = {
+    server_name: serverName,
     enable_external_sub: document.getElementById('set-enable-external-sub').value,
     server_url: document.getElementById('set-server-url').value.trim(),
     server_backup_urls: document.getElementById('set-server-backup-urls') ? document.getElementById('set-server-backup-urls').value.trim() : '',
