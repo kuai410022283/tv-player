@@ -148,7 +148,7 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 		"INSERT INTO main.subscription_plans (id, name, days, max_streams, price, description, subscription_token, created_at, updated_at) SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM master_db.subscription_plans",
 		
 		"DELETE FROM main.plan_group_relations",
-		"INSERT INTO main.plan_group_relations (plan_id, group_id) SELECT plan_id, group_id FROM master_db.plan_group_relations",
+		"INSERT INTO main.plan_group_relations (plan_id, group_id, sort_order) SELECT plan_id, group_id, sort_order FROM master_db.plan_group_relations",
 		
 		"DELETE FROM main.m3u_sources",
 		"INSERT INTO main.m3u_sources (id, name, url, auto_sync, sync_interval, user_agent, custom_headers, last_sync, created_at) SELECT id, name, url, auto_sync, sync_interval, user_agent, custom_headers, last_sync, created_at FROM master_db.m3u_sources",

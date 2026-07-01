@@ -293,6 +293,7 @@ func createTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS plan_group_relations (
 		plan_id INTEGER NOT NULL,
 		group_id INTEGER NOT NULL,
+		sort_order INTEGER DEFAULT 0,
 		PRIMARY KEY (plan_id, group_id),
 		FOREIGN KEY (plan_id) REFERENCES subscription_plans(id) ON DELETE CASCADE,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE CASCADE
@@ -328,6 +329,7 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_status TEXT DEFAULT 'idle';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_error TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE plan_group_relations ADD COLUMN sort_order INTEGER DEFAULT 0;")
 
 	return err
 }

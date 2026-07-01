@@ -163,3 +163,11 @@ input:checked + .slider:before { transform: translateX(16px); }
 .sortable-chosen{box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .sortable-drag{background:var(--bg2)}
 tr.no-drag .drag-handle{cursor:default;opacity:.3;pointer-events:none}
+
+/* ── Plan Group Tags ── */
+.plan-group-tag{transition:all .2s ease}
+.plan-group-tag:hover{opacity:.9;transform:scale(1.02)}
+.plan-group-tag .plan-group-remove{cursor:pointer;font-size:14px;opacity:.7;transition:opacity .2s}
+.plan-group-tag .plan-group-remove:hover{opacity:1}
+.plan-group-tag-unselected{transition:all .2s ease}
+.plan-group-tag-unselected:hover{background:var(--accent)!important;color:#fff!important}

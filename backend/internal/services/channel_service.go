@@ -36,9 +36,12 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 			WHERE cl.id = ?
 		`
 		args = append(args, clientID)
+		// 客户端请求时使用套餐级别的分组排序
+		query += ` ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, pgr.sort_order, g.id`
+	} else {
+		// 管理端请求时使用全局分组排序
+		query += ` ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id`
 	}
-
-	query += ` ORDER BY CASE WHEN g.name = '未分类' THEN 1 ELSE 0 END, g.sort_order, g.id`
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -360,7 +363,14 @@ func (s *ChannelService) ListChannels(groupID int64, search string, source strin
 	query := `SELECT c.id, c.group_id, c.name, COALESCE(c.logo, ''), COALESCE(c.description, ''), c.stream_url, 
 		COALESCE(c.stream_type, ''), COALESCE(c.epg_channel_id, ''), 
 		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), COALESCE(c.fcc, ''), COALESCE(c.fcc_type, ''), c.created_at, c.updated_at ` +
-		baseQuery + where + ` ORDER BY c.source, c.group_id, c.sort_order, c.id LIMIT ? OFFSET ?`
+		baseQuery + where
+	if clientID > 0 {
+		// 客户端请求时使用套餐级别的分组排序
+		query += ` ORDER BY c.source, pgr.sort_order, c.sort_order, c.id LIMIT ? OFFSET ?`
+	} else {
+		// 管理端请求时使用全局分组排序
+		query += ` ORDER BY c.source, c.group_id, c.sort_order, c.id LIMIT ? OFFSET ?`
+	}
 
 	rows, err := s.db.Query(query, queryArgs...)
 	if err != nil {

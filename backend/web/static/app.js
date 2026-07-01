@@ -1417,12 +1417,32 @@ function planGoToPage(p) {
   if (p >= 1 && p <= totalPages) { planPage = p; renderPlansTable(); }
 }
 
+function toggleAllPlanGroups(selectAll) {
+  if (selectAll) {
+    // 全选：将所有未选分组移到已选列表
+    const unselectedContainer = document.getElementById('plan-groups-container');
+    const unselectedTags = unselectedContainer.querySelectorAll('.plan-group-tag-unselected');
+    unselectedTags.forEach(tag => {
+      const groupId = parseInt(tag.getAttribute('data-id'));
+      addPlanGroup(groupId);
+    });
+  } else {
+    // 取消全选：将所有已选分组移到未选列表
+    const selectedContainer = document.getElementById('plan-groups-selected');
+    const selectedTags = selectedContainer.querySelectorAll('.plan-group-tag');
+    selectedTags.forEach(tag => {
+      const groupId = parseInt(tag.getAttribute('data-id'));
+      removePlanGroup(groupId);
+    });
+  }
+}
+
 async function savePlan() {
   const id = document.getElementById('plan-edit-id').value;
 
-  // Collect selected groups
-  const checkboxes = document.querySelectorAll('#plan-groups-container input[type="checkbox"]:checked');
-  const groupIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+  // Collect selected groups (in order from sortable)
+  const selectedTags = document.querySelectorAll('#plan-groups-selected .plan-group-tag');
+  const groupIds = Array.from(selectedTags).map(tag => parseInt(tag.getAttribute('data-id')));
 
   const d = {
     name: document.getElementById('plan-name').value,
@@ -1451,16 +1471,59 @@ async function editPlan(id) {
     if (found) p = found;
   }
 
-  // Render checkboxes
-  const container = document.getElementById('plan-groups-container');
-  container.innerHTML = groups.map(g => {
-    const isChecked = p.group_ids && p.group_ids.includes(g.id);
-    const sourceTag = g.source && g.source !== '手动' ? ` <span style="font-size:11px;color:var(--text2)">(${esc(g.source)})</span>` : '';
-    return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg2);padding:4px 10px;border-radius:4px;">
-      <input type="checkbox" value="${g.id}" ${isChecked ? 'checked' : ''}>
+  // 分离已选和未选分组，保持已选分组的顺序
+  const selectedGroups = [];
+  const unselectedGroups = [];
+  const selectedIds = new Set(p.group_ids || []);
+  
+  // 按照 group_ids 的顺序添加已选分组
+  for (const gid of (p.group_ids || [])) {
+    const g = groups.find(x => x.id === gid);
+    if (g) selectedGroups.push(g);
+  }
+  // 添加未选分组
+  for (const g of groups) {
+    if (!selectedIds.has(g.id)) unselectedGroups.push(g);
+  }
+
+  // 渲染已选分组（可拖拽）
+  const selectedContainer = document.getElementById('plan-groups-selected');
+  selectedContainer.innerHTML = selectedGroups.map(g => {
+    const source = g.source && g.source !== '手动' ? g.source : '';
+    const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
+    return `<div class="plan-group-tag" data-id="${g.id}" data-name="${esc(g.name)}"${source ? ` data-source="${esc(source)}"` : ''} style="display:flex;align-items:center;gap:5px;cursor:grab;background:var(--accent);color:#fff;padding:4px 10px;border-radius:4px;user-select:none;">
+      <span style="cursor:pointer;font-size:14px;" onclick="removePlanGroup(${g.id})">✕</span>
       ${esc(g.name)}${sourceTag}
-    </label>`;
+    </div>`;
   }).join('');
+
+  // 渲染未选分组
+  const unselectedContainer = document.getElementById('plan-groups-container');
+  const unselectedHeader = unselectedContainer.querySelector('div:first-child');
+  unselectedContainer.innerHTML = '';
+  if (unselectedHeader) unselectedContainer.appendChild(unselectedHeader);
+  unselectedGroups.forEach(g => {
+    const source = g.source && g.source !== '手动' ? g.source : '';
+    const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
+    const tag = document.createElement('div');
+    tag.className = 'plan-group-tag-unselected';
+    tag.setAttribute('data-id', g.id);
+    tag.setAttribute('data-name', g.name);
+    if (source) tag.setAttribute('data-source', source);
+    tag.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg2);padding:4px 10px;border-radius:4px;';
+    tag.innerHTML = `<span style="font-size:14px;">+</span> ${esc(g.name)}${sourceTag}`;
+    tag.onclick = () => addPlanGroup(g.id);
+    unselectedContainer.appendChild(tag);
+  });
+
+  // 初始化拖拽排序
+  if (window.planGroupsSortable) {
+    window.planGroupsSortable.destroy();
+  }
+  window.planGroupsSortable = new Sortable(selectedContainer, {
+    animation: 150,
+    ghostClass: 'sortable-ghost'
+  });
 
   document.getElementById('plan-edit-id').value = id || '';
   document.getElementById('plan-name').value = p.name;
@@ -1489,6 +1552,59 @@ async function editPlan(id) {
   }
 
   showModal('plan-modal');
+}
+
+// 添加分组到已选列表
+function addPlanGroup(groupId) {
+  const selectedContainer = document.getElementById('plan-groups-selected');
+  const unselectedContainer = document.getElementById('plan-groups-container');
+  
+  // 从未选列表移除
+  const unselectedTag = unselectedContainer.querySelector(`[data-id="${groupId}"]`);
+  if (unselectedTag) {
+    const gName = unselectedTag.getAttribute('data-name') || '';
+    const source = unselectedTag.getAttribute('data-source') || '';
+    const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
+    
+    // 添加到已选列表
+    const tag = document.createElement('div');
+    tag.className = 'plan-group-tag';
+    tag.setAttribute('data-id', groupId);
+    tag.setAttribute('data-name', gName);
+    if (source) tag.setAttribute('data-source', source);
+    tag.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:grab;background:var(--accent);color:#fff;padding:4px 10px;border-radius:4px;user-select:none;';
+    tag.innerHTML = `<span style="cursor:pointer;font-size:14px;" onclick="removePlanGroup(${groupId})">✕</span> ${esc(gName)}${sourceTag}`;
+    selectedContainer.appendChild(tag);
+    
+    unselectedTag.remove();
+  }
+}
+
+// 从已选列表移除分组
+function removePlanGroup(groupId) {
+  const selectedContainer = document.getElementById('plan-groups-selected');
+  const unselectedContainer = document.getElementById('plan-groups-container');
+  
+  // 从已选列表移除
+  const selectedTag = selectedContainer.querySelector(`[data-id="${groupId}"]`);
+  if (selectedTag) {
+    const gName = selectedTag.getAttribute('data-name') || '';
+    const source = selectedTag.getAttribute('data-source') || '';
+    const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
+    
+    // 添加到未选列表
+    const tag = document.createElement('div');
+    tag.className = 'plan-group-tag-unselected';
+    tag.setAttribute('data-id', groupId);
+    tag.setAttribute('data-name', gName);
+    if (source) tag.setAttribute('data-source', source);
+    tag.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg2);padding:4px 10px;border-radius:4px;';
+    tag.innerHTML = `<span style="font-size:14px;">+</span> ${esc(gName)}${sourceTag}`;
+    tag.onclick = () => addPlanGroup(groupId);
+    unselectedContainer.appendChild(tag);
+    
+    selectedTag.remove();
+  }
 }
 
 async function deletePlan(id) {

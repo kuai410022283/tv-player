@@ -94,7 +94,7 @@ type SubscriptionPlan struct {
 	Price             float64   `json:"price" db:"price"`             // 展示价格
 	Description       string    `json:"description" db:"description"`
 	SubscriptionToken string    `json:"subscription_token" db:"subscription_token"`
-	GroupIDs          []int64   `json:"group_ids" db:"-"`             // 关联的频道分组
+	GroupIDs          []int64   `json:"group_ids" db:"-"`             // 关联的频道分组（按顺序排列）
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }

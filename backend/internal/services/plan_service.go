@@ -64,10 +64,10 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 		items = append(items, m)
 	}
 
-	// Fetch group associations
+	// Fetch group associations (ordered by sort_order)
 	for _, m := range items {
 		m.GroupIDs = make([]int64, 0)
-		gRows, err := s.db.Query(`SELECT group_id FROM plan_group_relations WHERE plan_id=?`, m.ID)
+		gRows, err := s.db.Query(`SELECT group_id FROM plan_group_relations WHERE plan_id=? ORDER BY sort_order ASC, group_id ASC`, m.ID)
 		if err == nil {
 			for gRows.Next() {
 				var gID int64
@@ -96,9 +96,9 @@ func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 	m.CreatedAt = now
 	m.UpdatedAt = now
 
-	// Save group relations
-	for _, gID := range m.GroupIDs {
-		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id) VALUES (?,?)`, m.ID, gID)
+	// Save group relations with sort order
+	for i, gID := range m.GroupIDs {
+		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id, sort_order) VALUES (?,?,?)`, m.ID, gID, i)
 	}
 
 	return nil
@@ -116,10 +116,10 @@ func (s *PlanService) UpdatePlan(m *models.SubscriptionPlan) error {
 	}
 	m.UpdatedAt = now
 
-	// Update group relations
+	// Update group relations with sort order
 	_, _ = s.db.Exec(`DELETE FROM plan_group_relations WHERE plan_id=?`, m.ID)
-	for _, gID := range m.GroupIDs {
-		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id) VALUES (?,?)`, m.ID, gID)
+	for i, gID := range m.GroupIDs {
+		_, _ = s.db.Exec(`INSERT OR IGNORE INTO plan_group_relations (plan_id, group_id, sort_order) VALUES (?,?,?)`, m.ID, gID, i)
 	}
 
 	return nil
@@ -145,7 +145,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		return nil, err
 	}
 
-	// 2. 加载套餐关联分组下的非隐藏频道 (并按分组和频道的排序条件排序)
+	// 2. 加载套餐关联分组下的非隐藏频道 (并按套餐分组排序和频道排序条件排序)
 	query := `
 		SELECT c.id, c.group_id, cg.name AS group_name, c.name, COALESCE(c.logo, '') AS logo, 
 		       c.stream_url, COALESCE(c.stream_type, '') AS stream_type, COALESCE(c.epg_channel_id, '') AS epg_channel_id,
@@ -155,7 +155,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		JOIN channel_groups cg ON c.group_id = cg.id
 		JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
 		WHERE pgr.plan_id = ? AND c.is_hidden = 0
-		ORDER BY cg.sort_order ASC, cg.id ASC, c.sort_order ASC, c.id ASC
+		ORDER BY pgr.sort_order ASC, cg.id ASC, c.sort_order ASC, c.id ASC
 	`
 	rows, err := s.db.Query(query, planID)
 	if err != nil {
