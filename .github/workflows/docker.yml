@@ -71,10 +71,7 @@ jobs:
             type=raw,value=${{ steps.extract_version.outputs.VERSION }},enable=${{ steps.extract_version.outputs.VERSION != '' }}
           labels: |
             org.opencontainers.image.version=${{ steps.extract_version.outputs.VERSION || 'latest' }}
-            org.opencontainers.image.title=tv-player
             org.opencontainers.image.description=智能电视服务端
-            org.opencontainers.image.source=https://github.com/kuai410022283/tv-player
-
       - name: Build & Push
         uses: docker/build-push-action@v5
         with:

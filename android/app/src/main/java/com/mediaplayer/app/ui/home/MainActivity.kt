@@ -372,6 +372,10 @@ class MainActivity : AppCompatActivity() {
                     hideSettingsMenu()
                     menuHidden = true
                 }
+                if (layoutLineMenu?.visibility == View.VISIBLE) {
+                    hideLineSelectionMenu()
+                    menuHidden = true
+                }
                 
                 if (menuHidden) {
                     return true
@@ -1236,65 +1240,84 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
 
-        // ===== 手动指定内核模式：不做任何自动切换，仅 OSD 提示用户 =====
-        if (globalCore != Prefs.PLAYER_CORE_AUTO) {
-            val coreName = when (globalCore) {
-                Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                else -> "VLC"
-            }
-            osdOverlayView?.setInfoText("当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式".toString())
-            showOsd()
-            com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
-            return
-        }
+        val channel = allChannels.getOrNull(currentChannelIndex)
+        val lines = channel?.getLinesSafely() ?: emptyList()
 
-        // 如果是网络超时，不要去切换内核（因为内核没毛病），直接走换线逻辑
-        if (!isNetworkTimeout) {
-            // 内核容灾：智能模式下尝试切换播放内核
-            if (coreRetryLevel < 2) {
-                coreRetryLevel++
-                val coreName = when (coreRetryLevel) {
-                    1 -> "VLC"
-                    2 -> "IJKPlayer"
-                    else -> "ExoPlayer"
+        // ===== 手动指定内核模式：尝试切换线路（不做内核切换） =====
+        if (globalCore != Prefs.PLAYER_CORE_AUTO) {
+            if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
+                // 还有其他线路，按顺序尝试
+                currentLineIndex++
+                val coreName = when (globalCore) {
+                    Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                    Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                    else -> "VLC"
                 }
-                Toast.makeText(this, "尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
-                com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback failed. Retrying with core: $coreName")
+                Toast.makeText(this, "当前线路无法播放，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Manual core ($coreName) failed. Switching to line ${currentLineIndex + 1}")
                 playCurrentLineInTv()
+                return
+            } else {
+                // 所有线路都失败
+                val coreName = when (globalCore) {
+                    Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+                    Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                    else -> "VLC"
+                }
+                currentLineIndex = 0
+                osdOverlayView?.setInfoText("所有线路均无法播放，请切换为智能模式或更换其他频道".toString())
+                showOsd()
+                com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) failed on all lines.")
                 return
             }
         }
 
-        val channel = allChannels.getOrNull(currentChannelIndex)
-        val lines = channel?.getLinesSafely() ?: emptyList()
+        // ===== 智能模式：先切换线路，所有线路失败再切换内核 =====
 
+        // 1. 优先切换线路
         if (lines.isNotEmpty() && currentLineIndex < lines.size - 1) {
             currentLineIndex++
-            coreRetryLevel = 0
+            coreRetryLevel = 0  // 切换线路后重置内核重试计数
             Toast.makeText(this@MainActivity, "当前线路失效，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
-            com.mediaplayer.app.util.RemoteLogger.i("Player", "Core failed. Switching to line ${currentLineIndex + 1}")
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "Switching to line ${currentLineIndex + 1}")
             playCurrentLineInTv()
+            return
+        }
+
+        // 2. 所有线路都失败后，尝试切换内核（非网络超时情况）
+        if (!isNetworkTimeout && coreRetryLevel < 2) {
+            currentLineIndex = 0  // 重置线路索引，用新内核重新遍历所有线路
+            coreRetryLevel++
+            val coreName = when (coreRetryLevel) {
+                1 -> "VLC"
+                2 -> "IJKPlayer"
+                else -> "ExoPlayer"
+            }
+            Toast.makeText(this, "所有线路失败，尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "All lines failed. Retrying with core: $coreName")
+            playCurrentLineInTv()
+            return
+        }
+
+        // 3. 所有线路和内核都失败
+        coreRetryLevel = 0
+        currentLineIndex = 0
+        
+        val msg = if (isNetworkTimeout) "网络超时，播放失败" else "所有线路和内核均已失效"
+        com.mediaplayer.app.util.RemoteLogger.e("Player", "All lines and cores failed for channel: ${channel?.name ?: "Unknown"}. Reason: $msg")
+        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+        
+        continuousSkipCount++
+        if (continuousSkipCount >= maxAutoSkips) {
+            Toast.makeText(this@MainActivity, "多个频道连续播放失败，已停止自动换台", Toast.LENGTH_LONG).show()
+            continuousSkipCount = 0
         } else {
-            coreRetryLevel = 0
-            currentLineIndex = 0
-            
-            val msg = if (isNetworkTimeout) "网络超时，播放失败" else "所有线路均已失效"
-            com.mediaplayer.app.util.RemoteLogger.e("Player", "All lines and cores failed for channel: ${channel?.name ?: "Unknown"}. Reason: $msg")
-            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
-            
-            continuousSkipCount++
-            if (continuousSkipCount >= maxAutoSkips) {
-                Toast.makeText(this@MainActivity, "多个频道连续播放失败，已停止自动换台", Toast.LENGTH_LONG).show()
-                continuousSkipCount = 0
-            } else {
-                Toast.makeText(this@MainActivity, "当前频道失效，自动为您跳过", Toast.LENGTH_SHORT).show()
-                if (allChannels.isNotEmpty()) {
-                    val nextChannelIndex = (currentChannelIndex + 1) % allChannels.size
-                    uiHandler.postDelayed({
-                        playTvChannel(nextChannelIndex, isAutoSkip = true)
-                    }, 1000)
-                }
+            Toast.makeText(this@MainActivity, "当前频道失效，自动为您跳过", Toast.LENGTH_SHORT).show()
+            if (allChannels.isNotEmpty()) {
+                val nextChannelIndex = (currentChannelIndex + 1) % allChannels.size
+                uiHandler.postDelayed({
+                    playTvChannel(nextChannelIndex, isAutoSkip = true)
+                }, 1000)
             }
         }
     }
