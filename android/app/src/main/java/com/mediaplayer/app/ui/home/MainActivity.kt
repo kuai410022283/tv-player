@@ -1911,7 +1911,7 @@ class MainActivity : AppCompatActivity() {
 
                 for ((index, serverUrl) in candidates.withIndex()) {
                     val label = if (index == 0) "主服务器" else "备用服务器 $index"
-                    showAuthWaiting("正在验证$label ...")
+                    showAuthWaiting("正在验证$label ...", showQr = true)
 
                     ApiClient.init(serverUrl)
 
@@ -1967,11 +1967,11 @@ class MainActivity : AppCompatActivity() {
 
             var maintenanceResult: com.mediaplayer.app.data.model.ClientRegisterResp? = null
 
-            showAuthWaiting("正在注册设备...")
+            showAuthWaiting("正在注册设备...", showQr = true)
 
             for ((index, serverUrl) in candidates.withIndex()) {
                 val label = if (index == 0) "主服务器 ($serverUrl)" else "备用服务器 $index ($serverUrl)"
-                showAuthWaiting("正在连接$label ...")
+                showAuthWaiting("正在连接$label ...", showQr = true)
 
                 ApiClient.init(serverUrl)
                 authManager.clearAuth()
@@ -2005,16 +2005,16 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         "pending" -> {
-                            showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}")
+                            showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}", showQr = true)
                             startAuthPolling()
                             return@launch
                         }
                         "rejected" -> {
-                            showAuthWaiting("设备注册被拒绝\n请联系管理员")
+                            showAuthWaiting("设备注册被拒绝\n请联系管理员", showQr = true)
                             return@launch
                         }
                         "banned" -> {
-                            showAuthWaiting("设备已被封禁\n请联系管理员")
+                            showAuthWaiting("设备已被封禁\n请联系管理员", showQr = true)
                             return@launch
                         }
                     }
@@ -2079,12 +2079,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAuthWaiting(message: String, showQr: Boolean? = null) {
-        if (isTvMode) {
-            tvAuthWaiting?.visibility = View.VISIBLE
-            findViewById<TextView>(R.id.tvAuthStatus)?.text = message
-        }
+        // 更新状态文字（始终执行）
+        tvAuthWaiting?.visibility = View.VISIBLE
+        findViewById<TextView>(R.id.tvAuthStatus)?.text = message
         
         val actualShowQr = showQr ?: (layoutAuthQrConfig?.visibility == View.VISIBLE)
+        
+        // 面板已可见时，跳过二维码生成，避免闪烁
+        if (actualShowQr && layoutAuthQrConfig?.visibility == View.VISIBLE) {
+            return
+        }
         
         if (actualShowQr) {
             val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
@@ -2094,23 +2098,21 @@ class MainActivity : AppCompatActivity() {
                     checkAuthAndLoad()
                 }
                 
-                if (layoutAuthQrConfig?.visibility != View.VISIBLE) {
-                    val qrPort = configWebServer?.actualPort ?: 9528
-                    val qrUrl = "http://$ip:$qrPort/"
-                    val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
-                    ivAuthQrCode?.setImageBitmap(bitmap)
-                    tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
-                    tvAuthQrConfigHint?.setOnClickListener {
-                        try {
-                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            startActivity(intent)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                val qrPort = configWebServer?.actualPort ?: 9528
+                val qrUrl = "http://$ip:$qrPort/"
+                val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+                ivAuthQrCode?.setImageBitmap(bitmap)
+                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
+                tvAuthQrConfigHint?.setOnClickListener {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
-                    layoutAuthQrConfig?.visibility = View.VISIBLE
                 }
+                layoutAuthQrConfig?.visibility = View.VISIBLE
             }
         } else {
             layoutAuthQrConfig?.visibility = View.GONE
