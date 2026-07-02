@@ -6,6 +6,7 @@ data class ChannelLine(
     @SerializedName("id") val id: Long = 0,
     @SerializedName("stream_url") val streamUrl: String = "",
     @SerializedName("stream_type") val streamType: String = "hls",
+    @SerializedName("content_type") val contentType: String = "",
     @SerializedName("user_agent") val userAgent: String = "",
     @SerializedName("custom_headers") val customHeaders: String = "",
     @SerializedName("support_catchup") val supportCatchup: Boolean = false,
@@ -40,7 +41,7 @@ data class Channel(
     fun getLinesSafely(): List<ChannelLine> {
         if (lines.isNotEmpty()) return lines
         if (legacyStreamUrl.isNotEmpty()) {
-            return listOf(ChannelLine(id, legacyStreamUrl, legacyStreamType, legacyUserAgent, legacyCustomHeaders, supportCatchup, catchupDays))
+            return listOf(ChannelLine(id, legacyStreamUrl, legacyStreamType, "", legacyUserAgent, legacyCustomHeaders, supportCatchup, catchupDays))
         }
         return emptyList()
     }

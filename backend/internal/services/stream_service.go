@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/mediaplayer/backend/internal/config"
-	"github.com/mediaplayer/backend/internal/models"
-	"github.com/mediaplayer/backend/internal/services/multicast"
 	"github.com/bluenviron/gortsplib/v4"
 	"github.com/bluenviron/gortsplib/v4/pkg/base"
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/google/uuid"
+	"github.com/mediaplayer/backend/internal/config"
+	"github.com/mediaplayer/backend/internal/models"
+	"github.com/mediaplayer/backend/internal/services/multicast"
 	"github.com/pion/rtp"
 )
 
@@ -106,6 +107,33 @@ func (sp *StreamProxy) GetRedirectedURL(channelID int64) string {
 	return sp.redirectedURLs[channelID]
 }
 
+// isLiveContent 判断频道是否为直播内容
+// 优先使用显式 content_type 字段，为空时自动推断
+func isLiveContent(ch *models.Channel) bool {
+	ct := strings.ToLower(strings.TrimSpace(ch.ContentType))
+	if ct == "live" {
+		return true
+	}
+	if ct == "vod" {
+		return false
+	}
+	// 自动推断兜底
+	if isLocalPath(ch.StreamURL) {
+		return false // 本地文件 → vod
+	}
+	st := strings.ToLower(ch.StreamType)
+	switch st {
+	case "mp4", "mkv", "avi", "mov", "webm":
+		return false // 明确的容器格式 → vod
+	case "ts", "flv", "rtmp", "rtsp", "octet-stream":
+		return true // 直播协议 → live
+	case "hls", "dash":
+		return true // HLS/DASH 默认视为直播
+	default:
+		return true // 未知类型默认 live
+	}
+}
+
 // CheckHealth verifies a stream URL is reachable and returns stream info
 func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (*models.StreamStatus, error) {
 	// 如果是多源合并（#拼接），取第一条线路进行探测
@@ -155,6 +183,41 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		}
 	}
 
+	// 本地文件健康检查：用 os.Stat 替代 HTTP GET
+	if isLocalPath(url) {
+		cleanPath := filepath.Clean(url)
+		info, err := os.Stat(cleanPath)
+		if err != nil {
+			status.Status = "error"
+			status.ErrorMsg = "本地文件不存在: " + err.Error()
+			return status, nil
+		}
+		if info.IsDir() {
+			status.Status = "error"
+			status.ErrorMsg = "路径是目录而非文件"
+			return status, nil
+		}
+		status.Status = "online"
+		if streamType == "" {
+			ext := strings.ToLower(filepath.Ext(cleanPath))
+			switch ext {
+			case ".m3u8":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "hls")
+			case ".mp4":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "mp4")
+			case ".mkv":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "mkv")
+			case ".avi":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "avi")
+			case ".flv":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "flv")
+			case ".ts":
+				_ = sp.channelSvc.UpdateStreamType(channelID, "ts")
+			}
+		}
+		return status, nil
+	}
+
 	switch streamType {
 	case "hls", "mp4", "dash", "flv", "ts", "":
 		// 很多 IPTV 服务端会拦截 HEAD 请求 (返回 405/403)，因此改用 GET，并加入基础 UA 伪装
@@ -188,7 +251,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
 				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
 				strings.Contains(strings.ToLower(finalURL), ".m3u8")
-			
+
 			var actualType string
 			if isM3U8 {
 				actualType = "hls"
@@ -452,6 +515,9 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	if strings.HasPrefix(firstURL, "rtsp://") {
 		return sp.serveRtspProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
 	}
+	if isLocalPath(firstURL) {
+		return sp.serveLocalFileProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
 
 	type raceResult struct {
 		index int
@@ -500,7 +566,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
 				strings.Contains(strings.ToLower(resp.Request.URL.Path), ".m3u8") ||
 				strings.Contains(strings.ToLower(finalURL), ".m3u8")
-			
+
 			// 只有在主请求（非子路径分片请求）时，才更新该频道的 RedirectedURL
 			if targetURL == "" {
 				sp.SetRedirectedURL(channelID, finalURL)
@@ -692,7 +758,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		if bufferSize > 128*1024 {
 			bufferSize = 128 * 1024
 		}
-		
+
 		bufPtr := streamBufferPool.Get().(*[]byte)
 		buf := (*bufPtr)[:bufferSize]
 		defer streamBufferPool.Put(bufPtr)
@@ -1042,8 +1108,12 @@ func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL strin
 		var portStart, portEnd int = 40000, 40050
 		pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 		pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
-		if pStart != "" { _, _ = fmt.Sscanf(pStart, "%d", &portStart) }
-		if pEnd != "" { _, _ = fmt.Sscanf(pEnd, "%d", &portEnd) }
+		if pStart != "" {
+			_, _ = fmt.Sscanf(pStart, "%d", &portStart)
+		}
+		if pEnd != "" {
+			_, _ = fmt.Sscanf(pEnd, "%d", &portEnd)
+		}
 
 		fc, err := multicast.NewFCCClient(ctx, fccServer, portStart, portEnd, targetURL, fccType)
 		if err != nil {
@@ -1060,12 +1130,11 @@ func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL strin
 
 	// We don't need a separate goroutine to close the reader, NewMulticastReader respects context.
 
-
 	addrStr := strings.TrimPrefix(targetURL, "udp://")
 	addrStr = strings.TrimPrefix(addrStr, "rtp://")
 	addrStr = strings.TrimPrefix(addrStr, "@")
 	reqURL, _ := url.Parse("udp://" + addrStr)
-	
+
 	resp := &http.Response{
 		StatusCode: 200,
 		Body:       mreader,
@@ -1076,6 +1145,270 @@ func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL strin
 	return resp, nil
 }
 
+// openLocalFile 打开本地文件并返回文件句柄、大小和 MIME 类型
+func (sp *StreamProxy) openLocalFile(filePath string) (*os.File, int64, string, error) {
+	cleanPath := filepath.Clean(filePath)
+	if strings.Contains(cleanPath, "..") {
+		return nil, 0, "", fmt.Errorf("路径不安全: 包含 '..'")
+	}
+
+	f, err := os.Open(cleanPath)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("打开本地文件失败: %w", err)
+	}
+
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, 0, "", fmt.Errorf("获取文件信息失败: %w", err)
+	}
+	if info.IsDir() {
+		f.Close()
+		return nil, 0, "", fmt.Errorf("路径是一个目录，不是文件")
+	}
+
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(cleanPath)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	return f, info.Size(), contentType, nil
+}
+
+// serveLocalFileProxy 代理本地文件流，支持 HTTP Range 请求（拖动进度条）
+func (sp *StreamProxy) serveLocalFileProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, filePath string) error {
+	select {
+	case sp.sem <- struct{}{}:
+		defer func() { <-sp.sem }()
+	default:
+		return fmt.Errorf("并发流数已达上限 (%d)", sp.cfg.MaxConcurrent)
+	}
+
+	f, fileSize, contentType, err := sp.openLocalFile(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// 解析 Range 请求头，支持拖动进度条
+	rangeHeader := r.Header.Get("Range")
+	var start, end int64
+	isRangeRequest := false
+
+	if rangeHeader != "" && strings.HasPrefix(rangeHeader, "bytes=") {
+		rangeSpec := strings.TrimPrefix(rangeHeader, "bytes=")
+		parts := strings.SplitN(rangeSpec, "-", 2)
+		if len(parts) == 2 {
+			if parts[0] != "" {
+				start, _ = strconv.ParseInt(parts[0], 10, 64)
+			}
+			if parts[1] != "" {
+				end, _ = strconv.ParseInt(parts[1], 10, 64)
+			} else {
+				end = fileSize - 1 // "bytes=1000-" 表示从 1000 到文件末尾
+			}
+			if start >= 0 && start < fileSize && end >= start {
+				isRangeRequest = true
+			}
+		}
+	}
+
+	sessionID := fmt.Sprintf("local-%d-%d-%d", channelID, clientID, time.Now().UnixNano())
+
+	sp.mu.Lock()
+	sp.streams[sessionID] = &models.ActiveStream{
+		Mu:          &sync.RWMutex{},
+		SessionID:   sessionID,
+		ChannelID:   channelID,
+		ChannelName: ch.Name,
+		ClientID:    clientID,
+		ClientName:  clientName,
+		ClientIP:    clientIP,
+		URL:         filePath,
+		Status:      "playing_local",
+		StartedAt:   time.Now(),
+		LastActive:  time.Now(),
+	}
+	sp.cancels[sessionID] = func() {}
+	sp.mu.Unlock()
+
+	defer func() {
+		sp.mu.Lock()
+		delete(sp.streams, sessionID)
+		delete(sp.cancels, sessionID)
+		sp.mu.Unlock()
+	}()
+
+	// 设置公共响应头
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Accept-Ranges", "bytes")
+
+	if isRangeRequest {
+		// 206 Partial Content —— Range 请求
+		if end >= fileSize {
+			end = fileSize - 1
+		}
+		contentLength := end - start + 1
+
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
+		w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+		w.WriteHeader(http.StatusPartialContent)
+
+		if _, err := f.Seek(start, io.SeekStart); err != nil {
+			slog.Error("local file seek failed", "session", sessionID, "seek_to", start, "error", err)
+			return err
+		}
+
+		slog.Info("local file range request", "channel_id", channelID, "session", sessionID, "path", filePath, "range", fmt.Sprintf("%d-%d", start, end), "total", fileSize)
+
+		// 数据泵：仅发送请求的字节范围
+		bufPtr := streamBufferPool.Get().(*[]byte)
+		buf := (*bufPtr)[:128*1024]
+		defer streamBufferPool.Put(bufPtr)
+
+		remaining := contentLength
+		lastUpdate := time.Now()
+		var bytesSinceLastUpdate int64
+
+		for remaining > 0 {
+			select {
+			case <-r.Context().Done():
+				return nil
+			default:
+			}
+
+			toRead := int64(len(buf))
+			if toRead > remaining {
+				toRead = remaining
+			}
+			n, err := f.Read(buf[:toRead])
+			if n > 0 {
+				if _, wErr := w.Write(buf[:n]); wErr != nil {
+					return nil
+				}
+				remaining -= int64(n)
+				bytesSinceLastUpdate += int64(n)
+			}
+			if err != nil {
+				return nil
+			}
+
+			now := time.Now()
+			if now.Sub(lastUpdate) >= time.Second {
+				sp.mu.RLock()
+				if s, ok := sp.streams[sessionID]; ok {
+					s.Mu.Lock()
+					s.LastActive = now
+					s.SpeedBytes = bytesSinceLastUpdate
+					s.Mu.Unlock()
+				}
+				sp.mu.RUnlock()
+				bytesSinceLastUpdate = 0
+				lastUpdate = now
+			}
+		}
+		return nil
+	}
+
+	// 200 OK —— 全量请求（首次加载）
+	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+	w.WriteHeader(http.StatusOK)
+
+	flushThreshold := getFlushThreshold(ch, filePath)
+	flusher, canFlush := w.(http.Flusher)
+
+	slog.Info("local file proxy started", "channel_id", channelID, "session", sessionID, "path", filePath, "size", fileSize, "threshold", flushThreshold)
+
+	bufferSize := 128 * 1024
+	if sp.cfg.BufferSize > bufferSize {
+		bufferSize = sp.cfg.BufferSize
+	}
+	if bufferSize > 256*1024 {
+		bufferSize = 256 * 1024
+	}
+
+	bufPtr := streamBufferPool.Get().(*[]byte)
+	buf := (*bufPtr)[:bufferSize]
+	defer streamBufferPool.Put(bufPtr)
+	reader := bufio.NewReaderSize(f, bufferSize)
+
+	writeBufPtr := streamBufferPool.Get().(*[]byte)
+	writeBuf := (*writeBufPtr)[:0]
+	defer streamBufferPool.Put(writeBufPtr)
+
+	lastUpdate := time.Now()
+	var bytesSinceLastUpdate int64
+	hasFlushed := false
+
+	for {
+		select {
+		case <-r.Context().Done():
+			slog.Info("local file proxy client disconnected", "session", sessionID)
+			return nil
+		default:
+		}
+
+		n, err := reader.Read(buf)
+		if n > 0 {
+			writeBuf = append(writeBuf, buf[:n]...)
+
+			if !hasFlushed {
+				if len(writeBuf) > 0 {
+					wn, wErr := w.Write(writeBuf)
+					if wErr != nil {
+						return nil
+					}
+					if canFlush {
+						flusher.Flush()
+					}
+					bytesSinceLastUpdate += int64(wn)
+					writeBuf = writeBuf[:0]
+					hasFlushed = true
+				}
+			} else if len(writeBuf) >= flushThreshold {
+				wn, wErr := w.Write(writeBuf)
+				if wErr != nil {
+					return nil
+				}
+				if canFlush {
+					flusher.Flush()
+				}
+				bytesSinceLastUpdate += int64(wn)
+				writeBuf = writeBuf[:0]
+			}
+		}
+
+		if err != nil {
+			if len(writeBuf) > 0 {
+				w.Write(writeBuf)
+				if canFlush {
+					flusher.Flush()
+				}
+			}
+			if err == io.EOF {
+				slog.Info("local file proxy EOF", "session", sessionID)
+				return nil
+			}
+			slog.Error("local file proxy read error", "session", sessionID, "error", err)
+			return err
+		}
+
+		now := time.Now()
+		if now.Sub(lastUpdate) >= time.Second {
+			sp.mu.RLock()
+			if s, ok := sp.streams[sessionID]; ok {
+				s.Mu.Lock()
+				s.LastActive = now
+				s.SpeedBytes = bytesSinceLastUpdate
+				s.Mu.Unlock()
+			}
+			sp.mu.RUnlock()
+			bytesSinceLastUpdate = 0
+			lastUpdate = now
+		}
+	}
+}
+
 func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {
 	sessionID := fmt.Sprintf("multicast-%d-%s", channelID, uuid.New().String())
 
@@ -1084,7 +1417,7 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	// Catch-up / Time-shift Bypass
 	isCatchup := r.URL.Query().Get("playseek") != "" || r.URL.Query().Get("starttime") != "" || r.URL.Query().Get("catchup") != ""
 	isLiveMulticast := strings.HasPrefix(targetURL, "udp://") || strings.HasPrefix(targetURL, "rtp://")
-	
+
 	var fccClient *multicast.FCCClient
 	if !isCatchup && isLiveMulticast {
 		// 1. Parse FCC parameters from targetURL (channel URL)
@@ -1093,13 +1426,13 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			fccServer = parsedURL.Query().Get("fcc")
 			fccTypeStr = parsedURL.Query().Get("fcc-type")
 		}
-		
+
 		// 2. Override with HTTP request query parameters if present
 		if reqFcc := r.URL.Query().Get("fcc"); reqFcc != "" {
 			fccServer = reqFcc
 			fccTypeStr = r.URL.Query().Get("fcc-type")
 		}
-		
+
 		// 3. Fallback to channel settings if still empty
 		if fccServer == "" && ch != nil && ch.Fcc != "" {
 			fccServer = ch.Fcc
@@ -1122,17 +1455,21 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 				}
 			}
 			fccType := multicast.FccType(fccTypeStr)
-			
+
 			// 获取公网IP配置
 			publicIP, _ := sp.channelSvc.GetSetting("fcc_public_ip")
-			
+
 			slog.Info("FCC Config Evaluated", "fccServer", fccServer, "fccType", fccTypeStr, "ch.FccType", ch.FccType, "publicIP", publicIP)
 
 			var portStart, portEnd int = 40000, 40050
 			pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 			pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
-			if pStart != "" { _, _ = fmt.Sscanf(pStart, "%d", &portStart) }
-			if pEnd != "" { _, _ = fmt.Sscanf(pEnd, "%d", &portEnd) }
+			if pStart != "" {
+				_, _ = fmt.Sscanf(pStart, "%d", &portStart)
+			}
+			if pEnd != "" {
+				_, _ = fmt.Sscanf(pEnd, "%d", &portEnd)
+			}
 
 			// Try to connect FCC
 			fc, err := multicast.NewFCCClient(r.Context(), fccServer, portStart, portEnd, targetURL, fccType, publicIP)
@@ -1232,18 +1569,18 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 	slog.Info("starting rtsp proxy", "channel_id", channelID, "url", targetURL)
 
 	c := &gortsplib.Client{}
-	
+
 	// Watch for client disconnect to prevent goroutine leak
 	go func() {
 		<-r.Context().Done()
 		c.Close()
 	}()
-	
+
 	u, err := base.ParseURL(targetURL)
 	if err != nil {
 		return err
 	}
-	
+
 	err = c.Start(u.Scheme, u.Host)
 	if err != nil {
 		return err
@@ -1288,7 +1625,7 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 	}()
 
 	flusher, canFlush := w.(http.Flusher)
-	
+
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64
 
@@ -1299,15 +1636,15 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 			c.Close() // Force stop on client disconnect
 			return
 		}
-		
+
 		bytesSinceLastUpdate += int64(n)
-		
+
 		now := time.Now()
-		if now.Sub(lastUpdate) >= time.Millisecond * 100 {
+		if now.Sub(lastUpdate) >= time.Millisecond*100 {
 			if canFlush {
 				flusher.Flush()
 			}
-			
+
 			if now.Sub(lastUpdate) >= time.Second {
 				sp.mu.RLock()
 				if s, ok := sp.streams[sessionID]; ok {
@@ -1330,4 +1667,3 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 
 	return c.Wait()
 }
-

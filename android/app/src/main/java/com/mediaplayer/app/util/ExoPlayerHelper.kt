@@ -521,6 +521,11 @@ class ExoPlayerHelper(
         return exoPlayer?.currentPosition ?: 0L
     }
 
+    override fun getDuration(): Long {
+        val d = exoPlayer?.duration ?: 0L
+        return if (d == androidx.media3.common.C.TIME_UNSET) 0L else d
+    }
+
     override fun setTime(timeMs: Long) {
         exoPlayer?.seekTo(timeMs)
     }

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
@@ -150,7 +151,47 @@ class MainActivity : AppCompatActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var coreRetryLevel = 0
     private var isWatchdogEnabledForCurrentStream = false
-    
+
+    // VOD 专业快进/快退状态
+    private var vodSeekActive = false          // 快进或快退进行中
+    private var vodSeekDirection = 0           // -1=快退, 1=快进
+    private var vodSeekTarget = 0L             // 当前 seek 目标位置
+    private var vodSeekLastTick = 0L
+    private var vodSeekStartTime = 0L          // 开始时间（用于速度递增）
+    private val vodSeekStepMs = 60_000L        // 短按步进：60秒（1分钟）
+    private val vodSeekBaseSpeed = 60_000L     // 起始速度：60秒/秒（1分钟/秒）
+    private val vodSeekMaxSpeed = 300_000L     // 最大速度：300秒/秒（5分钟/秒）
+    private val vodSeekTickMs = 50L            // 50ms 刷新（20fps，够平滑且不卡）
+    private val vodSeekHandler = Handler(Looper.getMainLooper())
+    private val vodSeekRunnable = object : Runnable {
+        override fun run() {
+            if (!vodSeekActive) return
+            if (osdOverlayView?.isOsdVisible() != true) {
+                stopVodSeek()
+                return
+            }
+            val now = SystemClock.uptimeMillis()
+            val elapsed = (now - vodSeekLastTick).coerceAtLeast(1)
+            vodSeekLastTick = now
+            // 线性加速：每秒增加 60秒/秒 的速度
+            val seekElapsed = (now - vodSeekStartTime) / 1000.0
+            val currentSpeed = (vodSeekBaseSpeed + (seekElapsed * 60_000).toLong())
+                .coerceAtMost(vodSeekMaxSpeed)
+            val step = currentSpeed * elapsed / 1000
+            val duration = playerHelper?.getDuration() ?: 0
+            vodSeekTarget = (vodSeekTarget + vodSeekDirection * step)
+                .coerceIn(0L, if (duration > 0) duration else Long.MAX_VALUE)
+            playerHelper?.setTime(vodSeekTarget)
+            // 更新 OSD 显示
+            if (vodSeekDirection > 0) {
+                osdOverlayView?.updateVodProgress(vodSeekTarget, if (duration > 0) duration else vodSeekTarget)
+            } else {
+                osdOverlayView?.setVodSeekBackward(vodSeekTarget, if (duration > 0) duration else vodSeekTarget)
+            }
+            vodSeekHandler.postDelayed(this, vodSeekTickMs)
+        }
+    }
+
     // 数据加载并发锁
     private var isLoadingData = false
     // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
@@ -426,6 +467,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 return false
+            }
+
+            override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
+                if (isCurrentChannelVod()) {
+                    toggleVodPauseResume()
+                }
+                showOsd()
+                return true
             }
 
             override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
@@ -1075,6 +1124,20 @@ class MainActivity : AppCompatActivity() {
                     progressBuffering?.visibility = View.GONE
                     dismissSnapshot() // 新流首帧到来，移除截帧占位图
                     continuousSkipCount = 0
+
+                    // VOD 模式设置：根据 content_type 判断是否为点播
+                    val isVod = isCurrentChannelVod()
+                    osdOverlayView?.setVodMode(isVod)
+                    if (isVod) {
+                        osdOverlayView?.setVodSeekListener { seekMs ->
+                            playerHelper?.setTime(seekMs)
+                        }
+                        osdOverlayView?.startVodProgressUpdater(
+                            positionProvider = { playerHelper?.getTime() ?: 0L },
+                            durationProvider = { playerHelper?.getDuration() ?: 0L }
+                        )
+                    }
+
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -1223,6 +1286,17 @@ class MainActivity : AppCompatActivity() {
             val channel = allChannels.getOrNull(currentChannelIndex)
             if (channel != null) loadEpgForChannel(channel)
             com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback completed naturally.")
+            return
+        }
+
+        // VOD 点播自然播放完毕
+        if (isCurrentChannelVod()) {
+            stopVodSeek()
+            osdOverlayView?.stopVodProgressUpdater()
+            osdOverlayView?.setVodPlaying(false)
+            osdOverlayView?.setInfoText("播放完毕")
+            showOsd()
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "VOD playback completed naturally.")
             return
         }
 
@@ -1378,11 +1452,14 @@ class MainActivity : AppCompatActivity() {
             continuousSkipCount = 0
         }
         if (allChannels.isEmpty() || index < 0 || index >= allChannels.size) return
-        
+
         // 防止重复起播：如果已经在播放同一个频道，跳过
         if (index == currentChannelIndex && playerHelper?.isPlaying() == true) {
             return
         }
+
+        // 切换频道时先退出 VOD 模式，播放成功后再根据 content_type 设置
+        osdOverlayView?.setVodMode(false)
         
         // 取消上一个频道的 URL 解析协程，各播放器 play() 内部会自动 stop() 旧流。
         resolveJob?.cancel()
@@ -1401,7 +1478,11 @@ class MainActivity : AppCompatActivity() {
     
     private fun playCurrentLineInTv() {
         val channel = allChannels.getOrNull(currentChannelIndex) ?: return
-        
+
+        // 线路切换时停止 VOD 进度更新，避免在过渡期读到不一致的状态
+        stopVodSeek()
+        osdOverlayView?.stopVodProgressUpdater()
+
         osdOverlayView?.setChannelNum(String.format("%03d", channel.globalIndex + 1).toString())
         osdOverlayView?.setChannelName(channel.name.toString())
         
@@ -1614,6 +1695,42 @@ class MainActivity : AppCompatActivity() {
     private fun hideLineSelectionMenu() {
         layoutLineMenu?.visibility = View.GONE
         activeListArea = "channels"
+    }
+
+    /**
+     * 判断当前播放频道是否为 VOD（点播）内容
+     * 优先使用服务端下发的 content_type 字段，兜底用 stream_type 推断
+     */
+    private fun isCurrentChannelVod(): Boolean {
+        val channel = allChannels.getOrNull(currentChannelIndex) ?: return false
+        val lines = channel.getLinesSafely()
+        val line = lines.getOrNull(currentLineIndex) ?: return false
+        val ct = line.contentType.lowercase().trim()
+        if (ct == "vod") return true
+        if (ct == "live") return false
+        // 自动推断：本地文件或明确的点播容器格式
+        val st = line.streamType.lowercase()
+        return st in listOf("mp4", "mkv", "avi", "mov", "webm")
+    }
+
+    private fun stopVodSeek() {
+        vodSeekActive = false
+        vodSeekDirection = 0
+        vodSeekHandler.removeCallbacks(vodSeekRunnable)
+        osdOverlayView?.isVodSeeking = false
+        // 刷新 OSD 为最终状态
+        showOsd()
+    }
+
+    private fun toggleVodPauseResume() {
+        val player = playerHelper ?: return
+        if (player.isPlaying()) {
+            player.pause()
+            osdOverlayView?.setVodPlaying(false)
+        } else {
+            player.resume()
+            osdOverlayView?.setVodPlaying(true)
+        }
     }
 
     private fun showOsd() {
@@ -2693,6 +2810,76 @@ class MainActivity : AppCompatActivity() {
 
             com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "User pressed key $keyCode")
 
+            // VOD 模式：专业快进/快退（seekTo 跳跃式，线性加速）
+            // 短按：±60s（1分钟）步进 seek
+            // 长按左键/右键：seekTo 跳跃式快退/快进，速度线性递增（60s/s → 300s/s）
+            val isVodSeek = isCurrentChannelVod()
+                && layoutZappingMenu?.visibility != View.VISIBLE
+            if (isVodSeek && (osdOverlayView?.isOsdVisible() == true || vodSeekActive)) {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            if (event.repeatCount == 0) {
+                                // 短按：-60s（1分钟）步进
+                                stopVodSeek()
+                                val newPos = (playerHelper?.getTime() ?: 0) - vodSeekStepMs
+                                playerHelper?.setTime(newPos.coerceAtLeast(0))
+                                showOsd()
+                            } else {
+                                // 长按：seekTo 快退
+                                if (!vodSeekActive || vodSeekDirection != -1) {
+                                    stopVodSeek()
+                                    vodSeekActive = true
+                                    vodSeekDirection = -1
+                                    osdOverlayView?.isVodSeeking = true
+                                    vodSeekTarget = playerHelper?.getTime() ?: 0
+                                    vodSeekLastTick = SystemClock.uptimeMillis()
+                                    vodSeekStartTime = vodSeekLastTick
+                                    vodSeekHandler.post(vodSeekRunnable)
+                                }
+                                // 保持 OSD 可见
+                                osdOverlayView?.removeCallbacks()
+                                osdOverlayView?.showOsd()
+                            }
+                        } else if (event.action == KeyEvent.ACTION_UP) {
+                            stopVodSeek()
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            if (event.repeatCount == 0) {
+                                // 短按：+60s（1分钟）步进
+                                stopVodSeek()
+                                val current = playerHelper?.getTime() ?: 0
+                                val duration = playerHelper?.getDuration() ?: 0
+                                val newPos = current + vodSeekStepMs
+                                playerHelper?.setTime(if (duration > 0) newPos.coerceAtMost(duration) else newPos)
+                                showOsd()
+                            } else {
+                                // 长按：seekTo 快进
+                                if (!vodSeekActive || vodSeekDirection != 1) {
+                                    stopVodSeek()
+                                    vodSeekActive = true
+                                    vodSeekDirection = 1
+                                    osdOverlayView?.isVodSeeking = true
+                                    vodSeekTarget = playerHelper?.getTime() ?: 0
+                                    vodSeekLastTick = SystemClock.uptimeMillis()
+                                    vodSeekStartTime = vodSeekLastTick
+                                    vodSeekHandler.post(vodSeekRunnable)
+                                }
+                                // 保持 OSD 可见
+                                osdOverlayView?.removeCallbacks()
+                                osdOverlayView?.showOsd()
+                            }
+                        } else if (event.action == KeyEvent.ACTION_UP) {
+                            stopVodSeek()
+                        }
+                        return true
+                    }
+                }
+            }
+
             // 只要面板处于显示状态，用户的任何按键都应当重置自动隐藏的时间
             if (layoutZappingMenu?.visibility == View.VISIBLE) {
                 uiHandler.removeCallbacks(hideZappingRunnable)
@@ -3008,8 +3195,14 @@ class MainActivity : AppCompatActivity() {
 
             if (!isMenuVisible && !isSettingsVisible && !isEpgVisible && !isLineVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 if (event?.isTracking == true && !event.isCanceled) {
-                    // 短按 OK 键，显示 OSD（5s 自动隐藏）
-                    showOsd()
+                    // VOD 模式：短按 OK 键暂停/恢复播放
+                    if (isCurrentChannelVod()) {
+                        toggleVodPauseResume()
+                        showOsd()
+                    } else {
+                        // 直播模式：短按 OK 键，显示 OSD（5s 自动隐藏）
+                        showOsd()
+                    }
                 }
                 return true
             }

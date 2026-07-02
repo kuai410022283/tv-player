@@ -737,8 +737,8 @@ func (s *ChannelService) CreateChannel(c *models.Channel) error {
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, fcc, fcc_type, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, c.Fcc, c.FccType, now, now)
+	res, err := s.db.Exec(`INSERT INTO channels (group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, content_type, fcc, fcc_type, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, "unknown", c.Source, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, c.ContentType, c.Fcc, c.FccType, now, now)
 	if err != nil {
 		return err
 	}
@@ -767,8 +767,8 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 	if c.StreamType == "" {
 		c.StreamType = detectStreamType(c.StreamURL)
 	}
-	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, support_catchup=?, catchup_type=?, catchup_source=?, catchup_days=?, enable_multiplex=?, fcc=?, fcc_type=?, updated_at=? WHERE id=?`,
-		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, c.Fcc, c.FccType, time.Now(), c.ID)
+	_, err := s.db.Exec(`UPDATE channels SET group_id=?, name=?, logo=?, description=?, stream_url=?, stream_type=?, epg_channel_id=?, is_hidden=?, is_direct=?, sort_order=?, user_agent=?, custom_headers=?, support_catchup=?, catchup_type=?, catchup_source=?, catchup_days=?, enable_multiplex=?, content_type=?, fcc=?, fcc_type=?, updated_at=? WHERE id=?`,
+		c.GroupID, c.Name, c.Logo, c.Description, c.StreamURL, c.StreamType, c.EPGChannelID, hid, dir, c.SortOrder, c.UserAgent, c.CustomHeaders, catchup, c.CatchupType, c.CatchupSource, c.CatchupDays, c.EnableMultiplex, c.ContentType, c.Fcc, c.FccType, time.Now(), c.ID)
 	return err
 }
 

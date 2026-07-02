@@ -54,6 +54,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN content_type TEXT DEFAULT ''`)
 	// Ensure fcc_type setting exists for existing databases
 	_, _ = db.Exec(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom')`)
 

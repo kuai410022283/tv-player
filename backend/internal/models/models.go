@@ -53,6 +53,7 @@ type Channel struct {
 	CatchupSource  string   `json:"catchup_source,omitempty" db:"catchup_source"`
 	CatchupDays    int      `json:"catchup_days,omitempty" db:"catchup_days"`
 	EnableMultiplex int     `json:"enable_multiplex" db:"enable_multiplex"`
+	ContentType    string   `json:"content_type" db:"content_type"` // live, vod, 空=自动推断
 	Fcc            string   `json:"fcc,omitempty" db:"fcc"`
 	FccType        string   `json:"fcc_type,omitempty" db:"fcc_type"`
 	CanMultiplex bool       `json:"can_multiplex" db:"-"`

@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.SeekBar
 import android.widget.TextView
 import com.mediaplayer.app.R
 import com.mediaplayer.app.util.RemoteLogger
@@ -27,6 +28,29 @@ class OsdOverlayView @JvmOverloads constructor(
     private val tvOsdEpg: TextView
     private val tvOsdNextEpg: TextView
     private val progressEpg: ProgressBar
+    private val layoutVodControl: LinearLayout
+    private val tvVodIcon: TextView
+    private val tvVodCurrentTime: TextView
+    private val tvVodTotalTime: TextView
+    private val seekBarVod: SeekBar
+
+    // VOD 模式状态
+    private var isVodMode = false
+    private var isVodPlaying = true
+    private var vodDuration = 0L
+    private var vodSeekListener: ((Long) -> Unit)? = null
+    private var vodPositionProvider: (() -> Long)? = null
+    private var vodDurationProvider: (() -> Long)? = null
+    private val progressUpdateHandler = Handler(Looper.getMainLooper())
+    private var isUserDraggingSeekBar = false
+    // 快进/快退进行中，暂停自动进度刷新；恢复时自动重启进度更新器
+    var isVodSeeking = false
+        set(value) {
+            field = value
+            if (!value && isVodMode && !isUserDraggingSeekBar) {
+                restartVodProgressUpdater()
+            }
+        }
 
     private val uiHandler = Handler(Looper.getMainLooper())
     private val hideOsdRunnable = Runnable {
@@ -46,11 +70,40 @@ class OsdOverlayView @JvmOverloads constructor(
         tvOsdEpg = findViewById(R.id.tvOsdEpg)
         tvOsdNextEpg = findViewById(R.id.tvOsdNextEpg)
         progressEpg = findViewById(R.id.progressEpg)
+        layoutVodControl = findViewById(R.id.layoutVodControl)
+        tvVodIcon = findViewById(R.id.tvVodIcon)
+        tvVodCurrentTime = findViewById(R.id.tvVodCurrentTime)
+        tvVodTotalTime = findViewById(R.id.tvVodTotalTime)
+        seekBarVod = findViewById(R.id.seekBarVod)
+
+        // VOD SeekBar 拖动监听
+        seekBarVod.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser && isVodMode) {
+                    val seekMs = progress.toLong() * vodDuration / 1000
+                    tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+                    tvVodCurrentTime.text = formatTime(seekMs)
+                }
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {
+                isUserDraggingSeekBar = true
+                stopVodProgressUpdater()
+                removeCallbacks()
+            }
+            override fun onStopTrackingTouch(sb: SeekBar?) {
+                isUserDraggingSeekBar = false
+                val seekMs = (sb?.progress ?: 0).toLong() * vodDuration / 1000
+                vodSeekListener?.invoke(seekMs)
+                restartVodProgressUpdater()
+                showOsd()
+            }
+        })
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         uiHandler.removeCallbacks(hideOsdRunnable)
+        progressUpdateHandler.removeCallbacks(vodProgressRunnable)
     }
 
     fun showOsd() {
@@ -127,5 +180,126 @@ class OsdOverlayView @JvmOverloads constructor(
 
     fun getInfoText(): String {
         return tvOsdInfo.text.toString()
+    }
+
+    // ── VOD 模式控制 ──────────────────────────────────
+
+    fun setVodMode(enabled: Boolean) {
+        isVodMode = enabled
+        if (enabled) {
+            tvOsdEpg.visibility = View.GONE
+            tvOsdNextEpg.visibility = View.GONE
+            progressEpg.visibility = View.GONE
+            layoutVodControl.visibility = View.VISIBLE
+            seekBarVod.visibility = View.VISIBLE
+        } else {
+            tvOsdEpg.visibility = View.VISIBLE
+            tvOsdNextEpg.visibility = View.VISIBLE
+            progressEpg.visibility = View.VISIBLE
+            layoutVodControl.visibility = View.GONE
+            seekBarVod.visibility = View.GONE
+            stopVodProgressUpdater()
+        }
+    }
+
+    fun setVodPlaying(playing: Boolean) {
+        isVodPlaying = playing
+        if (isVodMode) {
+            tvVodIcon.text = if (playing) "▶" else "❚❚"
+            updateVodTimeDisplay()
+        }
+    }
+
+    fun setVodSeekListener(listener: (Long) -> Unit) {
+        vodSeekListener = listener
+    }
+
+    fun startVodProgressUpdater(positionProvider: () -> Long, durationProvider: () -> Long) {
+        vodPositionProvider = positionProvider
+        vodDurationProvider = durationProvider
+        stopVodProgressUpdater()
+        vodProgressRunnable.run()
+    }
+
+    /** 使用已注册的 provider 重新启动进度刷新（用于 SeekBar 拖动结束后恢复） */
+    private fun restartVodProgressUpdater() {
+        stopVodProgressUpdater()
+        if (vodPositionProvider != null && vodDurationProvider != null) {
+            vodProgressRunnable.run()
+        }
+    }
+
+    fun stopVodProgressUpdater() {
+        progressUpdateHandler.removeCallbacks(vodProgressRunnable)
+    }
+
+    private val vodProgressRunnable = object : Runnable {
+        override fun run() {
+            if (!isVodMode || isUserDraggingSeekBar || isVodSeeking) return
+            val currentMs = vodPositionProvider?.invoke() ?: 0L
+            val totalMs = vodDurationProvider?.invoke() ?: 0L
+            if (totalMs > 0) {
+                vodDuration = totalMs
+                seekBarVod.progress = (currentMs * 1000 / totalMs).toInt().coerceIn(0, 1000)
+                tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+                tvVodCurrentTime.text = formatTime(currentMs)
+                tvVodTotalTime.text = formatTime(totalMs)
+            }
+            progressUpdateHandler.postDelayed(this, 500)
+        }
+    }
+
+    private fun updateVodTimeDisplay() {
+        val currentMs = vodPositionProvider?.invoke() ?: 0L
+        tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+        tvVodCurrentTime.text = formatTime(currentMs)
+        tvVodTotalTime.text = formatTime(vodDuration)
+    }
+
+    /** 外部直接传入位置和时长，用于平滑 seek 动画（跳过 provider 回调） */
+    fun updateVodProgress(positionMs: Long, durationMs: Long) {
+        if (!isVodMode) return
+        vodDuration = durationMs
+        if (durationMs > 0) {
+            seekBarVod.progress = (positionMs * 1000 / durationMs).toInt().coerceIn(0, 1000)
+        }
+        tvVodIcon.text = "▶▶"
+        tvVodCurrentTime.text = formatTime(positionMs)
+        tvVodTotalTime.text = formatTime(durationMs)
+    }
+
+    /** 显示倍速状态（快进/快退） */
+    fun setVodSpeed(speed: Float) {
+        if (!isVodMode) return
+        if (speed > 1.0f) {
+            val speedText = if (speed == speed.toLong().toFloat()) "${speed.toLong()}x" else "%.1fx".format(speed)
+            tvVodIcon.text = "▶▶"
+            tvVodCurrentTime.text = speedText
+        } else if (speed < 1.0f && speed > 0f) {
+            val speedText = "%.1fx".format(speed)
+            tvVodIcon.text = "◀◀"
+            tvVodCurrentTime.text = speedText
+        } else {
+            updateVodTimeDisplay()
+        }
+    }
+
+    /** 显示快退 seek 位置 */
+    fun setVodSeekBackward(positionMs: Long, durationMs: Long) {
+        if (!isVodMode) return
+        if (durationMs > 0) {
+            seekBarVod.progress = (positionMs * 1000 / durationMs).toInt().coerceIn(0, 1000)
+        }
+        tvVodIcon.text = "◀◀"
+        tvVodCurrentTime.text = formatTime(positionMs)
+        tvVodTotalTime.text = formatTime(durationMs)
+    }
+
+    private fun formatTime(ms: Long): String {
+        val totalSeconds = ms / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 }

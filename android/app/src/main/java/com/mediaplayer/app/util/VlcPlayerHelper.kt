@@ -264,6 +264,10 @@ class VlcPlayerHelper(
         return mediaPlayer?.time ?: 0L
     }
 
+    override fun getDuration(): Long {
+        return mediaPlayer?.length ?: 0L
+    }
+
     override fun setTime(timeMs: Long) {
         mediaPlayer?.time = timeMs
     }

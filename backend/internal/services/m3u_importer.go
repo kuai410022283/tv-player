@@ -240,7 +240,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, fcc, fcc_type, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, content_type, fcc, fcc_type, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`)
 	if err != nil {
 		return 0, err
 	}
@@ -362,7 +362,13 @@ func detectStreamType(rawURL string) string {
 	}
 
 	// 3. 从 Path 提取精确文件后缀（最可靠的判断手段）
-	ext := strings.ToLower(path.Ext(u.Path))
+	uPath := u.Path
+	// 本地裸路径（如 /vol1/media/video.mp4）在某些边缘场景下 url.Parse 可能不填充 Path，
+	// 若检测到是本地路径且 Path 为空，回退使用原始输入提取后缀
+	if uPath == "" && isLocalPath(rawURL) {
+		uPath = rawURL
+	}
+	ext := strings.ToLower(path.Ext(uPath))
 	switch ext {
 	case ".m3u8":
 		return "hls"

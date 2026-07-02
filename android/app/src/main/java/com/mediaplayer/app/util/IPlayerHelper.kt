@@ -13,6 +13,7 @@ interface IPlayerHelper {
     
     fun isPlaying(): Boolean
     fun getTime(): Long
+    fun getDuration(): Long
     fun setTime(timeMs: Long)
     fun setRate(rate: Float)
     

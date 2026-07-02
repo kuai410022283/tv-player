@@ -112,7 +112,49 @@
                 app:layout_constraintBottom_toBottomOf="parent"
                 tools:text="接下来: 精彩节目" />
         </androidx.constraintlayout.widget.ConstraintLayout>
-            
+
+        <!-- VOD 控制行：左侧播放状态+当前时间，右侧总时长（直播模式下隐藏） -->
+        <LinearLayout
+            android:id="@+id/layoutVodControl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="@dimen/dp_8"
+            android:visibility="gone">
+
+            <!-- 固定宽度图标区域（防止图标变化导致时间晃动） -->
+            <TextView
+                android:id="@+id/tvVodIcon"
+                android:layout_width="56dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/text_24"
+                android:text="▶" />
+
+            <TextView
+                android:id="@+id/tvVodCurrentTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/text_24"
+                android:text="00:00:00" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvVodTotalTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#AAAAAA"
+                android:textSize="@dimen/text_24"
+                android:text="00:00:00" />
+        </LinearLayout>
+
         <ProgressBar
             android:id="@+id/progressEpg"
             style="?android:attr/progressBarStyleHorizontal"
@@ -122,6 +164,20 @@
             android:progress="30"
             android:progressTint="@color/accent"
             android:progressBackgroundTint="#44FFFFFF"/>
+
+        <!-- VOD SeekBar：可拖动进度条（直播模式下隐藏） -->
+        <SeekBar
+            android:id="@+id/seekBarVod"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/dp_24"
+            android:layout_marginTop="@dimen/dp_4"
+            android:max="1000"
+            android:progressTint="@color/accent"
+            android:thumbTint="@color/accent"
+            android:progressBackgroundTint="#44FFFFFF"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:visibility="gone" />
     </LinearLayout>
 
 </merge>

@@ -390,6 +390,10 @@ class IjkPlayerHelper(
         return ijkPlayer?.currentPosition ?: 0L
     }
 
+    override fun getDuration(): Long {
+        return ijkPlayer?.duration ?: 0L
+    }
+
     override fun setTime(timeMs: Long) {
         ijkPlayer?.seekTo(timeMs)
     }
