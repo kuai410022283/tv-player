@@ -33,6 +33,7 @@ import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
 import com.mediaplayer.app.data.api.ClientAuthManager
+import com.mediaplayer.app.data.api.ServerAuthFlowManager
 import com.mediaplayer.app.data.model.Channel
 import com.mediaplayer.app.data.model.ChannelGroup
 import com.mediaplayer.app.data.model.ChannelLine
@@ -70,6 +71,7 @@ class MainActivity : AppCompatActivity() {
 
     private val repo = ChannelRepository()
     private lateinit var authManager: ClientAuthManager
+    private lateinit var authFlowManager: ServerAuthFlowManager
     private var isTvMode = true
 
     // ── Views (TV mode - Zapping & Player) ──
@@ -343,14 +345,55 @@ class MainActivity : AppCompatActivity() {
         setupTouchGestures()
 
         authManager = ClientAuthManager(this)
+        authFlowManager = ServerAuthFlowManager(this, lifecycleScope, authManager)
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
         ApiClient.init(serverUrl)
 
         setupAdapters()
-        checkAuthAndLoad()
-        
+
+        // 初始化认证流程回调
+        authFlowManager.setCallback(object : ServerAuthFlowManager.Callback {
+            override fun onStatusUpdate(message: String, showQr: Boolean) {
+                showAuthWaiting(message, showQr)
+            }
+
+            override fun onSuccess(resp: com.mediaplayer.app.data.model.VerifyResponse) {
+                handleAuthSuccess(
+                    resp.announcement, resp.announcementInterval,
+                    resp.startupMediaEnabled, resp.startupMedia,
+                    resp.startupMediaType, resp.startupDuration,
+                    resp.startupSkipAfter, resp.globalMaintenance,
+                    resp.backupServers, resp.isTester
+                )
+            }
+
+            override fun onPending(deviceId: String) {
+                showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: $deviceId", showQr = true)
+                startAuthPolling()
+            }
+
+            override fun onRejected(message: String) {
+                showAuthWaiting(message, showQr = true)
+            }
+
+            override fun onBanned(message: String) {
+                showAuthWaiting(message, showQr = true)
+            }
+
+            override fun onAllFailed() {
+                showAuthWaiting("所有服务器均无法连接，15秒后自动重试...\n请检查配置信息", showQr = true)
+            }
+
+            override fun onRetryScheduled(delayMs: Long) {
+                // 可以在这里显示倒计时
+            }
+        })
+
+        // 启动认证流程
+        authFlowManager.startAuthFlow()
+
         // 检查版本更新
         com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
     }
@@ -1080,7 +1123,7 @@ class MainActivity : AppCompatActivity() {
             setupQrConfigServer {
                 hideSettingsMenu()
                 Toast.makeText(this@MainActivity, "配置已保存，重新加载中...", Toast.LENGTH_LONG).show()
-                checkAuthAndLoad()
+                authFlowManager.startAuthFlow()
             }
             val qrPort = configWebServer?.actualPort ?: 9528
             val qrUrl = "http://$ip:$qrPort/"
@@ -1994,7 +2037,7 @@ class MainActivity : AppCompatActivity() {
             playerHelper?.release()
             playerHelper = null
             authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
-            val retryRunnable = Runnable { checkAuthAndLoad() }
+            val retryRunnable = Runnable { authFlowManager.startAuthFlow() }
             authPollRunnable = retryRunnable
             authPollHandler.postDelayed(retryRunnable, 15000)
             return
@@ -2014,149 +2057,6 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(intent, 1001)
         } else {
             showContent()
-        }
-    }
-
-    private fun checkAuthAndLoad() {
-        // 先停止之前的轮询，避免多个轮询器同时运行
-        authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
-        authPollRunnable = null
-        
-        lifecycleScope.launch {
-            if (authManager.isApproved()) {
-                val serverList = getServerList()
-                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                val defaultUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-                val candidates = serverList.ifEmpty { listOf(defaultUrl) }
-
-                var maintenanceResp: com.mediaplayer.app.data.model.VerifyResponse? = null
-
-                for ((index, serverUrl) in candidates.withIndex()) {
-                    val label = if (index == 0) "主服务器" else "备用服务器 $index"
-                    showAuthWaiting("正在验证$label ...", showQr = true)
-
-                    ApiClient.init(serverUrl)
-
-                    val attempt = try {
-                        withTimeout(15_000L) {
-                            authManager.verify()
-                        }
-                    } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                        Result.failure(Exception("连接超时"))
-                    }
-
-                    if (attempt.isSuccess) {
-                        val resp = attempt.getOrNull()
-                        if (resp != null) {
-                            if (resp.globalMaintenance && !resp.isTester) {
-                                // 该服务器处于维护模式，记录下来并尝试下一个备用服务器
-                                maintenanceResp = resp
-                                continue
-                            } else {
-                                // 验证成功且未在维护，直接进入
-                                // 注意：只有主服务器（index==0）才更新 KEY_SERVER_URL，
-                                // 备用服务器成功时不覆盖，保证主服务器恢复后下次优先切回
-                                if (index == 0) {
-                                    prefs.edit().putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
-                                }
-                                handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
-                                return@launch
-                            }
-                        }
-                    }
-                }
-
-                // 循环结束，没有找到可用且非维护状态的服务器
-                if (maintenanceResp != null) {
-                    // 说明至少有一个连通了，但处于维护状态。统一展示维护界面。
-                    handleAuthSuccess(maintenanceResp.announcement, maintenanceResp.announcementInterval, maintenanceResp.startupMediaEnabled, maintenanceResp.startupMedia, maintenanceResp.startupMediaType, maintenanceResp.startupDuration, maintenanceResp.startupSkipAfter, maintenanceResp.globalMaintenance, maintenanceResp.backupServers, maintenanceResp.isTester)
-                } else {
-                    // 全部超时或网络错误，回退到注册重试流程
-                    doRegister()
-                }
-            } else {
-                doRegister()
-            }
-        }
-    }
-
-    private fun doRegister() {
-        lifecycleScope.launch {
-            val serverList = getServerList()
-            val defaultUrl = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                .getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-            val candidates = serverList.ifEmpty { listOf(defaultUrl) }
-
-            var maintenanceResult: com.mediaplayer.app.data.model.ClientRegisterResp? = null
-
-            showAuthWaiting("正在注册设备...", showQr = true)
-
-            for ((index, serverUrl) in candidates.withIndex()) {
-                val label = if (index == 0) "主服务器 ($serverUrl)" else "备用服务器 $index ($serverUrl)"
-                showAuthWaiting("正在连接$label ...", showQr = true)
-
-                ApiClient.init(serverUrl)
-                authManager.clearAuth()
-
-                val attempt = try {
-                    withTimeout(15_000L) { // 缩短单次超时时间，避免过长等待
-                        authManager.register()
-                    }
-                } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                    Result.failure(Exception("连接超时"))
-                }
-
-                if (attempt.isSuccess) {
-                    val result = attempt.getOrThrow()
-                    when (result.status) {
-                        "approved" -> {
-                            if (result.globalMaintenance && !result.isTester) {
-                                // 注册服务器处于维护模式，记录下来并尝试下一个备用服务器
-                                maintenanceResult = result
-                                continue
-                            } else {
-                                // 注册成功且未在维护，直接进入
-                                // 注意：只有主服务器（index==0）才更新 KEY_SERVER_URL，
-                                // 备用服务器成功时不覆盖，保证主服务器恢复后下次优先切回
-                                if (index == 0) {
-                                    getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
-                                        .putString(Prefs.KEY_SERVER_URL, serverUrl).apply()
-                                }
-                                handleAuthSuccess(result.announcement, result.announcementInterval, result.startupMediaEnabled, result.startupMedia, result.startupMediaType, result.startupDuration, result.startupSkipAfter, result.globalMaintenance, result.backupServers, result.isTester)
-                                return@launch
-                            }
-                        }
-                        "pending" -> {
-                            showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: ${authManager.getDeviceId()}", showQr = true)
-                            startAuthPolling()
-                            return@launch
-                        }
-                        "rejected" -> {
-                            showAuthWaiting("设备注册被拒绝\n请联系管理员", showQr = true)
-                            return@launch
-                        }
-                        "banned" -> {
-                            showAuthWaiting("设备已被封禁\n请联系管理员", showQr = true)
-                            return@launch
-                        }
-                    }
-                }
-                // attempt.isFailure → 继续尝试下一台服务器
-            }
-
-            // 循环结束，没有找到可用且非维护状态的服务器
-            if (maintenanceResult != null) {
-                // 至少有一个连通了，但处于维护状态。统一展示维护界面。
-                handleAuthSuccess(maintenanceResult.announcement, maintenanceResult.announcementInterval, maintenanceResult.startupMediaEnabled, maintenanceResult.startupMedia, maintenanceResult.startupMediaType, maintenanceResult.startupDuration, maintenanceResult.startupSkipAfter, maintenanceResult.globalMaintenance, maintenanceResult.backupServers, maintenanceResult.isTester)
-                return@launch
-            }
-
-            // 所有服务器均无法连接，不要死等，开启轮询机制定期重试连接
-            showAuthWaiting("所有服务器均无法连接，15秒后自动重试...\n请检查配置信息", showQr = true)
-            
-            val retryRunnable = Runnable { checkAuthAndLoad() }
-            authPollRunnable = retryRunnable
-            authPollHandler.postDelayed(retryRunnable, 15000)
         }
     }
 
@@ -2217,7 +2117,7 @@ class MainActivity : AppCompatActivity() {
             if (ip != null) {
                 setupQrConfigServer {
                     Toast.makeText(this@MainActivity, "配置已保存，正在重试...", Toast.LENGTH_LONG).show()
-                    checkAuthAndLoad()
+                    authFlowManager.startAuthFlow()
                 }
                 
                 val qrPort = configWebServer?.actualPort ?: 9528
@@ -2364,7 +2264,7 @@ class MainActivity : AppCompatActivity() {
                                     playerHelper = null
                                     heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
                                     heartbeatRunnable = null
-                                    checkAuthAndLoad()
+                                    authFlowManager.startAuthFlow()
                                 }
                             }
                             .onFailure {
@@ -2379,7 +2279,7 @@ class MainActivity : AppCompatActivity() {
                                     playerHelper = null
                                     heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
                                     heartbeatRunnable = null
-                                    checkAuthAndLoad()
+                                    authFlowManager.startAuthFlow()
                                 }
                                 // 第 1 次失败时不立即切换，等待下次心跳重试（避免网络抖动误触发）
                             }
@@ -3332,6 +3232,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         configWebServer?.stop()
+        authFlowManager.cancelRetry()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         stopEpgTicker()
