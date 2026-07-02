@@ -471,7 +471,10 @@ class MainActivity : AppCompatActivity() {
 
             override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
                 if (isCurrentChannelVod()) {
-                    toggleVodPauseResume()
+                    // VOD模式：OSD已显示时才触发暂停/恢复，避免误触
+                    if (osdOverlayView?.isOsdVisible() == true) {
+                        toggleVodPauseResume()
+                    }
                 }
                 showOsd()
                 return true
