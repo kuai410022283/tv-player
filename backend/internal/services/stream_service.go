@@ -107,33 +107,6 @@ func (sp *StreamProxy) GetRedirectedURL(channelID int64) string {
 	return sp.redirectedURLs[channelID]
 }
 
-// isLiveContent 判断频道是否为直播内容
-// 优先使用显式 content_type 字段，为空时自动推断
-func isLiveContent(ch *models.Channel) bool {
-	ct := strings.ToLower(strings.TrimSpace(ch.ContentType))
-	if ct == "live" {
-		return true
-	}
-	if ct == "vod" {
-		return false
-	}
-	// 自动推断兜底
-	if isLocalPath(ch.StreamURL) {
-		return false // 本地文件 → vod
-	}
-	st := strings.ToLower(ch.StreamType)
-	switch st {
-	case "mp4", "mkv", "avi", "mov", "webm":
-		return false // 明确的容器格式 → vod
-	case "ts", "flv", "rtmp", "rtsp", "octet-stream":
-		return true // 直播协议 → live
-	case "hls", "dash":
-		return true // HLS/DASH 默认视为直播
-	default:
-		return true // 未知类型默认 live
-	}
-}
-
 // CheckHealth verifies a stream URL is reachable and returns stream info
 func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (*models.StreamStatus, error) {
 	// 如果是多源合并（#拼接），取第一条线路进行探测
