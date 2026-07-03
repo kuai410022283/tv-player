@@ -3,6 +3,7 @@ package com.mediaplayer.app.util
 import android.content.Context
 import android.net.Uri
 import android.view.ViewGroup
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
@@ -11,6 +12,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.R as media3R
@@ -37,6 +39,9 @@ class ExoPlayerHelper(
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
     private var lastBuiltIsLiveStream: Boolean = false
+
+    // 复用 MediaSourceFactory（保留认证头等配置，用于外挂字幕加载）
+    private var mediaSourceFactory: DefaultMediaSourceFactory? = null
 
     init {
         initPlayerView()
@@ -145,6 +150,7 @@ class ExoPlayerHelper(
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
             .setDataSourceFactory(defaultDataSourceFactory)
+        this.mediaSourceFactory = mediaSourceFactory
 
         val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
         if (mimeType != null) {
@@ -265,149 +271,157 @@ class ExoPlayerHelper(
         
         applyScaleMode()
 
-        exoPlayer?.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> {
-                        listener.onBuffering(0f)
-                    }
-                    Player.STATE_READY -> {
-                        listener.onBuffering(100f)
-                        if (exoPlayer?.playWhenReady == true) {
-                            if (!isPlayerPlaying) {
-                                isPlayerPlaying = true
-                                // 在 STATE_READY 时主动上报可用信息
-                                // （onVideoSizeChanged 可能因流未上报尺寸而不触发）
-                                val videoFormat = exoPlayer?.videoFormat
-                                val audioFormat = exoPlayer?.audioFormat
-                                val info = buildString {
-                                    if (videoFormat != null && videoFormat.width > 0 && videoFormat.height > 0) {
-                                        append("${videoFormat.width}x${videoFormat.height}")
-                                    }
-                                    val videoMime = videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
-                                    val audioMime = audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
-                                    if (!videoMime.isNullOrEmpty()) {
-                                        if (isNotEmpty()) append(" | ")
-                                        append(videoMime)
-                                    }
-                                    if (!audioMime.isNullOrEmpty()) {
-                                        if (isNotEmpty()) append(" | ")
-                                        append(audioMime)
-                                    }
-                                }
-                                listener.onPlaying(info)
+        exoPlayer?.addListener(exoPlayerListener)
+    }
 
-                                val vMime = videoFormat?.sampleMimeType ?: ""
-                                val aMime = audioFormat?.sampleMimeType ?: ""
-                                val colorInfo = videoFormat?.colorInfo
-                                
-                                val isHdr10 = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_ST2084
-                                val isHlg = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_HLG
-                                val isDolbyVision = vMime == "video/dolby-vision" || videoFormat?.codecs?.contains("dvh1") == true || videoFormat?.codecs?.contains("dvhe") == true
-                                val isDolbyAtmos = aMime == "audio/eac3-joc" || audioFormat?.codecs?.contains("joc") == true
-                                val isDolbyAudio = !isDolbyAtmos && (aMime.contains("ac3") || aMime.contains("eac3") || aMime == "audio/true-hd" || audioFormat?.codecs?.contains("ac-3", ignoreCase = true) == true)
-                                val isDts = aMime.contains("dts") || audioFormat?.codecs?.contains("dts", ignoreCase = true) == true
-                                
-                                val badgeInfo = com.mediaplayer.app.util.StreamBadgeInfo(
-                                    isDolbyVision = isDolbyVision,
-                                    isHdr10 = isHdr10,
-                                    isHlg = isHlg,
-                                    isDolbyAtmos = isDolbyAtmos,
-                                    isDolbyAudio = isDolbyAudio,
-                                    isDts = isDts,
-                                    audioCodec = aMime.substringAfter("/").uppercase(),
-                                    videoCodec = vMime.substringAfter("/").uppercase()
-                                )
-                                listener.onMediaInfoReady(badgeInfo)
+    private val exoPlayerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    listener.onBuffering(0f)
+                }
+                Player.STATE_READY -> {
+                    listener.onBuffering(100f)
+                    if (exoPlayer?.playWhenReady == true) {
+                        if (!isPlayerPlaying) {
+                            isPlayerPlaying = true
+                            // 在 STATE_READY 时主动上报可用信息
+                            // （onVideoSizeChanged 可能因流未上报尺寸而不触发）
+                            val videoFormat = exoPlayer?.videoFormat
+                            val audioFormat = exoPlayer?.audioFormat
+                            val info = buildString {
+                                if (videoFormat != null && videoFormat.width > 0 && videoFormat.height > 0) {
+                                    append("${videoFormat.width}x${videoFormat.height}")
+                                }
+                                val videoMime = videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
+                                val audioMime = audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase()
+                                if (!videoMime.isNullOrEmpty()) {
+                                    if (isNotEmpty()) append(" | ")
+                                    append(videoMime)
+                                }
+                                if (!audioMime.isNullOrEmpty()) {
+                                    if (isNotEmpty()) append(" | ")
+                                    append(audioMime)
+                                }
                             }
+                            listener.onPlaying(info)
+
+                            val vMime = videoFormat?.sampleMimeType ?: ""
+                            val aMime = audioFormat?.sampleMimeType ?: ""
+                            val colorInfo = videoFormat?.colorInfo
+                            
+                            val isHdr10 = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_ST2084
+                            val isHlg = colorInfo?.colorTransfer == androidx.media3.common.C.COLOR_TRANSFER_HLG
+                            val isDolbyVision = vMime == "video/dolby-vision" || videoFormat?.codecs?.contains("dvh1") == true || videoFormat?.codecs?.contains("dvhe") == true
+                            val isDolbyAtmos = aMime == "audio/eac3-joc" || audioFormat?.codecs?.contains("joc") == true
+                            val isDolbyAudio = !isDolbyAtmos && (aMime.contains("ac3") || aMime.contains("eac3") || aMime == "audio/true-hd" || audioFormat?.codecs?.contains("ac-3", ignoreCase = true) == true)
+                            val isDts = aMime.contains("dts") || audioFormat?.codecs?.contains("dts", ignoreCase = true) == true
+                            
+                            val badgeInfo = com.mediaplayer.app.util.StreamBadgeInfo(
+                                isDolbyVision = isDolbyVision,
+                                isHdr10 = isHdr10,
+                                isHlg = isHlg,
+                                isDolbyAtmos = isDolbyAtmos,
+                                isDolbyAudio = isDolbyAudio,
+                                isDts = isDts,
+                                audioCodec = aMime.substringAfter("/").uppercase(),
+                                videoCodec = vMime.substringAfter("/").uppercase()
+                            )
+                            listener.onMediaInfoReady(badgeInfo)
+
+                            // 通知轨道列表变化
+                            listener.onTracksChanged(
+                                audioTracks = getAudioTracks(),
+                                subtitleTracks = getSubtitleTracks()
+                            )
                         }
                     }
-                    Player.STATE_ENDED -> {
-                        listener.onPlaybackCompleted()
-                    }
+                }
+                Player.STATE_ENDED -> {
+                    listener.onPlaybackCompleted()
+                }
+            }
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Playback error code: ${error.errorCode}", error)
+            
+            // 1. 直播流滑窗越界自愈 (带熔断机制)
+            if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                val now = System.currentTimeMillis()
+                if (now - behindLiveWindowLastTime > 60000) {
+                    behindLiveWindowCount = 0
+                }
+                behindLiveWindowCount++
+                behindLiveWindowLastTime = now
+                
+                if (behindLiveWindowCount <= 3) {
+                    com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window detected ($behindLiveWindowCount/3), auto-recovering...")
+                    exoPlayer?.seekToDefaultPosition()
+                    exoPlayer?.prepare()
+                    return // 吞掉错误，不再向上层报错
+                } else {
+                    com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window circuit breaker tripped! Throwing error.")
+                    // 熔断，重置计数，并抛给上层换源
+                    behindLiveWindowCount = 0
+                }
+            }
+            
+            // 2. 音视频解码或 AudioTrack 崩溃导致卡死，触发自愈重启 (兜底)
+            if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
+                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
+            ) {
+                val now = System.currentTimeMillis()
+                if (now - criticalErrorLastTime > 60000) {
+                    criticalErrorCount = 0
+                }
+                criticalErrorCount++
+                criticalErrorLastTime = now
+                
+                if (criticalErrorCount <= 3) {
+                    com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Audio/Video critical error detected ($criticalErrorCount/3), attempting to recover...", error)
+                    exoPlayer?.seekToDefaultPosition()
+                    exoPlayer?.prepare()
+                    return // 吞掉错误，尝试自愈
+                } else {
+                    com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Critical error circuit breaker tripped! Throwing error.", error)
+                    criticalErrorCount = 0
+                }
+            }
+            
+            // 3. 格式嗅探与重试 (MimeType 降级)
+            if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+            ) {
+                if (!isMimeTypeFallback) {
+                    isMimeTypeFallback = true
+                    com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Parsing error detected, falling back to M3U8 MimeType...")
+                    // 强制使用 M3U8 MimeType 再次尝试播放
+                    playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+                    return // 吞掉本次错误
                 }
             }
 
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Playback error code: ${error.errorCode}", error)
-                
-                // 1. 直播流滑窗越界自愈 (带熔断机制)
-                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                    val now = System.currentTimeMillis()
-                    if (now - behindLiveWindowLastTime > 60000) {
-                        behindLiveWindowCount = 0
-                    }
-                    behindLiveWindowCount++
-                    behindLiveWindowLastTime = now
-                    
-                    if (behindLiveWindowCount <= 3) {
-                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window detected ($behindLiveWindowCount/3), auto-recovering...")
-                        exoPlayer?.seekToDefaultPosition()
-                        exoPlayer?.prepare()
-                        return // 吞掉错误，不再向上层报错
-                    } else {
-                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Behind live window circuit breaker tripped! Throwing error.")
-                        // 熔断，重置计数，并抛给上层换源
-                        behindLiveWindowCount = 0
-                    }
-                }
-                
-                // 2. 音视频解码或 AudioTrack 崩溃导致卡死，触发自愈重启 (兜底)
-                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
-                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
-                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
-                ) {
-                    val now = System.currentTimeMillis()
-                    if (now - criticalErrorLastTime > 60000) {
-                        criticalErrorCount = 0
-                    }
-                    criticalErrorCount++
-                    criticalErrorLastTime = now
-                    
-                    if (criticalErrorCount <= 3) {
-                        com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Audio/Video critical error detected ($criticalErrorCount/3), attempting to recover...", error)
-                        exoPlayer?.seekToDefaultPosition()
-                        exoPlayer?.prepare()
-                        return // 吞掉错误，尝试自愈
-                    } else {
-                        com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Critical error circuit breaker tripped! Throwing error.", error)
-                        criticalErrorCount = 0
-                    }
-                }
-                
-                // 3. 格式嗅探与重试 (MimeType 降级)
-                if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
-                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
-                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-                ) {
-                    if (!isMimeTypeFallback) {
-                        isMimeTypeFallback = true
-                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Parsing error detected, falling back to M3U8 MimeType...")
-                        // 强制使用 M3U8 MimeType 再次尝试播放
-                        playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8)
-                        return // 吞掉本次错误
-                    }
-                }
+            listener.onError()
+        }
 
-                listener.onError()
-            }
-
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                if (videoSize.width > 0 && videoSize.height > 0) {
-                    val audioMime = exoPlayer?.audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
-                    val videoMime = exoPlayer?.videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
-                    lastResolution = "${videoSize.width}x${videoSize.height}"
-                    val info = buildString {
-                        append(lastResolution)
-                        if (videoMime.isNotEmpty()) append(" | ").append(videoMime)
-                        if (audioMime.isNotEmpty()) append(" | ").append(audioMime)
-                    }
-                    if (isPlayerPlaying) {
-                        listener.onPlaying(info)
-                    }
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            if (videoSize.width > 0 && videoSize.height > 0) {
+                val audioMime = exoPlayer?.audioFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
+                val videoMime = exoPlayer?.videoFormat?.sampleMimeType?.substringAfter("/")?.uppercase() ?: ""
+                lastResolution = "${videoSize.width}x${videoSize.height}"
+                val info = buildString {
+                    append(lastResolution)
+                    if (videoMime.isNotEmpty()) append(" | ").append(videoMime)
+                    if (audioMime.isNotEmpty()) append(" | ").append(audioMime)
+                }
+                if (isPlayerPlaying) {
+                    listener.onPlaying(info)
                 }
             }
-        })
+        }
     }
 
     override fun setAspectRatio(scaleMode: Int) {
@@ -534,6 +548,120 @@ class ExoPlayerHelper(
         exoPlayer?.setPlaybackSpeed(rate)
     }
 
+    // ── 音轨/字幕接口实现 ──
+
+    override fun getAudioTracks(): List<AudioTrackInfo> {
+        val tracks = exoPlayer?.currentTracks ?: return emptyList()
+        val result = mutableListOf<AudioTrackInfo>()
+        for (group in tracks.groups) {
+            if (group.type == C.TRACK_TYPE_AUDIO) {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    result.add(AudioTrackInfo(
+                        index = i,
+                        language = format.language ?: "und",
+                        label = format.label ?: languageToDisplayName(format.language)
+                            ?: "音轨 ${i + 1}",
+                        codec = format.sampleMimeType?.substringAfter("/")?.uppercase() ?: "",
+                        channelCount = format.channelCount,
+                        isSelected = group.isTrackSelected(i)
+                    ))
+                }
+            }
+        }
+        return result
+    }
+
+    override fun selectAudioTrack(index: Int) {
+        val exo = exoPlayer ?: return
+        for (group in exo.currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_AUDIO) {
+                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
+                exo.trackSelectionParameters = exo.trackSelectionParameters
+                    .buildUpon()
+                    .setOverrideForType(override)
+                    .build()
+                break
+            }
+        }
+    }
+
+    override fun getSubtitleTracks(): List<SubtitleTrackInfo> {
+        val tracks = exoPlayer?.currentTracks ?: return emptyList()
+        val result = mutableListOf(SubtitleTrackInfo(
+            index = -1, language = "", label = "关闭",
+            isEmbedded = false, mimeType = "", isSelected = true
+        ))
+        for (group in tracks.groups) {
+            if (group.type == C.TRACK_TYPE_TEXT) {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val isSelected = group.isTrackSelected(i)
+                    if (isSelected) result[0] = result[0].copy(isSelected = false)
+                    result.add(SubtitleTrackInfo(
+                        index = i,
+                        language = format.language ?: "und",
+                        label = format.label ?: languageToDisplayName(format.language)
+                            ?: "字幕 ${i + 1}",
+                        isEmbedded = true,
+                        mimeType = format.sampleMimeType ?: "",
+                        isSelected = isSelected
+                    ))
+                }
+            }
+        }
+        return result
+    }
+
+    override fun selectSubtitleTrack(index: Int) {
+        val exo = exoPlayer ?: return
+        if (index < 0) { disableSubtitle(); return }
+        for (group in exo.currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_TEXT) {
+                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
+                exo.trackSelectionParameters = exo.trackSelectionParameters
+                    .buildUpon()
+                    .setOverrideForType(override)
+                    .build()
+                break
+            }
+        }
+    }
+
+    override fun disableSubtitle() {
+        val exo = exoPlayer ?: return
+        exo.trackSelectionParameters = exo.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .build()
+    }
+
+    override fun loadExternalSubtitle(uri: Uri, mimeType: String): Boolean {
+        val exo = exoPlayer ?: return false
+        val currentPos = exo.currentPosition
+        val wasPlaying = exo.isPlaying
+
+        val originalItem = exo.currentMediaItem ?: return false
+        val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(mimeType)
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+
+        val newItem = originalItem.buildUpon()
+            .setSubtitleConfigurations(
+                originalItem.localConfiguration?.subtitleConfigurations.orEmpty() + subtitleConfig
+            )
+            .build()
+
+        val factory = mediaSourceFactory ?: return false
+        val mediaSource = factory.createMediaSource(newItem)
+        exo.setMediaSource(mediaSource)
+        exo.seekTo(currentPos)
+        exo.prepare()
+        if (wasPlaying) exo.play()
+        return true
+    }
+
     override fun release() {
         releasePlayer()
         videoLayout.removeView(playerView)
@@ -563,5 +691,24 @@ private class LenientAudioRendererWrapper(
         // 如果底层音频没准备好（比如因为源流时间戳损坏导致被丢弃），我们强行让它就绪。
         // 这样 ExoPlayer 就不会为了等待音频而退回 BUFFERING 状态卡死。视频渲染器会继续渲染画面。
         return true
+    }
+}
+
+// 辅助：语言代码 → 中文显示名
+private fun languageToDisplayName(code: String?): String? {
+    return when (code?.take(2)) {
+        "zh", "chi", "zho" -> "中文"
+        "en", "eng" -> "英语"
+        "ja", "jpn" -> "日语"
+        "ko", "kor" -> "韩语"
+        "fr", "fre", "fra" -> "法语"
+        "de", "deu", "ger" -> "德语"
+        "es", "spa" -> "西班牙语"
+        "pt", "por" -> "葡萄牙语"
+        "ru", "rus" -> "俄语"
+        "ar", "ara" -> "阿拉伯语"
+        "th", "tha" -> "泰语"
+        "vi", "vie" -> "越南语"
+        else -> code?.uppercase()
     }
 }

@@ -124,19 +124,19 @@
             android:visibility="gone">
 
             <!-- 固定宽度图标区域（防止图标变化导致时间晃动） -->
-            <TextView
+            <ImageView
                 android:id="@+id/tvVodIcon"
-                android:layout_width="56dp"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:textColor="#FFFFFF"
-                android:textSize="@dimen/text_24"
-                android:text="▶" />
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
+                android:src="@drawable/ic_vod_play"
+                android:focusable="true" />
 
             <TextView
                 android:id="@+id/tvVodCurrentTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/dp_8"
                 android:textColor="#FFFFFF"
                 android:textSize="@dimen/text_24"
                 android:text="00:00:00" />
@@ -152,7 +152,38 @@
                 android:layout_height="wrap_content"
                 android:textColor="#AAAAAA"
                 android:textSize="@dimen/text_24"
-                android:text="00:00:00" />
+                android:text="00:00:00"
+                android:nextFocusRight="@+id/tvBtnAudio" />
+
+            <TextView
+                android:id="@+id/tvBtnAudio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/dp_16"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/text_24"
+                android:focusable="true"
+                android:clickable="true"
+                android:nextFocusLeft="@id/tvBtnAudio"
+                android:paddingHorizontal="@dimen/dp_16"
+                android:paddingVertical="@dimen/dp_4"
+                android:visibility="gone"
+                android:text="音轨" />
+
+            <TextView
+                android:id="@+id/tvBtnSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/dp_16"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/text_24"
+                android:focusable="true"
+                android:clickable="true"
+                android:nextFocusRight="@id/tvBtnSubtitle"
+                android:paddingHorizontal="@dimen/dp_16"
+                android:paddingVertical="@dimen/dp_4"
+                android:visibility="gone"
+                android:text="字幕" />
         </LinearLayout>
 
         <ProgressBar

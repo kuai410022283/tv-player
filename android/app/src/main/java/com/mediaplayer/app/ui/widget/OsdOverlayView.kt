@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.ImageView
 import com.mediaplayer.app.R
 import com.mediaplayer.app.util.RemoteLogger
 
@@ -29,9 +30,11 @@ class OsdOverlayView @JvmOverloads constructor(
     private val tvOsdNextEpg: TextView
     private val progressEpg: ProgressBar
     private val layoutVodControl: LinearLayout
-    private val tvVodIcon: TextView
+    private val tvVodIcon: ImageView
     private val tvVodCurrentTime: TextView
     private val tvVodTotalTime: TextView
+    private val tvBtnAudio: TextView
+    private val tvBtnSubtitle: TextView
     private val seekBarVod: SeekBar
 
     // VOD 模式状态
@@ -59,6 +62,13 @@ class OsdOverlayView @JvmOverloads constructor(
 
     var onOsdVisibilityChanged: ((Boolean) -> Unit)? = null
 
+    // 音轨/字幕按钮点击回调
+    private var trackButtonListener: ((type: String) -> Unit)? = null
+
+    fun setTrackButtonListener(listener: (type: String) -> Unit) {
+        trackButtonListener = listener
+    }
+
     init {
         LayoutInflater.from(context).inflate(R.layout.view_osd_overlay, this, true)
 
@@ -74,6 +84,41 @@ class OsdOverlayView @JvmOverloads constructor(
         tvVodIcon = findViewById(R.id.tvVodIcon)
         tvVodCurrentTime = findViewById(R.id.tvVodCurrentTime)
         tvVodTotalTime = findViewById(R.id.tvVodTotalTime)
+        tvBtnAudio = findViewById(R.id.tvBtnAudio)
+        tvBtnSubtitle = findViewById(R.id.tvBtnSubtitle)
+
+        // 音轨/字幕按钮点击 → 通知 MainActivity 打开选择面板
+        tvBtnAudio.setOnClickListener {
+            trackButtonListener?.invoke("audio")
+        }
+        tvBtnSubtitle.setOnClickListener {
+            trackButtonListener?.invoke("subtitle")
+        }
+
+        val accentColor = androidx.core.content.ContextCompat.getColor(context, R.color.accent)
+
+        // 修复跑马灯中断：按钮获取焦点时，强制重置跑马灯的选中状态
+        val trackFocusListener = OnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                tvOsdChannelName.isSelected = true
+                tvOsdEpg.isSelected = true
+                (view as TextView).setTextColor(accentColor)
+            } else {
+                (view as TextView).setTextColor(android.graphics.Color.WHITE)
+            }
+        }
+        tvBtnAudio.onFocusChangeListener = trackFocusListener
+        tvBtnSubtitle.onFocusChangeListener = trackFocusListener
+
+        val iconFocusListener = OnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                (view as ImageView).imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+            } else {
+                (view as ImageView).imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+            }
+        }
+        tvVodIcon.onFocusChangeListener = iconFocusListener
+
         seekBarVod = findViewById(R.id.seekBarVod)
 
         // VOD SeekBar 拖动监听
@@ -81,7 +126,7 @@ class OsdOverlayView @JvmOverloads constructor(
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser && isVodMode) {
                     val seekMs = progress.toLong() * vodDuration / 1000
-                    tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+                    tvVodIcon.setImageResource(if (isVodPlaying) R.drawable.ic_vod_play else R.drawable.ic_vod_pause)
                     tvVodCurrentTime.text = formatTime(seekMs)
                 }
             }
@@ -107,6 +152,7 @@ class OsdOverlayView @JvmOverloads constructor(
     }
 
     fun showOsd() {
+        val wasHidden = layoutOsd.visibility != View.VISIBLE
         layoutOsd.visibility = View.VISIBLE
         
         // Ensure marquee works by selecting the views programmatically
@@ -114,8 +160,12 @@ class OsdOverlayView @JvmOverloads constructor(
         tvOsdEpg.isSelected = true
         tvOsdNextEpg.isSelected = true
 
+        if (wasHidden && isVodMode && !isUserDraggingSeekBar) {
+            tvVodIcon.requestFocus()
+        }
+
         uiHandler.removeCallbacks(hideOsdRunnable)
-        uiHandler.postDelayed(hideOsdRunnable, 5000)
+        uiHandler.postDelayed(hideOsdRunnable, 10000)
         
         onOsdVisibilityChanged?.invoke(true)
     }
@@ -205,7 +255,7 @@ class OsdOverlayView @JvmOverloads constructor(
     fun setVodPlaying(playing: Boolean) {
         isVodPlaying = playing
         if (isVodMode) {
-            tvVodIcon.text = if (playing) "▶" else "❚❚"
+            tvVodIcon.setImageResource(if (playing) R.drawable.ic_vod_play else R.drawable.ic_vod_pause)
             updateVodTimeDisplay()
         }
     }
@@ -241,7 +291,7 @@ class OsdOverlayView @JvmOverloads constructor(
             if (totalMs > 0) {
                 vodDuration = totalMs
                 seekBarVod.progress = (currentMs * 1000 / totalMs).toInt().coerceIn(0, 1000)
-                tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+                tvVodIcon.setImageResource(if (isVodPlaying) R.drawable.ic_vod_play else R.drawable.ic_vod_pause)
                 tvVodCurrentTime.text = formatTime(currentMs)
                 tvVodTotalTime.text = formatTime(totalMs)
             }
@@ -251,7 +301,7 @@ class OsdOverlayView @JvmOverloads constructor(
 
     private fun updateVodTimeDisplay() {
         val currentMs = vodPositionProvider?.invoke() ?: 0L
-        tvVodIcon.text = if (isVodPlaying) "▶" else "❚❚"
+        tvVodIcon.setImageResource(if (isVodPlaying) R.drawable.ic_vod_play else R.drawable.ic_vod_pause)
         tvVodCurrentTime.text = formatTime(currentMs)
         tvVodTotalTime.text = formatTime(vodDuration)
     }
@@ -263,7 +313,7 @@ class OsdOverlayView @JvmOverloads constructor(
         if (durationMs > 0) {
             seekBarVod.progress = (positionMs * 1000 / durationMs).toInt().coerceIn(0, 1000)
         }
-        tvVodIcon.text = "▶▶"
+        tvVodIcon.setImageResource(R.drawable.ic_vod_forward)
         tvVodCurrentTime.text = formatTime(positionMs)
         tvVodTotalTime.text = formatTime(durationMs)
     }
@@ -273,11 +323,11 @@ class OsdOverlayView @JvmOverloads constructor(
         if (!isVodMode) return
         if (speed > 1.0f) {
             val speedText = if (speed == speed.toLong().toFloat()) "${speed.toLong()}x" else "%.1fx".format(speed)
-            tvVodIcon.text = "▶▶"
+            tvVodIcon.setImageResource(R.drawable.ic_vod_forward)
             tvVodCurrentTime.text = speedText
         } else if (speed < 1.0f && speed > 0f) {
             val speedText = "%.1fx".format(speed)
-            tvVodIcon.text = "◀◀"
+            tvVodIcon.setImageResource(R.drawable.ic_vod_rewind)
             tvVodCurrentTime.text = speedText
         } else {
             updateVodTimeDisplay()
@@ -290,9 +340,28 @@ class OsdOverlayView @JvmOverloads constructor(
         if (durationMs > 0) {
             seekBarVod.progress = (positionMs * 1000 / durationMs).toInt().coerceIn(0, 1000)
         }
-        tvVodIcon.text = "◀◀"
+        tvVodIcon.setImageResource(R.drawable.ic_vod_rewind)
         tvVodCurrentTime.text = formatTime(positionMs)
         tvVodTotalTime.text = formatTime(durationMs)
+    }
+
+    // ── 音轨/字幕按钮控制（由 MainActivity.updateTrackButtonVisibility 调用） ──
+
+    fun updateAudioButton(label: String) {
+        tvBtnAudio.text = label
+        tvBtnAudio.visibility = if (label.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    fun updateSubtitleButton(label: String) {
+        tvBtnSubtitle.text = label
+        tvBtnSubtitle.visibility = if (label.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    fun setTrackButtonsEnabled(enabled: Boolean) {
+        tvBtnAudio.isFocusable = enabled
+        tvBtnSubtitle.isFocusable = enabled
+        tvBtnAudio.setTextColor(if (enabled) -0x1 else -0x555555) // WHITE or GRAY
+        tvBtnSubtitle.setTextColor(if (enabled) -0x1 else -0x555555)
     }
 
     private fun formatTime(ms: Long): String {

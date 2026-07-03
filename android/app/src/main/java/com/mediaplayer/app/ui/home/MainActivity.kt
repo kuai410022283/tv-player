@@ -42,6 +42,8 @@ import com.mediaplayer.app.ui.player.PlayerActivity
 import com.mediaplayer.app.ui.settings.SettingsActivity
 import com.mediaplayer.app.util.DeviceUtils
 import com.mediaplayer.app.util.FocusHelper
+import com.mediaplayer.app.util.AudioTrackInfo
+import com.mediaplayer.app.util.SubtitleTrackInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -99,6 +101,12 @@ class MainActivity : AppCompatActivity() {
 
     // ── Settings Sidebar ──
     private var layoutSettingsMenu: View? = null
+    private var layoutTrackMenu: View? = null
+    private var tvTrackPanelTitle: TextView? = null
+    private var containerTracks: LinearLayout? = null
+
+    /** Track menu open flag, used by OSD auto-hide coordinator and key routing */
+    private var isTrackPanelOpen: Boolean = false
     private var etSettingsUrl: EditText? = null
     private var sbSettingsCache: android.widget.SeekBar? = null
     private var tvSettingsCacheValue: TextView? = null
@@ -194,6 +202,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── 音轨/字幕缓存状态 ──
+    private var cachedAudioTracks: List<AudioTrackInfo>? = null
+    private var cachedSubtitleTracks: List<SubtitleTrackInfo>? = null
+
     // 数据加载并发锁
     private var isLoadingData = false
     // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
@@ -282,7 +294,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private var activeListArea = "channels" // "groups", "channels", "epg"
+    private var activeListArea = "channels" // "groups", "channels", "epg", "track"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -593,6 +605,9 @@ class MainActivity : AppCompatActivity() {
         osdOverlayView?.onOsdVisibilityChanged = { isVisible ->
             findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)?.forceShowByOsd = isVisible
         }
+        osdOverlayView?.setTrackButtonListener { type ->
+            showTrackPanel(type)
+        }
         progressBuffering = findViewById(R.id.progressBuffering)
         videoLayout = findViewById(R.id.videoLayout)
         progressLoading = findViewById(R.id.progressLoading)
@@ -694,6 +709,11 @@ class MainActivity : AppCompatActivity() {
         layoutLineMenu = findViewById(R.id.layoutLineMenu)
         tvLineMenuTitle = findViewById(R.id.tvLineMenuTitle)
         containerLines = findViewById(R.id.containerLines)
+
+        // Track Selection Menu
+        layoutTrackMenu = findViewById(R.id.layoutTrackMenu)
+        tvTrackPanelTitle = findViewById(R.id.tvTrackPanelTitle)
+        containerTracks = findViewById(R.id.containerTracks)
 
         setupSettingsViews()
 
@@ -1230,6 +1250,16 @@ class MainActivity : AppCompatActivity() {
             override fun onMediaInfoReady(badgeInfo: com.mediaplayer.app.util.StreamBadgeInfo) {
                 // 面向发烧友/PT玩家：在此丢弃通俗的中文标签，保留 onPlaying 时最初提取的底层原始媒体流参数。
             }
+            override fun onTracksChanged(
+                audioTracks: List<AudioTrackInfo>,
+                subtitleTracks: List<SubtitleTrackInfo>
+            ) {
+                uiHandler.post {
+                    cachedAudioTracks = audioTracks
+                    cachedSubtitleTracks = subtitleTracks
+                    updateTrackButtonVisibility()
+                }
+            }
         }
 
         try {
@@ -1506,6 +1536,11 @@ class MainActivity : AppCompatActivity() {
 
         // 切换频道时先退出 VOD 模式，播放成功后再根据 content_type 设置
         osdOverlayView?.setVodMode(false)
+
+        // 关闭音轨/字幕选择面板并清空缓存
+        if (isTrackPanelOpen) hideTrackSelectionPanel()
+        cachedAudioTracks = null
+        cachedSubtitleTracks = null
         
         // 取消上一个频道的 URL 解析协程，各播放器 play() 内部会自动 stop() 旧流。
         resolveJob?.cancel()
@@ -1744,6 +1779,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * 关闭所有活动面板（互斥逻辑）
+     */
+    private fun hideOtherActivePanels() {
+        if (layoutLineMenu?.visibility == View.VISIBLE) {
+            layoutLineMenu?.visibility = View.GONE
+        }
+        if (layoutEpgMenu?.visibility == View.VISIBLE) {
+            hideEpgMenu()
+        }
+        if (layoutSettingsMenu?.visibility == View.VISIBLE) {
+            hideSettingsMenu()
+        }
+        if (layoutZappingMenu?.visibility == View.VISIBLE) {
+            uiHandler.removeCallbacks(hideZappingRunnable)
+            hideZappingRunnable.run()
+        }
+        if (isTrackPanelOpen) {
+            hideTrackSelectionPanel()
+        }
+        activeListArea = "channels"
+    }
+
+    /**
      * 判断当前播放频道是否为 VOD（点播）内容
      * 优先使用服务端下发的 content_type 字段，兜底用 stream_type 推断
      */
@@ -1777,6 +1835,156 @@ class MainActivity : AppCompatActivity() {
             player.resume()
             osdOverlayView?.setVodPlaying(true)
         }
+    }
+
+    /**
+     * 根据缓存的轨道列表更新 OSD 按钮文本和可见性
+     */
+    private fun updateTrackButtonVisibility() {
+        val audioTracks = cachedAudioTracks
+        val subtitleTracks = cachedSubtitleTracks
+
+        // 音轨按钮：仅在有 ≥2 条音轨时显示固定文案"音轨"
+        if (audioTracks != null && audioTracks.size >= 2) {
+            osdOverlayView?.updateAudioButton("音轨")
+        } else {
+            osdOverlayView?.updateAudioButton("")
+        }
+
+        // 字幕按钮：有 ≥1 条内嵌字幕时显示固定文案"字幕"
+        if (subtitleTracks != null && subtitleTracks.any { it.index >= 0 }) {
+            osdOverlayView?.updateSubtitleButton("字幕")
+        } else {
+            osdOverlayView?.updateSubtitleButton("")
+        }
+
+        // IJK 降级检测：内核不支持音轨切换时禁用按钮
+        val isIjk = playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
+        osdOverlayView?.setTrackButtonsEnabled(!isIjk)
+    }
+
+    // ── 音轨/字幕选择面板 ──
+
+    private fun showTrackPanel(type: String) {
+        if (!isCurrentChannelVod() && currentCatchupChannelIndex < 0) return
+
+        // 互斥：关闭其他面板
+        hideOtherActivePanels()
+
+        val tracks: List<Any>
+        val title: String
+        val isAudio = type == "audio"
+
+        if (isAudio) {
+            cachedAudioTracks = playerHelper?.getAudioTracks()
+            tracks = cachedAudioTracks.orEmpty()
+            title = "选择音轨"
+        } else {
+            cachedSubtitleTracks = playerHelper?.getSubtitleTracks()
+            tracks = cachedSubtitleTracks.orEmpty()
+            title = "选择字幕"
+        }
+
+        if (tracks.isEmpty()) return
+
+        tvTrackPanelTitle?.text = title
+        val selectedIndex = populateTrackListItems(containerTracks, tracks, isAudio)
+
+        // 暂停 OSD 自动隐藏
+        osdOverlayView?.removeCallbacks()
+        layoutTrackMenu?.visibility = View.VISIBLE
+        isTrackPanelOpen = true
+        activeListArea = "track"
+
+        // 自动聚焦当前选中的项目
+        if (selectedIndex in 0 until (containerTracks?.childCount ?: 0)) {
+            containerTracks?.getChildAt(selectedIndex)?.requestFocus()
+        } else {
+            containerTracks?.getChildAt(0)?.requestFocus()
+        }
+    }
+
+    fun hideTrackSelectionPanel() {
+        layoutTrackMenu?.visibility = View.GONE
+        isTrackPanelOpen = false
+        // 显示 OSD 并重新启动 5 秒倒计时
+        osdOverlayView?.showOsd()
+
+        // 隐藏后取消 focusable 避免残留焦点干扰
+        containerTracks?.removeAllViews()
+    }
+
+    private fun populateTrackListItems(
+        container: LinearLayout?,
+        tracks: List<Any>,
+        isAudio: Boolean
+    ): Int {
+        container?.removeAllViews()
+        var focusIndex = 0
+
+        @Suppress("UNCHECKED_CAST")
+        val audioTracks = if (isAudio) tracks as? List<AudioTrackInfo> else null
+        @Suppress("UNCHECKED_CAST")
+        val subtitleTracks = if (!isAudio) tracks as? List<SubtitleTrackInfo> else null
+
+        val maxIndex = if (isAudio) audioTracks?.size?.minus(1) ?: 0
+                       else subtitleTracks?.size?.minus(1) ?: 0
+
+        for (i in 0..maxIndex) {
+            val isSelected: Boolean
+            val label: String
+
+            if (isAudio) {
+                val t = audioTracks!![i]
+                isSelected = t.isSelected
+                val codecInfo = if (t.codec.isNotEmpty() || t.channelCount > 0) {
+                    " (${t.codec}${if (t.channelCount > 0) " ${t.channelCount}.0" else ""})"
+                } else ""
+                label = t.label + codecInfo
+            } else {
+                val t = subtitleTracks!![i]
+                isSelected = t.isSelected
+                label = if (t.index < 0) t.label else t.label
+            }
+            
+            if (isSelected) focusIndex = i
+
+            val item = TextView(this).apply {
+                text = if (isSelected) "✅ $label" else "   $label"
+                setTextColor(if (isSelected) resources.getColor(R.color.accent) else android.graphics.Color.WHITE)
+                textSize = 18f
+                isFocusable = true
+                isClickable = true
+                setBackgroundResource(R.drawable.selector_channel_item)
+                setPadding(
+                    resources.getDimensionPixelSize(R.dimen.dp_16),
+                    resources.getDimensionPixelSize(R.dimen.dp_12),
+                    resources.getDimensionPixelSize(R.dimen.dp_16),
+                    resources.getDimensionPixelSize(R.dimen.dp_12)
+                )
+                setOnClickListener {
+                    if (isAudio) {
+                        playerHelper?.selectAudioTrack(audioTracks!![i].index)
+                    } else {
+                        val subIndex = subtitleTracks!![i].index
+                        if (subIndex < 0) {
+                            playerHelper?.disableSubtitle()
+                        } else {
+                            playerHelper?.selectSubtitleTrack(subIndex)
+                        }
+                    }
+                    hideTrackSelectionPanel()
+                    // 延迟更新标签（等播放器回调）
+                    android.os.Handler(mainLooper).postDelayed({
+                        cachedAudioTracks = playerHelper?.getAudioTracks()
+                        cachedSubtitleTracks = playerHelper?.getSubtitleTracks()
+                        updateTrackButtonVisibility()
+                    }, 300)
+                }
+            }
+            container?.addView(item)
+        }
+        return focusIndex
     }
 
     private fun showOsd() {
@@ -1827,6 +2035,13 @@ class MainActivity : AppCompatActivity() {
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "OSD VISIBLE")
         osdOverlayView?.removeCallbacks()
         osdOverlayView?.showOsd()
+        
+        // VOD 模式：默认焦点落在播放进度图标，按 OK 暂停/恢复，按 DOWN 移到音轨按钮
+        if (isCurrentChannelVod()) {
+            findViewById<View>(R.id.tvVodIcon)?.post {
+                findViewById<View>(R.id.tvVodIcon)?.requestFocus()
+            }
+        }
         
         // 换台时同步触发跑马灯
         if (!sysAnnouncement.isNullOrEmpty() && !marqueeIsVisible) {
@@ -2701,7 +2916,7 @@ class MainActivity : AppCompatActivity() {
             // 快速通行：非本应用关注的按键（如音量、电源、未知遥控键等）
             // 直接交给系统，不执行任何日志或 Handler 操作，防止主线程被淹没
             val isKnownKey = keyCode in setOf(
-                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO,
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
@@ -2716,8 +2931,15 @@ class MainActivity : AppCompatActivity() {
             // VOD 模式：专业快进/快退（seekTo 跳跃式，线性加速）
             // 短按：±60s（1分钟）步进 seek
             // 长按左键/右键：seekTo 跳跃式快退/快进，速度线性递增（60s/s → 300s/s）
+            // Gap A: 焦点在 OSD 音轨/字幕按钮上时，LEFT/RIGHT 不拦截，交给按钮焦点导航
+            val focusOnTrackButton = currentFocus?.let { view ->
+                view.id == R.id.tvBtnAudio || view.id == R.id.tvBtnSubtitle
+            } ?: false
             val isVodSeek = isCurrentChannelVod()
                 && layoutZappingMenu?.visibility != View.VISIBLE
+                && layoutLineMenu?.visibility != View.VISIBLE
+                && !isTrackPanelOpen
+                && !focusOnTrackButton
             if (isVodSeek && (osdOverlayView?.isOsdVisible() == true || vodSeekActive)) {
                 when (keyCode) {
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -2791,6 +3013,51 @@ class MainActivity : AppCompatActivity() {
             if (osdOverlayView?.isOsdVisible() == true) {
                 osdOverlayView?.removeCallbacks()
                 osdOverlayView?.showOsd()
+
+                // ── VOD 模式 OSD 焦点导航 ──
+                if (isCurrentChannelVod() && !isTrackPanelOpen) {
+                    val isFocusOnAudio = currentFocus?.id == R.id.tvBtnAudio
+                    val isFocusOnSubtitle = currentFocus?.id == R.id.tvBtnSubtitle
+                    val focusOnTrackBtn = isFocusOnAudio || isFocusOnSubtitle
+
+                    // DPAD_UP: 向上导航 (字幕 -> 音轨 -> 播放进度)
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            if (isFocusOnSubtitle) {
+                                val btnAudio = findViewById<View>(R.id.tvBtnAudio)
+                                if (btnAudio?.visibility == View.VISIBLE) {
+                                    btnAudio.requestFocus()
+                                } else {
+                                    findViewById<View>(R.id.tvVodIcon)?.requestFocus()
+                                }
+                            } else if (isFocusOnAudio) {
+                                findViewById<View>(R.id.tvVodIcon)?.requestFocus()
+                            }
+                        }
+                        return true // 拦截 UP 防止切台
+                    }
+
+                    // DPAD_DOWN: 向下导航 (播放进度 -> 音轨 -> 字幕)
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            val btnAudio = findViewById<View>(R.id.tvBtnAudio)
+                            val btnSubtitle = findViewById<View>(R.id.tvBtnSubtitle)
+                            
+                            if (!focusOnTrackBtn) {
+                                if (btnAudio?.visibility == View.VISIBLE) {
+                                    btnAudio.requestFocus()
+                                } else if (btnSubtitle?.visibility == View.VISIBLE) {
+                                    btnSubtitle.requestFocus()
+                                }
+                            } else if (isFocusOnAudio) {
+                                if (btnSubtitle?.visibility == View.VISIBLE) {
+                                    btnSubtitle.requestFocus()
+                                }
+                            }
+                        }
+                        return true // 拦截 DOWN 防止切台
+                    }
+                }
             }
             
             val focusedView = currentFocus
@@ -2893,16 +3160,21 @@ class MainActivity : AppCompatActivity() {
                 val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
                 val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
                 val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
-                val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible
+                val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible || isTrackPanelOpen
 
                 if (!anyPanelOpen) {
                     // 【焦点修复】拦截焦点遗留在频道列表项上的 OK 事件，防止触发换台
                     // 改为显示 OSD（用户可通过 LEFT 键呼出频道列表）
                     val focusedView = currentFocus
                     if (focusedView != null && isViewDescendantOf(focusedView, tvChannelsRv)) {
-                        com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for OSD")
-                        showOsd()
-                        return true
+                        // VOD 中 OSD 已显示时，不拦截 OK 事件，让 onKeyUp 处理暂停/恢复
+                        if (isCurrentChannelVod() && osdOverlayView?.isOsdVisible() == true) {
+                            // 不拦截，传递到 onKeyUp 处理 toggle
+                        } else {
+                            com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for OSD")
+                            showOsd()
+                            return true
+                        }
                     }
                 }
             }
@@ -2912,7 +3184,24 @@ class MainActivity : AppCompatActivity() {
 
     // ── TV key events ──────────────────────────────────
 
+    /** 检查当前焦点是否在 OSD 音轨/字幕按钮上 */
+    private fun isFocusOnTrackButton(): Boolean {
+        return currentFocus?.let { view ->
+            view.id == R.id.tvBtnAudio || view.id == R.id.tvBtnSubtitle
+        } ?: false
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_INFO) {
+            if (isTrackPanelOpen) hideTrackSelectionPanel() else showTrackPanel("audio")
+            return true
+        }
+
+        // 焦点在 OSD 音轨/字幕按钮上时，不拦截任何按键，让系统处理焦点导航和点击事件
+        if (isFocusOnTrackButton()) {
+            return super.onKeyDown(keyCode, event)
+        }
+
         // 任何时候按下菜单键，直接显示右侧设置
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
@@ -2926,7 +3215,7 @@ class MainActivity : AppCompatActivity() {
             val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
             val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
 
-            val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible
+            val anyPanelOpen = isMenuVisible || isSettingsVisible || isEpgVisible || isLineVisible || isTrackPanelOpen
 
             // 当任何面板未显示时，开始追踪 OK 键的长按事件
             if (!anyPanelOpen && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
@@ -3081,6 +3370,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isFocusOnTrackButton()) {
+            return super.onKeyLongPress(keyCode, event)
+        }
         if (isTvMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
             // 长按 OK 键呼出手动切源菜单
             showLineSelectionMenu()
@@ -3090,6 +3382,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        // 焦点在 OSD 音轨/字幕按钮上时，不拦截 OK 事件，让按钮的 onClickListener 触发
+        if (isFocusOnTrackButton()) {
+            return super.onKeyUp(keyCode, event)
+        }
+
         if (isTvMode && tvAuthWaiting?.visibility == View.GONE) {
             val isMenuVisible = layoutZappingMenu?.visibility == View.VISIBLE
             val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
@@ -3098,12 +3395,13 @@ class MainActivity : AppCompatActivity() {
 
             if (!isMenuVisible && !isSettingsVisible && !isEpgVisible && !isLineVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
                 if (event?.isTracking == true && !event.isCanceled) {
-                    // VOD 模式：短按 OK 键暂停/恢复播放
                     if (isCurrentChannelVod()) {
-                        toggleVodPauseResume()
+                        // VOD：第一次 OK 显示 OSD，OSD 已显示时再按才暂停/恢复
+                        if (osdOverlayView?.isOsdVisible() == true) {
+                            toggleVodPauseResume()
+                        }
                         showOsd()
                     } else {
-                        // 直播模式：短按 OK 键，显示 OSD（5s 自动隐藏）
                         showOsd()
                     }
                 }
@@ -3144,6 +3442,10 @@ class MainActivity : AppCompatActivity() {
         if (layoutZappingMenu?.visibility == View.VISIBLE) {
             uiHandler.removeCallbacks(hideZappingRunnable)
             hideZappingRunnable.run()
+            return
+        }
+        if (isTrackPanelOpen) {
+            hideTrackSelectionPanel()
             return
         }
         if (osdOverlayView?.isOsdVisible() == true) {

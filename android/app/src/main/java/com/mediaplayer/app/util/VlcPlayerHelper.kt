@@ -96,6 +96,11 @@ class VlcPlayerHelper(
                         if (info.isNotEmpty()) {
                             listener.onPlaying(info) // 再次更新包含分辨率的状态
                         }
+                        // 通知轨道列表变化
+                        listener.onTracksChanged(
+                            audioTracks = getAudioTracks(),
+                            subtitleTracks = getSubtitleTracks()
+                        )
                     }, 1000)
                 }
                 MediaPlayer.Event.EncounteredError -> {
@@ -278,6 +283,68 @@ class VlcPlayerHelper(
 
     override fun setRate(rate: Float) {
         mediaPlayer?.rate = rate
+    }
+
+    // ── 音轨/字幕接口实现 ──
+
+    override fun getAudioTracks(): List<AudioTrackInfo> {
+        val mp = mediaPlayer ?: return emptyList()
+        val descriptions = mp.audioTracks ?: return emptyList()
+        val currentId = mp.audioTrack
+        return descriptions.filter { it.id >= 0 }.map { desc ->
+            AudioTrackInfo(
+                index = desc.id,
+                language = desc.name?.take(2)?.lowercase() ?: "und",
+                label = desc.name ?: "音轨 ${desc.id}",
+                codec = "",
+                channelCount = 0,
+                isSelected = desc.id == currentId
+            )
+        }
+    }
+
+    override fun selectAudioTrack(index: Int) {
+        mediaPlayer?.audioTrack = index
+    }
+
+    override fun getSubtitleTracks(): List<SubtitleTrackInfo> {
+        val mp = mediaPlayer ?: return emptyList()
+        val descriptions = mp.spuTracks ?: return emptyList()
+        val currentId = mp.spuTrack
+        val result = mutableListOf(SubtitleTrackInfo(
+            index = -1, language = "", label = "关闭",
+            isEmbedded = false, mimeType = "",
+            isSelected = currentId == -1
+        ))
+        descriptions.filter { it.id >= 0 }.forEach { desc ->
+            result.add(SubtitleTrackInfo(
+                index = desc.id,
+                language = desc.name?.take(2)?.lowercase() ?: "und",
+                label = desc.name ?: "字幕 ${desc.id}",
+                isEmbedded = true,
+                mimeType = "",
+                isSelected = desc.id == currentId
+            ))
+        }
+        return result
+    }
+
+    override fun selectSubtitleTrack(index: Int) {
+        mediaPlayer?.spuTrack = index
+    }
+
+    override fun disableSubtitle() {
+        mediaPlayer?.spuTrack = -1
+    }
+
+    override fun loadExternalSubtitle(uri: Uri, mimeType: String): Boolean {
+        return try {
+            mediaPlayer?.addSlave(IMedia.Slave.Type.Subtitle, uri.toString(), true)
+            true
+        } catch (e: Exception) {
+            com.mediaplayer.app.util.RemoteLogger.e("VLC", "Failed to load subtitle", e)
+            false
+        }
     }
 
     override fun release() {

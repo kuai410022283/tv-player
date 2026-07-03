@@ -230,7 +230,49 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- 4. 顶层：授权/启动等待界面 -->
+    <!-- 5. 音轨/字幕选择面板 (Track Selection Menu) -->
+    <FrameLayout
+        android:id="@+id/layoutTrackMenu"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="false">
+
+        <LinearLayout
+            android:layout_width="@dimen/menu_line_width"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/bg_channel_info"
+            android:padding="@dimen/dp_24">
+
+            <TextView
+                android:id="@+id/tvTrackPanelTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="选择音轨"
+                android:textColor="@color/accent"
+                android:textSize="@dimen/sp_22"
+                android:textStyle="bold"
+                android:layout_marginBottom="@dimen/dp_16"
+                android:gravity="center_horizontal"/>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+                <LinearLayout
+                    android:id="@+id/containerTracks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- 6. 顶层：授权/启动等待界面 -->
     <ScrollView
         android:id="@+id/layoutAuthWaiting"
         android:layout_width="match_parent"

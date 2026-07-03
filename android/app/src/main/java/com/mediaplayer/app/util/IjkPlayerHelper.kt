@@ -1,6 +1,7 @@
 package com.mediaplayer.app.util
 
 import android.content.Context
+import android.net.Uri
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
@@ -401,6 +402,15 @@ class IjkPlayerHelper(
     override fun setRate(rate: Float) {
         ijkPlayer?.setSpeed(rate)
     }
+
+    // ── 音轨/字幕接口（IJK 不支持，全部降级为空实现） ──
+
+    override fun getAudioTracks(): List<AudioTrackInfo> = emptyList()
+    override fun selectAudioTrack(index: Int) {}
+    override fun getSubtitleTracks(): List<SubtitleTrackInfo> = emptyList()
+    override fun selectSubtitleTrack(index: Int) {}
+    override fun disableSubtitle() {}
+    override fun loadExternalSubtitle(uri: Uri, mimeType: String): Boolean = false
 
     override fun release() {
         releasePlayer()
