@@ -20,6 +20,7 @@ backend/data/
 /captures
 .externalNativeBuild
 .cxx
+.github/workflows/extract-keystore.yml
 android/app/build/
 android/.gradle/
 android/local.properties
@@ -59,3 +60,7 @@ test.txt
 
 # other
 other
+android/original-release-files
+android/keystore.env
+android/release.keystore
+

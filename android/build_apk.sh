@@ -5,6 +5,12 @@ echo "🚀 开始编译 Android TV 客户端 Release APK..."
 # 修复 JAVA_HOME 指向错误的问题（去掉末尾的 \bin）
 export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
 
+if [ -f "keystore.env" ]; then
+    echo "🔑 加载本地签名配置 (keystore.env)"
+    source keystore.env
+    export ANDROID_SIGNING_KEYSTORE="$(pwd)/release.keystore"
+fi
+
 # 确保 gradlew 具有可执行权限
 chmod +x ./gradlew
 
