@@ -1167,14 +1167,25 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 			}
 		}()
 
-		re := regexp.MustCompile(`(\d+)$`)
-		matches := re.FindStringSubmatch(body.VersionName)
 		var versionCode int
-		if len(matches) > 1 {
-			versionCode, _ = strconv.Atoi(matches[1])
+		// 解析 Android versionCode:
+		// 按照规则 v1.1.0 -> 100, v1.0.99 -> 99，公式为 minor * 100 + patch
+		reSemver := regexp.MustCompile(`(?:v)?(\d+)\.(\d+)\.(\d+)`)
+		if semverMatches := reSemver.FindStringSubmatch(body.VersionName); len(semverMatches) == 4 {
+			minor, _ := strconv.Atoi(semverMatches[2])
+			patch, _ := strconv.Atoi(semverMatches[3])
+			versionCode = minor*100 + patch
+		} else {
+			// 后备逻辑：提取字符串末尾的连续数字
+			reFallback := regexp.MustCompile(`(\d+)$`)
+			fallbackMatches := reFallback.FindStringSubmatch(body.VersionName)
+			if len(fallbackMatches) > 1 {
+				versionCode, _ = strconv.Atoi(fallbackMatches[1])
+			}
 		}
-		if versionCode == 0 {
-			pullUpdateState.Store(updateTaskState{Status: "error", Message: "无法从版本号解析 versionCode"})
+
+		if versionCode <= 0 {
+			pullUpdateState.Store(updateTaskState{Status: "error", Message: "无法从版本号解析 versionCode: " + body.VersionName})
 			return
 		}
 
