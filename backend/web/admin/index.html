@@ -118,6 +118,14 @@
         </svg>
         <span>系统日志</span>
       </div>
+      <div class="nav-item" onclick="showSection('manual',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <path d="M13 2v7l3-2 3 2V2"/>
+        </svg>
+        <span>使用手册</span>
+      </div>
       <div class="nav-section">账户</div>
       <div class="nav-item" onclick="showModal('password-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -145,6 +153,11 @@
       <!-- System Logs Iframe -->
       <div id="sec-system-logs" style="display:none; height:100%;">
         <iframe id="logs-iframe" src="about:blank" style="width:100%; height:100%; border:none; display:block;"></iframe>
+      </div>
+
+      <!-- Manual -->
+      <div id="sec-manual" style="display:none; height:100%;">
+        <iframe id="manual-iframe" src="about:blank" style="width:100%; height:100%; border:none; display:block;"></iframe>
       </div>
 
       <!-- Dashboard -->

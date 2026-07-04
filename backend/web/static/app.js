@@ -240,6 +240,12 @@ function showSection(name, el) {
       if (iframe && (iframe.src === 'about:blank' || iframe.src.endsWith('blank'))) {
         iframe.src = '/admin/logs_viewer.html';
       }
+    },
+    'manual': () => {
+      const iframe = document.getElementById('manual-iframe');
+      if (iframe && (iframe.src === 'about:blank' || iframe.src.endsWith('blank'))) {
+        iframe.src = '/admin/manual.html';
+      }
     }
   };
   if (loaders[name]) loaders[name]();
