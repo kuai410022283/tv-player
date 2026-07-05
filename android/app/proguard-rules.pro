@@ -1,4 +1,4 @@
-# Proguard rules for MediaPlayer
+﻿# Proguard rules for MediaPlayer
 
 # Retrofit
 -keepattributes Signature
@@ -16,6 +16,8 @@
 -keep class com.mediaplayer.app.data.model.** { *; }
 -keepclassmembers class com.mediaplayer.app.data.model.** { *; }
 -keep class com.mediaplayer.app.data.api.ClientAuthManager$Companion { *; }
+-keep class com.mediaplayer.app.data.ChannelMemory { *; }
+-keepclassmembers class com.mediaplayer.app.data.ChannelMemory { *; }
 
 # Gson TypeToken
 -keep class com.google.gson.reflect.TypeToken { *; }
@@ -48,3 +50,17 @@
 # Keep API response wrapper
 -keep class com.mediaplayer.app.data.model.ApiResponse { *; }
 -keep class com.mediaplayer.app.data.model.PageResponse { *; }
+
+# Add robust Kotlin Coroutines rules
+-keep class kotlin.coroutines.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep interface kotlin.coroutines.Continuation { *; }
+
+# Keep API Managers
+-keep class com.mediaplayer.app.data.api.ClientAuthManager { *; }
+-keep class com.mediaplayer.app.data.api.ServerAuthFlowManager { *; }
+-keep class com.mediaplayer.app.data.api.ApiClient { *; }
+
+# Gson specific attributes
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
