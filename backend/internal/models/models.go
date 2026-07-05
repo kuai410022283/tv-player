@@ -116,6 +116,7 @@ type SubscriptionChannel struct {
 	CatchupDays    int    `json:"catchup_days"`
 	UserAgent      string `json:"user_agent"`
 	CustomHeaders  string `json:"custom_headers"`
+	ContentType    string `json:"content_type"`
 	Fcc            string `json:"fcc,omitempty"`
 	FccType        string `json:"fcc_type,omitempty"`
 }

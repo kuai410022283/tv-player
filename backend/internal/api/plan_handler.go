@@ -121,6 +121,9 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	// TXT 格式
 	if format == "txt" {
 		c.Header("Content-Type", "text/plain; charset=utf-8")
+		if c.Query("download") == "1" {
+			c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.txt"`, planName))
+		}
 		var sb strings.Builder
 
 		currentGroup := ""
@@ -161,7 +164,17 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	}
 
 	// M3U 格式 (默认)
-	c.Header("Content-Type", "application/x-mpegurl; charset=utf-8")
+	userAgent := c.Request.UserAgent()
+	isBrowser := strings.Contains(userAgent, "Mozilla/") || strings.Contains(userAgent, "Chrome/") || strings.Contains(userAgent, "Safari/")
+	
+	if c.Query("download") == "1" {
+		c.Header("Content-Type", "application/x-mpegurl; charset=utf-8")
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.m3u"`, planName))
+	} else if c.Query("preview") == "1" || isBrowser {
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+	} else {
+		c.Header("Content-Type", "application/x-mpegurl; charset=utf-8")
+	}
 	var sb strings.Builder
 	sb.WriteString("#EXTM3U")
 
@@ -224,6 +237,11 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			tvgID = fmt.Sprintf("%d", ch.ID)
 		}
 
+		contentTypeStr := ""
+		if ch.ContentType != "" {
+			contentTypeStr = fmt.Sprintf(` tvg-type="%s"`, ch.ContentType)
+		}
+
 		lines := strings.Split(ch.StreamURL, "#")
 		for lineIdx, u := range lines {
 			u = strings.TrimSpace(u)
@@ -265,8 +283,8 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			}
 
 			tvgChno := i + 1
-			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-chno="%d" tvg-name="%s" tvg-logo="%s" group-title="%s"%s,%s`+"\n",
-				tvgID, tvgChno, ch.Name, logoURL, ch.GroupName, catchupStr, displayName))
+			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-chno="%d" tvg-name="%s" tvg-logo="%s" group-title="%s"%s%s,%s`+"\n",
+				tvgID, tvgChno, ch.Name, logoURL, ch.GroupName, catchupStr, contentTypeStr, displayName))
 			sb.WriteString(playURL)
 			sb.WriteString("\n")
 		}

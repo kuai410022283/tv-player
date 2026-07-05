@@ -38,6 +38,7 @@ import com.mediaplayer.app.data.model.Channel
 import com.mediaplayer.app.data.model.ChannelGroup
 import com.mediaplayer.app.data.model.ChannelLine
 import com.mediaplayer.app.data.repository.ChannelRepository
+import com.mediaplayer.app.data.ChannelMemoryManager
 import com.mediaplayer.app.ui.player.PlayerActivity
 import com.mediaplayer.app.ui.settings.SettingsActivity
 import com.mediaplayer.app.util.DeviceUtils
@@ -362,6 +363,8 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
         ApiClient.init(serverUrl)
+        
+        ChannelMemoryManager.init(this)
 
         setupAdapters()
 
@@ -803,7 +806,44 @@ class MainActivity : AppCompatActivity() {
     private var btnSettingsScale: View? = null
     private var btnSettingsDecoder: View? = null
     private var btnSettingsCore: View? = null
+    private var btnSettingsMemory: View? = null
+    private var tvSettingsMemoryValue: TextView? = null
+    private var isIndependentMemoryOn = false
     private var currentCore = Prefs.PLAYER_CORE_AUTO
+    var currentDecoderMode = Prefs.DECODER_MODE_AUTO
+    
+    private fun syncSettingsMemoryState() {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val channel = allChannels.getOrNull(currentChannelIndex)
+        val mem = channel?.let { com.mediaplayer.app.data.ChannelMemoryManager.getMemory(it.id) }
+        
+        if (mem != null && (mem.decoderMode != null || mem.playerCore != null)) {
+            isIndependentMemoryOn = true
+            currentDecoderMode = mem.decoderMode ?: prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+            currentCore = mem.playerCore ?: prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        } else {
+            isIndependentMemoryOn = false
+            currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+            currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        }
+        
+        // Update UI
+        tvSettingsMemoryValue?.text = if (isIndependentMemoryOn) "专属配置" else "跟随系统"
+        tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor(if (isIndependentMemoryOn) "#00E5FF" else "#AAAAAA"))
+        
+        findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (currentDecoderMode) {
+            Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
+            Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
+            else -> "自动识别"
+        }
+        
+        findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (currentCore) {
+            Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
+            Prefs.PLAYER_CORE_VLC -> "VLC"
+            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+            else -> "智能切换"
+        }
+    }
 
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -812,6 +852,9 @@ class MainActivity : AppCompatActivity() {
         btnSettingsDecoder = findViewById(R.id.btnSettingsDecoder)
         btnSettingsCore = findViewById(R.id.btnSettingsCore)
         btnSettingsScale = findViewById(R.id.btnSettingsScale)
+        btnSettingsMemory = findViewById(R.id.btnSettingsMemory)
+        tvSettingsMemoryValue = findViewById(R.id.tvSettingsMemoryValue)
+        
         val btnSettingsAutoStart = findViewById<View>(R.id.btnSettingsAutoStart)
         val btnSettingsAudioPassthrough = findViewById<View>(R.id.btnSettingsAudioPassthrough)
         val tvSettingsAudioPassthroughValue = findViewById<TextView>(R.id.tvSettingsAudioPassthroughValue)
@@ -826,6 +869,7 @@ class MainActivity : AppCompatActivity() {
                 else -> "自动识别"
             }
         }
+
 
         fun updateScaleText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
@@ -846,7 +890,8 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.tvSettingsReverseChannelsValue)?.text = if (enabled) "开" else "关"
         }
         
-        var currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        
+        currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         // 迁移旧版本中 X5 内核的选择（X5 已移除，自动回退到智能切换）
         if (currentCore == 4) {
@@ -878,18 +923,60 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "音频直通设置已保存，下次播放生效", Toast.LENGTH_SHORT).show()
         }
         
+        fun updateMemoryText(enabled: Boolean) {
+            if (enabled) {
+                tvSettingsMemoryValue?.text = "专属配置"
+                tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#00E5FF"))
+            } else {
+                tvSettingsMemoryValue?.text = "跟随系统"
+                tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#AAAAAA"))
+            }
+        }
+        
+        btnSettingsMemory?.setOnClickListener {
+            val channel = allChannels.getOrNull(currentChannelIndex)
+            if (channel == null) {
+                Toast.makeText(this, "当前无频道，无法设置独立记忆", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            isIndependentMemoryOn = !isIndependentMemoryOn
+            updateMemoryText(isIndependentMemoryOn)
+            
+            if (isIndependentMemoryOn) {
+                com.mediaplayer.app.data.ChannelMemoryManager.updateDecoder(channel.id, currentDecoderMode)
+                com.mediaplayer.app.data.ChannelMemoryManager.updateCore(channel.id, currentCore)
+                Toast.makeText(this, "已开启独立记忆", Toast.LENGTH_SHORT).show()
+            } else {
+                com.mediaplayer.app.data.ChannelMemoryManager.clearDecoderAndCore(channel.id)
+                currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+                currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+                updateDecoderText(currentDecoderMode)
+                updateCoreText(currentCore)
+                Toast.makeText(this, "已恢复系统默认", Toast.LENGTH_SHORT).show()
+            }
+        }
+        
         btnSettingsDecoder?.setOnClickListener {
+            val channel = allChannels.getOrNull(currentChannelIndex)
             currentDecoderMode = when (currentDecoderMode) {
                 Prefs.DECODER_MODE_AUTO -> Prefs.DECODER_MODE_HARDWARE
                 Prefs.DECODER_MODE_HARDWARE -> Prefs.DECODER_MODE_SOFTWARE
                 else -> Prefs.DECODER_MODE_AUTO
             }
             updateDecoderText(currentDecoderMode)
-            prefs.edit().putInt(Prefs.KEY_DECODER_MODE, currentDecoderMode).apply()
-            Toast.makeText(this, "解码模式已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            
+            if (isIndependentMemoryOn && channel != null) {
+                com.mediaplayer.app.data.ChannelMemoryManager.updateDecoder(channel.id, currentDecoderMode)
+                Toast.makeText(this, "专属解码模式已保存", Toast.LENGTH_SHORT).show()
+            } else {
+                prefs.edit().putInt(Prefs.KEY_DECODER_MODE, currentDecoderMode).apply()
+                Toast.makeText(this, "全局解码模式已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            }
         }
         
         btnSettingsCore?.setOnClickListener {
+            val channel = allChannels.getOrNull(currentChannelIndex)
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
                 Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_VLC
@@ -897,8 +984,14 @@ class MainActivity : AppCompatActivity() {
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
-            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
-            Toast.makeText(this, "播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            
+            if (isIndependentMemoryOn && channel != null) {
+                com.mediaplayer.app.data.ChannelMemoryManager.updateCore(channel.id, currentCore)
+                Toast.makeText(this, "专属播放内核已保存", Toast.LENGTH_SHORT).show()
+            } else {
+                prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
+                Toast.makeText(this, "全局播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            }
         }
         
         val btnSettingsShowLogo = findViewById<View>(R.id.btnSettingsShowLogo)
@@ -1100,6 +1193,9 @@ class MainActivity : AppCompatActivity() {
         layoutZappingMenu?.visibility = View.GONE
         
         layoutSettingsMenu?.visibility = View.VISIBLE
+        
+        syncSettingsMemoryState()
+        
         // 填充关于信息
         val authManager = ClientAuthManager(this)
         var versionText = "1.0.0"
@@ -1258,6 +1354,33 @@ class MainActivity : AppCompatActivity() {
                     cachedAudioTracks = audioTracks
                     cachedSubtitleTracks = subtitleTracks
                     updateTrackButtonVisibility()
+                    
+                    // 应用独立记忆（音轨/字幕）
+                    val channel = allChannels.getOrNull(currentChannelIndex)
+                    if (channel != null) {
+                        val mem = com.mediaplayer.app.data.ChannelMemoryManager.getMemory(channel.id)
+                        if (mem != null) {
+                            if (mem.audioTrackId != null) {
+                                val target = audioTracks.find { it.id == mem.audioTrackId }
+                                if (target != null && !target.isSelected) {
+                                    playerHelper?.selectAudioTrack(target.index)
+                                }
+                            }
+                            if (mem.subtitleTrackId != null) {
+                                if (mem.subtitleTrackId == "disable") {
+                                    val currentSelected = subtitleTracks.find { it.isSelected }
+                                    if (currentSelected != null) {
+                                        playerHelper?.disableSubtitle()
+                                    }
+                                } else {
+                                    val target = subtitleTracks.find { it.id == mem.subtitleTrackId }
+                                    if (target != null && !target.isSelected) {
+                                        playerHelper?.selectSubtitleTrack(target.index)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1550,7 +1673,9 @@ class MainActivity : AppCompatActivity() {
         currentCatchupChannelIndex = -1
         
         if (currentChannelIndex != index) {
-            currentLineIndex = 0
+            val channel = allChannels.getOrNull(index)
+            val mem = channel?.let { com.mediaplayer.app.data.ChannelMemoryManager.getMemory(it.id) }
+            currentLineIndex = mem?.lineIndex ?: 0
             coreRetryLevel = 0
         }
         currentChannelIndex = index
@@ -1754,6 +1879,10 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     if (currentLineIndex != index) {
                         currentLineIndex = index
+                        val channel = allChannels.getOrNull(currentChannelIndex)
+                        if (channel != null) {
+                            com.mediaplayer.app.data.ChannelMemoryManager.updateLineIndex(channel.id, index)
+                        }
                         Toast.makeText(this@MainActivity, "已手动切换至线路 ${index + 1}", Toast.LENGTH_SHORT).show()
                         playCurrentLineInTv()
                     }
@@ -1963,14 +2092,26 @@ class MainActivity : AppCompatActivity() {
                     resources.getDimensionPixelSize(R.dimen.dp_12)
                 )
                 setOnClickListener {
+                    val channel = allChannels.getOrNull(currentChannelIndex)
                     if (isAudio) {
-                        playerHelper?.selectAudioTrack(audioTracks!![i].index)
+                        val trackInfo = audioTracks!![i]
+                        playerHelper?.selectAudioTrack(trackInfo.index)
+                        if (channel != null) {
+                            com.mediaplayer.app.data.ChannelMemoryManager.updateTracks(channel.id, trackInfo.id, null)
+                        }
                     } else {
-                        val subIndex = subtitleTracks!![i].index
+                        val trackInfo = subtitleTracks!![i]
+                        val subIndex = trackInfo.index
                         if (subIndex < 0) {
                             playerHelper?.disableSubtitle()
+                            if (channel != null) {
+                                com.mediaplayer.app.data.ChannelMemoryManager.updateTracks(channel.id, null, "disable")
+                            }
                         } else {
                             playerHelper?.selectSubtitleTrack(subIndex)
+                            if (channel != null) {
+                                com.mediaplayer.app.data.ChannelMemoryManager.updateTracks(channel.id, null, trackInfo.id)
+                            }
                         }
                     }
                     hideTrackSelectionPanel()

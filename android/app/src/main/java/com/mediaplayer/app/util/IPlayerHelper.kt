@@ -11,7 +11,9 @@ data class AudioTrackInfo(
     val codec: String,        // 编码格式 (AAC, AC3, EAC3, OPUS, DTS...)
     val channelCount: Int,    // 声道数 (2=立体声, 6=5.1, 8=7.1)
     val isSelected: Boolean   // 是否为当前选中
-)
+) {
+    val id: String get() = "${language}_${label}"
+}
 
 data class SubtitleTrackInfo(
     val index: Int,           // 轨道索引（-1 表示"关闭"）
@@ -20,7 +22,9 @@ data class SubtitleTrackInfo(
     val isEmbedded: Boolean,  // 是否内嵌于容器中
     val mimeType: String,     // MIME 类型（用于外挂字幕格式识别）
     val isSelected: Boolean   // 是否为当前选中
-)
+) {
+    val id: String get() = "${language}_${label}"
+}
 
 interface IPlayerHelper {
     /**

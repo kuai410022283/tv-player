@@ -424,7 +424,7 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusDown="@+id/btnSettingsDecoder">
+                    android:nextFocusDown="@+id/btnSettingsMemory">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -447,6 +447,42 @@
                         app:tint="#888888"/>
                 </LinearLayout>
 
+                <!-- 独立记忆 (Channel Memory) -->
+                <LinearLayout
+                    android:id="@+id/btnSettingsMemory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsScale"
+                    android:nextFocusDown="@+id/btnSettingsDecoder">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="独立记忆"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsMemoryValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="跟随系统"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/btnSettingsDecoder"
                     android:layout_width="match_parent"
@@ -458,7 +494,7 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusUp="@+id/btnSettingsScale"
+                    android:nextFocusUp="@+id/btnSettingsMemory"
                     android:nextFocusDown="@+id/btnSettingsCore">
                     <TextView
                         android:layout_width="wrap_content"

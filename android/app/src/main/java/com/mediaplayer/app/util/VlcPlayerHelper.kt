@@ -29,7 +29,7 @@ class VlcPlayerHelper(
 
     private fun initPlayer() {
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
-        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        val decoderMode = (context as? com.mediaplayer.app.ui.home.MainActivity)?.currentDecoderMode ?: prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
 
         val options = ArrayList<String>()
         options.add("--aout=opensles")
@@ -158,7 +158,7 @@ class VlcPlayerHelper(
         
         media.addOption(":http-reconnect=true")
 
-        val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        val decoderMode = (context as? com.mediaplayer.app.ui.home.MainActivity)?.currentDecoderMode ?: prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         when (decoderMode) {
             Prefs.DECODER_MODE_HARDWARE -> media.setHWDecoderEnabled(true, true)
             Prefs.DECODER_MODE_SOFTWARE -> media.setHWDecoderEnabled(false, false)
