@@ -559,15 +559,15 @@ class ExoPlayerHelper(
     override fun getAudioTracks(): List<AudioTrackInfo> {
         val tracks = exoPlayer?.currentTracks ?: return emptyList()
         val result = mutableListOf<AudioTrackInfo>()
-        for (group in tracks.groups) {
+        for ((groupIndex, group) in tracks.groups.withIndex()) {
             if (group.type == C.TRACK_TYPE_AUDIO) {
                 for (i in 0 until group.length) {
                     val format = group.getTrackFormat(i)
                     result.add(AudioTrackInfo(
-                        index = i,
+                        index = (groupIndex shl 16) or (i and 0xFFFF),
                         language = format.language ?: "und",
                         label = format.label ?: languageToDisplayName(format.language)
-                            ?: "音轨 ${i + 1}",
+                            ?: "音轨 ${result.size + 1}",
                         codec = format.sampleMimeType?.substringAfter("/")?.uppercase() ?: "",
                         channelCount = format.channelCount,
                         isSelected = group.isTrackSelected(i)
@@ -580,14 +580,17 @@ class ExoPlayerHelper(
 
     override fun selectAudioTrack(index: Int) {
         val exo = exoPlayer ?: return
-        for (group in exo.currentTracks.groups) {
+        val groupIndex = index ushr 16
+        val trackIndex = index and 0xFFFF
+        val groups = exo.currentTracks.groups
+        if (groupIndex in groups.indices) {
+            val group = groups[groupIndex]
             if (group.type == C.TRACK_TYPE_AUDIO) {
-                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
+                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(trackIndex))
                 exo.trackSelectionParameters = exo.trackSelectionParameters
                     .buildUpon()
                     .setOverrideForType(override)
                     .build()
-                break
             }
         }
     }
@@ -598,21 +601,23 @@ class ExoPlayerHelper(
             index = -1, language = "", label = "关闭",
             isEmbedded = false, mimeType = "", isSelected = true
         ))
-        for (group in tracks.groups) {
+        var trackCounter = 1
+        for ((groupIndex, group) in tracks.groups.withIndex()) {
             if (group.type == C.TRACK_TYPE_TEXT) {
                 for (i in 0 until group.length) {
                     val format = group.getTrackFormat(i)
                     val isSelected = group.isTrackSelected(i)
                     if (isSelected) result[0] = result[0].copy(isSelected = false)
                     result.add(SubtitleTrackInfo(
-                        index = i,
+                        index = (groupIndex shl 16) or (i and 0xFFFF),
                         language = format.language ?: "und",
                         label = format.label ?: languageToDisplayName(format.language)
-                            ?: "字幕 ${i + 1}",
+                            ?: "字幕 $trackCounter",
                         isEmbedded = true,
                         mimeType = format.sampleMimeType ?: "",
                         isSelected = isSelected
                     ))
+                    trackCounter++
                 }
             }
         }
@@ -622,14 +627,18 @@ class ExoPlayerHelper(
     override fun selectSubtitleTrack(index: Int) {
         val exo = exoPlayer ?: return
         if (index < 0) { disableSubtitle(); return }
-        for (group in exo.currentTracks.groups) {
+        
+        val groupIndex = index ushr 16
+        val trackIndex = index and 0xFFFF
+        val groups = exo.currentTracks.groups
+        if (groupIndex in groups.indices) {
+            val group = groups[groupIndex]
             if (group.type == C.TRACK_TYPE_TEXT) {
-                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(index))
+                val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(trackIndex))
                 exo.trackSelectionParameters = exo.trackSelectionParameters
                     .buildUpon()
                     .setOverrideForType(override)
                     .build()
-                break
             }
         }
     }
