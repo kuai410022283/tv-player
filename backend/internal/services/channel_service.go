@@ -150,6 +150,74 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 	return tx.Commit()
 }
 
+func (s *ChannelService) BatchUpdateGroups(ids []int64, action string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var groupQuery string
+	var channelQuery string
+	switch action {
+	case "direct_on":
+		groupQuery = "UPDATE channel_groups SET is_direct = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+		channelQuery = "UPDATE channels SET is_direct = 1, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "direct_off":
+		groupQuery = "UPDATE channel_groups SET is_direct = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+		channelQuery = "UPDATE channels SET is_direct = 0, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "mux_on":
+		groupQuery = "UPDATE channel_groups SET enable_multiplex = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+		channelQuery = "UPDATE channels SET enable_multiplex = 1, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "mux_off":
+		groupQuery = "UPDATE channel_groups SET enable_multiplex = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+		channelQuery = "UPDATE channels SET enable_multiplex = 0, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "content_type_auto":
+		channelQuery = "UPDATE channels SET content_type = '', updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "content_type_live":
+		channelQuery = "UPDATE channels SET content_type = 'live', updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	case "content_type_vod":
+		channelQuery = "UPDATE channels SET content_type = 'vod', updated_at = CURRENT_TIMESTAMP WHERE group_id = ?"
+	default:
+		return fmt.Errorf("invalid action")
+	}
+
+	var stmtGroup *sql.Stmt
+	if groupQuery != "" {
+		stmtGroup, err = tx.Prepare(groupQuery)
+		if err != nil {
+			return err
+		}
+		defer stmtGroup.Close()
+	}
+
+	var stmtChannel *sql.Stmt
+	if channelQuery != "" {
+		stmtChannel, err = tx.Prepare(channelQuery)
+		if err != nil {
+			return err
+		}
+		defer stmtChannel.Close()
+	}
+
+	for _, id := range ids {
+		if stmtGroup != nil {
+			if _, err := stmtGroup.Exec(id); err != nil {
+				return err
+			}
+		}
+		if stmtChannel != nil {
+			if _, err := stmtChannel.Exec(id); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {

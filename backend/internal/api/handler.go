@@ -243,6 +243,11 @@ func (h *Handler) BatchGroup(c *gin.Context) {
 		}
 		// 删除后重新排序，消除 sort_order 空洞
 		_ = h.channelSvc.ReorderAllGroups()
+	} else {
+		if err := h.channelSvc.BatchUpdateGroups(req.IDs, req.Action); err != nil {
+			failInternal(c, err, "批量操作失败")
+			return
+		}
 	}
 	ok(c, nil)
 }

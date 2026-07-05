@@ -289,7 +289,17 @@
           <div class="search">
             <button class="btn btn-primary btn-sm" id="btn-save-sort" style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveGroupOrder()">💾 保存排序</button>
             <input type="text" placeholder="搜索分组..." id="group-search" oninput="searchGroups()">
-            <button class="btn btn-danger btn-sm" onclick="showModal('group-batch-modal')">批量操作</button>
+            <select id="group-batch-action" onchange="handleGroupBatchAction(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
+              <option value="">批量操作...</option>
+              <option value="delete">删除选中分组</option>
+              <option value="direct_on">开启直连模式</option>
+              <option value="direct_off">关闭直连模式</option>
+              <option value="mux_on">开启复用状态</option>
+              <option value="mux_off">关闭复用状态</option>
+              <option value="content_type_auto">设置内容类型(自动)</option>
+              <option value="content_type_live">设置内容类型(直播)</option>
+              <option value="content_type_vod">设置内容类型(点播)</option>
+            </select>
             <button class="btn btn-primary" onclick="showAddGroupModal()">+ 添加分组</button>
           </div>
         </div>
@@ -1289,10 +1299,10 @@
     <div class="modal-overlay" id="group-batch-modal">
       <div class="modal">
         <h3>分组批量操作</h3>
-        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
+        <p id="group-batch-modal-text" style="color:var(--text2);font-size:13px;margin-bottom:16px">将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('group-batch-modal')">取消</button>
-          <button class="btn btn-danger" onclick="doGroupBatchDelete()">确认删除</button>
+          <button class="btn btn-ghost" onclick="hideModal('group-batch-modal'); document.getElementById('group-batch-action').value='';">取消</button>
+          <button class="btn btn-danger" onclick="doGroupBatchAction()">确认操作</button>
         </div>
       </div>
     </div>
