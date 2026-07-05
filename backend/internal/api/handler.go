@@ -566,6 +566,22 @@ func (h *Handler) BatchChannel(c *gin.Context) {
 	ok(c, nil)
 }
 
+func (h *Handler) BatchUpdateChannel(c *gin.Context) {
+	var req struct {
+		IDs    []int64 `json:"ids" binding:"required"`
+		Action string  `json:"action" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.channelSvc.BatchUpdateChannels(req.IDs, req.Action); err != nil {
+		failInternal(c, err, "批量操作失败")
+		return
+	}
+	ok(c, nil)
+}
+
 // ── Stream ─────────────────────────────────────────────
 
 func (h *Handler) ProxyStream(c *gin.Context) {

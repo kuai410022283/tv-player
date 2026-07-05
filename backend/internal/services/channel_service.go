@@ -801,6 +801,50 @@ func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
 	return tx.Commit()
 }
 
+func (s *ChannelService) BatchUpdateChannels(ids []int64, action string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var query string
+	switch action {
+	case "direct_on":
+		query = "UPDATE channels SET is_direct = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "direct_off":
+		query = "UPDATE channels SET is_direct = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "mux_on":
+		query = "UPDATE channels SET enable_multiplex = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "mux_off":
+		query = "UPDATE channels SET enable_multiplex = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "content_type_auto":
+		query = "UPDATE channels SET content_type = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "content_type_live":
+		query = "UPDATE channels SET content_type = 'live', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	case "content_type_vod":
+		query = "UPDATE channels SET content_type = 'vod', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+	default:
+		return fmt.Errorf("invalid action")
+	}
+
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *ChannelService) UpdateStatus(id int64, status string) error {
 	_, err := s.db.Exec(`UPDATE channels SET status=?, last_check=? WHERE id=?`, status, time.Now(), id)
 	return err

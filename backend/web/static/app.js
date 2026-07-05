@@ -422,13 +422,54 @@ function toggleAllChannels(cb) {
   document.querySelectorAll('.ch-check').forEach(el => el.checked = cb.checked);
 }
 
-async function doChannelBatchDelete() {
+function handleChannelBatchAction(action) {
+  if (!action) return;
+  document.getElementById('channel-batch-action').value = ""; // reset
+  const checked = document.querySelectorAll('.ch-check:checked');
+  if (checked.length === 0) {
+    toast('请先勾选要操作的频道', 'error');
+    return;
+  }
+  
+  window.pendingBatchAction = action;
+  const actionNames = {
+    'delete': '删除',
+    'direct_on': '开启直连模式',
+    'direct_off': '关闭直连模式',
+    'mux_on': '开启复用状态',
+    'mux_off': '关闭复用状态',
+    'content_type_auto': '设置内容类型(自动推断)',
+    'content_type_live': '设置内容类型(直播Live)',
+    'content_type_vod': '设置内容类型(点播VOD)'
+  };
+  
+  const modalText = document.getElementById('channel-batch-modal-text');
+  if (action === 'delete') {
+    modalText.innerText = `将永久删除勾选的 ${checked.length} 个频道，此操作不可恢复。`;
+  } else {
+    modalText.innerText = `将为勾选的 ${checked.length} 个频道批量${actionNames[action]}。`;
+  }
+  showModal('channel-batch-modal');
+}
+
+async function doChannelBatchAction() {
+  const action = window.pendingBatchAction;
   const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
-  if (!ids.length) { toast('请先选择要删除的频道', 'error'); return; }
-  await api('/channels/batch', { method: 'DELETE', body: JSON.stringify({ ids }) });
-  hideModal('channel-batch-modal');
-  toast(`已删除 ${ids.length} 个频道`);
-  loadChannels(document.getElementById('channel-search').value);
+  if (!ids.length || !action) return;
+  
+  try {
+    if (action === 'delete') {
+      await api('/channels/batch', { method: 'DELETE', body: JSON.stringify({ ids }) });
+      toast(`已批量删除 ${ids.length} 个频道`);
+    } else {
+      await api('/channels/batch', { method: 'PUT', body: JSON.stringify({ ids, action }) });
+      toast(`批量操作成功`);
+    }
+    hideModal('channel-batch-modal');
+    loadChannels(document.getElementById('channel-search').value);
+  } catch (e) {
+    // Error is handled by api()
+  }
 }
 
 async function startHealthCheck() {
