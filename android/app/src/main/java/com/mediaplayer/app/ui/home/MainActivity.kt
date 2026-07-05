@@ -1360,25 +1360,32 @@ class MainActivity : AppCompatActivity() {
                     if (channel != null) {
                         val mem = com.mediaplayer.app.data.ChannelMemoryManager.getMemory(channel.id)
                         if (mem != null) {
-                            if (mem.audioTrackId != null) {
-                                val target = audioTracks.find { it.id == mem.audioTrackId }
-                                if (target != null && !target.isSelected) {
-                                    playerHelper?.selectAudioTrack(target.index)
-                                }
-                            }
-                            if (mem.subtitleTrackId != null) {
-                                if (mem.subtitleTrackId == "disable") {
-                                    val currentSelected = subtitleTracks.find { it.isSelected }
-                                    if (currentSelected != null) {
-                                        playerHelper?.disableSubtitle()
+                            // 延时 500ms 应用记忆，避免 ExoPlayer 正在初始化渲染器时发生时钟冲突 (Multiple renderer media clocks enabled)
+                            uiHandler.postDelayed({
+                                // 重新校验频道是否没变
+                                val currentChan = allChannels.getOrNull(currentChannelIndex)
+                                if (currentChan?.id == channel.id) {
+                                    if (mem.audioTrackId != null) {
+                                        val target = cachedAudioTracks?.find { it.id == mem.audioTrackId }
+                                        if (target != null && !target.isSelected) {
+                                            playerHelper?.selectAudioTrack(target.index)
+                                        }
                                     }
-                                } else {
-                                    val target = subtitleTracks.find { it.id == mem.subtitleTrackId }
-                                    if (target != null && !target.isSelected) {
-                                        playerHelper?.selectSubtitleTrack(target.index)
+                                    if (mem.subtitleTrackId != null) {
+                                        if (mem.subtitleTrackId == "disable") {
+                                            val currentSelected = cachedSubtitleTracks?.find { it.isSelected }
+                                            if (currentSelected != null) {
+                                                playerHelper?.disableSubtitle()
+                                            }
+                                        } else {
+                                            val target = cachedSubtitleTracks?.find { it.id == mem.subtitleTrackId }
+                                            if (target != null && !target.isSelected) {
+                                                playerHelper?.selectSubtitleTrack(target.index)
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                            }, 500)
                         }
                     }
                 }
