@@ -86,9 +86,13 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (count int, err error) {
 
 	defer resp.Body.Close()
 
-	channels, err := ParseM3U(resp.Body)
+	channels, epgURL, err := ParseM3U(resp.Body)
 	if err != nil {
 		return 0, err
+	}
+
+	if epgURL != "" {
+		imp.appendEPGURL(epgURL)
 	}
 
 	count, err = imp.importChannels(channels, sourceID, source.Name, source.UserAgent, source.CustomHeaders)
@@ -124,11 +128,43 @@ func (imp *M3UImporter) StartAutoSync() {
 
 // ImportFromString parses M3U content from a string
 func (imp *M3UImporter) ImportFromString(content string, sourceName string) (int, error) {
-	channels, err := ParseM3U(strings.NewReader(content))
+	channels, epgURL, err := ParseM3U(strings.NewReader(content))
 	if err != nil {
 		return 0, err
 	}
+	if epgURL != "" {
+		imp.appendEPGURL(epgURL)
+	}
 	return imp.importChannels(channels, 0, sourceName, "", "")
+}
+
+func (imp *M3UImporter) appendEPGURL(newURL string) {
+	var current string
+	err := imp.channelSvc.db.QueryRow("SELECT value FROM user_settings WHERE key='epg_source_url'").Scan(&current)
+	if err != nil {
+		// setting might not exist yet
+		current = ""
+	}
+
+	// deduplicate
+	urls := strings.Split(strings.ReplaceAll(current, "\r", "\n"), "\n")
+	for _, u := range urls {
+		if strings.TrimSpace(u) == newURL {
+			return // already exists
+		}
+	}
+
+	// Append
+	if current != "" && !strings.HasSuffix(current, "\n") {
+		current += "\n"
+	}
+	current += newURL
+
+	_, _ = imp.channelSvc.db.Exec(`
+		INSERT INTO user_settings (key, value) 
+		VALUES ('epg_source_url', ?) 
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value
+	`, current)
 }
 
 func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string) (int, error) {

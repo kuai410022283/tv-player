@@ -39,6 +39,7 @@ async function api(path, opts = {}) {
 
   const headers = { 'Content-Type': 'application/json' };
   if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+  if (!opts.cache) opts.cache = 'no-store'; // 默认禁用缓存，防止频道、源等列表不刷新
   if (!opts.silent) showLoading();
   try {
     const res = await fetch(API + path, { headers, ...opts });
@@ -1124,6 +1125,32 @@ async function importM3UContent() {
       loadSources();
     } else {
       toast('未识别到有效的频道数据，请检查格式', 'error');
+    }
+  } catch (e) {
+    // 错误信息已由 api() 拦截提示
+  }
+}
+
+async function formatContent(targetFormat) {
+  const contentInput = document.getElementById('import-content');
+  const c = contentInput.value;
+  if (!c) {
+    toast('请粘贴需要格式化的内容', 'error');
+    return;
+  }
+  
+  toast('正在请求后端进行格式化...');
+  try {
+    const r = await api('/m3u/format', {
+      method: 'POST',
+      body: JSON.stringify({ content: c, target_format: targetFormat })
+    });
+    
+    if (r.data && r.data.formatted) {
+      contentInput.value = r.data.formatted;
+      toast(`格式化成功（${targetFormat.toUpperCase()}格式）`, 'success');
+    } else {
+      toast('未识别到有效的频道数据，无法格式化', 'error');
     }
   } catch (e) {
     // 错误信息已由 api() 拦截提示

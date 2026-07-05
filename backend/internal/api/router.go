@@ -63,6 +63,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			m3u.POST("", hs.Handler.AddM3USource)
 			m3u.POST("/:id/import", hs.Handler.ImportM3U)
 			m3u.POST("/import-string", hs.Handler.ImportM3UString)
+			m3u.POST("/format", hs.Handler.FormatSourceString)
 			m3u.PUT("/:id", hs.Handler.UpdateM3USource)
 			m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
 		}

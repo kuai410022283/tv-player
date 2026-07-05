@@ -1183,9 +1183,13 @@
             id="import-name" placeholder="例如：本地测试源" required></div>
         <div class="form-group">
           <label style="display:flex;justify-content:space-between;align-items:center;">
-            <span>M3U内容</span>
-            <button class="btn btn-ghost btn-sm"
-              onclick="document.getElementById('import-file-input').click()">导入源文件</button>
+            <span>M3U/TXT内容</span>
+            <div class="format-toolbar" style="display:flex;gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="formatContent('m3u')">格式化为标准M3U</button>
+              <button class="btn btn-ghost btn-sm" onclick="formatContent('txt')">格式化为极简TXT</button>
+              <button class="btn btn-ghost btn-sm"
+                onclick="document.getElementById('import-file-input').click()">导入源文件</button>
+            </div>
           </label>
           <input type="file" id="import-file-input" accept=".m3u,.m3u8,.txt" style="display:none"
             onchange="handleImportFile(event)">

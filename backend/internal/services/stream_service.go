@@ -850,13 +850,14 @@ func extractAttr(line, attr string) string {
 	return ""
 }
 
-func ParseM3U(reader io.Reader) ([]map[string]string, error) {
+func ParseM3U(reader io.Reader) ([]map[string]string, string, error) {
 	scanner := bufio.NewScanner(reader)
 	// 增加 buffer 限制，防止某些 M3U 文件单行过长（如带有大尺寸 base64 logo url 时）超过 64KB
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 10*1024*1024)
 	var channels []map[string]string
 	var current map[string]string
+	var epgURL string
 
 	var globalCatchupType string
 	var globalCatchupSource string
@@ -880,6 +881,7 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 			globalCatchupType = extractAttr(line, "catchup")
 			globalCatchupSource = extractAttr(line, "catchup-source")
 			globalCatchupDays = extractAttr(line, "catchup-days")
+			epgURL = extractAttr(line, "x-tvg-url")
 		} else if strings.HasPrefix(line, "#EXTINF:") {
 			current = parseExtInf(line)
 			if current["catchup"] == "" && globalCatchupType != "" {
@@ -919,7 +921,7 @@ func ParseM3U(reader io.Reader) ([]map[string]string, error) {
 			}
 		}
 	}
-	return channels, scanner.Err()
+	return channels, epgURL, scanner.Err()
 }
 
 func parseVlcOpt(line string, ch map[string]string) {
@@ -962,10 +964,10 @@ func parseExtInf(line string) map[string]string {
 }
 
 // ParseM3UFile parses an M3U file from disk
-func ParseM3UFile(path string) ([]map[string]string, error) {
+func ParseM3UFile(path string) ([]map[string]string, string, error) {
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer f.Close()
 	return ParseM3U(f)

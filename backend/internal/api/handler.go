@@ -895,6 +895,35 @@ func (h *Handler) ImportM3UString(c *gin.Context) {
 	ok(c, gin.H{"imported": count})
 }
 
+func (h *Handler) FormatSourceString(c *gin.Context) {
+	var body struct {
+		Content      string `json:"content"`
+		TargetFormat string `json:"target_format"` // "m3u" or "txt"
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.Content == "" {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	var formatted string
+	var err error
+
+	if body.TargetFormat == "txt" {
+		formatted, err = services.FormatToTXT(body.Content)
+	} else {
+		// default to m3u
+		formatted, err = services.FormatToM3U(body.Content)
+	}
+
+	if err != nil {
+		slog.Error("Source format failed", "error", err)
+		fail(c, 400, "格式化失败: "+err.Error())
+		return
+	}
+
+	ok(c, gin.H{"formatted": formatted})
+}
+
 func (h *Handler) DeleteM3USource(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err := h.channelSvc.DeleteM3USource(id); err != nil {
