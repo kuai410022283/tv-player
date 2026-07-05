@@ -38,7 +38,7 @@ class ExoPlayerHelper(
 
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
-    private var lastBuiltIsLiveStream: Boolean = false
+    private var lastBuiltNeedsLenientClock: Boolean = false
 
     // 复用 MediaSourceFactory（保留认证头等配置，用于外挂字幕加载）
     private var mediaSourceFactory: DefaultMediaSourceFactory? = null
@@ -95,12 +95,18 @@ class ExoPlayerHelper(
             startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
             contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
         }
+
+        // 精准圈定需要启用“弹性时钟防卡死”的流（排除普通的直连 HTTP 点播和直连 TS）
+        val needsLenientClock = url.lowercase().run {
+            startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
+            contains("/udp/") || contains("/rtp/")
+        }
         
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)
 
-        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLiveStream) {
-            buildPlayer(isLiveStream)
+        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || needsLenientClock != lastBuiltNeedsLenientClock) {
+            buildPlayer(needsLenientClock)
         }
 
         isPlayerPlaying = false
@@ -190,12 +196,12 @@ class ExoPlayerHelper(
         exoPlayer?.play()
     }
 
-    private fun buildPlayer(isLiveStream: Boolean) {
+    private fun buildPlayer(needsLenientClock: Boolean) {
         releasePlayer()
 
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
-        lastBuiltIsLiveStream = isLiveStream
+        lastBuiltNeedsLenientClock = needsLenientClock
 
         val renderersFactory = object : DefaultRenderersFactory(context) {
             override fun buildAudioRenderers(
@@ -211,10 +217,10 @@ class ExoPlayerHelper(
                 // 使用官方默认配置的 audioSink (其内置了大量机型兼容修复)，实现更安全的 Passthrough 握手
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
-                if (isLiveStream) {
+                if (needsLenientClock) {
                     // 拦截官方生成的音频渲染器，套上我们的“防卡死代理壳”
                     for (i in 0 until out.size) {
-                        out[i] = LenientAudioRendererWrapper(out[i])
+                        out[i] = SmartAudioRendererWrapper(out[i])
                     }
                 }
             }
@@ -676,21 +682,86 @@ class ExoPlayerHelper(
     }
 }
 
-// 利用 Kotlin 接口委托，零耦合代理官方渲染器，拦截音频主时钟霸权
-private class LenientAudioRendererWrapper(
+// 利用 Kotlin 接口委托，实现智能弹性音频渲染器，解决 UDP 流卡死与长期播放音画不同步问题
+private class SmartAudioRendererWrapper(
     private val wrappedRenderer: androidx.media3.exoplayer.Renderer
 ) : androidx.media3.exoplayer.Renderer by wrappedRenderer {
     
+    private val elasticClock = ElasticMediaClock()
+
     override fun getMediaClock(): androidx.media3.exoplayer.MediaClock? {
-        // 【核心补丁】强制返回 null，让 ExoPlayer 退化为使用系统物理时钟。
-        // 这样即使底层 UDP 音频时间戳彻底错乱或丢包导致没有声音输出，视频画面也会匀速继续播放，绝对不会发生冻结卡死。
-        return null
+        // 返回我们的弹性时钟代理，由它来决定是透传真实时钟，还是用系统时钟代跑
+        return elasticClock
+    }
+
+    override fun start() {
+        wrappedRenderer.start()
+        elasticClock.start()
+    }
+
+    override fun stop() {
+        elasticClock.stop()
+        wrappedRenderer.stop()
     }
 
     override fun isReady(): Boolean {
-        // 如果底层音频没准备好（比如因为源流时间戳损坏导致被丢弃），我们强行让它就绪。
-        // 这样 ExoPlayer 就不会为了等待音频而退回 BUFFERING 状态卡死。视频渲染器会继续渲染画面。
+        // 0ms 立即接管：针对不可靠传输源，视频流畅度优先。
+        // 强制返回 true，阻止 ExoPlayer 挂起视频渲染进入 STATE_BUFFERING 导致卡死。
+        // 缺失的音频包通过 ElasticMediaClock 进行时间轴补齐。
         return true
+    }
+
+    private inner class ElasticMediaClock : androidx.media3.exoplayer.MediaClock {
+        private val realClock: androidx.media3.exoplayer.MediaClock? = wrappedRenderer.mediaClock
+        
+        private var isPlaying = false
+        private var lastRealPositionUs = 0L
+        private var syntheticPositionUs = 0L
+        private var lastSystemTimeMs = 0L
+        
+        fun start() {
+            isPlaying = true
+            lastSystemTimeMs = android.os.SystemClock.elapsedRealtime()
+            syntheticPositionUs = realClock?.positionUs ?: 0L
+            lastRealPositionUs = syntheticPositionUs
+        }
+        
+        fun stop() {
+            isPlaying = false
+        }
+
+        override fun getPositionUs(): Long {
+            if (realClock == null) return syntheticPositionUs
+            
+            val realPos = realClock.positionUs
+            val now = android.os.SystemClock.elapsedRealtime()
+            val deltaSysUs = (now - lastSystemTimeMs) * 1000L
+            lastSystemTimeMs = now
+            
+            if (isPlaying) {
+                if (realPos != lastRealPositionUs) {
+                    // 顺风局：音频流动正常。强行对齐真实音频 PTS，确保绝对同步
+                    syntheticPositionUs = realPos
+                    lastRealPositionUs = realPos
+                } else {
+                    // 逆风局：音频停滞（断流）。利用系统物理时间推进合成时钟，让视频继续平滑渲染
+                    syntheticPositionUs += (deltaSysUs * pbParams.speed).toLong()
+                }
+            }
+            
+            return syntheticPositionUs
+        }
+
+        private var pbParams = androidx.media3.common.PlaybackParameters.DEFAULT
+        
+        override fun setPlaybackParameters(playbackParameters: androidx.media3.common.PlaybackParameters) {
+            realClock?.playbackParameters = playbackParameters
+            pbParams = playbackParameters
+        }
+
+        override fun getPlaybackParameters(): androidx.media3.common.PlaybackParameters {
+            return realClock?.playbackParameters ?: pbParams
+        }
     }
 }
 

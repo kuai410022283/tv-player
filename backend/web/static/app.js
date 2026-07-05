@@ -1115,10 +1115,19 @@ async function importM3UContent() {
   const c = document.getElementById('import-content').value;
   if (!n) { toast('请填写来源名称', 'error'); return; }
   if (!c) { toast('请粘贴内容', 'error'); return; }
-  toast('正在导入...');
-  const r = await api('/m3u/import-string', { method: 'POST', body: JSON.stringify({ name: n, content: c }) });
-  toast(r.data ? `导入: ${r.data.imported} 频道` : '失败', 'error');
-  if (r.data) hideModal('import-modal');
+  toast('正在解析与导入数据，大文件可能需要几十秒，请耐心等待...');
+  try {
+    const r = await api('/m3u/import-string', { method: 'POST', body: JSON.stringify({ name: n, content: c }) });
+    if (r.data && r.data.imported > 0) {
+      toast(`导入成功：共导入 ${r.data.imported} 个频道`, 'success');
+      hideModal('import-modal');
+      loadSources();
+    } else {
+      toast('未识别到有效的频道数据，请检查格式', 'error');
+    }
+  } catch (e) {
+    // 错误信息已由 api() 拦截提示
+  }
 }
 
 function handleImportFile(event) {
@@ -1130,13 +1139,13 @@ function handleImportFile(event) {
     const text = e.target.result;
     if (text.includes('#EXTM3U') || text.includes('#EXTINF') || text.includes(',')) {
       document.getElementById('import-content').value = text;
-      toast('文件读取成功，请点击导入', 'success');
+      toast(`文件 "${file.name}" 已读取完毕，请点击下方「导入」按钮进行解析`, 'success');
       const nameInput = document.getElementById('import-name');
       if (!nameInput.value) {
         nameInput.value = file.name.replace(/\.[^/.]+$/, "");
       }
     } else {
-      toast('文件格式不正确，需要是标准的 M3U 或 TXT 格式', 'error');
+      toast('文件格式不正确，需要是标准的 M3U 或 TXT(名称,URL) 格式', 'error');
     }
     event.target.value = '';
   };
