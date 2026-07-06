@@ -10,8 +10,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -20,8 +23,7 @@ import kotlinx.coroutines.withContext
 class ChannelRepository {
 
     companion object {
-        private const val PAGE_SIZE = 2000 // 每页大小
-        private const val FIRST_PAGE_SIZE = 2000 // 首页快速加载大小
+        private const val PAGE_SIZE = 500 // 恢复为 500 条/页
     }
 
     /** 获取所有分组 */
@@ -39,39 +41,78 @@ class ChannelRepository {
     }
 
     /**
-     * 懒加载频道：先返回首页数据用于快速显示，后台继续加载剩余数据。
-     *
-     * @param groups 已获取的分组列表（不含"全部"虚拟分组 id=0）
-     * @return Flow，第一项是首页数据（快速显示），后续项是增量数据（后台加载）
+     * 懒加载频道：通过首组特权优先拉取，解决定位延迟。
+     * 后台并发增量加载其余组数据。
      */
     fun loadChannelsLazy(
         groups: List<ChannelGroup>
-    ): Flow<List<Channel>> = flow {
-        val groupIds = groups.map { it.id }.toSet()
+    ): Flow<List<Channel>> = channelFlow {
+        if (groups.isEmpty()) return@channelFlow
 
-        // 1. 获取第一页（使用较大的 PageSize，快速显示大部分/所有频道）
-        val firstPageResult = fetchChannelsPage(page = 1, pageSize = FIRST_PAGE_SIZE)
-        val firstPageChannels = firstPageResult.items?.filter { groupIds.contains(it.groupId) } ?: emptyList()
-        emit(firstPageChannels)
+        val semaphore = Semaphore(20)
 
-        // 2. 如果还有更多数据，后台继续加载
-        val total = firstPageResult.total
-        val loadedSize = firstPageResult.items?.size ?: 0
-        if (loadedSize > 0 && loadedSize < total) {
-            val remainingChannels = fetchRemainingChannelsGlobal(
-                startPage = 2,
-                initialFetchedCount = loadedSize,
-                groupIds = groupIds
-            )
-            if (remainingChannels.isNotEmpty()) {
-                emit(remainingChannels)
+        // 1. 首组绝对优先通道（VIP通道）
+        // groups 的第 0 个已经被 MainActivity 强行提权为上次观看的组
+        val firstGroup = groups.first()
+        val firstPageResp = fetchChannelsPage(page = 1, pageSize = PAGE_SIZE, groupId = firstGroup.id)
+        val firstPageChannels = firstPageResp.items ?: emptyList()
+        if (firstPageChannels.isNotEmpty()) {
+            send(firstPageChannels) // 第一时间送达前端 UI，秒切秒播
+            
+            // 如果这个首组数据量极大（超过 500），在后台默默补齐
+            if (firstPageChannels.size < firstPageResp.total) {
+                launch {
+                    semaphore.withPermit {
+                        fetchRemainingForGroup(firstGroup.id, 2, firstPageChannels.size, firstPageResp.total, this@channelFlow)
+                    }
+                }
+            }
+        }
+
+        // 2. 剩余分组进入高并发排队系统
+        val otherGroups = groups.drop(1)
+        otherGroups.forEach { group ->
+            launch {
+                semaphore.withPermit {
+                    val resp = fetchChannelsPage(page = 1, pageSize = PAGE_SIZE, groupId = group.id)
+                    val channels = resp.items ?: emptyList()
+                    if (channels.isNotEmpty()) {
+                        send(channels) // 只要拿到任何一组的首页，立刻增量合并给前端
+                        
+                        if (channels.size < resp.total) {
+                            fetchRemainingForGroup(group.id, 2, channels.size, resp.total, this@channelFlow)
+                        }
+                    }
+                }
             }
         }
     }.flowOn(Dispatchers.IO)
 
-    private suspend fun fetchChannelsPage(page: Int, pageSize: Int): PageResponse<Channel> {
+    private suspend fun fetchRemainingForGroup(
+        groupId: Long,
+        startPage: Int,
+        initialFetchedCount: Int,
+        total: Long,
+        flowScope: kotlinx.coroutines.channels.ProducerScope<List<Channel>>
+    ) {
+        var page = startPage
+        var totalFetched = initialFetchedCount
+        while (totalFetched < total) {
+            val resp = fetchChannelsPage(page, PAGE_SIZE, groupId)
+            val items = resp.items ?: emptyList()
+            if (items.isEmpty()) break
+            
+            flowScope.send(items)
+            totalFetched += items.size
+            if (items.size < PAGE_SIZE) break
+            page++
+        }
+    }
+
+    private suspend fun fetchChannelsPage(page: Int, pageSize: Int, groupId: Long? = null): PageResponse<Channel> {
         return try {
             val resp = ApiClient.getService().getChannels(
+                groupId = groupId,
                 page = page,
                 pageSize = pageSize
             )
@@ -85,58 +126,42 @@ class ChannelRepository {
         }
     }
 
-    private suspend fun fetchRemainingChannelsGlobal(
-        startPage: Int,
-        initialFetchedCount: Int,
-        groupIds: Set<Long>
-    ): List<Channel> {
-        val result = mutableListOf<Channel>()
-        var page = startPage
-        var totalFetched = initialFetchedCount
-        while (true) {
-            val pageData = fetchChannelsPage(page, PAGE_SIZE)
-            val fetchedItems = pageData.items ?: emptyList()
-            if (fetchedItems.isEmpty()) break
-
-            totalFetched += fetchedItems.size
-            val filtered = fetchedItems.filter { groupIds.contains(it.groupId) }
-            result.addAll(filtered)
-
-            if (fetchedItems.size < PAGE_SIZE || totalFetched >= pageData.total) break
-            page++
-        }
-        return result
-    }
-
     /**
-     * 按分组并行拉取所有频道（现已优化为全局单流拉取，解决分组并行请求过多导致服务器负载过大和530错误的问题）。
-     *
-     * @param groups 已获取的分组列表（不含"全部"虚拟分组 id=0）
+     * 按分组并发拉取所有频道，同样利用 Semaphore(20) 限制并发，杜绝服务端 530 错误。
      */
     suspend fun getAllChannelsByGroups(
         groups: List<ChannelGroup>
     ): Result<List<Channel>> = withContext(Dispatchers.IO) {
         try {
-            val groupIds = groups.map { it.id }.toSet()
-            val result = mutableListOf<Channel>()
-            var page = 1
-            var totalFetched = 0
-            while (true) {
-                val pageData = fetchChannelsPage(page, PAGE_SIZE)
-                val fetchedItems = pageData.items ?: emptyList()
-                if (fetchedItems.isEmpty()) break
-
-                totalFetched += fetchedItems.size
-                val filtered = fetchedItems.filter { groupIds.contains(it.groupId) }
-                result.addAll(filtered)
-
-                if (fetchedItems.size < PAGE_SIZE || totalFetched >= pageData.total) break
-                page++
-            }
-            Result.success(result)
+            val semaphore = Semaphore(20)
+            val allItems = coroutineScope {
+                groups.map { group ->
+                    async {
+                        semaphore.withPermit {
+                            fetchAllChannelsForGroup(group.id)
+                        }
+                    }
+                }.awaitAll()
+            }.flatten()
+            Result.success(allItems)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private suspend fun fetchAllChannelsForGroup(groupId: Long): List<Channel> {
+        val result = mutableListOf<Channel>()
+        var page = 1
+        while (true) {
+            val resp = fetchChannelsPage(page, PAGE_SIZE, groupId)
+            val fetchedItems = resp.items ?: emptyList()
+            if (fetchedItems.isEmpty()) break
+            
+            result.addAll(fetchedItems)
+            if (fetchedItems.size < PAGE_SIZE || result.size >= resp.total) break
+            page++
+        }
+        return result
     }
 
     /**

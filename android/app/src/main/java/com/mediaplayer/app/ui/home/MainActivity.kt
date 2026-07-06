@@ -1708,9 +1708,12 @@ class MainActivity : AppCompatActivity() {
         
         osdOverlayView?.setInfoText(if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中...".toString())
         
-        // 记忆功能：保存最后播放的频道 ID
+        // 记忆功能：保存最后播放的频道 ID 和分组 ID
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        prefs.edit().putLong("last_channel_id", channel.id).apply()
+        prefs.edit()
+            .putLong("last_channel_id", channel.id)
+            .putLong("last_group_id", channel.groupId)
+            .apply()
         
         loadEpgForChannel(channel)
         showOsd()
@@ -2668,9 +2671,25 @@ class MainActivity : AppCompatActivity() {
                 groupAdapter.submitList(groups)
                 groupAdapter.setSelected(0)
 
-                // 2. 懒加载频道：先显示首页数据，后台继续加载剩余
+                // 获取上次观看的 group_id
+                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                val lastGroupId = prefs.getLong("last_group_id", -1L)
+
+                // 为后台并发拉取构建优先队列（不影响 UI 左侧边栏排序）
+                val fetchPriorityGroups = if (lastGroupId != -1L) {
+                    val targetGroup = realGroups.find { it.id == lastGroupId }
+                    if (targetGroup != null) {
+                        listOf(targetGroup) + realGroups.filter { it.id != lastGroupId }
+                    } else {
+                        realGroups
+                    }
+                } else {
+                    realGroups
+                }
+
+                // 2. 懒加载频道：首个分组（即上次观看的组）将优先被拉取并瞬间显示
                 var isFirstEmission = true
-                repo.loadChannelsLazy(realGroups).collect { newChannels ->
+                repo.loadChannelsLazy(fetchPriorityGroups).collect { newChannels ->
                     if (isFirstEmission) {
                         // 首页数据：立即显示，让用户看到内容
                         isFirstEmission = false
