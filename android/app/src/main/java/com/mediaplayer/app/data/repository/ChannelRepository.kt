@@ -4,6 +4,7 @@ import com.mediaplayer.app.data.api.ApiClient
 import com.mediaplayer.app.data.model.Channel
 import com.mediaplayer.app.data.model.ChannelGroup
 import com.mediaplayer.app.data.model.EPGProgram
+import com.mediaplayer.app.data.model.PageResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,8 +20,8 @@ import kotlinx.coroutines.withContext
 class ChannelRepository {
 
     companion object {
-        private const val PAGE_SIZE = 500 // 每页大小
-        private const val FIRST_PAGE_SIZE = 500 // 首页快速加载大小
+        private const val PAGE_SIZE = 2000 // 每页大小
+        private const val FIRST_PAGE_SIZE = 2000 // 首页快速加载大小
     }
 
     /** 获取所有分组 */
@@ -46,83 +47,69 @@ class ChannelRepository {
     fun loadChannelsLazy(
         groups: List<ChannelGroup>
     ): Flow<List<Channel>> = flow {
-        // 1. 并行拉取每个分组的首页数据（500条/组）
-        val firstPageChannels = coroutineScope {
-            groups.map { group ->
-                async { fetchFirstPageForGroup(group.id) }
-            }.awaitAll()
-        }.flatten()
+        val groupIds = groups.map { it.id }.toSet()
 
-        // 立即发射首页数据，UI 可以马上显示
+        // 1. 获取第一页（使用较大的 PageSize，快速显示大部分/所有频道）
+        val firstPageResult = fetchChannelsPage(page = 1, pageSize = FIRST_PAGE_SIZE)
+        val firstPageChannels = firstPageResult.items?.filter { groupIds.contains(it.groupId) } ?: emptyList()
         emit(firstPageChannels)
 
-        // 2. 后台继续加载每个分组的剩余数据
-        val remainingChannels = coroutineScope {
-            groups.map { group ->
-                async { fetchRemainingChannels(group.id) }
-            }.awaitAll()
-        }.flatten()
-
-        // 发射增量数据
-        if (remainingChannels.isNotEmpty()) {
-            emit(remainingChannels)
+        // 2. 如果还有更多数据，后台继续加载
+        val total = firstPageResult.total
+        val loadedSize = firstPageResult.items?.size ?: 0
+        if (loadedSize > 0 && loadedSize < total) {
+            val remainingChannels = fetchRemainingChannelsGlobal(
+                startPage = 2,
+                initialFetchedCount = loadedSize,
+                groupIds = groupIds
+            )
+            if (remainingChannels.isNotEmpty()) {
+                emit(remainingChannels)
+            }
         }
     }.flowOn(Dispatchers.IO)
 
-    /**
-     * 拉取单个分组的首页数据（第一页）
-     */
-    private suspend fun fetchFirstPageForGroup(groupId: Long): List<Channel> {
+    private suspend fun fetchChannelsPage(page: Int, pageSize: Int): PageResponse<Channel> {
         return try {
             val resp = ApiClient.getService().getChannels(
-                groupId = groupId,
-                page = 1,
-                pageSize = FIRST_PAGE_SIZE
+                page = page,
+                pageSize = pageSize
             )
             if (resp.isSuccessful && resp.body()?.code == 0) {
-                resp.body()!!.data?.items ?: emptyList()
+                resp.body()!!.data ?: PageResponse()
             } else {
-                emptyList()
+                PageResponse()
             }
         } catch (e: Exception) {
-            emptyList()
+            PageResponse()
         }
     }
 
-    /**
-     * 拉取单个分组的剩余数据（第2页及以后）
-     */
-    private suspend fun fetchRemainingChannels(groupId: Long): List<Channel> {
+    private suspend fun fetchRemainingChannelsGlobal(
+        startPage: Int,
+        initialFetchedCount: Int,
+        groupIds: Set<Long>
+    ): List<Channel> {
         val result = mutableListOf<Channel>()
-        var page = 2 // 从第2页开始
+        var page = startPage
+        var totalFetched = initialFetchedCount
         while (true) {
-            val resp = try {
-                ApiClient.getService().getChannels(
-                    groupId = groupId,
-                    page = page,
-                    pageSize = PAGE_SIZE
-                )
-            } catch (e: Exception) {
-                break
-            }
-            if (!resp.isSuccessful || resp.body()?.code != 0) break
-            val pageData = resp.body()!!.data ?: break
-
+            val pageData = fetchChannelsPage(page, PAGE_SIZE)
             val fetchedItems = pageData.items ?: emptyList()
             if (fetchedItems.isEmpty()) break
 
-            result.addAll(fetchedItems)
-            if (fetchedItems.size < PAGE_SIZE || result.size >= pageData.total) break
+            totalFetched += fetchedItems.size
+            val filtered = fetchedItems.filter { groupIds.contains(it.groupId) }
+            result.addAll(filtered)
+
+            if (fetchedItems.size < PAGE_SIZE || totalFetched >= pageData.total) break
             page++
         }
         return result
     }
 
     /**
-     * 按分组并行拉取所有频道（解决全局 page_size 上限问题）。
-     *
-     * 利用 设备→套餐→{分组1, 分组2,...} 结构，对每个分组单独请求，
-     * 每组频道数通常远小于单页上限，同时支持自动翻页以应对超大分组。
+     * 按分组并行拉取所有频道（现已优化为全局单流拉取，解决分组并行请求过多导致服务器负载过大和530错误的问题）。
      *
      * @param groups 已获取的分组列表（不含"全部"虚拟分组 id=0）
      */
@@ -130,45 +117,26 @@ class ChannelRepository {
         groups: List<ChannelGroup>
     ): Result<List<Channel>> = withContext(Dispatchers.IO) {
         try {
-            val allItems = coroutineScope {
-                groups.map { group ->
-                    async { fetchAllChannelsForGroup(group.id) }
-                }.awaitAll()
-            }.flatten()
-            Result.success(allItems)
+            val groupIds = groups.map { it.id }.toSet()
+            val result = mutableListOf<Channel>()
+            var page = 1
+            var totalFetched = 0
+            while (true) {
+                val pageData = fetchChannelsPage(page, PAGE_SIZE)
+                val fetchedItems = pageData.items ?: emptyList()
+                if (fetchedItems.isEmpty()) break
+
+                totalFetched += fetchedItems.size
+                val filtered = fetchedItems.filter { groupIds.contains(it.groupId) }
+                result.addAll(filtered)
+
+                if (fetchedItems.size < PAGE_SIZE || totalFetched >= pageData.total) break
+                page++
+            }
+            Result.success(result)
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    /**
-     * 拉取单个分组的全量频道，自动翻页直到取完该分组所有数据。
-     */
-    private suspend fun fetchAllChannelsForGroup(groupId: Long): List<Channel> {
-        val result = mutableListOf<Channel>()
-        var page = 1
-        while (true) {
-            val resp = try {
-                ApiClient.getService().getChannels(
-                    groupId = groupId,
-                    page = page,
-                    pageSize = PAGE_SIZE
-                )
-            } catch (e: Exception) {
-                break
-            }
-            if (!resp.isSuccessful || resp.body()?.code != 0) break
-            val pageData = resp.body()!!.data ?: break
-            
-            val fetchedItems = pageData.items ?: emptyList()
-            if (fetchedItems.isEmpty()) break
-            
-            result.addAll(fetchedItems)
-            // 已取完该分组所有数据则退出（通过实际拉取数量与每页数量判断更稳妥）
-            if (fetchedItems.size < PAGE_SIZE || result.size >= pageData.total) break
-            page++
-        }
-        return result
     }
 
     /**

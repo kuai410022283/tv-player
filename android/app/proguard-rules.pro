@@ -1,4 +1,4 @@
-﻿# Proguard rules for MediaPlayer
+# Proguard rules for MediaPlayer
 
 # Retrofit
 -keepattributes Signature
@@ -64,3 +64,12 @@
 # Gson specific attributes
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
+
+# VLC Player
+-keep class org.videolan.libvlc.** { *; }
+-keep class org.videolan.medialibrary.** { *; }
+
+# IJKPlayer
+-keep class tv.danmaku.ijk.media.player.** { *; }
+-keep class tv.danmaku.ijk.media.player.IjkMediaPlayer { *; }
+-keep class tv.danmaku.ijk.media.player.ffmpeg.FFmpegApi { *; }
