@@ -107,6 +107,64 @@ func (sp *StreamProxy) GetRedirectedURL(channelID int64) string {
 	return sp.redirectedURLs[channelID]
 }
 
+// resolveStrmUrl intercepts .strm URLs, fetches them, and extracts the first valid http(s) link.
+// It supports up to 5 levels of redirection (nested .strm files).
+func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua string, headers map[string]string) (string, error) {
+	currentURL := initialURL
+	for i := 0; i < 5; i++ {
+		if !strings.HasSuffix(strings.ToLower(currentURL), ".strm") {
+			return currentURL, nil
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", currentURL, nil)
+		if err != nil {
+			return currentURL, err
+		}
+		if ua != "" {
+			req.Header.Set("User-Agent", ua)
+		} else {
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player")
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		resp, err := sp.client.Do(req)
+		if err != nil {
+			return currentURL, err
+		}
+
+		if resp.StatusCode != 200 {
+			resp.Body.Close()
+			return currentURL, fmt.Errorf("strm returned status %d", resp.StatusCode)
+		}
+
+		// Read up to 10KB to prevent memory exhaustion from malicious large files
+		scanner := bufio.NewScanner(resp.Body)
+		var extracted string
+		bytesRead := 0
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			bytesRead += len(line)
+			if bytesRead > 10240 { // limit to ~10KB
+				break
+			}
+			if strings.HasPrefix(strings.ToLower(line), "http://") || strings.HasPrefix(strings.ToLower(line), "https://") {
+				extracted = line
+				break
+			}
+		}
+		resp.Body.Close()
+
+		if extracted != "" {
+			currentURL = extracted
+		} else {
+			return currentURL, nil // Return the original strm if no valid link is found
+		}
+	}
+	return currentURL, nil
+}
+
 // CheckHealth verifies a stream URL is reachable and returns stream info
 func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (*models.StreamStatus, error) {
 	// 如果是多源合并（#拼接），取第一条线路进行探测
@@ -140,6 +198,13 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
 		},
+	}
+
+	// 解析可能存在的 strm 直链
+	resolvedURL, err := sp.resolveStrmUrl(context.Background(), url, ua, headers)
+	if err == nil && resolvedURL != "" {
+		url = resolvedURL
+		status.URL = url // 更新 status 里的 URL 为真实流地址
 	}
 
 	if streamType == "" {
@@ -976,6 +1041,12 @@ func ParseM3UFile(path string) ([]map[string]string, string, error) {
 func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, ua string, headers map[string]string, ch *models.Channel) (*http.Response, error) {
 	if strings.HasPrefix(targetURL, "udp://") || strings.HasPrefix(targetURL, "rtp://") {
 		return sp.openUDPStreamWithFCC(ctx, targetURL, ch)
+	}
+
+	// 解析可能存在的 strm 直链
+	resolvedURL, err := sp.resolveStrmUrl(ctx, targetURL, ua, headers)
+	if err == nil && resolvedURL != "" {
+		targetURL = resolvedURL
 	}
 
 	// 检测是否为咪咕/华数等需定制 UA 的源（通过 URL 中的 appCode 等参数判断）

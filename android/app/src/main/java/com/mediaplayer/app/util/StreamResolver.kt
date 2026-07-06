@@ -90,8 +90,39 @@ object StreamResolver {
                             break
                         }
                     } else {
+                        // 如果是 .strm 文件且请求成功，尝试解析提取真实的视频直链
+                        if (code == 200 && currentUrl.endsWith(".strm", ignoreCase = true)) {
+                            var extractedUrl: String? = null
+                            try {
+                                response.body?.byteStream()?.let { stream ->
+                                    val reader = java.io.BufferedReader(java.io.InputStreamReader(stream))
+                                    var charsRead = 0
+                                    var line: String? = reader.readLine()
+                                    while (line != null && charsRead < 10240) { // 最多读取 ~10KB 防止内存爆炸
+                                        charsRead += line.length
+                                        val trimmed = line.trim()
+                                        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                                            extractedUrl = trimmed
+                                            break
+                                        }
+                                        line = reader.readLine()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                            response.close()
+                            
+                            if (extractedUrl != null) {
+                                currentUrl = extractedUrl!!
+                                redirects++
+                                continue
+                            }
+                        } else {
+                            response.close()
+                        }
+                        
                         // 遇到非重定向状态（如 200 OK），说明这就是真实的流地址
-                        response.close()
                         break
                     }
                 } catch (e: Exception) {
