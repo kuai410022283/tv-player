@@ -1718,11 +1718,17 @@ class MainActivity : AppCompatActivity() {
         loadEpgForChannel(channel)
         showOsd()
 
-        // 核心匹配逻辑
-        var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
+        // 获取频道独立记忆
+        val mem = com.mediaplayer.app.data.ChannelMemoryManager.getMemory(channel.id)
+
+        // 同步当前频道的解码模式记忆
+        currentDecoderMode = mem?.decoderMode ?: prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+
+        // 核心匹配逻辑（优先使用独立记忆的内核）
+        var globalCore = mem?.playerCore ?: prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         if (globalCore == 4) {
             globalCore = Prefs.PLAYER_CORE_AUTO
-            prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
+            // 注意：这里不要覆盖 prefs，因为这可能是某个频道的临时回退
         }
         
         var desiredCore = globalCore
@@ -1796,6 +1802,9 @@ class MainActivity : AppCompatActivity() {
             // 防止异步截屏延后出现，覆盖在新频道的首帧上，从而导致“重影”现象。
             dismissSnapshot()
         }
+        // 关键修复：无论是新建还是复用 PlayerHelper，都必须将最新的独立解码模式同步到底层
+        playerHelper?.setDecoderMode(currentDecoderMode)
+        
         progressBuffering?.visibility = View.VISIBLE
 
         resolveJob = lifecycleScope.launch {
@@ -2162,9 +2171,7 @@ class MainActivity : AppCompatActivity() {
         if (playerHelper?.isPlaying() == true) {
             val infoText = osdOverlayView?.getInfoText() ?: "" ?: ""
             if (infoText.contains("连接中") || infoText.isEmpty()) {
-                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
-                val decoderStr = when (decoderMode) {
+                val decoderStr = when (currentDecoderMode) {
                     Prefs.DECODER_MODE_HARDWARE -> "HW"
                     Prefs.DECODER_MODE_SOFTWARE -> "SW"
                     else -> "Auto"
