@@ -2671,6 +2671,8 @@ class MainActivity : AppCompatActivity() {
                 groupAdapter.submitList(groups)
                 groupAdapter.setSelected(0)
 
+                val groupOrderMap = realGroups.mapIndexed { index, group -> group.id to index }.toMap()
+
                 // 获取上次观看的 group_id
                 val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                 val lastGroupId = prefs.getLong("last_group_id", -1L)
@@ -2729,15 +2731,26 @@ class MainActivity : AppCompatActivity() {
                         val uniqueNewChannels = newChannels.filter { channelIndexById[it.id] == null }
                         
                         if (uniqueNewChannels.isNotEmpty()) {
-                            val startIndex = allChannels.size
+                            // 记录当前播放的频道 ID 以便排序后恢复索引
+                            val currentPlayingId = if (currentChannelIndex in allChannels.indices) {
+                                allChannels[currentChannelIndex].id
+                            } else -1L
+
                             allChannels.addAll(uniqueNewChannels)
                             
-                            // 更新 ID 索引
-                            uniqueNewChannels.forEach { channelIndexById[it.id] = it }
+                            // 按照套餐的真实顺序排序，解决并发拉取导致的乱序和频道号跳跃问题
+                            allChannels.sortBy { groupOrderMap[it.groupId] ?: Int.MAX_VALUE }
                             
-                            // 更新全局索引
-                            uniqueNewChannels.forEachIndexed { index, channel ->
-                                channel.globalIndex = startIndex + index
+                            // 重新构建 ID 索引和全局频道号索引
+                            channelIndexById.clear()
+                            allChannels.forEachIndexed { index, channel ->
+                                channelIndexById[channel.id] = channel
+                                channel.globalIndex = index
+                            }
+                            
+                            // 恢复当前播放频道的索引
+                            if (currentPlayingId != -1L) {
+                                currentChannelIndex = allChannels.indexOfFirst { it.id == currentPlayingId }
                             }
                             
                             // 更新分组映射

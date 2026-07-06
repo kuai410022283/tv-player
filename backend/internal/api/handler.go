@@ -267,6 +267,8 @@ func (h *Handler) BatchSortGroups(c *gin.Context) {
 		failInternal(c, err, "批量排序失败")
 		return
 	}
+	// 分组排序变化后，连带整理频道排序数字，使其在每个分组内保持完美的 0~N 连续
+	_ = h.channelSvc.ReorderChannels(0, "")
 	ok(c, nil)
 }
 
@@ -287,6 +289,8 @@ func (h *Handler) BatchSortChannels(c *gin.Context) {
 		failInternal(c, err, "批量排序失败")
 		return
 	}
+	// 频道拖拽排序（尤其是跨分组拖拽或页面全局拖拽）后，强制重新隔离计算各分组的 0~N
+	_ = h.channelSvc.ReorderChannels(0, "")
 	ok(c, nil)
 }
 
@@ -1279,18 +1283,27 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 				return
 			}
 
-			out, err := os.Create(apkPath)
+			tmpPath := apkPath + ".tmp"
+			out, err := os.Create(tmpPath)
 			if err != nil {
 				pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建文件失败: " + err.Error()})
 				return
 			}
-			defer out.Close()
 
 			pw := &progressWriter{total: resp.ContentLength}
 			src := io.TeeReader(resp.Body, pw)
 
 			if _, err := io.Copy(out, src); err != nil {
+				out.Close()
+				os.Remove(tmpPath)
 				pullUpdateState.Store(updateTaskState{Status: "error", Message: "保存文件失败: " + err.Error()})
+				return
+			}
+			out.Close()
+
+			if err := os.Rename(tmpPath, apkPath); err != nil {
+				os.Remove(tmpPath)
+				pullUpdateState.Store(updateTaskState{Status: "error", Message: "重命名文件失败: " + err.Error()})
 				return
 			}
 		}

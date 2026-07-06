@@ -269,6 +269,20 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		}
 	}
 
+	// 3.5 获取当前数据库中各分组的最大 sort_order，以便新频道能在分组末尾追加
+	maxOrders := make(map[int64]int)
+	rowsMax, err := imp.channelSvc.db.Query("SELECT group_id, COALESCE(MAX(sort_order), -1) FROM channels WHERE source = ? GROUP BY group_id", sourceName)
+	if err == nil {
+		defer rowsMax.Close()
+		for rowsMax.Next() {
+			var gID int64
+			var m int
+			if rowsMax.Scan(&gID, &m) == nil {
+				maxOrders[gID] = m
+			}
+		}
+	}
+
 	// 4. 开启事务进行批量更新和插入
 	tx, err := imp.channelSvc.db.Begin()
 	if err != nil {
@@ -339,8 +353,15 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, channelID)
 			keptIDs[channelID] = true
 		} else {
-			// 插入新频道
-			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, i)
+			// 插入新频道，使用分组独立的计数器
+			currentMax, ok := maxOrders[groupID]
+			if !ok {
+				currentMax = -1
+			}
+			sortOrder := currentMax + 1
+			maxOrders[groupID] = sortOrder
+
+			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, sortOrder)
 			if err == nil {
 				imported++
 				if newID, err := res.LastInsertId(); err == nil {
@@ -369,7 +390,10 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		return 0, err
 	}
 
-	return len(mergedKeys), nil
+	// 7. 消除所有因旧频道删除而产生的排序数字空洞，同时整理新导入频道的最终分组内顺序
+	_ = imp.channelSvc.ReorderChannels(0, sourceName)
+
+	return imported, nil
 }
 
 func detectStreamType(rawURL string) string {

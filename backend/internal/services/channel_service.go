@@ -147,7 +147,12 @@ func (s *ChannelService) DeleteGroup(id int64) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err == nil {
+		// 删除分组后，重建所有分组的排序，消除空洞
+		_ = s.ReorderAllGroups()
+	}
+	return err
 }
 
 func (s *ChannelService) BatchUpdateGroups(ids []int64, action string) error {
@@ -242,7 +247,12 @@ func (s *ChannelService) BatchDeleteGroups(ids []int64) error {
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err == nil {
+		// 删除分组后，重建所有分组的排序，消除空洞
+		_ = s.ReorderAllGroups()
+	}
+	return err
 }
 
 // BatchUpdateGroupSort 批量更新分组排序
@@ -433,11 +443,11 @@ func (s *ChannelService) ListChannels(groupID int64, search string, source strin
 		c.is_hidden, c.is_direct, c.sort_order, COALESCE(c.status, 'unknown'), c.last_check, COALESCE(c.source, '手动'), COALESCE(c.user_agent, ''), COALESCE(c.custom_headers, ''), c.support_catchup, COALESCE(c.catchup_type, ''), COALESCE(c.catchup_source, ''), c.catchup_days, COALESCE(c.enable_multiplex, 0), COALESCE(c.content_type, ''), COALESCE(c.fcc, ''), COALESCE(c.fcc_type, ''), c.created_at, c.updated_at ` +
 		baseQuery + where
 	if clientID > 0 {
-		// 客户端请求时使用套餐级别的分组排序
-		query += ` ORDER BY c.source, pgr.sort_order, c.sort_order, c.id LIMIT ? OFFSET ?`
+		// 客户端请求时使用套餐级别的分组排序，严格遵循套餐管理中设定的分组先后顺序，剔除 c.source 的干扰
+		query += ` ORDER BY pgr.sort_order, c.sort_order, c.id LIMIT ? OFFSET ?`
 	} else {
-		// 管理端请求时使用全局分组排序
-		query += ` ORDER BY c.source, c.group_id, c.sort_order, c.id LIMIT ? OFFSET ?`
+		// 管理端请求时使用全局分组排序 (加入未分类垫底和分组自定义排序)
+		query += ` ORDER BY c.source, CASE WHEN cg.name = '未分类' THEN 1 ELSE 0 END, cg.sort_order, cg.id, c.sort_order, c.id LIMIT ? OFFSET ?`
 	}
 
 	rows, err := s.db.Query(query, queryArgs...)
@@ -516,32 +526,39 @@ func (s *ChannelService) BatchUpdateChannelSort(items []struct {
 	return tx.Commit()
 }
 
-// ReorderChannels 按 group_id + source 重新排序频道（消除 sort_order 空洞）
+// ReorderChannels 按 group_id + source 独立重新排序频道（消除 sort_order 空洞）
 func (s *ChannelService) ReorderChannels(groupID int64, source string) error {
-	where := "WHERE is_hidden = 0"
+	where := "WHERE c.is_hidden = 0"
 	args := []interface{}{}
 	if groupID > 0 {
-		where += " AND group_id = ?"
+		where += " AND c.group_id = ?"
 		args = append(args, groupID)
 	}
 	if source != "" {
-		where += " AND source = ?"
+		where += " AND c.source = ?"
 		args = append(args, source)
 	}
 
-	rows, err := s.db.Query(`SELECT id FROM channels `+where+` ORDER BY sort_order, id`, args...)
+	// 联表 channel_groups 以确保排序逻辑和列表一致（尽管对于重排本身，只要分组聚拢即可）
+	query := `SELECT c.id, c.group_id, c.source FROM channels c LEFT JOIN channel_groups cg ON c.group_id = cg.id ` + where + ` ORDER BY c.source, CASE WHEN cg.name = '未分类' THEN 1 ELSE 0 END, cg.sort_order, cg.id, c.sort_order, c.id`
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var ids []int64
+	type chInfo struct {
+		id      int64
+		groupID int64
+		source  string
+	}
+	var items []chInfo
 	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
+		var item chInfo
+		if err := rows.Scan(&item.id, &item.groupID, &item.source); err != nil {
 			return err
 		}
-		ids = append(ids, id)
+		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -559,8 +576,14 @@ func (s *ChannelService) ReorderChannels(groupID int64, source string) error {
 	}
 	defer func() { _ = stmt.Close() }()
 
-	for i, id := range ids {
-		if _, err := stmt.Exec(i, id); err != nil {
+	// 为每个 (group_id, source) 维护独立的排序计数器
+	counters := make(map[string]int)
+	for _, item := range items {
+		key := fmt.Sprintf("%d|%s", item.groupID, item.source)
+		seq := counters[key]
+		counters[key]++
+
+		if _, err := stmt.Exec(seq, item.id); err != nil {
 			return err
 		}
 	}
@@ -842,6 +865,10 @@ func (s *ChannelService) UpdateChannel(c *models.Channel) error {
 
 func (s *ChannelService) DeleteChannel(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM channels WHERE id=?`, id)
+	if err == nil {
+		// 删除频道后，可能产生排序空洞，重新梳理
+		_ = s.ReorderChannels(-1, "")
+	}
 	return err
 }
 
@@ -866,7 +893,12 @@ func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	err = tx.Commit()
+	if err == nil {
+		// 批量删除频道后，可能产生大量排序空洞，重新梳理
+		_ = s.ReorderChannels(-1, "")
+	}
+	return err
 }
 
 func (s *ChannelService) BatchUpdateChannels(ids []int64, action string) error {
