@@ -39,6 +39,43 @@ object StreamResolver {
                 // 检查协程是否已被取消，及时退出避免不必要的 HTTP 请求
                 if (!isActive) return@withContext currentUrl
 
+                if (currentUrl.startsWith("file://", ignoreCase = true)) {
+                    if (currentUrl.endsWith(".strm", ignoreCase = true)) {
+                        try {
+                            var extractedUrl: String? = null
+                            val file = java.io.File(java.net.URI(currentUrl))
+                            if (file.exists()) {
+                                file.bufferedReader().use { reader ->
+                                    var charsRead = 0
+                                    var line: String? = reader.readLine()
+                                    while (line != null && charsRead < 10240) {
+                                        val currentLine = line ?: break
+                                        charsRead += currentLine.length
+                                        val trimmed = currentLine.trim()
+                                        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                                            extractedUrl = trimmed
+                                            break
+                                        }
+                                        line = reader.readLine()
+                                    }
+                                }
+                            }
+                            if (extractedUrl != null) {
+                                currentUrl = extractedUrl!!
+                                redirects++
+                                continue
+                            } else {
+                                break // 找不到链接兜底返回
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            break
+                        }
+                    } else {
+                        break // 本地非 strm 文件，直接返回原始 file:// 供播放器读取
+                    }
+                }
+
                 try {
                     val requestBuilder = Request.Builder().url(currentUrl)
 
@@ -99,8 +136,9 @@ object StreamResolver {
                                     var charsRead = 0
                                     var line: String? = reader.readLine()
                                     while (line != null && charsRead < 10240) { // 最多读取 ~10KB 防止内存爆炸
-                                        charsRead += line.length
-                                        val trimmed = line.trim()
+                                        val currentLine = line ?: break
+                                        charsRead += currentLine.length
+                                        val trimmed = currentLine.trim()
                                         if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
                                             extractedUrl = trimmed
                                             break

@@ -116,31 +116,44 @@ func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua
 			return currentURL, nil
 		}
 
-		req, err := http.NewRequestWithContext(ctx, "GET", currentURL, nil)
-		if err != nil {
-			return currentURL, err
-		}
-		if ua != "" {
-			req.Header.Set("User-Agent", ua)
+		var scanner *bufio.Scanner
+		var bodyToClose io.ReadCloser
+
+		if isLocalPath(currentURL) {
+			f, err := os.Open(filepath.Clean(currentURL))
+			if err != nil {
+				return currentURL, fmt.Errorf("local strm open failed: %v", err)
+			}
+			scanner = bufio.NewScanner(f)
+			bodyToClose = f
 		} else {
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player")
-		}
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+			req, err := http.NewRequestWithContext(ctx, "GET", currentURL, nil)
+			if err != nil {
+				return currentURL, err
+			}
+			if ua != "" {
+				req.Header.Set("User-Agent", ua)
+			} else {
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player")
+			}
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
 
-		resp, err := sp.client.Do(req)
-		if err != nil {
-			return currentURL, err
-		}
+			resp, err := sp.client.Do(req)
+			if err != nil {
+				return currentURL, err
+			}
 
-		if resp.StatusCode != 200 {
-			resp.Body.Close()
-			return currentURL, fmt.Errorf("strm returned status %d", resp.StatusCode)
+			if resp.StatusCode != 200 {
+				resp.Body.Close()
+				return currentURL, fmt.Errorf("strm returned status %d", resp.StatusCode)
+			}
+			scanner = bufio.NewScanner(resp.Body)
+			bodyToClose = resp.Body
 		}
 
 		// Read up to 10KB to prevent memory exhaustion from malicious large files
-		scanner := bufio.NewScanner(resp.Body)
 		var extracted string
 		bytesRead := 0
 		for scanner.Scan() {
@@ -154,7 +167,9 @@ func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua
 				break
 			}
 		}
-		resp.Body.Close()
+		if bodyToClose != nil {
+			bodyToClose.Close()
+		}
 
 		if extracted != "" {
 			currentURL = extracted
@@ -179,17 +194,24 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		Status: "unknown",
 	}
 
+	// 获取自定义的 User-Agent 和 Headers
+	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
+	if ua == "" {
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
+	}
+
+	// 无论本地还是网络，探测前统一穿透可能的 .strm 壳
+	resolvedURL, err := sp.resolveStrmUrl(context.Background(), url, ua, headers)
+	if err == nil && resolvedURL != "" {
+		url = resolvedURL
+		status.URL = url // 更新 status 里的 URL 为真实流地址
+	}
+
 	// 校验 URL
 	if err := ValidateStreamURL(url); err != nil {
 		status.Status = "error"
 		status.ErrorMsg = "URL 不安全: " + err.Error()
 		return status, err
-	}
-
-	// 获取自定义的 User-Agent 和 Headers
-	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
-	if ua == "" {
-		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
 	}
 
 	// 健康检查用独立短超时 client，禁用 KeepAlive 避免关闭未读完的响应体导致闲置连接接收到乱码
@@ -198,13 +220,6 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
 		},
-	}
-
-	// 解析可能存在的 strm 直链
-	resolvedURL, err := sp.resolveStrmUrl(context.Background(), url, ua, headers)
-	if err == nil && resolvedURL != "" {
-		url = resolvedURL
-		status.URL = url // 更新 status 里的 URL 为真实流地址
 	}
 
 	if streamType == "" {
@@ -544,6 +559,14 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			return fmt.Errorf("线路校验失败: %w", lastErr)
 		}
 		return fmt.Errorf("无有效播放线路")
+	}
+
+	// 提前进行 strm 穿透清洗，无论 HTTP 还是本地路径
+	for i, u := range validURLs {
+		resolvedURL, err := sp.resolveStrmUrl(r.Context(), u, ua, headers)
+		if err == nil && resolvedURL != "" {
+			validURLs[i] = resolvedURL
+		}
 	}
 
 	firstURL := validURLs[0]
