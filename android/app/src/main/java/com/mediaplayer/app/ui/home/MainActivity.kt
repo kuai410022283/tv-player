@@ -3800,6 +3800,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         )
         pipController.handlePictureInPictureModeChanged(isInPictureInPictureMode, viewsToHide)
         
+        val timeOverlayView = findViewById<com.mediaplayer.app.ui.widget.TimeOverlayView>(R.id.timeOverlayView)
+        timeOverlayView?.onPipModeChanged(isInPictureInPictureMode, newConfig)
+        
         if (!isInPictureInPictureMode) {
             // 退出画中画恢复 OSD
             osdOverlayView?.visibility = View.VISIBLE

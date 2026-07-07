@@ -132,4 +132,35 @@ class TimeOverlayView @JvmOverloads constructor(
             visibility = View.GONE
         }
     }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        pivotX = w.toFloat()
+        pivotY = 0f
+    }
+
+    fun onPipModeChanged(isPip: Boolean, config: android.content.res.Configuration?) {
+        if (!isPip || config == null) {
+            scaleX = 1.0f
+            scaleY = 1.0f
+            translationX = 0f
+            translationY = 0f
+        } else {
+            // Reference width for a standard TV screen in DP is usually around 960
+            val tvWidthDp = 960f
+            // 乘以 1.4 让画中画里的时间显示相对大一点，避免太小看不清
+            val scale = ((config.screenWidthDp / tvWidthDp) * 1.4f).coerceIn(0.1f, 1.0f)
+            
+            scaleX = scale
+            scaleY = scale
+            
+            // Adjust margin based on scale (original margin is 32dp)
+            val density = context.resources.displayMetrics.density
+            val marginPx = 32 * density
+            val marginDiff = marginPx * (1f - scale)
+            
+            translationX = marginDiff
+            translationY = -marginDiff
+        }
+    }
 }
