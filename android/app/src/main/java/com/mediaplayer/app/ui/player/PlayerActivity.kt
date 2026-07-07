@@ -16,6 +16,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import android.net.Uri
+import android.app.PictureInPictureParams
+import android.util.Rational
+import android.content.res.Configuration
 import org.videolan.libvlc.util.VLCVideoLayout
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
@@ -34,7 +37,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-class PlayerActivity : AppCompatActivity() {
+class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCallback {
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
@@ -76,6 +79,9 @@ class PlayerActivity : AppCompatActivity() {
     private var tvEpgNow: android.widget.TextView? = null
     private var tvEpgNext: android.widget.TextView? = null
 
+    // ── OSD UI elements ──
+    private var layoutRemoteHint: View? = null
+
     // ── Phone-only views ──
     private var layoutGestureHint: View? = null
     private var layoutVolumeIndicator: View? = null
@@ -101,12 +107,17 @@ class PlayerActivity : AppCompatActivity() {
     private var lineIndex = 0
     private var allChannels = listOf<Channel>()
     private var resolveJob: kotlinx.coroutines.Job? = null
+    private var isPipEnabled = false
+    private var isPipClosedBySystem = false
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideInfoRunnable = Runnable { hideChannelInfo() }
     private val hideVolumeRunnable = Runnable { layoutVolumeIndicator?.visibility = View.GONE }
     private val hideBrightnessRunnable = Runnable { layoutBrightnessIndicator?.visibility = View.GONE }
     private val hideSpeedRunnable = Runnable { tvSpeedIndicator?.visibility = View.GONE }
+
+    // PiP Controller
+    private lateinit var pipController: com.mediaplayer.app.util.PipController
 
     // ── Retry ──
     private var continuousSkipCount = 0
@@ -195,6 +206,8 @@ class PlayerActivity : AppCompatActivity() {
 
         // 强制所有设备使用 TV 模式逻辑
         isTvMode = true
+        
+        pipController = com.mediaplayer.app.util.PipController(this, this)
 
         setContentView(R.layout.activity_player)
         setupViews()
@@ -224,6 +237,56 @@ class PlayerActivity : AppCompatActivity() {
         showChannelInfo()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 停止保活服务
+        stopService(Intent(this, PlaybackService::class.java))
+        playerHelper?.resume()
+        hideSystemUI()
+        
+        // 委托给 PipController 动态参数更新
+        pipController.updatePipParams(playerHelper?.isPlaying() == true)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        pipController.handleUserLeaveHint(playerHelper?.isPlaying() == true)
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        
+        val viewsToHide = listOf(
+            layoutChannelInfo,
+            progressBar,
+            layoutRemoteHint,
+            layoutGestureHint,
+            layoutVolumeIndicator,
+            layoutBrightnessIndicator,
+            tvSpeedIndicator
+        )
+        pipController.handlePictureInPictureModeChanged(isInPictureInPictureMode, viewsToHide)
+        
+        if (isInPictureInPictureMode) {
+            handler.removeCallbacks(hideInfoRunnable)
+        } else {
+            if (lifecycle.currentState != androidx.lifecycle.Lifecycle.State.RESUMED) {
+                isPipClosedBySystem = true
+            }
+            
+            // 退出画中画：恢复默认全屏UI
+            if (playerHelper?.isPlaying() == false && currentPlaybackState == PlaybackState.IDLE) {
+                // 如果画中画期间播放结束或失败，退出时关闭 Activity
+                finish()
+            } else {
+                // 恢复底部操作按键提示
+                layoutRemoteHint?.visibility = View.VISIBLE
+                // 恢复顶部频道信息，并触发倒计时隐藏
+                showChannelInfo()
+            }
+        }
+    }
+
     // ═══════════════════════════════════════════════════
     // VIEW SETUP
     // ═══════════════════════════════════════════════════
@@ -239,6 +302,7 @@ class PlayerActivity : AppCompatActivity() {
         layoutEpg = findViewById(R.id.layoutEpg)
         tvEpgNow = findViewById(R.id.tvEpgNow)
         tvEpgNext = findViewById(R.id.tvEpgNext)
+        layoutRemoteHint = findViewById(R.id.layoutRemoteHint)
 
         layoutGestureHint = findViewById(R.id.layoutGestureHint)
         layoutVolumeIndicator = findViewById(R.id.layoutVolumeIndicator)
@@ -353,6 +417,7 @@ class PlayerActivity : AppCompatActivity() {
                     tvStatus?.text = "播放中"
                     continuousSkipCount = 0
                     retryCount = 0
+                    pipController.updatePipParams(true)
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -382,12 +447,14 @@ class PlayerActivity : AppCompatActivity() {
             override fun onError() {
                 handler.post { 
                     currentPlaybackState = PlaybackState.IDLE
+                    pipController.updatePipParams(false)
                     handlePlaybackError(isNetworkTimeout = false) 
                 }
             }
             override fun onPlaybackCompleted() {
                 handler.post {
                     currentPlaybackState = PlaybackState.IDLE
+                    pipController.updatePipParams(false)
                     handlePlaybackCompleted()
                 }
             }
@@ -706,12 +773,12 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun hideChannelInfo() {
-        layoutChannelInfo?.visibility = View.GONE
-    }
-
     private fun toggleChannelInfo() {
         if (layoutChannelInfo?.visibility == View.VISIBLE) hideChannelInfo() else showChannelInfo()
+    }
+
+    private fun hideChannelInfo() {
+        layoutChannelInfo?.visibility = View.GONE
     }
 
     private fun showVolumeIndicator(vol: Int) {
@@ -847,6 +914,17 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        
+        // 如果处于画中画模式，保持小窗渲染，无需启动后台服务
+        if (pipController.shouldKeepPlayerAliveOnPause()) {
+            return
+        }
+        
+        // 如果是因为关闭画中画而导致的 onPause，不启动后台服务
+        if (isPipClosedBySystem || isFinishing) {
+            return
+        }
+        
         // 不暂停 player，让它在后台继续播放
         // 启动前台服务保活进程
         val serviceIntent = Intent(this, PlaybackService::class.java).apply {
@@ -855,19 +933,45 @@ class PlayerActivity : AppCompatActivity() {
         try { androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent) } catch (_: Exception) {}
     }
 
-    override fun onResume() {
-        super.onResume()
-        // 停止保活服务
-        stopService(Intent(this, PlaybackService::class.java))
-        playerHelper?.resume()
-        hideSystemUI()
+    override fun onStop() {
+        super.onStop()
+        if (isPipClosedBySystem || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode)) {
+            playerHelper?.release()
+            pipController.release()
+            stopService(Intent(this, PlaybackService::class.java))
+            finishAffinity()
+            System.exit(0)
+        }
     }
+
+    // onResume is handled earlier
 
     override fun onDestroy() {
         super.onDestroy()
         stopService(Intent(this, PlaybackService::class.java))
         handler.removeCallbacksAndMessages(null)
+        pipController.release()
         playerHelper?.release()
         playerHelper = null
+    }
+
+    override fun onPipPlay() {
+        playerHelper?.resume()
+        pipController.updatePipParams(true)
+    }
+
+    override fun onPipPause() {
+        playerHelper?.pause()
+        pipController.updatePipParams(false)
+    }
+
+    override fun onPipNext() {
+        nextChannel()
+        pipController.updatePipParams(true)
+    }
+
+    override fun onPipPrev() {
+        prevChannel()
+        pipController.updatePipParams(true)
     }
 }

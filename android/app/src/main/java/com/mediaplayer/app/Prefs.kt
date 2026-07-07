@@ -35,6 +35,9 @@ object Prefs {
     // 开机自启
     const val KEY_AUTO_START = "auto_start"
 
+    // 画中画
+    const val KEY_ENABLE_PIP = "enable_pip"
+
     // 画面比例
     const val KEY_SCALE_MODE = "scale_mode"
     const val SCALE_MODE_DEFAULT = 0 // 自适应 (Fit)

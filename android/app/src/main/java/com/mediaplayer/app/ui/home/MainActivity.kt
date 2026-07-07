@@ -53,7 +53,7 @@ import com.mediaplayer.app.util.VlcPlayerHelper
 import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.math.max
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCallback {
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
@@ -98,6 +98,9 @@ class MainActivity : AppCompatActivity() {
     // Line Selection Menu
     private var layoutLineMenu: View? = null
     private var tvLineMenuTitle: TextView? = null
+    
+    // PiP Controller
+    private lateinit var pipController: com.mediaplayer.app.util.PipController
     private var containerLines: LinearLayout? = null
 
     // ── Settings Sidebar ──
@@ -211,6 +214,7 @@ class MainActivity : AppCompatActivity() {
     private var isLoadingData = false
     // 首次 onResume 标记（防止与 onCreate 的认证链路冲突）
     private var isFirstResume = true
+    private var isPipClosedBySystem = false
     private var hasShownSplash = false
     private var lastEpgBgRefreshTime = 0L
     
@@ -323,6 +327,8 @@ class MainActivity : AppCompatActivity() {
 
         // 强制所有设备使用 TV 的沉浸式界面大一统！
         isTvMode = true
+        
+        pipController = com.mediaplayer.app.util.PipController(this, this)
         
         // 安全地请求横屏方向，规避 Android 8.0 透明主题请求固定方向时的崩溃Bug
         try {
@@ -903,9 +909,14 @@ class MainActivity : AppCompatActivity() {
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
         var currentAudioPassthrough = prefs.getBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, false)
+        var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
+        }
+
+        fun updatePipText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsPipValue)?.text = if (enabled) "开" else "关"
         }
 
         updateDecoderText(currentDecoderMode)
@@ -915,12 +926,52 @@ class MainActivity : AppCompatActivity() {
         updateShowLogoText(currentShowLogo)
         updateReverseChannelsText(currentReverseChannels)
         updateAudioPassthroughText(currentAudioPassthrough)
+        updatePipText(currentEnablePip)
         
         btnSettingsAudioPassthrough?.setOnClickListener {
             currentAudioPassthrough = !currentAudioPassthrough
             updateAudioPassthroughText(currentAudioPassthrough)
             prefs.edit().putBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, currentAudioPassthrough).apply()
             Toast.makeText(this, "音频直通设置已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+        }
+
+        val btnSettingsPip = findViewById<View>(R.id.btnSettingsPip)
+        btnSettingsPip?.setOnClickListener {
+            if (!currentEnablePip) {
+                // 准备开启时，检查是否具有画中画权限
+                var hasPermission = false
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val appOps = getSystemService(android.content.Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+                    val mode = appOps.checkOpNoThrow(android.app.AppOpsManager.OPSTR_PICTURE_IN_PICTURE, android.os.Process.myUid(), packageName)
+                    hasPermission = (mode == android.app.AppOpsManager.MODE_ALLOWED)
+                }
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && !hasPermission) {
+                    Toast.makeText(this, "请在此页面允许“画中画”权限", Toast.LENGTH_LONG).show()
+                    try {
+                        // 尝试打开专属的画中画权限设置页
+                        val intent = Intent("android.settings.PICTURE_IN_PICTURE_SETTINGS")
+                        intent.data = android.net.Uri.parse("package:$packageName")
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        // 如果系统不支持专属页面，则打开应用详情页
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            intent.data = android.net.Uri.parse("package:$packageName")
+                            startActivity(intent)
+                        } catch (e2: Exception) {
+                            com.mediaplayer.app.util.RemoteLogger.e("MainActivity", "无法跳转到设置页面", e2)
+                        }
+                    }
+                    // 权限未给，拦截此次开关切换，让用户下次再点
+                    return@setOnClickListener
+                }
+            }
+            currentEnablePip = !currentEnablePip
+            updatePipText(currentEnablePip)
+            prefs.edit().putBoolean(Prefs.KEY_ENABLE_PIP, currentEnablePip).apply()
+            pipController.updatePipParams(playerHelper?.isPlaying() == true)
+            Toast.makeText(this, "画中画模式已" + (if (currentEnablePip) "开启" else "关闭"), Toast.LENGTH_SHORT).show()
         }
         
         fun updateMemoryText(enabled: Boolean) {
@@ -1286,6 +1337,7 @@ class MainActivity : AppCompatActivity() {
                     progressBuffering?.visibility = View.GONE
                     dismissSnapshot() // 新流首帧到来，移除截帧占位图
                     continuousSkipCount = 0
+                    pipController.updatePipParams(true)
 
                     // VOD 模式设置：根据 content_type 判断是否为点播
                     val isVod = isCurrentChannelVod()
@@ -1333,6 +1385,7 @@ class MainActivity : AppCompatActivity() {
             override fun onError() {
                 uiHandler.post { 
                     currentPlaybackState = PlaybackState.IDLE
+                    pipController.updatePipParams(false)
                     dismissSnapshot() // 播放失败也移除截帧
                     handlePlaybackError(isNetworkTimeout = false) 
                 }
@@ -1340,6 +1393,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPlaybackCompleted() {
                 uiHandler.post {
                     currentPlaybackState = PlaybackState.IDLE
+                    pipController.updatePipParams(false)
                     handlePlaybackCompleted()
                 }
             }
@@ -3682,6 +3736,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         hideSystemUI()
         
+        // 交由专门的控制器去动态注入画中画参数
+        pipController.updatePipParams(playerHelper?.isPlaying() == true)
+        
         // 首次 onResume 由 onCreate 的认证链路负责数据加载，跳过以避免并发
         if (isFirstResume) {
             isFirstResume = false
@@ -3692,9 +3749,11 @@ class MainActivity : AppCompatActivity() {
             loadData()
             settingsChanged = false
         } else if (isTvMode && allChannels.isNotEmpty() && currentChannelIndex >= 0 && currentChannelIndex < allChannels.size) {
-            // 直播流在切后台后会断开或缓冲失效，必须重新连接加载
-            videoLayout?.post {
-                playTvChannel(currentChannelIndex)
+            // 直播流在切后台后会断开或缓冲失效，必须重新连接加载 (仅当不在画中画模式时)
+            if (!(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && isInPictureInPictureMode)) {
+                videoLayout?.post {
+                    playTvChannel(currentChannelIndex)
+                }
             }
         }
     }
@@ -3702,10 +3761,52 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         uiHandler.removeCallbacks(watchdogRunnable)
-        if (isTvMode) {
+        if (pipController.shouldKeepPlayerAliveOnPause()) {
+            // 画中画模式下被拦截，不停止播放
+        } else if (isTvMode) {
             // 直播流切后台直接彻底停止，释放硬件解码器和网络连接
             playerHelper?.release()
             playerHelper = null
+        }
+    }
+    
+    override fun onStop() {
+        super.onStop()
+        if (isPipClosedBySystem || (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && isInPictureInPictureMode)) {
+            playerHelper?.release()
+            pipController.release()
+            stopService(Intent(this, com.mediaplayer.app.service.PlaybackService::class.java))
+            finishAffinity()
+            System.exit(0)
+        } else if (!isTvMode) {
+            playerHelper?.pause()
+        }
+    }
+    
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        pipController.handleUserLeaveHint(playerHelper?.isPlaying() == true)
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        
+        val viewsToHide = listOf(
+            layoutZappingMenu,
+            layoutEpgMenu,
+            layoutSettingsMenu,
+            layoutLineMenu,
+            osdOverlayView
+        )
+        pipController.handlePictureInPictureModeChanged(isInPictureInPictureMode, viewsToHide)
+        
+        if (!isInPictureInPictureMode) {
+            // 退出画中画恢复 OSD
+            osdOverlayView?.visibility = View.VISIBLE
+            
+            if (lifecycle.currentState != androidx.lifecycle.Lifecycle.State.RESUMED) {
+                isPipClosedBySystem = true
+            }
         }
     }
 
@@ -3729,7 +3830,36 @@ class MainActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.removeCallbacks(channelInputRunnable)
         uiHandler.removeCallbacks(watchdogRunnable)
+        pipController.release()
         playerHelper?.release()
         playerHelper = null
+    }
+
+    override fun onPipPlay() {
+        playerHelper?.resume()
+        pipController.updatePipParams(true)
+    }
+
+    override fun onPipPause() {
+        playerHelper?.pause()
+        pipController.updatePipParams(false)
+    }
+
+    override fun onPipNext() {
+        if (allChannels.isNotEmpty()) {
+            var nextIndex = currentChannelIndex + 1
+            if (nextIndex >= allChannels.size) nextIndex = 0
+            playTvChannel(nextIndex)
+            pipController.updatePipParams(true)
+        }
+    }
+
+    override fun onPipPrev() {
+        if (allChannels.isNotEmpty()) {
+            var prevIndex = currentChannelIndex - 1
+            if (prevIndex < 0) prevIndex = allChannels.size - 1
+            playTvChannel(prevIndex)
+            pipController.updatePipParams(true)
+        }
     }
 }

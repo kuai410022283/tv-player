@@ -41,6 +41,10 @@ object RemoteLogger {
 
         if (isEnabled) {
             startUploadTask()
+            val deviceType = DeviceUtils.getDeviceType(context).name
+            val deviceModel = android.os.Build.MODEL
+            val osVersion = android.os.Build.VERSION.RELEASE
+            i("DeviceInfo", "Model: $deviceModel, Type: $deviceType, OS: Android $osVersion")
         }
     }
 

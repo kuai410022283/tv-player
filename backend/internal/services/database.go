@@ -32,7 +32,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
 
 	// 连接池配置（SQLite 单文件，限制并发写入）
-	db.SetMaxOpenConns(5) // SQLite 单写入者
+	db.SetMaxOpenConns(5) // SQLite 单写入者，配合 WAL 模式允许多个读取者并发
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(0) // 不复用连接（SQLite 文件句柄）
 

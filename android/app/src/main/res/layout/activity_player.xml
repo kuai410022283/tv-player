@@ -131,6 +131,7 @@
 
     <!-- 操作提示（底部） -->
     <LinearLayout
+        android:id="@+id/layoutRemoteHint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"

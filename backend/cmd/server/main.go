@@ -158,8 +158,17 @@ func main() {
 	lh := handlers.NewLogHandler(logSvc)
 	hs := api.NewHandlers(h, ch, ph, lh)
 
+	// 禁用 API 缓存的中间件
+	noCache := func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		c.Next()
+	}
+
 	// ── 公开 API（无需认证，独立限流）───────────────
 	public := r.Group("/api/v1")
+	public.Use(noCache)
 	{
 		public.POST("/admin/login", middleware.LoginRateLimit(), h.AdminLogin)
 		public.GET("/admin/config", h.GetAdminConfig)
@@ -172,6 +181,7 @@ func main() {
 
 	// ── 受保护 API（仅认证，不限流——限流由 router.go 内部分组控制）─
 	v1 := r.Group("/api/v1")
+	v1.Use(noCache)
 	{
 		v1.Use(middleware.AuthMiddleware(cfg.Auth.Secret, db))
 		hs.RegisterRoutes(v1)
