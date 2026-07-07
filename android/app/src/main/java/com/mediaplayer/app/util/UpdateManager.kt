@@ -80,8 +80,13 @@ object UpdateManager {
     }
 
     private fun downloadAndInstall(context: Context, url: String) {
+        var finalUrl = url
+        val lowerUrl = finalUrl.lowercase(java.util.Locale.getDefault())
+        if (!lowerUrl.startsWith("http://") && !lowerUrl.startsWith("https://")) {
+            finalUrl = "http://$finalUrl"
+        }
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val uri = Uri.parse(url)
+        val uri = Uri.parse(finalUrl)
         val request = DownloadManager.Request(uri)
         
         val fileName = "update_${System.currentTimeMillis()}.apk"
