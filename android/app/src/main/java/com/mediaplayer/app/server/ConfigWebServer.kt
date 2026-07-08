@@ -226,9 +226,9 @@ class ConfigWebServer(
                     <h2>欢迎使用</h2>
                     <p style="color:#666; font-size:14px;">请输入授权与位置信息</p>
                     <form action="/save" method="post">
-                        <textarea name="server_url" placeholder="请在此粘贴服务商提供的配置信息&#10;支持多个地址，用换行/逗号/分号隔开" required></textarea>
-                        <div class="hint">支持多个服务器地址（第一行为主服务器），用换行、逗号或分号隔开。</div>
-                        <input type="text" name="location" placeholder="安装位置（例如：13号楼一单元302）" required>
+                        <textarea name="server_url" placeholder="请在此粘贴服务商提供的授权码&#10;支持多个授权码，当主服务器宕机时，会自动切换至备用服务器" required></textarea>
+                        <div class="hint">第一行为主服务器，每行填写一个。</div>
+                        <input type="text" name="location" placeholder="安装位置（例如：13号楼一单元302），方便服务器识别设备。" required>
                         <button type="submit">保存配置</button>
                     </form>
                 </div>
