@@ -2362,17 +2362,19 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
     }
 
-    private fun checkAndRefreshEpgBg() {
+    private fun checkAndRefreshEpgBg(force: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (lastEpgBgRefreshTime == 0L) {
-            lastEpgBgRefreshTime = now
-            return
+        if (!force) {
+            if (lastEpgBgRefreshTime == 0L) {
+                lastEpgBgRefreshTime = now
+                return
+            }
+            if (now - lastEpgBgRefreshTime < 600_000L) { // 10 minutes
+                return
+            }
         }
-        if (now - lastEpgBgRefreshTime < 600_000L) { // 10 minutes
-            return
-        }
-            lastEpgBgRefreshTime = now
-            val gId = currentGroupId ?: return
+        lastEpgBgRefreshTime = now
+        val gId = currentGroupId ?: return
             
             lifecycleScope.launch(Dispatchers.IO) {
                 var page = 1
@@ -2778,11 +2780,18 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         epgTickerRunnable?.let { epgTickerHandler.removeCallbacks(it) }
         val runnable = object : Runnable {
             override fun run() {
+                // 智能检测：如果当前节目进度已达 100%，突破 10 分钟防刷锁，静默拉取下一集 EPG
+                val channelForEpgCheck = allChannels.getOrNull(currentChannelIndex)
+                if (channelForEpgCheck != null) {
+                    if (channelForEpgCheck.currentEpg.isNotEmpty() && channelForEpgCheck.getDynamicEpgPercent() >= 100) {
+                        checkAndRefreshEpgBg(force = true)
+                    }
+                }
+
                 // Update OSD if visible
                 if (osdOverlayView?.isOsdVisible() == true) {
-                    val channel = allChannels.getOrNull(currentChannelIndex)
-                    if (channel != null) {
-                        loadEpgForChannel(channel)
+                    if (channelForEpgCheck != null) {
+                        loadEpgForChannel(channelForEpgCheck)
                     }
                 }
                 
