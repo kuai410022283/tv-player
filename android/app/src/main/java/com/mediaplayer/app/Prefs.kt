@@ -40,6 +40,11 @@ object Prefs {
     const val PLAYER_CORE_EXO = 2
     const val PLAYER_CORE_IJK = 3
     
+    // 渲染引擎 (为未来做准备)
+    const val KEY_RENDER_VIEW = "render_view_mode"
+    const val RENDER_VIEW_SURFACE = 0
+    const val RENDER_VIEW_TEXTURE = 1
+    
     // 开机自启
     const val KEY_AUTO_START = "auto_start"
 

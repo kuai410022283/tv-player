@@ -1,6 +1,7 @@
 package com.mediaplayer.app.ui.home
 
 import android.content.Intent
+import kotlin.coroutines.resume
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -1733,7 +1734,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     /**
      * 截取当前 videoLayout 画面作为切台占位图，覆盖在最上层，消除切台黑屏。
      */
-    private fun captureSnapshot() {
+    private suspend fun captureSnapshotAsync(timeoutMs: Long = 50L) {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        if (prefs.getInt(Prefs.KEY_RENDER_VIEW, Prefs.RENDER_VIEW_SURFACE) == Prefs.RENDER_VIEW_TEXTURE) {
+            return
+        }
+
         val vl = videoLayout ?: return
         val iv = snapshotOverlay ?: return
         val currentGen = ++snapshotGeneration
@@ -1741,15 +1747,22 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 使用 PixelCopy（API 26+）获取 SurfaceView 的截图
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
-                val copyListener = android.view.PixelCopy.OnPixelCopyFinishedListener { result ->
-                    if (result == android.view.PixelCopy.SUCCESS) {
-                        if (currentGen == snapshotGeneration) {
-                            iv.setImageBitmap(bitmap)
-                            iv.visibility = View.VISIBLE
+                kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+                    kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
+                        val copyListener = android.view.PixelCopy.OnPixelCopyFinishedListener { result ->
+                            if (continuation.isActive) {
+                                if (result == android.view.PixelCopy.SUCCESS) {
+                                    if (currentGen == snapshotGeneration) {
+                                        iv.setImageBitmap(bitmap)
+                                        iv.visibility = View.VISIBLE
+                                    }
+                                }
+                                continuation.resume(Unit)
+                            }
                         }
+                        android.view.PixelCopy.request(this@MainActivity.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
                     }
                 }
-                android.view.PixelCopy.request(this.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
             } else {
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(bitmap)
@@ -1904,35 +1917,38 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
         }
 
-        var needsRebuildDelay = false
-        if (playerHelper == null || !isCoreMatch) {
-            needsRebuildDelay = true
-            // 跨内核切换前：截帧占位，保存 overlay 引用（removeAllViews 会移除它）
-            captureSnapshot()
-            playerHelper?.release()
-            videoLayout?.removeAllViews() // 清除旧的视图
-            initPlayerWithCore(desiredCore)
-            // 跨内核切换后：重新挂载截帧 ImageView 到新 videoLayout 顶层
+        val isCoreChanged = playerHelper == null || !isCoreMatch
+        
+        resolveJob = lifecycleScope.launch {
+            val gen = ++playGeneration
+            
+            // 1. 方案一：异步截图，掩盖黑屏，且为方案二预留豁免逻辑
+            if (!isCurrentChannelVod()) {
+                captureSnapshotAsync(50L)
+            }
+            
+            if (gen != playGeneration) return@launch
+            
+            // 2. 清理与重建播放器画布
+            if (isCoreChanged) {
+                playerHelper?.release()
+                videoLayout?.removeAllViews()
+                initPlayerWithCore(desiredCore)
+            }
+            
+            // 确保遮罩在最顶层
             snapshotOverlay?.let { iv ->
                 if (iv.parent == null) {
                     videoLayout?.addView(iv)
-                    // 确保覆盖在新建的播放器 Surface 之上
                 }
+                iv.bringToFront()
             }
-        } else {
-            // 同内核切换：直接由底层控制缓冲黑屏或保留上一帧，无需上层强加异步截屏。
-            // 防止异步截屏延后出现，覆盖在新频道的首帧上，从而导致“重影”现象。
-            dismissSnapshot()
-        }
-        // 关键修复：无论是新建还是复用 PlayerHelper，都必须将最新的独立解码模式同步到底层
-        playerHelper?.setDecoderMode(currentDecoderMode)
-        
-        progressBuffering?.visibility = View.VISIBLE
+            
+            playerHelper?.setDecoderMode(currentDecoderMode)
+            progressBuffering?.visibility = View.VISIBLE
 
-        resolveJob = lifecycleScope.launch {
-            val gen = ++playGeneration
-            // 解决主备切换等场景下，过快重建播放器导致硬件解码器耗尽/死锁的问题
-            if (needsRebuildDelay) {
+            // 切换延迟，如果是新老内核重建，给予硬解缓冲时间
+            if (isCoreChanged) {
                 kotlinx.coroutines.delay(200)
             }
             val finalUrl = com.mediaplayer.app.util.StreamResolver.resolve(line.streamUrl, line.userAgent, line.customHeaders)
