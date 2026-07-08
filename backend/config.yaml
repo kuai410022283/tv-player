@@ -2,7 +2,7 @@
 # ⚠️ 部署前必须修改 auth.secret 和 auth.admin_password
 
 server:
-  host: "0.0.0.0"
+  host: "127.0.0.1"
   port: 9527
 
 database:

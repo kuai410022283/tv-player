@@ -307,7 +307,11 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		ch := mc.ch
 		groupID := mc.groupID
 		mergedURLStr := strings.Join(mc.urls, "#")
-		streamType := detectStreamType(mc.urls[0]) // 以第一条线路的类型为准
+		var types []string
+		for _, u := range mc.urls {
+			types = append(types, detectStreamType(u))
+		}
+		streamType := strings.Join(types, "#")
 
 		// Build custom headers map
 		headersMap := make(map[string]string)

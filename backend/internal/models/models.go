@@ -8,57 +8,57 @@ import (
 // ── Channel Group ──────────────────────────────────────
 
 type ChannelGroup struct {
-	ID        int64     `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
-	Icon      string    `json:"icon,omitempty" db:"icon"`
-	SortOrder int       `json:"sort_order" db:"sort_order"`
-	IsDirect  bool      `json:"is_direct" db:"is_direct"`
-	Source       string    `json:"source" db:"source"`
-	ChannelCount int       `json:"channel_count" db:"channel_count"`
-	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
-	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
-	EnableMultiplex int    `json:"enable_multiplex" db:"enable_multiplex"`
-	CanMultiplex bool      `json:"can_multiplex" db:"-"`
-	NonMuxCount  int       `json:"non_mux_count" db:"-"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID              int64     `json:"id" db:"id"`
+	Name            string    `json:"name" db:"name"`
+	Icon            string    `json:"icon,omitempty" db:"icon"`
+	SortOrder       int       `json:"sort_order" db:"sort_order"`
+	IsDirect        bool      `json:"is_direct" db:"is_direct"`
+	Source          string    `json:"source" db:"source"`
+	ChannelCount    int       `json:"channel_count" db:"channel_count"`
+	UserAgent       string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders   string    `json:"custom_headers,omitempty" db:"custom_headers"`
+	EnableMultiplex int       `json:"enable_multiplex" db:"enable_multiplex"`
+	CanMultiplex    bool      `json:"can_multiplex" db:"-"`
+	NonMuxCount     int       `json:"non_mux_count" db:"-"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // ── Channel ────────────────────────────────────────────
 
 type Channel struct {
-	ID          int64     `json:"id" db:"id"`
-	GroupID     int64     `json:"group_id" db:"group_id"`
-	Name        string    `json:"name" db:"name"`
-	Logo        string    `json:"logo,omitempty" db:"logo"`
-	Description string    `json:"description,omitempty" db:"description"`
-	StreamURL   string    `json:"stream_url" db:"stream_url"`
-	StreamType  string    `json:"stream_type" db:"stream_type"` // hls, flv, rtmp, rtsp, mp4, dash
-	EPGChannelID string   `json:"epg_channel_id,omitempty" db:"epg_channel_id"`
-	CurrentEPG   string   `json:"current_epg,omitempty" db:"-"`
-	NextEPG      string   `json:"next_epg,omitempty" db:"-"`
-	EpgPercent   int      `json:"epg_percent,omitempty" db:"-"`
+	ID           int64  `json:"id" db:"id"`
+	GroupID      int64  `json:"group_id" db:"group_id"`
+	Name         string `json:"name" db:"name"`
+	Logo         string `json:"logo,omitempty" db:"logo"`
+	Description  string `json:"description,omitempty" db:"description"`
+	StreamURL    string `json:"stream_url" db:"stream_url"`
+	StreamType   string `json:"stream_type" db:"stream_type"` // hls, flv, rtmp, rtsp, mp4, dash
+	EPGChannelID string `json:"epg_channel_id,omitempty" db:"epg_channel_id"`
+	CurrentEPG   string `json:"current_epg,omitempty" db:"-"`
+	NextEPG      string `json:"next_epg,omitempty" db:"-"`
+	EpgPercent   int    `json:"epg_percent,omitempty" db:"-"`
 
-	IsHidden    bool      `json:"is_hidden" db:"is_hidden"`
-	IsDirect    bool      `json:"is_direct" db:"is_direct"`
-	SortOrder   int       `json:"sort_order" db:"sort_order"`
-	Status      string    `json:"status" db:"status"` // online, offline, unknown
-	LastCheck   time.Time `json:"last_check,omitempty" db:"last_check"`
-	M3USourceID   int64     `json:"m3u_source_id" db:"m3u_source_id"`
-	Source        string    `json:"source" db:"source"`
-	UserAgent     string    `json:"user_agent,omitempty" db:"user_agent"`
-	CustomHeaders string    `json:"custom_headers,omitempty" db:"custom_headers"`
-	SupportCatchup bool     `json:"support_catchup" db:"support_catchup"`
-	CatchupType    string   `json:"catchup_type,omitempty" db:"catchup_type"`
-	CatchupSource  string   `json:"catchup_source,omitempty" db:"catchup_source"`
-	CatchupDays    int      `json:"catchup_days,omitempty" db:"catchup_days"`
-	EnableMultiplex int     `json:"enable_multiplex" db:"enable_multiplex"`
-	ContentType    string   `json:"content_type" db:"content_type"` // live, vod, 空=自动推断
-	Fcc            string   `json:"fcc,omitempty" db:"fcc"`
-	FccType        string   `json:"fcc_type,omitempty" db:"fcc_type"`
-	CanMultiplex bool       `json:"can_multiplex" db:"-"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	IsHidden        bool      `json:"is_hidden" db:"is_hidden"`
+	IsDirect        bool      `json:"is_direct" db:"is_direct"`
+	SortOrder       int       `json:"sort_order" db:"sort_order"`
+	Status          string    `json:"status" db:"status"` // online, offline, unknown
+	LastCheck       time.Time `json:"last_check,omitempty" db:"last_check"`
+	M3USourceID     int64     `json:"m3u_source_id" db:"m3u_source_id"`
+	Source          string    `json:"source" db:"source"`
+	UserAgent       string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders   string    `json:"custom_headers,omitempty" db:"custom_headers"`
+	SupportCatchup  bool      `json:"support_catchup" db:"support_catchup"`
+	CatchupType     string    `json:"catchup_type,omitempty" db:"catchup_type"`
+	CatchupSource   string    `json:"catchup_source,omitempty" db:"catchup_source"`
+	CatchupDays     int       `json:"catchup_days,omitempty" db:"catchup_days"`
+	EnableMultiplex int       `json:"enable_multiplex" db:"enable_multiplex"`
+	ContentType     string    `json:"content_type" db:"content_type"` // live, vod, 空=自动推断
+	Fcc             string    `json:"fcc,omitempty" db:"fcc"`
+	FccType         string    `json:"fcc_type,omitempty" db:"fcc_type"`
+	CanMultiplex    bool      `json:"can_multiplex" db:"-"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // ── EPG (Electronic Program Guide) ─────────────────────
@@ -95,7 +95,7 @@ type SubscriptionPlan struct {
 	Price             float64   `json:"price" db:"price"`             // 展示价格
 	Description       string    `json:"description" db:"description"`
 	SubscriptionToken string    `json:"subscription_token" db:"subscription_token"`
-	GroupIDs          []int64   `json:"group_ids" db:"-"`             // 关联的频道分组（按顺序排列）
+	GroupIDs          []int64   `json:"group_ids" db:"-"` // 关联的频道分组（按顺序排列）
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -141,17 +141,17 @@ type AppUpdateConfig struct {
 // ── Source M3U ─────────────────────────────────────────
 
 type M3USource struct {
-	ID        int64     `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	URL          string    `json:"url" db:"url"`
-	AutoSync     bool      `json:"auto_sync" db:"auto_sync"`
-	SyncInterval int       `json:"sync_interval" db:"sync_interval"` // In hours
-	UserAgent    string    `json:"user_agent,omitempty" db:"user_agent"`
-	CustomHeaders string   `json:"custom_headers,omitempty" db:"custom_headers"`
-	LastSync     time.Time `json:"last_sync,omitempty" db:"last_sync"`
-	SyncStatus   string    `json:"sync_status" db:"sync_status"` // idle, syncing, error
-	SyncError    string    `json:"sync_error,omitempty" db:"sync_error"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	ID            int64     `json:"id" db:"id"`
+	Name          string    `json:"name" db:"name"`
+	URL           string    `json:"url" db:"url"`
+	AutoSync      bool      `json:"auto_sync" db:"auto_sync"`
+	SyncInterval  int       `json:"sync_interval" db:"sync_interval"` // In hours
+	UserAgent     string    `json:"user_agent,omitempty" db:"user_agent"`
+	CustomHeaders string    `json:"custom_headers,omitempty" db:"custom_headers"`
+	LastSync      time.Time `json:"last_sync,omitempty" db:"last_sync"`
+	SyncStatus    string    `json:"sync_status" db:"sync_status"` // idle, syncing, error
+	SyncError     string    `json:"sync_error,omitempty" db:"sync_error"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 }
 
 // ── API Request / Response ─────────────────────────────
@@ -162,9 +162,15 @@ type PageRequest struct {
 }
 
 func (p *PageRequest) Normalize() {
-	if p.Page < 1 { p.Page = 1 }
-	if p.PageSize < 1 { p.PageSize = 20 }
-	if p.PageSize > 5000 { p.PageSize = 5000 } // 支持大分页，提升7000+频道场景加载速度
+	if p.Page < 1 {
+		p.Page = 1
+	}
+	if p.PageSize < 1 {
+		p.PageSize = 20
+	}
+	if p.PageSize > 5000 {
+		p.PageSize = 5000
+	} // 支持大分页，提升7000+频道场景加载速度
 }
 
 type PageResponse struct {
@@ -181,39 +187,39 @@ type APIResponse struct {
 }
 
 type StreamStatus struct {
-	ChannelID   int64  `json:"channel_id"`
-	URL         string `json:"url"`
-	Status      string `json:"status"` // playing, buffering, error, stopped
-	Bitrate     int64  `json:"bitrate"`
-	Resolution  string `json:"resolution"`
-	BufferPct   int    `json:"buffer_pct"`
-	ErrorMsg    string `json:"error_msg,omitempty"`
+	ChannelID  int64  `json:"channel_id"`
+	URL        string `json:"url"`
+	Status     string `json:"status"` // playing, buffering, error, stopped
+	Bitrate    int64  `json:"bitrate"`
+	Resolution string `json:"resolution"`
+	BufferPct  int    `json:"buffer_pct"`
+	ErrorMsg   string `json:"error_msg,omitempty"`
 }
 
 // ── Client (设备授权) ─────────────────────────────────
 
 type Client struct {
 	ID           int64     `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`                   // 设备名称
-	DeviceID     string    `json:"device_id" db:"device_id"`         // 设备唯一标识
-	DeviceModel  string    `json:"device_model" db:"device_model"`   // 设备型号
-	DeviceOS     string    `json:"device_os" db:"device_os"`         // 系统版本
-	AppVersion   string    `json:"app_version" db:"app_version"`     // 客户端版本
-	IP           string    `json:"ip" db:"ip"`                       // 最近连接IP
+	Name         string    `json:"name" db:"name"`                           // 设备名称
+	DeviceID     string    `json:"device_id" db:"device_id"`                 // 设备唯一标识
+	DeviceModel  string    `json:"device_model" db:"device_model"`           // 设备型号
+	DeviceOS     string    `json:"device_os" db:"device_os"`                 // 系统版本
+	AppVersion   string    `json:"app_version" db:"app_version"`             // 客户端版本
+	IP           string    `json:"ip" db:"ip"`                               // 最近连接IP
 	AccessToken  string    `json:"access_token,omitempty" db:"access_token"` // 访问令牌
-	TokenPreview string    `json:"token_preview,omitempty" db:"-"`   // 令牌预览
-	Status       string    `json:"status" db:"status"`               // pending, approved, rejected, banned, expired
-	PlanID       int64     `json:"plan_id" db:"plan_id"`             // 绑定的套餐ID
-	PlanName     string    `json:"plan_name,omitempty" db:"-"`       // 套餐名称 (展示用)
-	MaxStreams    int       `json:"max_streams" db:"max_streams"`     // 允许最大并发流数
-	ExpiresAt    time.Time `json:"expires_at,omitempty" db:"expires_at"` // 授权过期时间
-	ApprovedBy   string    `json:"approved_by,omitempty" db:"approved_by"` // 审批人
+	TokenPreview string    `json:"token_preview,omitempty" db:"-"`           // 令牌预览
+	Status       string    `json:"status" db:"status"`                       // pending, approved, rejected, banned, expired
+	PlanID       int64     `json:"plan_id" db:"plan_id"`                     // 绑定的套餐ID
+	PlanName     string    `json:"plan_name,omitempty" db:"-"`               // 套餐名称 (展示用)
+	MaxStreams   int       `json:"max_streams" db:"max_streams"`             // 允许最大并发流数
+	ExpiresAt    time.Time `json:"expires_at,omitempty" db:"expires_at"`     // 授权过期时间
+	ApprovedBy   string    `json:"approved_by,omitempty" db:"approved_by"`   // 审批人
 	RejectReason string    `json:"reject_reason,omitempty" db:"reject_reason"`
 	LastSeen     time.Time `json:"last_seen,omitempty" db:"last_seen"`
 	TotalPlayMin int64     `json:"total_play_minutes" db:"total_play_minutes"` // 累计播放分钟
-	RequestNote  string    `json:"request_note,omitempty" db:"request_note"` // 申请备注
-	EnableLog    bool      `json:"enable_log" db:"enable_log"`               // 是否采集日志
-	IsTester     bool      `json:"is_tester" db:"is_tester"`                 // 是否为测试设备
+	RequestNote  string    `json:"request_note,omitempty" db:"request_note"`   // 申请备注
+	EnableLog    bool      `json:"enable_log" db:"enable_log"`                 // 是否采集日志
+	IsTester     bool      `json:"is_tester" db:"is_tester"`                   // 是否为测试设备
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -236,7 +242,7 @@ type ClientRegisterResp struct {
 	ExpiresAt   string `json:"expires_at,omitempty"`
 	Message     string `json:"message"`
 	EnableLog   bool   `json:"enable_log"`
-	
+
 	// 维护与测试标识
 	GlobalMaintenance bool `json:"global_maintenance"`
 	IsTester          bool `json:"is_tester"`
@@ -253,10 +259,10 @@ type ClientRegisterResp struct {
 
 // 客户端审批请求
 type ClientApproveReq struct {
-	PlanID    int64  `json:"plan_id"`    // 选定的套餐ID
-	MaxDays   int    `json:"max_days"`   // 授权天数 (如果未选套餐, 可自定义)
-	MaxStreams int   `json:"max_streams"` // 最大并发流 (如果未选套餐, 可自定义)
-	Note      string `json:"note"`
+	PlanID     int64  `json:"plan_id"`     // 选定的套餐ID
+	MaxDays    int    `json:"max_days"`    // 授权天数 (如果未选套餐, 可自定义)
+	MaxStreams int    `json:"max_streams"` // 最大并发流 (如果未选套餐, 可自定义)
+	Note       string `json:"note"`
 }
 
 // 客户端拒绝请求
@@ -273,14 +279,14 @@ type ClientBatchReq struct {
 // ── License (可选：许可证模式) ─────────────────────────
 
 type License struct {
-	ID          int64     `json:"id" db:"id"`
-	Key         string    `json:"key" db:"license_key"`
-	ClientID    int64     `json:"client_id" db:"client_id"`
-	MaxDevices  int       `json:"max_devices" db:"max_devices"`
-	MaxStreams  int       `json:"max_streams" db:"max_streams"`
-	Features    string    `json:"features" db:"features"` // JSON: ["hd","4k","dvr"]
-	ExpiresAt   time.Time `json:"expires_at" db:"expires_at"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	ID         int64     `json:"id" db:"id"`
+	Key        string    `json:"key" db:"license_key"`
+	ClientID   int64     `json:"client_id" db:"client_id"`
+	MaxDevices int       `json:"max_devices" db:"max_devices"`
+	MaxStreams int       `json:"max_streams" db:"max_streams"`
+	Features   string    `json:"features" db:"features"` // JSON: ["hd","4k","dvr"]
+	ExpiresAt  time.Time `json:"expires_at" db:"expires_at"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
 // ── Access Log ─────────────────────────────────────────
@@ -303,7 +309,7 @@ type AccessLog struct {
 type ServerStats struct {
 	TotalChannels  int   `json:"total_channels"`
 	OnlineChannels int   `json:"online_channels"`
-	ActiveStreams   int   `json:"active_streams"`
+	ActiveStreams  int   `json:"active_streams"`
 	TotalClients   int   `json:"total_clients"`
 	PendingClients int   `json:"pending_clients"`
 	OnlineClients  int   `json:"online_clients"`
@@ -314,16 +320,16 @@ type ServerStats struct {
 // ActiveStream 代表当前正在通过服务端代理转发的活跃流状态
 type ActiveStream struct {
 	Mu          *sync.RWMutex `json:"-"`
-	SessionID   string    `json:"session_id"`
-	ClientID    int64     `json:"client_id"`
-	ClientIP    string    `json:"client_ip"`
-	ClientName  string    `json:"client_name"`
-	ChannelID   int64     `json:"channel_id"`
-	ChannelName string    `json:"channel_name"`
-	URL         string    `json:"url"`
-	Status      string    `json:"status"`
-	SpeedBytes  int64     `json:"speed_bytes"` // 实时速度 (Bytes/s)
-	ErrorMsg    string    `json:"error_msg,omitempty"`
-	StartedAt   time.Time `json:"started_at"`
-	LastActive  time.Time `json:"last_active"`
+	SessionID   string        `json:"session_id"`
+	ClientID    int64         `json:"client_id"`
+	ClientIP    string        `json:"client_ip"`
+	ClientName  string        `json:"client_name"`
+	ChannelID   int64         `json:"channel_id"`
+	ChannelName string        `json:"channel_name"`
+	URL         string        `json:"url"`
+	Status      string        `json:"status"`
+	SpeedBytes  int64         `json:"speed_bytes"` // 实时速度 (Bytes/s)
+	ErrorMsg    string        `json:"error_msg,omitempty"`
+	StartedAt   time.Time     `json:"started_at"`
+	LastActive  time.Time     `json:"last_active"`
 }

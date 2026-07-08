@@ -181,7 +181,8 @@ func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua
 }
 
 // CheckHealth verifies a stream URL is reachable and returns stream info
-func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (*models.StreamStatus, error) {
+// CheckHealth verifies a stream URL is reachable and returns stream info
+func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamType string) (*models.StreamStatus, error) {
 	// 如果是多源合并（#拼接），取第一条线路进行探测
 	urls := strings.Split(rawURL, "#")
 	if len(urls) == 0 || urls[0] == "" {
@@ -226,13 +227,13 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 		lowerURL := strings.ToLower(url)
 		if strings.HasPrefix(lowerURL, "rtmp://") {
 			streamType = "rtmp"
-			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
 		} else if strings.HasPrefix(lowerURL, "rtsp://") {
 			streamType = "rtsp"
-			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
 		} else if strings.HasPrefix(lowerURL, "udp://") || strings.HasPrefix(lowerURL, "rtp://") {
 			streamType = "udp"
-			_ = sp.channelSvc.UpdateStreamType(channelID, streamType)
+			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
 		}
 	}
 
@@ -255,17 +256,17 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 			ext := strings.ToLower(filepath.Ext(cleanPath))
 			switch ext {
 			case ".m3u8":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "hls")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "hls")
 			case ".mp4":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "mp4")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "mp4")
 			case ".mkv":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "mkv")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "mkv")
 			case ".avi":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "avi")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "avi")
 			case ".flv":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "flv")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "flv")
 			case ".ts":
-				_ = sp.channelSvc.UpdateStreamType(channelID, "ts")
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, "ts")
 			}
 		}
 		return status, nil
@@ -315,9 +316,9 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 			}
 
 			if streamType == "" && actualType != "" {
-				_ = sp.channelSvc.UpdateStreamType(channelID, actualType)
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, actualType)
 			} else if streamType == "ts" && actualType == "hls" {
-				_ = sp.channelSvc.UpdateStreamType(channelID, actualType)
+				_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, actualType)
 			}
 		} else {
 			status.Status = "offline"
@@ -334,7 +335,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, rawURL, streamType string) (
 
 // TriggerHealthCheck starts a smooth rolling health check in the background.
 // It distributes the checks evenly over expectedMinutes to prevent CC bans and CPU spikes.
-func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
+func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int, ids []int64) error {
 	sp.mu.Lock()
 	if sp.isHealthCheckRunning {
 		sp.mu.Unlock()
@@ -354,26 +355,37 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 			sp.mu.Unlock()
 		}()
 
-		// 获取全量无限制列表：循环按页取，直到取完
-		page := 1
-		pageSize := 100
 		var allChannels []models.Channel
 
-		for {
-			p := &models.PageRequest{Page: page, PageSize: pageSize}
-			resp, err := sp.channelSvc.ListChannels(0, "", "", nil, p, 0)
-			if err != nil || resp == nil {
-				break
+		if len(ids) > 0 {
+			// Fetch specific channels
+			for _, id := range ids {
+				ch, err := sp.channelSvc.GetChannel(id, 0)
+				if err == nil && ch != nil {
+					allChannels = append(allChannels, *ch)
+				}
 			}
-			channels, ok := resp.Items.([]models.Channel)
-			if !ok || len(channels) == 0 {
-				break
+		} else {
+			// 获取全量无限制列表：循环按页取，直到取完
+			page := 1
+			pageSize := 100
+
+			for {
+				p := &models.PageRequest{Page: page, PageSize: pageSize}
+				resp, err := sp.channelSvc.ListChannels(0, "", "", nil, p, 0)
+				if err != nil || resp == nil {
+					break
+				}
+				channels, ok := resp.Items.([]models.Channel)
+				if !ok || len(channels) == 0 {
+					break
+				}
+				allChannels = append(allChannels, channels...)
+				if len(channels) < pageSize {
+					break
+				}
+				page++
 			}
-			allChannels = append(allChannels, channels...)
-			if len(channels) < pageSize {
-				break
-			}
-			page++
 		}
 
 		total := len(allChannels)
@@ -399,15 +411,24 @@ func (sp *StreamProxy) TriggerHealthCheck(expectedMinutes int) error {
 		for _, ch := range allChannels {
 			// 支持多线路顺序探测，只要有一条活着就算 online
 			urls := strings.Split(ch.StreamURL, "#")
+			types := strings.Split(ch.StreamType, "#")
 			finalStatus := "offline"
-			for _, rawURL := range urls {
+			for i, rawURL := range urls {
 				if strings.TrimSpace(rawURL) == "" {
 					continue
 				}
-				status, _ := sp.CheckHealth(ch.ID, rawURL, ch.StreamType)
+				lineType := ""
+				if i < len(types) {
+					lineType = types[i]
+				}
+				status, _ := sp.CheckHealth(ch.ID, i, rawURL, lineType)
 				if status.Status == "online" {
 					finalStatus = "online"
-					break
+				}
+
+				// 防止多线路并发过快被封，线路间增加微小间隔
+				if len(urls) > 1 && i < len(urls)-1 {
+					time.Sleep(500 * time.Millisecond)
 				}
 			}
 			_ = sp.channelSvc.UpdateStatus(ch.ID, finalStatus)
@@ -457,11 +478,11 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 // getFlushThreshold returns the protocol-appropriate flush buffer size.
 // Priority: Channel.StreamType > Original source URL (ch.StreamURL) > Content-Type detection > finalURL.
 // Different protocols have different latency vs. TCP efficiency needs.
-func getFlushThreshold(ch *models.Channel, finalURL string) int {
+func getFlushThreshold(streamType string, originalLineURL string, finalURL string) int {
 	// 主信号：Channel StreamType（来自配置或竞速环节 Content-Type 自动识别）
-	st := strings.ToLower(ch.StreamType)
+	st := strings.ToLower(streamType)
 	// 核心信号：原始源地址（代理 URL 中不含 /rtp/ 等模式，必须用原始源判断）
-	src := strings.ToLower(ch.StreamURL)
+	src := strings.ToLower(originalLineURL)
 	// 备选信号：上游实际连接地址（可能经过重定向丢失模式）
 	u := strings.ToLower(finalURL)
 	// 合并判断：原始源 + 实际连接地址
@@ -523,9 +544,14 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	}
 
 	rawURLs := strings.Split(streamToProxy, "#")
+	actualLineIndices := make([]int, len(rawURLs))
+	for i := range rawURLs {
+		actualLineIndices[i] = i
+	}
 	if lineStr := r.URL.Query().Get("line"); lineStr != "" {
 		if lineIdx, err := strconv.Atoi(lineStr); err == nil && lineIdx >= 0 && lineIdx < len(rawURLs) {
 			rawURLs = []string{rawURLs[lineIdx]} // 客户端指定了线路，仅尝试该线路
+			actualLineIndices = []int{lineIdx}
 		}
 	}
 
@@ -589,6 +615,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 
 	resultChan := make(chan raceResult, expectedCount)
 	cancels := make([]context.CancelFunc, expectedCount)
+	var winnerActualType string
 
 	for i, u := range validURLs {
 		reqCtx, reqCancel := context.WithCancel(r.Context())
@@ -640,15 +667,21 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			} else if strings.Contains(strings.ToLower(contentType), "flv") {
 				actualType = "flv"
 			}
-			if ch.StreamType == "" && actualType != "" {
+			winnerActualType = actualType
+			types := strings.Split(ch.StreamType, "#")
+			currentType := ""
+			realLineIdx := actualLineIndices[winnerIdx]
+			if realLineIdx < len(types) {
+				currentType = types[realLineIdx]
+			}
+
+			if currentType == "" && actualType != "" {
 				// 类型完全未知，直接写入检测结果
-				ch.StreamType = actualType
-				_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
-			} else if ch.StreamType == "ts" && actualType == "hls" {
+				_ = sp.channelSvc.UpdateStreamType(ch.ID, realLineIdx, actualType)
+			} else if currentType == "ts" && actualType == "hls" {
 				// URL 无后缀时静态检测兜底为 ts，但 Content-Type 确认是 HLS
 				// 首次播放时自动修正，后续播放直接使用 16KB 低延迟模式
-				ch.StreamType = actualType
-				_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
+				_ = sp.channelSvc.UpdateStreamType(ch.ID, realLineIdx, actualType)
 			}
 			break
 		} else {
@@ -731,175 +764,150 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	w.WriteHeader(resp.StatusCode)
 
 	// 根据协议类型选择 Flush 阈值
-	flushThreshold := getFlushThreshold(ch, finalURL)
-	isLowLatency := flushThreshold <= 64*1024
-
+	winnerLineType := ""
+	types := strings.Split(ch.StreamType, "#")
+	if actualLineIndices[winnerIdx] < len(types) {
+		winnerLineType = types[actualLineIndices[winnerIdx]]
+	}
+	if winnerLineType == "" && winnerActualType != "" {
+		winnerLineType = winnerActualType
+	}
+	flushThreshold := getFlushThreshold(winnerLineType, validURLs[winnerIdx], finalURL)
+	baseThreshold := flushThreshold
 	flusher, canFlush := w.(http.Flusher)
 
-	if isLowLatency && canFlush {
-		// ═══════════════════════════════════════════════════════
-		// 低延迟 Pipe 模式：累积写入 + 2ms 超时 Flush，避免小包刷屏
-		// ═══════════════════════════════════════════════════════
-		slog.Info("stream proxy pipe mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "threshold", flushThreshold)
+	// 1. 设置动态上限与超时底线
+	maxThreshold := 2048 * 1024 // 默认上限 2MB
+	maxLatency := 500 * time.Millisecond // 默认最差等半秒
 
-		reader := bufio.NewReaderSize(resp.Body, 64*1024)
-		readBuf := make([]byte, 64*1024)
-		writeBuf := make([]byte, 0, 128*1024)
-		lastUpdate := time.Now()
-		lastFlush := time.Now()
-		var bytesSinceLastUpdate int64 = 0
-		var bytesRead int64 = 0
+	if baseThreshold <= 16*1024 { // HLS 等极端实时
+		maxThreshold = 64 * 1024
+		maxLatency = 2 * time.Millisecond
+	} else if baseThreshold <= 64*1024 { // 直播 TS
+		maxThreshold = 256 * 1024
+		maxLatency = 100 * time.Millisecond
+	} else if baseThreshold <= 128*1024 { // RTSP/RTMP/未知
+		maxThreshold = 2048 * 1024
+		maxLatency = 500 * time.Millisecond
+	} else { // RTP 大包
+		maxThreshold = 2048 * 1024
+		maxLatency = 200 * time.Millisecond
+	}
 
-		for {
-			n, err := reader.Read(readBuf)
-			if n > 0 {
-				bytesRead += int64(n)
-				writeBuf = append(writeBuf, readBuf[:n]...)
+	slog.Info("stream proxy unified dynamic mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "baseThreshold", baseThreshold, "maxLatency", maxLatency)
 
-				// 累积到 16KB 或 2ms 超时再 Flush，平衡延迟与 TCP 效率
-				shouldFlush := len(writeBuf) >= 16*1024 || time.Since(lastFlush) >= 2*time.Millisecond
-				if shouldFlush {
-					if _, wErr := w.Write(writeBuf); wErr != nil {
-						slog.Info("stream proxy client disconnected (pipe)", "session", sessionID, "bytes", bytesRead)
-						return nil
-					}
-					flusher.Flush()
-					bytesSinceLastUpdate += int64(len(writeBuf))
-					writeBuf = writeBuf[:0]
-					lastFlush = time.Now()
-				}
+	// 2. 初始化缓冲区
+	reader := bufio.NewReaderSize(resp.Body, 128*1024)
+	readBuf := make([]byte, 128*1024)
+	writeBuf := make([]byte, 0, maxThreshold+128*1024) // 预留余量
+	
+	lastUpdate := time.Now()
+	lastFlush := time.Now()
+	var bytesSinceLastUpdate int64 = 0
+	var bytesRead int64 = 0
+	
+	currentThreshold := baseThreshold
+	hasFlushed := false
+
+	// 3. 统一智能读写循环
+	for {
+		n, err := reader.Read(readBuf)
+		if n > 0 {
+			bytesRead += int64(n)
+			writeBuf = append(writeBuf, readBuf[:n]...)
+
+			shouldFlush := false
+			if !hasFlushed {
+				shouldFlush = len(writeBuf) > 0 // 首包秒发
+			} else {
+				shouldFlush = len(writeBuf) >= currentThreshold || time.Since(lastFlush) >= maxLatency
 			}
-			if err != nil {
-				// 流结束：刷出残余数据
-				if len(writeBuf) > 0 {
-					w.Write(writeBuf)
-					flusher.Flush()
-				}
-				if err == io.EOF {
-					slog.Info("stream proxy upstream EOF (pipe)", "session", sessionID, "bytes", bytesRead)
+
+			if shouldFlush {
+				if _, wErr := w.Write(writeBuf); wErr != nil {
+					slog.Info("stream proxy client disconnected", "session", sessionID, "bytes", bytesRead)
 					return nil
 				}
-				slog.Error("stream proxy upstream error (pipe)", "session", sessionID, "error", err, "bytes", bytesRead)
-				return err
+				if canFlush {
+					flusher.Flush()
+				}
+				bytesSinceLastUpdate += int64(len(writeBuf))
+				writeBuf = writeBuf[:0]
+				lastFlush = time.Now()
+				hasFlushed = true
 			}
+		}
 
-			// 客户端断开检测
-			select {
-			case <-r.Context().Done():
-				slog.Info("stream proxy client disconnected (pipe)", "session", sessionID, "bytes", bytesRead)
+		if err != nil {
+			// 流结束：刷出残余数据
+			if len(writeBuf) > 0 {
+				w.Write(writeBuf)
+				if canFlush {
+					flusher.Flush()
+				}
+			}
+			if err == io.EOF {
+				slog.Info("stream proxy upstream EOF", "session", sessionID, "bytes", bytesRead)
 				return nil
-			default:
 			}
-
-			// 每秒更新流状态统计
-			now := time.Now()
-			if now.Sub(lastUpdate) >= time.Second {
-				sp.mu.RLock()
-				if s, ok := sp.streams[sessionID]; ok {
-					s.Mu.Lock()
-					s.LastActive = now
-					s.SpeedBytes = bytesSinceLastUpdate
-					s.Mu.Unlock()
-				}
-				sp.mu.RUnlock()
-				bytesSinceLastUpdate = 0
-				lastUpdate = now
-			}
-		}
-	} else {
-		// ═══════════════════════════════════════════════════════
-		// 缓冲模式：适合 HLS/DASH/文件等非实时流
-		// ═══════════════════════════════════════════════════════
-		slog.Info("stream proxy buffered mode", "channel_id", channelID, "session", sessionID, "url", finalURL, "threshold", flushThreshold)
-
-		bufferSize := 64 * 1024
-		if sp.cfg.BufferSize > bufferSize {
-			bufferSize = sp.cfg.BufferSize
-		}
-		if bufferSize > 128*1024 {
-			bufferSize = 128 * 1024
+			slog.Error("stream proxy upstream error", "session", sessionID, "error", err, "bytes", bytesRead)
+			return err
 		}
 
-		bufPtr := streamBufferPool.Get().(*[]byte)
-		buf := (*bufPtr)[:bufferSize]
-		defer streamBufferPool.Put(bufPtr)
-		reader := bufio.NewReaderSize(resp.Body, bufferSize)
+		// 客户端断开检测
+		select {
+		case <-r.Context().Done():
+			slog.Info("stream proxy client disconnected", "session", sessionID, "bytes", bytesRead)
+			return nil
+		default:
+		}
 
-		writeBufPtr := streamBufferPool.Get().(*[]byte)
-		writeBuf := (*writeBufPtr)[:0]
-		defer streamBufferPool.Put(writeBufPtr)
+		// 4. 每秒计算网速，进行动态换挡 (16,32,64,128,256,512,1024,2048)
+		now := time.Now()
+		if now.Sub(lastUpdate) >= time.Second {
+			sp.mu.RLock()
+			if s, ok := sp.streams[sessionID]; ok {
+				s.Mu.Lock()
+				s.LastActive = now
+				s.SpeedBytes = bytesSinceLastUpdate
+				s.Mu.Unlock()
+			}
+			sp.mu.RUnlock()
 
-		lastUpdate := time.Now()
-		var bytesSinceLastUpdate int64 = 0
-		hasFlushed := false
-
-		for {
-			select {
-			case <-r.Context().Done():
-				return nil
-			default:
+			// 目标一秒吐流 4 次
+			targetSize := int(bytesSinceLastUpdate / 4)
+			newThreshold := 16 * 1024
+			if targetSize >= 1024*1024 {
+				newThreshold = 2048 * 1024
+			} else if targetSize >= 512*1024 {
+				newThreshold = 1024 * 1024
+			} else if targetSize >= 256*1024 {
+				newThreshold = 512 * 1024
+			} else if targetSize >= 128*1024 {
+				newThreshold = 256 * 1024
+			} else if targetSize >= 64*1024 {
+				newThreshold = 128 * 1024
+			} else if targetSize >= 32*1024 {
+				newThreshold = 64 * 1024
+			} else if targetSize >= 16*1024 {
+				newThreshold = 32 * 1024
 			}
 
-			n, err := reader.Read(buf)
-			if n > 0 {
-				writeBuf = append(writeBuf, buf[:n]...)
-
-				if !hasFlushed {
-					if len(writeBuf) > 0 {
-						wn, wErr := w.Write(writeBuf)
-						if wErr != nil {
-							return nil
-						}
-						if canFlush {
-							flusher.Flush()
-						}
-						bytesSinceLastUpdate += int64(wn)
-						writeBuf = writeBuf[:0]
-						hasFlushed = true
-					}
-				} else if len(writeBuf) >= flushThreshold {
-					wn, wErr := w.Write(writeBuf)
-					if wErr != nil {
-						return nil
-					}
-					if canFlush {
-						flusher.Flush()
-					}
-					bytesSinceLastUpdate += int64(wn)
-					writeBuf = writeBuf[:0]
-				}
+			// 约束在极限水位之间
+			if newThreshold > maxThreshold {
+				newThreshold = maxThreshold
+			}
+			
+			if newThreshold != currentThreshold {
+				// slog.Debug("stream proxy dynamic shift", "session", sessionID, "speed", bytesSinceLastUpdate, "old", currentThreshold, "new", newThreshold)
+				currentThreshold = newThreshold
 			}
 
-			if err != nil {
-				if len(writeBuf) > 0 {
-					w.Write(writeBuf)
-					if canFlush {
-						flusher.Flush()
-					}
-				}
-				if err == io.EOF {
-					return nil
-				}
-				return err
-			}
-
-			now := time.Now()
-			if now.Sub(lastUpdate) >= time.Second {
-				sp.mu.RLock()
-				if s, ok := sp.streams[sessionID]; ok {
-					s.Mu.Lock()
-					s.LastActive = now
-					s.SpeedBytes = bytesSinceLastUpdate
-					s.Mu.Unlock()
-				}
-				sp.mu.RUnlock()
-				bytesSinceLastUpdate = 0
-				lastUpdate = now
-			}
+			bytesSinceLastUpdate = 0
+			lastUpdate = now
 		}
 	}
 }
-
 // KillStream forces a specific proxy stream to disconnect
 func (sp *StreamProxy) KillStream(sessionID string) bool {
 	sp.mu.Lock()
@@ -1383,7 +1391,12 @@ func (sp *StreamProxy) serveLocalFileProxy(channelID int64, clientID int64, clie
 	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
 	w.WriteHeader(http.StatusOK)
 
-	flushThreshold := getFlushThreshold(ch, filePath)
+	types := strings.Split(ch.StreamType, "#")
+	t := ""
+	if len(types) > 0 {
+		t = types[0]
+	}
+	flushThreshold := getFlushThreshold(t, filePath, filePath)
 	flusher, canFlush := w.(http.Flusher)
 
 	slog.Info("local file proxy started", "channel_id", channelID, "session", sessionID, "path", filePath, "size", fileSize, "threshold", flushThreshold)

@@ -138,7 +138,9 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 val now = System.currentTimeMillis()
                 when (currentPlaybackState) {
                     PlaybackState.BUFFERING -> {
-                        if (stateStartTime > 0 && now - stateStartTime > 10000L) {
+                        // 动态看门狗超时：默认 10秒；直播/特殊流放宽到 25秒，给足大水库蓄水时间
+                        val timeoutLimit = if (!isWatchdogEnabledForCurrentStream) 25000L else 10000L
+                        if (stateStartTime > 0 && now - stateStartTime > timeoutLimit) {
                             tvStatus?.text = "网络连接超时，正在尝试切换线路..."
                             currentPlaybackState = PlaybackState.IDLE
                             handlePlaybackError(isNetworkTimeout = true)

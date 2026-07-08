@@ -472,12 +472,27 @@ async function doChannelBatchAction() {
   }
 }
 
+function openHealthCheckModal() {
+  const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
+  const descEl = document.getElementById('hc-modal-desc');
+  if (ids.length > 0) {
+    descEl.innerText = `系统将对您勾选的 ${ids.length} 个频道进行健康检查探测，请设置预期完成时间。`;
+  } else {
+    descEl.innerText = `系统将采用平滑滚动机制逐一探测全库频道，绝不会产生高并发被源站封禁。请设置预期完成时间。`;
+  }
+  showModal('health-check-modal');
+}
+
 async function startHealthCheck() {
   const min = parseInt(document.getElementById('hc-expected-minutes').value) || 120;
+  const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
   hideModal('health-check-modal');
   toast('正在请求启动健康检查...');
   try {
-    const r = await api('/channels/health-check/start', { method: 'POST', body: JSON.stringify({ expected_minutes: min }) });
+    const r = await api('/channels/health-check/start', { 
+      method: 'POST', 
+      body: JSON.stringify({ expected_minutes: min, ids: ids.length > 0 ? ids : undefined }) 
+    });
     toast(r.message || '健康检查已平滑启动', 'success');
     pollHealthCheckStatus(); // 启动后立即轮询一次状态
   } catch (e) {

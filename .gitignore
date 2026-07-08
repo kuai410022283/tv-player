@@ -63,4 +63,7 @@ other
 android/original-release-files
 android/keystore.env
 android/release.keystore
+docs
+*.strm
+
 

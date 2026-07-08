@@ -179,9 +179,11 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 	streamToProxy := ch.StreamURL
 	rawURLs := strings.Split(streamToProxy, "#")
 	validURLs := []string{}
-	for _, u := range rawURLs {
+	actualLineIndices := []int{}
+	for i, u := range rawURLs {
 		if strings.TrimSpace(u) != "" {
 			validURLs = append(validURLs, strings.TrimSpace(u))
+			actualLineIndices = append(actualLineIndices, i)
 		}
 	}
 
@@ -235,23 +237,29 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 					finalURL = res.resp.Request.URL.String()
 				}
 
-				// Self-healing of StreamType
-				if ch.StreamType == "" {
-					contentType := res.resp.Header.Get("Content-Type")
-					isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
-						strings.Contains(strings.ToLower(finalURL), ".m3u8")
-					var actualType string
-					if isM3U8 {
-						actualType = "hls"
-					} else if strings.Contains(strings.ToLower(contentType), "video/mp2t") || strings.Contains(strings.ToLower(contentType), "octet-stream") {
-						actualType = "ts"
-					} else if strings.Contains(strings.ToLower(contentType), "flv") {
-						actualType = "flv"
-					}
-					if actualType != "" {
-						ch.StreamType = actualType
-						_ = sp.channelSvc.UpdateStreamType(ch.ID, actualType)
-					}
+				contentType := res.resp.Header.Get("Content-Type")
+				isM3U8 := strings.Contains(strings.ToLower(contentType), "mpegurl") ||
+					strings.Contains(strings.ToLower(finalURL), ".m3u8")
+				var actualType string
+				if isM3U8 {
+					actualType = "hls"
+				} else if strings.Contains(strings.ToLower(contentType), "video/mp2t") || strings.Contains(strings.ToLower(contentType), "octet-stream") {
+					actualType = "ts"
+				} else if strings.Contains(strings.ToLower(contentType), "flv") {
+					actualType = "flv"
+				}
+
+				types := strings.Split(ch.StreamType, "#")
+				realLineIdx := actualLineIndices[res.index]
+				currentType := ""
+				if realLineIdx < len(types) {
+					currentType = types[realLineIdx]
+				}
+				
+				if currentType == "" && actualType != "" {
+					_ = sp.channelSvc.UpdateStreamType(ch.ID, realLineIdx, actualType)
+				} else if currentType == "ts" && actualType == "hls" {
+					_ = sp.channelSvc.UpdateStreamType(ch.ID, realLineIdx, actualType)
 				}
 
 				// Save cancel for the winning request to attach to broadcaster

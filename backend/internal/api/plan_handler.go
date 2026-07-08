@@ -133,10 +133,10 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				sb.WriteString(fmt.Sprintf("%s,#genre#\n", currentGroup))
 			}
 
-			lines := strings.Split(ch.StreamURL, "#")
-			for lineIdx, u := range lines {
-				u = strings.TrimSpace(u)
-				if u == "" {
+			rawURLs := strings.Split(ch.StreamURL, "#")
+			types := strings.Split(ch.StreamType, "#")
+			for lineIdx, u := range rawURLs {
+				if strings.TrimSpace(u) == "" {
 					continue
 				}
 
@@ -147,11 +147,15 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 					playURL = u
 				} else {
 					ext := "ts"
-					switch ch.StreamType {
+					lineType := ""
+					if lineIdx < len(types) {
+						lineType = types[lineIdx]
+					}
+					switch lineType {
 					case "hls", "":
 						ext = "m3u8"
 					case "mp4", "flv", "mkv", "mpd":
-						ext = ch.StreamType
+						ext = lineType
 					}
 					playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s&plan=1", baseURL, ch.ID, ext, lineIdx, token)
 				}
@@ -166,7 +170,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 	// M3U 格式 (默认)
 	userAgent := c.Request.UserAgent()
 	isBrowser := strings.Contains(userAgent, "Mozilla/") || strings.Contains(userAgent, "Chrome/") || strings.Contains(userAgent, "Safari/")
-	
+
 	if c.Query("download") == "1" {
 		c.Header("Content-Type", "application/x-mpegurl; charset=utf-8")
 		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.m3u"`, planName))
@@ -187,7 +191,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			sb.WriteString(fmt.Sprintf(` x-tvg-url="%s"`, epgURLs))
 		}
 	}
-	
+
 	shift := h.svc.GetEPGTimeShift()
 	if shift != 0 {
 		sb.WriteString(fmt.Sprintf(` tvg-shift="%d"`, shift))
@@ -211,7 +215,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				logoURL = baseURL + logoURL
 			}
 		}
-		
+
 		if strings.HasPrefix(logoURL, baseURL) {
 			if strings.Contains(logoURL, "?") {
 				logoURL = fmt.Sprintf("%s&token=%s&plan=1", logoURL, token)

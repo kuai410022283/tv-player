@@ -950,9 +950,23 @@ func (s *ChannelService) UpdateStatus(id int64, status string) error {
 	return err
 }
 
-// UpdateStreamType updates the stream type of a channel (e.g. from auto-detection)
-func (s *ChannelService) UpdateStreamType(id int64, streamType string) error {
-	_, err := s.db.Exec("UPDATE channels SET stream_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", streamType, id)
+// UpdateStreamType updates the stream type of a specific line for a channel (e.g. from auto-detection)
+func (s *ChannelService) UpdateStreamType(id int64, lineIdx int, streamType string) error {
+	var currentType string
+	err := s.db.QueryRow("SELECT COALESCE(stream_type, '') FROM channels WHERE id = ?", id).Scan(&currentType)
+	if err != nil {
+		return err
+	}
+
+	types := strings.Split(currentType, "#")
+	// Pad the types slice if it's smaller than lineIdx
+	for len(types) <= lineIdx {
+		types = append(types, "")
+	}
+	types[lineIdx] = streamType
+	newStreamType := strings.Join(types, "#")
+
+	_, err = s.db.Exec("UPDATE channels SET stream_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", newStreamType, id)
 	return err
 }
 

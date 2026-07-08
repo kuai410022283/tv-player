@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
-	"path/filepath"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mediaplayer/backend/internal/services"

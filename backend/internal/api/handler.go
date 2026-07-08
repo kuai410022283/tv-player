@@ -57,7 +57,8 @@ func getJWTSecret() string {
 
 func (h *Handler) TriggerHealthCheck(c *gin.Context) {
 	var body struct {
-		ExpectedMinutes int `json:"expected_minutes"`
+		ExpectedMinutes int     `json:"expected_minutes"`
+		IDs             []int64 `json:"ids"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		fail(c, 400, "参数错误")
@@ -67,7 +68,7 @@ func (h *Handler) TriggerHealthCheck(c *gin.Context) {
 		body.ExpectedMinutes = 60 // 默认 60 分钟
 	}
 
-	if err := h.streamProxy.TriggerHealthCheck(body.ExpectedMinutes); err != nil {
+	if err := h.streamProxy.TriggerHealthCheck(body.ExpectedMinutes, body.IDs); err != nil {
 		fail(c, 400, err.Error())
 		return
 	}
@@ -380,24 +381,31 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				var linesForThisItem []map[string]interface{}
 
 				if !items[i].IsDirect {
-					ext := "ts"
-					switch items[i].StreamType {
-					case "hls":
-						ext = "m3u8"
-					case "m3u8", "mp4", "flv", "mkv", "mpd":
-						ext = items[i].StreamType
-					}
-					// 代理模式下，也拆开下发给客户端，每条线路对应一个带索引的代理地址（相对路径）
 					rawURLs := strings.Split(items[i].StreamURL, "#")
+					types := strings.Split(items[i].StreamType, "#")
 					for lineIdx, u := range rawURLs {
 						if strings.TrimSpace(u) == "" {
 							continue
 						}
+
+						lineType := ""
+						if lineIdx < len(types) {
+							lineType = types[lineIdx]
+						}
+
+						ext := "ts"
+						switch lineType {
+						case "hls":
+							ext = "m3u8"
+						case "m3u8", "mp4", "flv", "mkv", "mpd":
+							ext = lineType
+						}
+
 						lineProxyURL := fmt.Sprintf("/api/v1/stream/proxy/%d/line/%d/play.%s", items[i].ID, lineIdx, ext)
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
 							"id":              items[i].ID,
 							"stream_url":      lineProxyURL,
-							"stream_type":     items[i].StreamType,
+							"stream_type":     lineType,
 							"content_type":    items[i].ContentType,
 							"user_agent":      items[i].UserAgent,
 							"custom_headers":  items[i].CustomHeaders,
@@ -408,14 +416,21 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				} else {
 					// 直连模式下，把 "#" 拼接的多线路拆开下发给客户端，由客户端实现多线路容灾换线
 					rawURLs := strings.Split(items[i].StreamURL, "#")
-					for _, u := range rawURLs {
+					types := strings.Split(items[i].StreamType, "#")
+					for lineIdx, u := range rawURLs {
 						if strings.TrimSpace(u) == "" {
 							continue
 						}
+
+						lineType := ""
+						if lineIdx < len(types) {
+							lineType = types[lineIdx]
+						}
+
 						linesForThisItem = append(linesForThisItem, map[string]interface{}{
 							"id":              items[i].ID,
 							"stream_url":      strings.TrimSpace(u),
-							"stream_type":     items[i].StreamType,
+							"stream_type":     lineType,
 							"content_type":    items[i].ContentType,
 							"user_agent":      items[i].UserAgent,
 							"custom_headers":  items[i].CustomHeaders,
@@ -489,12 +504,17 @@ func (h *Handler) GetChannel(c *gin.Context) {
 		// token 已经被去除，不在这里获取了
 
 		if !ch.IsDirect {
+			types := strings.Split(ch.StreamType, "#")
+			lineType := ""
+			if len(types) > 0 {
+				lineType = types[0]
+			}
 			ext := "ts"
-			switch ch.StreamType {
+			switch lineType {
 			case "hls":
 				ext = "m3u8"
 			case "m3u8", "mp4", "flv", "mkv", "mpd":
-				ext = ch.StreamType
+				ext = lineType
 			}
 			ch.StreamURL = fmt.Sprintf("/api/v1/stream/proxy/%d/line/0/play.%s", ch.ID, ext)
 		}
@@ -825,7 +845,12 @@ func (h *Handler) CheckStream(c *gin.Context) {
 		fail(c, 404, "频道不存在")
 		return
 	}
-	status, _ := h.streamProxy.CheckHealth(ch.ID, ch.StreamURL, ch.StreamType)
+	types := strings.Split(ch.StreamType, "#")
+	lineType := ""
+	if len(types) > 0 {
+		lineType = types[0]
+	}
+	status, _ := h.streamProxy.CheckHealth(ch.ID, 0, ch.StreamURL, lineType)
 	ok(c, status)
 }
 

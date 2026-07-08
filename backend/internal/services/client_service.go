@@ -39,7 +39,9 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 	var nullExpiresAt sql.NullTime
 	err := s.db.QueryRow(`SELECT id, status, access_token, expires_at, enable_log, is_tester FROM clients WHERE device_id=?`, req.DeviceID).
 		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt, &existing.EnableLog, &existing.IsTester)
-	if nullExpiresAt.Valid { existing.ExpiresAt = nullExpiresAt.Time }
+	if nullExpiresAt.Valid {
+		existing.ExpiresAt = nullExpiresAt.Time
+	}
 
 	if err == nil {
 		// 已注册，更新信息
@@ -47,9 +49,9 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 			req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, req.Note, now, existing.ID)
 
 		resp := &models.ClientRegisterResp{
-			ClientID: existing.ID,
-			Status:   existing.Status,
-			Message:  statusMessage(existing.Status),
+			ClientID:  existing.ID,
+			Status:    existing.Status,
+			Message:   statusMessage(existing.Status),
 			EnableLog: existing.EnableLog,
 			IsTester:  existing.IsTester,
 		}
@@ -83,7 +85,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 
 	if autoApprove {
 		status = "approved"
-		
+
 		// 检查是否配置了默认套餐
 		if val, err := s.GetSettingValue("default_plan_id"); err == nil && val != "" && val != "0" {
 			var pid int64
@@ -126,9 +128,9 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 	s.AddLog(clientID, "register", 0, ip, "", "新设备注册")
 
 	resp := &models.ClientRegisterResp{
-		ClientID: clientID,
-		Status:   status,
-		Message:  statusMessage(status),
+		ClientID:  clientID,
+		Status:    status,
+		Message:   statusMessage(status),
 		EnableLog: false, // 新设备默认关闭日志
 	}
 
@@ -149,7 +151,9 @@ func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 	var expiresAt sql.NullTime
 	err := s.db.QueryRow(`SELECT c.id, c.name, c.device_id, c.device_model, c.status, c.max_streams, c.expires_at, c.access_token, c.enable_log, c.is_tester, COALESCE(p.name, '') FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id WHERE c.access_token=?`, token).
 		Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.Status, &c.MaxStreams, &expiresAt, &c.AccessToken, &c.EnableLog, &c.IsTester, &c.PlanName)
-	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
+	if expiresAt.Valid {
+		c.ExpiresAt = expiresAt.Time
+	}
 	if err != nil {
 		return nil, fmt.Errorf("无效的令牌")
 	}
@@ -299,7 +303,7 @@ func (s *ClientService) UpdateLogConfig(clientID int64, enableLog bool) error {
 	if !enableLog {
 		state = "关闭"
 	}
-	s.AddLog(clientID, "log_config_updated", 0, "", "", "管理员" + state + "了远程日志采集")
+	s.AddLog(clientID, "log_config_updated", 0, "", "", "管理员"+state+"了远程日志采集")
 	return nil
 }
 
@@ -312,7 +316,7 @@ func (s *ClientService) SetTester(clientID int64, isTester bool) error {
 	if !isTester {
 		state = "取消测试机"
 	}
-	s.AddLog(clientID, "tester_updated", 0, "", "", "管理员将其" + state)
+	s.AddLog(clientID, "tester_updated", 0, "", "", "管理员将其"+state)
 	return nil
 }
 
@@ -354,11 +358,21 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 		if err := rows.Scan(&c.ID, &c.Name, &c.DeviceID, &c.DeviceModel, &c.DeviceOS, &c.AppVersion, &c.IP, &c.Status, &c.PlanID, &c.MaxStreams, &expiresAt, &approvedBy, &rejectReason, &lastSeen, &c.TotalPlayMin, &reqNote, &c.EnableLog, &c.IsTester, &c.CreatedAt, &c.UpdatedAt, &c.PlanName); err != nil {
 			return nil, err
 		}
-		if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
-		if lastSeen.Valid { c.LastSeen = lastSeen.Time }
-		if approvedBy.Valid { c.ApprovedBy = approvedBy.String }
-		if rejectReason.Valid { c.RejectReason = rejectReason.String }
-		if reqNote.Valid { c.RequestNote = reqNote.String }
+		if expiresAt.Valid {
+			c.ExpiresAt = expiresAt.Time
+		}
+		if lastSeen.Valid {
+			c.LastSeen = lastSeen.Time
+		}
+		if approvedBy.Valid {
+			c.ApprovedBy = approvedBy.String
+		}
+		if rejectReason.Valid {
+			c.RejectReason = rejectReason.String
+		}
+		if reqNote.Valid {
+			c.RequestNote = reqNote.String
+		}
 		clients = append(clients, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -385,11 +399,21 @@ func (s *ClientService) GetByID(id int64) (*models.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if expiresAt.Valid { c.ExpiresAt = expiresAt.Time }
-	if lastSeen.Valid { c.LastSeen = lastSeen.Time }
-	if approvedBy.Valid { c.ApprovedBy = approvedBy.String }
-	if rejectReason.Valid { c.RejectReason = rejectReason.String }
-	if reqNote.Valid { c.RequestNote = reqNote.String }
+	if expiresAt.Valid {
+		c.ExpiresAt = expiresAt.Time
+	}
+	if lastSeen.Valid {
+		c.LastSeen = lastSeen.Time
+	}
+	if approvedBy.Valid {
+		c.ApprovedBy = approvedBy.String
+	}
+	if rejectReason.Valid {
+		c.RejectReason = rejectReason.String
+	}
+	if reqNote.Valid {
+		c.RequestNote = reqNote.String
+	}
 	// 生成预览
 	if len(c.AccessToken) > 8 {
 		c.TokenPreview = c.AccessToken[:8] + "..."
