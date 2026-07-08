@@ -542,16 +542,19 @@ func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, string
 					total := p.EndTime.Sub(p.StartTime).Seconds()
 					elapsed := now.Sub(p.StartTime).Seconds()
 					
+					currentTitle := fmt.Sprintf("%s-%s %s", p.StartTime.Format("15:04"), p.EndTime.Format("15:04"), p.Title)
+					
 					nextTitle := ""
 					if i+1 < len(progs) {
-						nextTitle = progs[i+1].Title
+						nextP := progs[i+1]
+						nextTitle = fmt.Sprintf("%s-%s %s", nextP.StartTime.Format("15:04"), nextP.EndTime.Format("15:04"), nextP.Title)
 					}
 
 					if total > 0 {
 						pct := int((elapsed / total) * 100)
-						return p.Title, nextTitle, pct, true
+						return currentTitle, nextTitle, pct, true
 					}
-					return p.Title, nextTitle, 0, true
+					return currentTitle, nextTitle, 0, true
 				}
 			}
 		}
