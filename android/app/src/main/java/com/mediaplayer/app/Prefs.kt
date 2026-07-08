@@ -14,6 +14,12 @@ object Prefs {
     const val KEY_GESTURE_BRIGHTNESS = "gesture_brightness_enabled"
     const val KEY_GESTURE_VOLUME = "gesture_volume_enabled"
     
+    // 全局细线进度条：0=关闭, 1=顶部, 2=底部
+    const val KEY_GLOBAL_PROGRESS_BAR = "global_progress_bar"
+    const val GLOBAL_PROGRESS_OFF = 0
+    const val GLOBAL_PROGRESS_TOP = 1
+    const val GLOBAL_PROGRESS_BOTTOM = 2
+    
     // 播放器设置
     const val KEY_NETWORK_CACHE = "network_cache_ms"
     const val DEFAULT_NETWORK_CACHE = 0

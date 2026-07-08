@@ -159,6 +159,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private val focusDebounceHandler = Handler(Looper.getMainLooper())
     private var focusDebounceRunnable: Runnable? = null
 
+    private var globalProgressBar: ProgressBar? = null
+    private val globalProgressHandler = Handler(Looper.getMainLooper())
+    private var globalProgressRunnable: Runnable? = null
+
     private var playerHelper: com.mediaplayer.app.util.IPlayerHelper? = null
     private var continuousSkipCount = 0
     private val maxAutoSkips = 5
@@ -610,6 +614,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     // ═══════════════════════════════════════════════════
 
     private fun setupTvViews() {
+        globalProgressBar = findViewById(R.id.globalProgressBar)
         tvGroupsRv = findViewById(R.id.rvGroups)
         tvChannelsRv = findViewById(R.id.rvChannels)
         tvAuthWaiting = findViewById(R.id.layoutAuthWaiting)
@@ -876,6 +881,27 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val tvSettingsGestureBrightnessValue = findViewById<TextView>(R.id.tvSettingsGestureBrightnessValue)
         val btnSettingsGestureVolume = findViewById<View>(R.id.btnSettingsGestureVolume)
         val tvSettingsGestureVolumeValue = findViewById<TextView>(R.id.tvSettingsGestureVolumeValue)
+        
+        val btnSettingsGlobalProgress = findViewById<View>(R.id.btnSettingsGlobalProgress)
+        val tvSettingsGlobalProgressValue = findViewById<TextView>(R.id.tvSettingsGlobalProgressValue)
+        
+        fun updateGlobalProgressText(mode: Int) {
+            tvSettingsGlobalProgressValue?.text = when (mode) {
+                Prefs.GLOBAL_PROGRESS_TOP -> "顶部"
+                Prefs.GLOBAL_PROGRESS_BOTTOM -> "底部"
+                else -> "关闭"
+            }
+        }
+        
+        var currentGlobalProgress = prefs.getInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, Prefs.GLOBAL_PROGRESS_OFF)
+        updateGlobalProgressText(currentGlobalProgress)
+        
+        btnSettingsGlobalProgress?.setOnClickListener {
+            currentGlobalProgress = (currentGlobalProgress + 1) % 3
+            updateGlobalProgressText(currentGlobalProgress)
+            prefs.edit().putInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, currentGlobalProgress).apply()
+            startGlobalProgressTicker()
+        }
         
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
@@ -2621,6 +2647,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         loadData()
         startHeartbeat()
         startEpgTicker()
+        startGlobalProgressTicker()
     }
 
     private fun triggerMarquee() {
@@ -2671,6 +2698,64 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 原生跑马灯运行完毕后自动隐藏，并进入下一轮间隔排期
             uiHandler.postDelayed(hideMarqueeRunnable, displayDuration)
         }
+    }
+
+    private fun startGlobalProgressTicker() {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val prefValue = prefs.getInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, Prefs.GLOBAL_PROGRESS_OFF)
+        
+        if (prefValue == Prefs.GLOBAL_PROGRESS_OFF) {
+            stopGlobalProgressTicker()
+            globalProgressBar?.visibility = View.GONE
+            return
+        }
+
+        globalProgressBar?.let { pb ->
+            val lp = pb.layoutParams as? android.widget.FrameLayout.LayoutParams
+            if (lp != null) {
+                lp.gravity = if (prefValue == Prefs.GLOBAL_PROGRESS_BOTTOM) android.view.Gravity.BOTTOM else android.view.Gravity.TOP
+                pb.layoutParams = lp
+            }
+        }
+
+        globalProgressRunnable?.let { globalProgressHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                if (osdOverlayView?.isOsdVisible() == true) {
+                    globalProgressBar?.visibility = View.GONE
+                    globalProgressHandler.postDelayed(this, 1000)
+                    return
+                }
+
+                if (isCurrentChannelVod()) {
+                    val duration = playerHelper?.getDuration() ?: 0
+                    val time = playerHelper?.getTime() ?: 0
+                    if (duration > 0) {
+                        globalProgressBar?.progress = ((time * 1000) / duration).toInt()
+                        globalProgressBar?.visibility = View.VISIBLE
+                    } else {
+                        globalProgressBar?.visibility = View.GONE
+                    }
+                } else {
+                    val channel = allChannels.getOrNull(currentChannelIndex)
+                    if (channel != null && channel.currentEpg.isNotEmpty()) {
+                        globalProgressBar?.progress = (channel.getDynamicEpgPercent() * 10).toInt()
+                        globalProgressBar?.visibility = View.VISIBLE
+                    } else {
+                        globalProgressBar?.visibility = View.GONE
+                    }
+                }
+                
+                globalProgressHandler.postDelayed(this, 1000)
+            }
+        }
+        globalProgressRunnable = runnable
+        globalProgressHandler.postDelayed(runnable, 1000)
+    }
+
+    private fun stopGlobalProgressTicker() {
+        globalProgressRunnable?.let { globalProgressHandler.removeCallbacks(it) }
+        globalProgressRunnable = null
     }
 
     private fun startEpgTicker() {
@@ -3871,6 +3956,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         stopEpgTicker()
+        stopGlobalProgressTicker()
         osdOverlayView?.removeCallbacks()
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.removeCallbacks(channelInputRunnable)
