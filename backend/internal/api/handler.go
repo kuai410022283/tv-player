@@ -1189,15 +1189,18 @@ var pullUpdateCancel context.CancelFunc
 var pullUpdateMutex sync.Mutex
 
 type progressWriter struct {
-	total   int64
-	written int64
+	total      int64
+	written    int64
+	basePct    int32
+	fileWeight float64
 }
 
 func (pw *progressWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	pw.written += int64(n)
 	if pw.total > 0 {
-		pct := int32(float64(pw.written) / float64(pw.total) * 100)
+		filePct := float64(pw.written) / float64(pw.total) * 100.0
+		pct := pw.basePct + int32(filePct*pw.fileWeight)
 		pullUpdateState.Store(updateTaskState{Status: "downloading", Progress: pct})
 	}
 	return n, nil
@@ -1205,13 +1208,24 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 
 func (h *Handler) PullAppUpdate(c *gin.Context) {
 	var body struct {
-		VersionName string `json:"version_name" binding:"required"`
-		DownloadURL string `json:"download_url" binding:"required"`
-		UpdateLog   string `json:"update_log"`
+		VersionName  string   `json:"version_name" binding:"required"`
+		DownloadURL  string   `json:"download_url"`
+		DownloadURLs []string `json:"download_urls"`
+		UpdateLog    string   `json:"update_log"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		fail(c, 400, "参数错误")
 		return
+	}
+
+	if body.DownloadURL == "" && len(body.DownloadURLs) == 0 {
+		fail(c, 400, "缺少下载地址")
+		return
+	}
+
+	urls := body.DownloadURLs
+	if len(urls) == 0 {
+		urls = []string{body.DownloadURL}
 	}
 
 	state := pullUpdateState.Load()
@@ -1274,62 +1288,75 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 			return
 		}
 
-		parts := strings.Split(body.DownloadURL, "/")
-		filename := parts[len(parts)-1]
-		if filename == "" {
-			filename = "update.apk"
-		}
-		apkPath := filepath.Join(downloadDir, filename)
+		fileWeight := 1.0 / float64(len(urls))
 
-		skipDownload := false
-		if info, err := os.Stat(apkPath); err == nil && info.Size() > 0 {
-			skipDownload = true
-		}
-
-		if !skipDownload {
-			req, err := http.NewRequestWithContext(ctx, "GET", body.DownloadURL, nil)
-			if err != nil {
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建请求失败: " + err.Error()})
-				return
+		for i, u := range urls {
+			basePct := int32(float64(i) / float64(len(urls)) * 100)
+			
+			parts := strings.Split(u, "/")
+			filename := parts[len(parts)-1]
+			if filename == "" {
+				filename = fmt.Sprintf("update_%d.apk", i)
 			}
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载已取消"})
-				} else {
-					pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载失败: " + err.Error()})
+			apkPath := filepath.Join(downloadDir, filename)
+
+			skipDownload := false
+			if info, err := os.Stat(apkPath); err == nil && info.Size() > 0 {
+				skipDownload = true
+			}
+
+			if !skipDownload {
+				req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+				if err != nil {
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建请求失败: " + err.Error()})
+					return
 				}
-				return
-			}
-			defer resp.Body.Close()
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					if errors.Is(err, context.Canceled) {
+						pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载已取消"})
+					} else {
+						pullUpdateState.Store(updateTaskState{Status: "error", Message: "下载失败: " + err.Error()})
+					}
+					return
+				}
 
-			if resp.StatusCode != 200 {
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: fmt.Sprintf("下载失败: HTTP %d", resp.StatusCode)})
-				return
-			}
+				if resp.StatusCode != 200 {
+					resp.Body.Close()
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: fmt.Sprintf("下载失败: HTTP %d", resp.StatusCode)})
+					return
+				}
 
-			tmpPath := apkPath + ".tmp"
-			out, err := os.Create(tmpPath)
-			if err != nil {
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建文件失败: " + err.Error()})
-				return
-			}
+				tmpPath := apkPath + ".tmp"
+				out, err := os.Create(tmpPath)
+				if err != nil {
+					resp.Body.Close()
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "创建文件失败: " + err.Error()})
+					return
+				}
 
-			pw := &progressWriter{total: resp.ContentLength}
-			src := io.TeeReader(resp.Body, pw)
+				pw := &progressWriter{
+					total:      resp.ContentLength,
+					basePct:    basePct,
+					fileWeight: fileWeight,
+				}
+				src := io.TeeReader(resp.Body, pw)
 
-			if _, err := io.Copy(out, src); err != nil {
+				if _, err := io.Copy(out, src); err != nil {
+					out.Close()
+					resp.Body.Close()
+					os.Remove(tmpPath)
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "保存文件失败: " + err.Error()})
+					return
+				}
 				out.Close()
-				os.Remove(tmpPath)
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: "保存文件失败: " + err.Error()})
-				return
-			}
-			out.Close()
+				resp.Body.Close()
 
-			if err := os.Rename(tmpPath, apkPath); err != nil {
-				os.Remove(tmpPath)
-				pullUpdateState.Store(updateTaskState{Status: "error", Message: "重命名文件失败: " + err.Error()})
-				return
+				if err := os.Rename(tmpPath, apkPath); err != nil {
+					os.Remove(tmpPath)
+					pullUpdateState.Store(updateTaskState{Status: "error", Message: "重命名文件失败: " + err.Error()})
+					return
+				}
 			}
 		}
 

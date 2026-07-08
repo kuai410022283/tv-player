@@ -2563,6 +2563,7 @@ function onUpdateAssetChange() {
   const assetSelect = document.getElementById('update-asset-select');
   const btn = document.getElementById('btn-update-download');
   const btnPull = document.getElementById('btn-update-pull');
+  const btnDownloadAll = document.getElementById('btn-update-download-all');
   
   const releaseIndex = parseInt(tagSelect.value);
   const assetIndex = parseInt(assetSelect.value);
@@ -2570,6 +2571,7 @@ function onUpdateAssetChange() {
   if (isNaN(releaseIndex) || isNaN(assetIndex) || !githubReleasesCache[releaseIndex] || !githubReleasesCache[releaseIndex].assets[assetIndex]) {
     btn.style.display = 'none';
     if(btnPull) btnPull.style.display = 'none';
+    if(btnDownloadAll) btnDownloadAll.style.display = 'none';
     return;
   }
   
@@ -2586,12 +2588,109 @@ function onUpdateAssetChange() {
   btn.dataset.href = proxyUrl + asset.browser_download_url;
   btn.style.display = 'inline-flex';
   
+  if (btnDownloadAll) {
+    const hasApks = githubReleasesCache[releaseIndex].assets.some(a => a.name.includes('.apk'));
+    btnDownloadAll.style.display = hasApks ? 'inline-flex' : 'none';
+  }
+
   if (btnPull) {
     if (asset.name.includes('.apk')) {
       btnPull.style.display = 'inline-flex';
     } else {
       btnPull.style.display = 'none';
     }
+  }
+}
+
+async function downloadAllClients() {
+  const tagSelect = document.getElementById('update-tag-select');
+  const releaseIndex = parseInt(tagSelect.value);
+  if (isNaN(releaseIndex) || !githubReleasesCache[releaseIndex]) return;
+  
+  const release = githubReleasesCache[releaseIndex];
+  const apkAssets = release.assets.filter(a => a.name.includes('.apk'));
+  
+  if (apkAssets.length === 0) {
+    toast('当前版本没有可用的客户端安装包', 'warn');
+    return;
+  }
+  if (!confirm(`确定要将版本 ${release.tag_name} 的 ${apkAssets.length} 个客户端安装包全部拉取至服务端吗？`)) {
+    return;
+  }
+
+  const btn = document.getElementById('btn-update-download-all');
+  const originalText = btn.textContent;
+  btn.textContent = '准备下载...';
+  btn.disabled = true;
+
+  const btnCancel = document.getElementById('btn-update-cancel');
+  if (btnCancel) {
+    btnCancel.style.display = 'inline-flex';
+    btnCancel.disabled = false;
+    btnCancel.textContent = '停止下载';
+  }
+
+  const proxySelect = document.getElementById('update-proxy-select');
+  const proxyUrl = proxySelect ? proxySelect.value : "";
+  const downloadUrls = apkAssets.map(asset => proxyUrl + asset.browser_download_url);
+  
+  try {
+    const res = await fetch(API + '/admin/settings/pull-update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        version_name: release.tag_name,
+        download_urls: downloadUrls,
+        update_log: release.body || ''
+      })
+    });
+    
+    const data = await res.json();
+    if (!res.ok || data.code !== 0) {
+      alert('操作失败: ' + (data.message || '未知错误'));
+      btn.textContent = originalText;
+      btn.disabled = false;
+      if (btnCancel) btnCancel.style.display = 'none';
+      return;
+    }
+
+    let pollInterval = setInterval(async () => {
+      try {
+        const pRes = await fetch(API + '/admin/settings/pull-update/progress', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        const pData = await pRes.json();
+        if (pData && pData.code === 0 && pData.data) {
+          const state = pData.data;
+          if (state.status === "downloading") {
+             btn.textContent = `正在下载 (${state.progress}%)`;
+          } else if (state.status === "success") {
+             clearInterval(pollInterval);
+             btn.textContent = originalText;
+             btn.disabled = false;
+             if (btnCancel) btnCancel.style.display = 'none';
+             alert('全部下载并发布成功！');
+          } else if (state.status === "error") {
+             clearInterval(pollInterval);
+             btn.textContent = originalText;
+             btn.disabled = false;
+             if (btnCancel) btnCancel.style.display = 'none';
+             alert('下载失败: ' + state.message);
+          }
+        }
+      } catch (err) {
+        // Ignore polling errors
+      }
+    }, 1000);
+
+  } catch (err) {
+    alert('请求失败: ' + err.message);
+    btn.textContent = originalText;
+    btn.disabled = false;
+    if (btnCancel) btnCancel.style.display = 'none';
   }
 }
 

@@ -211,8 +211,8 @@ class ExoPlayerHelper(
             loadControlBuilder.setBufferDurationsMs(
                 currentCacheMs * 2,
                 currentCacheMs * 4,
-                30, // 永远死守 30ms 秒开底线
-                currentCacheMs // 用户设置的网络缓存，专门用来防卡顿
+                currentCacheMs,
+                currentCacheMs
             )
         } else {
             loadControlBuilder.setBufferDurationsMs(15000, 30000, 30, 3000)
