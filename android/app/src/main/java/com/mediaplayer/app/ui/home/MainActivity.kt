@@ -441,7 +441,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 adjustMode = 0
                 val screenWidth = videoLayout?.width ?: 0
                 if (screenWidth > 0) {
-                    if (e.x > screenWidth * 0.05f && e.x < screenWidth * 0.15f) {
+                    val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                    val enableBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
+                    val enableVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
+                    
+                    if (enableBrightness && e.x > screenWidth * 0.05f && e.x < screenWidth * 0.15f) {
                         adjustMode = 1
                         val lp = window.attributes
                         initialBrightness = lp.screenBrightness
@@ -453,7 +457,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                                 initialBrightness = 0.5f
                             }
                         }
-                    } else if (e.x < screenWidth * 0.95f && e.x > screenWidth * 0.85f) {
+                    } else if (enableVolume && e.x < screenWidth * 0.95f && e.x > screenWidth * 0.85f) {
                         adjustMode = 2
                         val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
                         initialVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
@@ -868,6 +872,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val btnSettingsCheckUpdate = findViewById<View>(R.id.btnSettingsCheckUpdate)
         val btnSettingsAbout = findViewById<View>(R.id.btnSettingsAbout)
         
+        val btnSettingsGestureBrightness = findViewById<View>(R.id.btnSettingsGestureBrightness)
+        val tvSettingsGestureBrightnessValue = findViewById<TextView>(R.id.tvSettingsGestureBrightnessValue)
+        val btnSettingsGestureVolume = findViewById<View>(R.id.btnSettingsGestureVolume)
+        val tvSettingsGestureVolumeValue = findViewById<TextView>(R.id.tvSettingsGestureVolumeValue)
+        
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
                 Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
@@ -896,6 +905,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             findViewById<TextView>(R.id.tvSettingsReverseChannelsValue)?.text = if (enabled) "开" else "关"
         }
         
+        fun updateGestureBrightnessText(enabled: Boolean) {
+            tvSettingsGestureBrightnessValue?.text = if (enabled) "开" else "关"
+        }
+        
+        fun updateGestureVolumeText(enabled: Boolean) {
+            tvSettingsGestureVolumeValue?.text = if (enabled) "开" else "关"
+        }
+        
         
         currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
@@ -910,6 +927,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
         var currentAudioPassthrough = prefs.getBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, false)
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
+        var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
+        var currentGestureVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
@@ -927,6 +946,20 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateReverseChannelsText(currentReverseChannels)
         updateAudioPassthroughText(currentAudioPassthrough)
         updatePipText(currentEnablePip)
+        updateGestureBrightnessText(currentGestureBrightness)
+        updateGestureVolumeText(currentGestureVolume)
+        
+        btnSettingsGestureBrightness?.setOnClickListener {
+            currentGestureBrightness = !currentGestureBrightness
+            updateGestureBrightnessText(currentGestureBrightness)
+            prefs.edit().putBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, currentGestureBrightness).apply()
+        }
+        
+        btnSettingsGestureVolume?.setOnClickListener {
+            currentGestureVolume = !currentGestureVolume
+            updateGestureVolumeText(currentGestureVolume)
+            prefs.edit().putBoolean(Prefs.KEY_GESTURE_VOLUME, currentGestureVolume).apply()
+        }
         
         btnSettingsAudioPassthrough?.setOnClickListener {
             currentAudioPassthrough = !currentAudioPassthrough
@@ -1154,13 +1187,29 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         // 亮度设置
         val sbBrightness = findViewById<SeekBar>(R.id.sbSettingsBrightness)
-        sbBrightness?.max = 100
-        sbBrightness?.progress = ((window.attributes.screenBrightness.coerceAtLeast(0.01f)) * 100).toInt().coerceIn(1, 100)
+        val tvBrightnessLabel = findViewById<TextView>(R.id.tvSettingsBrightnessLabel)
+        sbBrightness?.max = 101
+        
+        val currentBrightness = window.attributes.screenBrightness
+        if (currentBrightness < 0) {
+            sbBrightness?.progress = 101
+            tvBrightnessLabel?.text = "画面亮度 (自动)"
+        } else {
+            sbBrightness?.progress = ((currentBrightness.coerceAtLeast(0.01f)) * 100).toInt().coerceIn(1, 100)
+            tvBrightnessLabel?.text = "画面亮度"
+        }
+
         sbBrightness?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     val lp = window.attributes
-                    lp.screenBrightness = max(0.01f, progress / 100f)
+                    if (progress == 101) {
+                        lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        tvBrightnessLabel?.text = "画面亮度 (自动)"
+                    } else {
+                        lp.screenBrightness = max(0.01f, progress / 100f)
+                        tvBrightnessLabel?.text = "画面亮度"
+                    }
                     window.attributes = lp
                 }
             }
@@ -1185,13 +1234,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         btnSettingsAbout?.setOnClickListener {
             showAboutDevice()
-        }
-        btnSettingsAbout?.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                btnSettingsAbout.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start()
-            } else {
-                btnSettingsAbout.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-            }
         }
     }
 

@@ -62,10 +62,14 @@ class PlayerGestureController(
             if (absDy > absDx && absDy > 30) {
                 // 垂直滑动
                 val screenWidth = context.resources.displayMetrics.widthPixels
-                if (e1.x > screenWidth * 0.05f && e1.x < screenWidth * 0.15f) {
+                val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+                val enableBrightness = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_GESTURE_BRIGHTNESS, true)
+                val enableVolume = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_GESTURE_VOLUME, true)
+                
+                if (enableBrightness && e1.x > screenWidth * 0.05f && e1.x < screenWidth * 0.15f) {
                     // 左侧 5%~15% → 亮度
                     listener.onBrightnessChange(-dy / 300f)
-                } else if (e1.x < screenWidth * 0.95f && e1.x > screenWidth * 0.85f) {
+                } else if (enableVolume && e1.x < screenWidth * 0.95f && e1.x > screenWidth * 0.85f) {
                     // 右侧 5%~15% → 音量
                     listener.onVolumeChange(-dy / 300f)
                 }

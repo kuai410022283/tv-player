@@ -777,8 +777,8 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	flusher, canFlush := w.(http.Flusher)
 
 	// 1. 设置动态上限与超时底线
-	maxThreshold := 2048 * 1024 // 默认上限 2MB
-	maxLatency := 500 * time.Millisecond // 默认最差等半秒
+	var maxThreshold int
+	var maxLatency time.Duration
 
 	if baseThreshold <= 16*1024 { // HLS 等极端实时
 		maxThreshold = 64 * 1024

@@ -11,6 +11,8 @@ object Prefs {
     const val KEY_SERVER_URL = "server_url"
     const val KEY_GESTURE_HINT_SHOWN = "gesture_hint_shown"
     const val KEY_SHOW_CHANNEL_LOGO = "show_channel_logo"
+    const val KEY_GESTURE_BRIGHTNESS = "gesture_brightness_enabled"
+    const val KEY_GESTURE_VOLUME = "gesture_volume_enabled"
     
     // 播放器设置
     const val KEY_NETWORK_CACHE = "network_cache_ms"
