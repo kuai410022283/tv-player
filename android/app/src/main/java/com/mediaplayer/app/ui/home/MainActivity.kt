@@ -3162,7 +3162,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_BACK
-            )
+            ) || keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 || keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9
             if (!isKnownKey) {
                 return super.dispatchKeyEvent(event)
             }
@@ -3380,7 +3380,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     }
                     
                     isInputtingChannel = true
-                    if (channelInputBuffer.length < 4) {
+                    if (channelInputBuffer.length < 5) {
                         channelInputBuffer.append(digit)
                     }
                     
