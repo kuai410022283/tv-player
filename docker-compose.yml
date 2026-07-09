@@ -19,4 +19,4 @@ services:
       # 频道logo目录
       - ./library:/app/library
       # 配置文件（可自行修改IP和端口，需确保容器内的路径正确，通常是运行目录下的 config.yaml）
-      - ./config.yaml:/app/config.yaml
+      # - ./config.yaml:/app/config.yaml

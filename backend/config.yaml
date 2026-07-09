@@ -1,9 +1,9 @@
-# MediaPlayer v1.0.0配置文件
+# MediaPlayer v1.1.4配置文件
 # ⚠️ 部署前必须修改 auth.secret 和 auth.admin_password
 
 server:
-  host: "127.0.0.1"
-  port: 9527
+  host: "0.0.0.0"  
+  port: 9527  # Docker部署需要改对应端口映射出来
 
 database:
   path: "./data/mediaplayer.db"
