@@ -18,6 +18,7 @@ class GroupAdapter(
     private val onFocus: ((ChannelGroup) -> Unit)? = null
 ) : ListAdapter<ChannelGroup, GroupAdapter.ViewHolder>(DiffCallback()) {
 
+    var showSource: Boolean = false
     private var selectedId = 0L
 
     fun setSelected(id: Long) {
@@ -38,7 +39,7 @@ class GroupAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.contains("selection_changed")) {
             val item = getItem(position)
-            holder.bind(item, item.id == selectedId)
+            holder.bind(item, item.id == selectedId, showSource)
             return
         }
         super.onBindViewHolder(holder, position, payloads)
@@ -46,7 +47,7 @@ class GroupAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        holder.bind(item, item.id == selectedId)
+        holder.bind(item, item.id == selectedId, showSource)
         holder.itemView.setOnClickListener { onClick(item) }
 
         // TV 焦点与触控兼容处理
@@ -74,7 +75,7 @@ class GroupAdapter(
         private val tvSource: TextView? = itemView.findViewById(R.id.tvGroupSource)
         private val indicator: View = itemView.findViewById(R.id.viewIndicator)
 
-        fun bind(item: ChannelGroup, selected: Boolean) {
+        fun bind(item: ChannelGroup, selected: Boolean, showSource: Boolean) {
             val nameStr = item.name ?: ""
             val regex = Regex("^(.*)\\(([^)]+)\\)$")
             val match = regex.find(nameStr)
@@ -82,7 +83,7 @@ class GroupAdapter(
             if (match != null && tvSource != null) {
                 tvName.text = match.groupValues[1].trim()
                 tvSource.text = match.groupValues[2]
-                tvSource.visibility = View.VISIBLE
+                tvSource.visibility = if (showSource) View.VISIBLE else View.GONE
             } else {
                 tvName.text = nameStr
                 tvSource?.visibility = View.GONE

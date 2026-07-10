@@ -13,6 +13,7 @@ object Prefs {
     const val KEY_SHOW_CHANNEL_LOGO = "show_channel_logo"
     const val KEY_GESTURE_BRIGHTNESS = "gesture_brightness_enabled"
     const val KEY_GESTURE_VOLUME = "gesture_volume_enabled"
+    const val KEY_SHOW_GROUP_SOURCE = "show_group_source"
     
     // 全局细线进度条：0=关闭, 1=顶部, 2=底部
     const val KEY_GLOBAL_PROGRESS_BAR = "global_progress_bar"

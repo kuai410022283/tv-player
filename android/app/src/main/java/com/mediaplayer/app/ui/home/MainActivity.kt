@@ -913,6 +913,23 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             startGlobalProgressTicker()
         }
         
+        val btnSettingsGroupSource = findViewById<View>(R.id.btnSettingsGroupSource)
+        val tvSettingsGroupSourceValue = findViewById<TextView>(R.id.tvSettingsGroupSourceValue)
+        
+        var showGroupSource = prefs.getBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, false)
+        tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
+        tvSettingsGroupSourceValue?.setTextColor(android.graphics.Color.parseColor(if (showGroupSource) "#00E5FF" else "#AAAAAA"))
+        
+        btnSettingsGroupSource?.setOnClickListener {
+            showGroupSource = !showGroupSource
+            tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
+            tvSettingsGroupSourceValue?.setTextColor(android.graphics.Color.parseColor(if (showGroupSource) "#00E5FF" else "#AAAAAA"))
+            prefs.edit().putBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, showGroupSource).apply()
+            
+            groupAdapter.showSource = showGroupSource
+            groupAdapter.notifyDataSetChanged()
+        }
+        
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
                 Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
@@ -1743,36 +1760,44 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     /**
      * 截取当前 videoLayout 画面作为切台占位图，覆盖在最上层，消除切台黑屏。
      */
-    private suspend fun captureSnapshotAsync(timeoutMs: Long = 50L) {
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        if (prefs.getInt(Prefs.KEY_RENDER_VIEW, Prefs.RENDER_VIEW_SURFACE) == Prefs.RENDER_VIEW_TEXTURE) {
-            return
-        }
-
+    private suspend fun captureSnapshotAsync(timeoutMs: Long = 30L) {
         val vl = videoLayout ?: return
         val iv = snapshotOverlay ?: return
+        if (vl.width <= 0 || vl.height <= 0) return
+
         val currentGen = ++snapshotGeneration
         try {
-            // 使用 PixelCopy（API 26+）获取 SurfaceView 的截图
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
+                var copySuccess = false
                 kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
                     kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
                         val copyListener = android.view.PixelCopy.OnPixelCopyFinishedListener { result ->
                             if (continuation.isActive) {
-                                if (result == android.view.PixelCopy.SUCCESS) {
-                                    if (currentGen == snapshotGeneration) {
-                                        iv.setImageBitmap(bitmap)
-                                        iv.visibility = View.VISIBLE
-                                    }
-                                }
+                                copySuccess = (result == android.view.PixelCopy.SUCCESS)
                                 continuation.resume(Unit)
                             }
                         }
-                        android.view.PixelCopy.request(this@MainActivity.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
+                        // 优先对 videoLayout 内部的 SurfaceView 子视图截图
+                        // 这比对整个 window 截图对 VLC/IJK 更可靠
+                        val surfaceChild = (vl as? android.view.ViewGroup)?.let { parent ->
+                            (0 until parent.childCount)
+                                .mapNotNull { parent.getChildAt(it) }
+                                .firstOrNull { it is android.view.SurfaceView }
+                        }
+                        if (surfaceChild is android.view.SurfaceView) {
+                            android.view.PixelCopy.request(surfaceChild, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
+                        } else {
+                            android.view.PixelCopy.request(this@MainActivity.window, bitmap, copyListener, android.os.Handler(android.os.Looper.getMainLooper()))
+                        }
                     }
                 }
+                if (copySuccess && currentGen == snapshotGeneration) {
+                    iv.setImageBitmap(bitmap)
+                    iv.visibility = View.VISIBLE
+                }
             } else {
+                // API < 26 降级方案
                 val bitmap = android.graphics.Bitmap.createBitmap(vl.width, vl.height, android.graphics.Bitmap.Config.ARGB_8888)
                 val canvas = android.graphics.Canvas(bitmap)
                 vl.draw(canvas)
@@ -1933,19 +1958,22 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             // 1. 方案一：异步截图，掩盖黑屏，且为方案二预留豁免逻辑
             if (!isCurrentChannelVod()) {
-                captureSnapshotAsync(50L)
+                captureSnapshotAsync(30L)
             }
             
             if (gen != playGeneration) return@launch
             
             // 2. 清理与重建播放器画布
             if (isCoreChanged) {
+                // 先把截图遮罩从父容器摘出，防止 removeAllViews() 将其销毁
+                snapshotOverlay?.let { iv -> (iv.parent as? android.view.ViewGroup)?.removeView(iv) }
+                
                 playerHelper?.release()
                 videoLayout?.removeAllViews()
                 initPlayerWithCore(desiredCore)
             }
             
-            // 确保遮罩在最顶层
+            // 确保遮罩在最顶层（无论是否切换了内核都需要执行）
             snapshotOverlay?.let { iv ->
                 if (iv.parent == null) {
                     videoLayout?.addView(iv)
@@ -2455,6 +2483,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
             }
         )
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        groupAdapter.showSource = prefs.getBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, false)
 
         channelAdapter = ChannelAdapter(
             isTvMode = isTvMode,
@@ -2477,8 +2507,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
             }
         )
-        
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         channelAdapter.showLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
 
         if (isTvMode) {
