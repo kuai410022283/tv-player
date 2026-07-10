@@ -18,6 +18,7 @@ import com.mediaplayer.app.data.model.Channel
 class ChannelAdapter(
     private val isTvMode: Boolean = false,
     private val onClick: (Channel, Int) -> Unit,
+    private val onLongClick: ((Channel, Int) -> Unit)? = null,
     private val onFocus: ((Channel, Int) -> Unit)? = null
 ) : RecyclerView.Adapter<ChannelAdapter.ViewHolder>() {
 
@@ -28,6 +29,15 @@ class ChannelAdapter(
     fun setData(list: List<Channel>) {
         val oldList = this.channels
         val newList = list
+        
+        // 如果数据量过大，DiffUtil 在主线程计算会造成明显卡顿
+        // 分组切换通常是全量数据替换，直接使用 notifyDataSetChanged 性能最好
+        if (oldList.size > 200 || newList.size > 200) {
+            this.channels = newList
+            notifyDataSetChanged()
+            return
+        }
+
         val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize() = oldList.size
             override fun getNewListSize() = newList.size
@@ -72,6 +82,10 @@ class ChannelAdapter(
                     val item = getItem(position)
                     holder.bindEpgOnly(item)
                     return
+                } else if (payload == "fav_update") {
+                    val item = getItem(position)
+                    holder.bindFavOnly(item)
+                    return
                 }
             }
         }
@@ -91,6 +105,12 @@ class ChannelAdapter(
 
         // 点击事件
         holder.itemView.setOnClickListener { onClick(item, position) }
+        
+        // 长按事件
+        holder.itemView.setOnLongClickListener { 
+            onLongClick?.invoke(item, position)
+            true
+        }
 
         if (isTvMode) {
             // TV 模式: D-pad 焦点处理，并且防止触控模式下的双击问题
@@ -183,7 +203,13 @@ class ChannelAdapter(
                 ivLogo.visibility = View.GONE
             }
 
+            val isFav = com.mediaplayer.app.data.FavoriteManager.isFavorite(item.id)
             ivFav.visibility = View.GONE
+            if (isFav) {
+                tvIndex.setTextColor(android.graphics.Color.parseColor("#FFD700"))
+            } else {
+                tvIndex.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, R.color.text_secondary))
+            }
 
             playingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
             itemView.isActivated = isPlaying
@@ -204,6 +230,15 @@ class ChannelAdapter(
                 tvCurrentEpg.text = "暂无节目信息"
                 tvCurrentEpg.visibility = View.VISIBLE
                 progressEpgItem.visibility = View.GONE
+            }
+        }
+        
+        fun bindFavOnly(item: Channel) {
+            val isFav = com.mediaplayer.app.data.FavoriteManager.isFavorite(item.id)
+            if (isFav) {
+                tvIndex.setTextColor(android.graphics.Color.parseColor("#FFD700"))
+            } else {
+                tvIndex.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, R.color.text_secondary))
             }
         }
     }

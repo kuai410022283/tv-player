@@ -376,6 +376,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         ApiClient.init(serverUrl)
         
         ChannelMemoryManager.init(this)
+        com.mediaplayer.app.data.FavoriteManager.init(this)
 
         setupAdapters()
 
@@ -502,7 +503,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
             override fun onLongPress(e: android.view.MotionEvent) {
                 // 手机端：长按屏幕呼出“手动切换线路”
-                showLineSelectionMenu()
+                val isZappingVisible = layoutZappingMenu?.visibility == View.VISIBLE
+                val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
+                val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+                val isOsdVisible = osdOverlayView?.isOsdVisible() == true
+                val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
+                
+                if (!isZappingVisible && !isEpgVisible && !isSettingsVisible && !isOsdVisible && !isLineVisible) {
+                    showLineSelectionMenu()
+                }
             }
 
             override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
@@ -1847,7 +1856,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         prefs.edit()
             .putLong("last_channel_id", channel.id)
-            .putLong("last_group_id", channel.groupId)
+            .putLong("last_group_id", currentGroupId)
             .apply()
         
         loadEpgForChannel(channel)
@@ -2426,6 +2435,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 currentGroupId = group.id
                 filterChannels(scrollToTop = true)
                 groupAdapter.setSelected(group.id)
+                activeListArea = "channels"
                 tvChannelsRv?.requestFocus()
             },
             onFocus = { group ->
@@ -2452,6 +2462,19 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     val realIndex = allChannels.indexOf(channel)
                     playTvChannel(realIndex)
                     uiHandler.postDelayed(hideZappingRunnable, 500)
+            },
+            onLongClick = { channel, position ->
+                val isAdded = com.mediaplayer.app.data.FavoriteManager.toggleFavorite(channel.id)
+                val msg = if (isAdded) "已添加到收藏" else "已取消收藏"
+                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+                
+                if (currentGroupId == -1L) {
+                    // 如果在收藏分组内取消收藏，立即移除并刷新列表
+                    filterChannels(scrollToTop = false)
+                } else {
+                    // 在其他分组内，仅局部刷新心形图标状态
+                    channelAdapter.notifyItemChanged(position, "fav_update")
+                }
             }
         )
         
@@ -2880,7 +2903,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             try {
                 // 1. 先拉分组列表
                 val realGroups = repo.getGroups().getOrElse { emptyList() }
-                groups = listOf(ChannelGroup(id = 0, name = "全部")) + realGroups
+                groups = listOf(
+                    ChannelGroup(id = -1, name = "收藏", icon = ""),
+                    ChannelGroup(id = 0, name = "全部")
+                ) + realGroups
                 groupAdapter.submitList(groups)
                 groupAdapter.setSelected(0)
 
@@ -2888,10 +2914,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
                 // 获取上次观看的 group_id
                 val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                val lastGroupId = prefs.getLong("last_group_id", -1L)
+                val lastGroupId = prefs.getLong("last_group_id", 0L)
 
                 // 为后台并发拉取构建优先队列（不影响 UI 左侧边栏排序）
-                val fetchPriorityGroups = if (lastGroupId != -1L) {
+                val fetchPriorityGroups = if (lastGroupId > 0L) {
                     val targetGroup = realGroups.find { it.id == lastGroupId }
                     if (targetGroup != null) {
                         listOf(targetGroup) + realGroups.filter { it.id != lastGroupId }
@@ -2931,7 +2957,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                                     targetIndex = foundIndex
                                 }
                             }
-                            currentGroupId = newChannels[targetIndex].groupId
+                            val validGroup = groups.find { it.id == lastGroupId }
+                            currentGroupId = validGroup?.id ?: newChannels[targetIndex].groupId
+                            if (currentGroupId == -1L && !com.mediaplayer.app.data.FavoriteManager.isFavorite(lastChannelId)) {
+                                currentGroupId = newChannels[targetIndex].groupId
+                            }
                             groupAdapter.setSelected(currentGroupId)
                             filterChannels(scrollToTop = false)
                             playTvChannel(targetIndex)
@@ -2991,7 +3021,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     }
 
     private fun filterChannels(scrollToTop: Boolean = true) {
-        filteredChannels = if (currentGroupId == 0L) {
+        filteredChannels = if (currentGroupId == -1L) {
+            val favIds = com.mediaplayer.app.data.FavoriteManager.getFavorites()
+            favIds.mapNotNull { channelIndexById[it] }.sortedBy { it.globalIndex }
+        } else if (currentGroupId == 0L) {
             allChannels
         } else {
             channelsByGroup[currentGroupId] ?: emptyList()
@@ -3166,7 +3199,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         var groupChanged = false
         if (resetToPlaying) {
-            val newGroupId = playingChannel?.groupId ?: 0L
+            val playingChannelInCurrentGroup = filteredChannels.any { it.id == playingChannel?.id }
+            val newGroupId = if (playingChannelInCurrentGroup) currentGroupId else playingChannel?.groupId ?: 0L
             if (currentGroupId != newGroupId) {
                 currentGroupId = newGroupId
                 groupChanged = true
@@ -3767,9 +3801,20 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             return super.onKeyLongPress(keyCode, event)
         }
         if (isTvMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
-            // 长按 OK 键呼出手动切源菜单
-            showLineSelectionMenu()
-            return true
+            val isZappingVisible = layoutZappingMenu?.visibility == View.VISIBLE
+            val isEpgVisible = layoutEpgMenu?.visibility == View.VISIBLE
+            val isSettingsVisible = layoutSettingsMenu?.visibility == View.VISIBLE
+            val isOsdVisible = osdOverlayView?.isOsdVisible() == true
+            val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
+            
+            if (!isZappingVisible && !isEpgVisible && !isSettingsVisible && !isOsdVisible && !isLineVisible) {
+                // 长按 OK 键呼出手动切源菜单
+                showLineSelectionMenu()
+                return true
+            }
+            
+            // 如果面板处于显示状态，忽略全局拦截，将长按事件下发给焦点 View (ChannelAdapter) 处理收藏逻辑
+            return super.onKeyLongPress(keyCode, event)
         }
         return super.onKeyLongPress(keyCode, event)
     }
