@@ -52,6 +52,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			channelWrite.DELETE("/:id", hs.Handler.DeleteChannel)
 			channelWrite.DELETE("/batch", hs.Handler.BatchChannel)
 			channelWrite.PUT("/batch", hs.Handler.BatchUpdateChannel)
+			channelWrite.POST("/mirror", hs.Handler.MirrorChannel)
 			channelWrite.POST("/health-check/start", hs.Handler.TriggerHealthCheck)
 			channelWrite.GET("/health-check/status", hs.Handler.GetHealthCheckStatus)
 		}

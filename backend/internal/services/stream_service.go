@@ -457,6 +457,21 @@ func (sp *StreamProxy) GetProxyURL(channelID int64, baseURL string) string {
 	return fmt.Sprintf("%s/api/v1/stream/proxy/%d", baseURL, channelID)
 }
 
+// IsStreamTypeMultiplexable checks if the stream type supports multiplexing.
+// For multi-line channels (e.g., ts#ts#ts), all lines must support multiplexing.
+func IsStreamTypeMultiplexable(streamType string) bool {
+	if streamType == "" {
+		return false
+	}
+	types := strings.Split(strings.ToLower(streamType), "#")
+	for _, st := range types {
+		if st != "ts" && st != "flv" && st != "rtmp" && st != "rtsp" && st != "octet-stream" {
+			return false
+		}
+	}
+	return true
+}
+
 // ServeStream proxies the actual stream data. If targetURL is provided, it proxies that URL instead of the channel's default StreamURL.
 func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, targetURL string) error {
 	ch, err := sp.channelSvc.GetChannel(channelID, 0)
@@ -464,8 +479,7 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 		return fmt.Errorf("channel not found: %w", err)
 	}
 
-	st := strings.ToLower(ch.StreamType)
-	canMultiplex := (st == "ts" || st == "flv" || st == "rtmp" || st == "rtsp" || st == "octet-stream")
+	canMultiplex := IsStreamTypeMultiplexable(ch.StreamType)
 	isMultiplex := ch.EnableMultiplex == 1 && canMultiplex && targetURL == ""
 
 	if isMultiplex {

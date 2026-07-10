@@ -57,6 +57,8 @@ type Channel struct {
 	Fcc             string    `json:"fcc,omitempty" db:"fcc"`
 	FccType         string    `json:"fcc_type,omitempty" db:"fcc_type"`
 	CanMultiplex    bool      `json:"can_multiplex" db:"-"`
+	LinkedChannelID int64     `json:"linked_channel_id" db:"linked_channel_id"`
+	IsProtected     bool      `json:"is_protected" db:"is_protected"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }

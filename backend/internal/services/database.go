@@ -48,6 +48,11 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0`)
+	_, _ = db.Exec("ALTER TABLE plan_group_relations ADD COLUMN sort_order INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN fcc TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN fcc_type TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN linked_channel_id INTEGER DEFAULT 0;")
+	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN is_protected INTEGER DEFAULT 0;")
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc_type TEXT DEFAULT ''`)
@@ -158,6 +163,8 @@ func createTables(db *sql.DB) error {
 		enable_multiplex INTEGER DEFAULT 0,
 		fcc TEXT DEFAULT '',
 		fcc_type TEXT DEFAULT '',
+		linked_channel_id INTEGER DEFAULT 0,
+		is_protected INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -168,6 +175,13 @@ func createTables(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_channels_is_hidden ON channels(is_hidden);
 	CREATE INDEX IF NOT EXISTS idx_channels_group_hidden ON channels(group_id, is_hidden);
 	CREATE INDEX IF NOT EXISTS idx_channels_sort_order ON channels(group_id, sort_order);
+
+	-- 级联删除触发器
+	CREATE TRIGGER IF NOT EXISTS trg_cascade_mirror_delete
+	AFTER DELETE ON channels
+	BEGIN
+		DELETE FROM channels WHERE linked_channel_id = old.id;
+	END;
 
 	DROP TABLE IF EXISTS epg_programs;
 

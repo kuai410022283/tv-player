@@ -256,7 +256,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	// 3. 读取数据库中该来源下已有的频道信息（用于匹配和镜像清理）
 	existingDB := make(map[string]int64) // key -> channel_id
 	keptIDs := make(map[int64]bool)
-	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name FROM channels WHERE source = ?", sourceName)
+	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name FROM channels WHERE source = ? AND (is_protected = 0 OR is_protected IS NULL)", sourceName)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -393,6 +393,14 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
+
+	// 6.5 连动更新：将所有关联到当前来源频道的“影子”流地址同步更新
+	_, _ = imp.channelSvc.db.Exec(`
+		UPDATE channels 
+		SET stream_url = (SELECT stream_url FROM channels b WHERE b.id = channels.linked_channel_id),
+		    stream_type = (SELECT stream_type FROM channels b WHERE b.id = channels.linked_channel_id)
+		WHERE linked_channel_id > 0 AND linked_channel_id IN (SELECT id FROM channels WHERE source = ?)
+	`, sourceName)
 
 	// 7. 消除所有因旧频道删除而产生的排序数字空洞，同时整理新导入频道的最终分组内顺序
 	_ = imp.channelSvc.ReorderChannels(0, sourceName)

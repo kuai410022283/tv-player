@@ -604,6 +604,13 @@ async function loadChannelSources() {
           res.data.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
         select.value = currentVal;
       }
+      const mirrorSource = document.getElementById('ch-mirror-source');
+      if (mirrorSource) {
+        const mirrorVal = mirrorSource.value;
+        mirrorSource.innerHTML = '<option value="">(请先选择来源)</option>' +
+          res.data.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+        if (mirrorVal) mirrorSource.value = mirrorVal;
+      }
     }
   } catch (e) { /* ignore */ }
 }
@@ -684,7 +691,10 @@ function showAddChannelModal() {
   document.getElementById('ch-headers').value = '';
   document.getElementById('ch-fcc').value = '';
   document.getElementById('ch-fcc-type').value = '';
-  document.getElementById('ch-sort').value = '0';
+  document.getElementById('ch-content-type').value = '';
+  document.getElementById('ch-sort').value = 0;
+  const mirrorAction = document.getElementById('ch-mirror-action');
+  if (mirrorAction) mirrorAction.style.display = 'none';
   showModal('channel-modal');
 }
 
@@ -743,6 +753,14 @@ async function editChannel(id) {
   document.getElementById('ch-content-type').value = c.content_type || '';
   document.getElementById('ch-sort').value = c.sort_order || 0;
   document.getElementById('channel-modal-title').textContent = '编辑频道';
+  
+  const mirrorAction = document.getElementById('ch-mirror-action');
+  if (mirrorAction) {
+    mirrorAction.style.display = 'block';
+    document.getElementById('ch-mirror-source').value = '';
+    document.getElementById('ch-mirror-group').innerHTML = '<option value="">(请先选择分组)</option>';
+  }
+
   showModal('channel-modal');
 }
 
@@ -787,9 +805,52 @@ async function toggleChannelMultiplex(id, enable) {
 }
 
 async function deleteChannel(id) {
-  if (!confirm('确定删除？')) return;
+  if (!confirm('确认删除？')) return;
   await api(`/channels/${id}`, { method: 'DELETE' });
   loadChannels();
+}
+
+async function mirrorChannel() {
+  const idStr = document.getElementById('ch-edit-id').value;
+  if (!idStr) return;
+  const id = parseInt(idStr, 10);
+  const targetSource = document.getElementById('ch-mirror-source').value;
+  const targetGroupStr = document.getElementById('ch-mirror-group').value;
+  if (!targetSource || !targetGroupStr) {
+    toast('请完整选择目标来源和目标分组', 'error');
+    return;
+  }
+  
+  try {
+    await api('/channels/mirror', {
+      method: 'POST',
+      body: JSON.stringify({
+        source_channel_id: id,
+        target_group_id: parseInt(targetGroupStr, 10),
+        target_source: targetSource
+      })
+    });
+    toast('频道镜像克隆成功！');
+    hideModal('channel-modal');
+    loadChannels();
+  } catch (e) {
+    toast('镜像失败: ' + (e.message || e), 'error');
+  }
+}
+
+function updateMirrorGroups() {
+  const source = document.getElementById('ch-mirror-source').value;
+  const groupSelect = document.getElementById('ch-mirror-group');
+  if (!source) {
+    groupSelect.innerHTML = '<option value="">(请先选择分组)</option>';
+    return;
+  }
+  const filteredGroups = groups.filter(g => (g.source || '手动') === source);
+  if (filteredGroups.length === 0) {
+    groupSelect.innerHTML = '<option value="">(该来源下无分组)</option>';
+  } else {
+    groupSelect.innerHTML = filteredGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  }
 }
 
 

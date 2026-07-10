@@ -1803,3 +1803,23 @@ func (h *Handler) PingMaster(c *gin.Context) {
 
 	ok(c, gin.H{"message": "连接成功"})
 }
+
+func (h *Handler) MirrorChannel(c *gin.Context) {
+	var req struct {
+		SourceChannelID int64  `json:"source_channel_id" binding:"required"`
+		TargetGroupID   int64  `json:"target_group_id" binding:"required"`
+		TargetSource    string `json:"target_source" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	ch, err := h.channelSvc.MirrorChannel(req.SourceChannelID, req.TargetGroupID, req.TargetSource)
+	if err != nil {
+		fail(c, 500, err.Error())
+		return
+	}
+
+	ok(c, ch)
+}
