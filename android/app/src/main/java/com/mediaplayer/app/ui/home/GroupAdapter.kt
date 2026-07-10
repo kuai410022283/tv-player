@@ -71,11 +71,25 @@ class GroupAdapter(
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvName: TextView = itemView.findViewById(R.id.tvGroupName)
+        private val tvSource: TextView? = itemView.findViewById(R.id.tvGroupSource)
         private val indicator: View = itemView.findViewById(R.id.viewIndicator)
 
         fun bind(item: ChannelGroup, selected: Boolean) {
-            tvName.text = item.name
+            val nameStr = item.name ?: ""
+            val regex = Regex("^(.*)\\(([^)]+)\\)$")
+            val match = regex.find(nameStr)
+            
+            if (match != null && tvSource != null) {
+                tvName.text = match.groupValues[1].trim()
+                tvSource.text = match.groupValues[2]
+                tvSource.visibility = View.VISIBLE
+            } else {
+                tvName.text = nameStr
+                tvSource?.visibility = View.GONE
+            }
+            
             tvName.isSelected = selected
+            tvSource?.isSelected = selected
             indicator.visibility = if (selected) View.VISIBLE else View.INVISIBLE
             itemView.alpha = if (selected) 1.0f else 0.7f
         }

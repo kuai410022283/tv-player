@@ -29,7 +29,9 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 	`
 	var args []interface{}
 
+	var enableAggregation int
 	if clientID > 0 {
+		_ = s.db.QueryRow(`SELECT COALESCE(sp.enable_aggregation, 0) FROM clients c JOIN subscription_plans sp ON c.plan_id = sp.id WHERE c.id = ?`, clientID).Scan(&enableAggregation)
 		query += `
 			JOIN plan_group_relations pgr ON g.id = pgr.group_id
 			JOIN clients cl ON pgr.plan_id = cl.plan_id
@@ -70,6 +72,31 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
+	if clientID > 0 {
+		if enableAggregation == 1 {
+			var mergedGroups []models.ChannelGroup
+			seenNames := make(map[string]int)
+			for _, g := range groups {
+				if idx, exists := seenNames[g.Name]; exists {
+					mergedGroups[idx].ChannelCount += g.ChannelCount
+					mergedGroups[idx].NonMuxCount += g.NonMuxCount
+					mergedGroups[idx].CanMultiplex = (mergedGroups[idx].ChannelCount - mergedGroups[idx].NonMuxCount > 0)
+				} else {
+					mergedGroups = append(mergedGroups, g)
+					seenNames[g.Name] = len(mergedGroups) - 1
+				}
+			}
+			groups = mergedGroups
+		} else {
+			for i := range groups {
+				if groups[i].Source != "" && groups[i].Source != "手动" {
+					groups[i].Name = fmt.Sprintf("%s(%s)", groups[i].Name, groups[i].Source)
+				}
+			}
+		}
+	}
+
 	return groups, nil
 }
 
@@ -404,8 +431,24 @@ func (s *ChannelService) ListChannels(groupID int64, search string, source strin
 	whereClauses = append(whereClauses, "c.is_hidden = 0")
 
 	if groupID > 0 {
-		whereClauses = append(whereClauses, "c.group_id = ?")
-		queryArgs = append(queryArgs, groupID)
+		var enableAggregation int
+		if clientID > 0 {
+			_ = s.db.QueryRow(`SELECT COALESCE(sp.enable_aggregation, 0) FROM clients c JOIN subscription_plans sp ON c.plan_id = sp.id WHERE c.id = ?`, clientID).Scan(&enableAggregation)
+		}
+		if enableAggregation == 1 {
+			var gName string
+			_ = s.db.QueryRow(`SELECT name FROM channel_groups WHERE id = ?`, groupID).Scan(&gName)
+			if gName != "" {
+				whereClauses = append(whereClauses, "cg.name = ?")
+				queryArgs = append(queryArgs, gName)
+			} else {
+				whereClauses = append(whereClauses, "c.group_id = ?")
+				queryArgs = append(queryArgs, groupID)
+			}
+		} else {
+			whereClauses = append(whereClauses, "c.group_id = ?")
+			queryArgs = append(queryArgs, groupID)
+		}
 	}
 	if source != "" {
 		whereClauses = append(whereClauses, "c.source = ?")

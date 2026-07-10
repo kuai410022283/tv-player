@@ -253,18 +253,24 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		}
 	}
 
-	// 3. 读取数据库中该来源下已有的频道信息（用于匹配和镜像清理）
-	existingDB := make(map[string]int64) // key -> channel_id
+	// 3. 读取数据库中该来源下已有的频道信息
+	existingDB := make(map[string]int64) // key -> channel_id (非保护)
+	protectedDB := make(map[string]bool) // key -> bool (受保护/镜像)
 	keptIDs := make(map[int64]bool)
-	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name FROM channels WHERE source = ? AND (is_protected = 0 OR is_protected IS NULL)", sourceName)
+	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name, COALESCE(is_protected, 0) FROM channels WHERE source = ?", sourceName)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var id, groupID int64
 			var name string
-			if rows.Scan(&id, &groupID, &name) == nil {
+			var isProtected int
+			if rows.Scan(&id, &groupID, &name, &isProtected) == nil {
 				key := fmt.Sprintf("%d|%s", groupID, name)
-				existingDB[key] = id
+				if isProtected == 1 {
+					protectedDB[key] = true
+				} else {
+					existingDB[key] = id
+				}
 			}
 		}
 	}
@@ -351,6 +357,11 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 
 		fcc := ch["fcc"]
 		fccType := ch["fcc-type"]
+
+		// 如果该名字和分组下已经存在受保护的镜像频道，则直接跳过，防止产生同名的普通频道
+		if protectedDB[key] {
+			continue
+		}
 
 		if channelID, exists := existingDB[key]; exists {
 			// 更新已存在的频道

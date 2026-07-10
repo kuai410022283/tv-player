@@ -118,6 +118,54 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		baseURL = fmt.Sprintf("%s://%s", scheme, c.Request.Host)
 	}
 
+	type mergedLine struct {
+		URL  string
+		Type string
+	}
+	type mergedChannel struct {
+		*models.SubscriptionChannel
+		AllLines []mergedLine
+	}
+	type mergedGroup struct {
+		GroupName string
+		Channels  []*mergedChannel
+	}
+	var groupList []*mergedGroup
+	groupMap := make(map[string]int) // map[GroupName] -> index in groupList
+	channelMap := make(map[string]map[string]int) // map[GroupName] -> map[ChannelName] -> index in groupList[idx].Channels
+
+	for _, ch := range channels {
+		if _, ok := groupMap[ch.GroupName]; !ok {
+			groupList = append(groupList, &mergedGroup{GroupName: ch.GroupName})
+			groupMap[ch.GroupName] = len(groupList) - 1
+			channelMap[ch.GroupName] = make(map[string]int)
+		}
+		
+		lines := strings.Split(ch.StreamURL, "#")
+		types := strings.Split(ch.StreamType, "#")
+		
+		var currentLines []mergedLine
+		for i, l := range lines {
+			l = strings.TrimSpace(l)
+			if l != "" {
+				t := ""
+				if i < len(types) {
+					t = types[i]
+				}
+				currentLines = append(currentLines, mergedLine{URL: l, Type: t})
+			}
+		}
+
+		gIdx := groupMap[ch.GroupName]
+		if cIdx, exists := channelMap[ch.GroupName][ch.Name]; exists {
+			groupList[gIdx].Channels[cIdx].AllLines = append(groupList[gIdx].Channels[cIdx].AllLines, currentLines...)
+		} else {
+			mc := &mergedChannel{SubscriptionChannel: ch, AllLines: currentLines}
+			groupList[gIdx].Channels = append(groupList[gIdx].Channels, mc)
+			channelMap[ch.GroupName][ch.Name] = len(groupList[gIdx].Channels) - 1
+		}
+	}
+
 	// TXT 格式
 	if format == "txt" {
 		c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -126,42 +174,30 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		}
 		var sb strings.Builder
 
-		currentGroup := ""
-		for _, ch := range channels {
-			if ch.GroupName != currentGroup {
-				currentGroup = ch.GroupName
-				sb.WriteString(fmt.Sprintf("%s,#genre#\n", currentGroup))
-			}
+		for _, grp := range groupList {
+			sb.WriteString(fmt.Sprintf("%s,#genre#\n", grp.GroupName))
+			for _, ch := range grp.Channels {
 
-			rawURLs := strings.Split(ch.StreamURL, "#")
-			types := strings.Split(ch.StreamType, "#")
-			for lineIdx, u := range rawURLs {
-				if strings.TrimSpace(u) == "" {
-					continue
-				}
-
+			for lineIdx, ml := range ch.AllLines {
 				displayName := ch.Name
 
 				var playURL string
 				if ch.IsDirect {
-					playURL = u
+					playURL = ml.URL
 				} else {
 					ext := "ts"
-					lineType := ""
-					if lineIdx < len(types) {
-						lineType = types[lineIdx]
-					}
-					switch lineType {
+					switch ml.Type {
 					case "hls", "":
 						ext = "m3u8"
 					case "mp4", "flv", "mkv", "mpd":
-						ext = lineType
+						ext = ml.Type
 					}
 					playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s&plan=1", baseURL, ch.ID, ext, lineIdx, token)
 				}
 
 				sb.WriteString(fmt.Sprintf("%s,%s\n", displayName, playURL))
 			}
+		}
 		}
 		c.String(http.StatusOK, sb.String())
 		return
@@ -204,7 +240,10 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		strategy = logoSvc.GetLogoStrategy()
 	}
 
-	for i, ch := range channels {
+	var chanIndex int
+	for _, grp := range groupList {
+		for _, ch := range grp.Channels {
+			chanIndex++
 		logoURL := ch.Logo
 		if logoSvc != nil {
 			logoURL = logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, baseURL)
@@ -246,18 +285,11 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 			contentTypeStr = fmt.Sprintf(` tvg-type="%s"`, ch.ContentType)
 		}
 
-		lines := strings.Split(ch.StreamURL, "#")
-		for lineIdx, u := range lines {
-			u = strings.TrimSpace(u)
-			if u == "" {
-				continue
-			}
-
+		for lineIdx, ml := range ch.AllLines {
 			displayName := ch.Name
-
 			var playURL string
 			if ch.IsDirect {
-				playURL = u
+				playURL = ml.URL
 				var kodiHeaders []string
 				if ch.UserAgent != "" {
 					kodiHeaders = append(kodiHeaders, "User-Agent="+ch.UserAgent)
@@ -277,20 +309,21 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 				}
 			} else {
 				ext := "ts"
-				switch ch.StreamType {
+				switch ml.Type {
 				case "hls", "":
 					ext = "m3u8"
 				case "mp4", "flv", "mkv", "mpd":
-					ext = ch.StreamType
+					ext = ml.Type
 				}
 				playURL = fmt.Sprintf("%s/api/v1/stream/proxy/%d/play.%s?line=%d&token=%s&plan=1", baseURL, ch.ID, ext, lineIdx, token)
 			}
 
-			tvgChno := i + 1
+			tvgChno := chanIndex
 			sb.WriteString(fmt.Sprintf(`#EXTINF:-1 tvg-id="%s" tvg-chno="%d" tvg-name="%s" tvg-logo="%s" group-title="%s"%s%s,%s`+"\n",
 				tvgID, tvgChno, ch.Name, logoURL, ch.GroupName, catchupStr, contentTypeStr, displayName))
 			sb.WriteString(playURL)
 			sb.WriteString("\n")
+		}
 		}
 	}
 	c.String(http.StatusOK, sb.String())

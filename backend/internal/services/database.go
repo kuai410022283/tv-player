@@ -302,6 +302,7 @@ func createTables(db *sql.DB) error {
 		price REAL DEFAULT 0.0,
 		description TEXT DEFAULT '',
 		subscription_token TEXT DEFAULT '',
+		enable_aggregation INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -343,6 +344,7 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN is_tester INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
+	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN enable_aggregation INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_status TEXT DEFAULT 'idle';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_error TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE plan_group_relations ADD COLUMN sort_order INTEGER DEFAULT 0;")

@@ -18,13 +18,36 @@
         android:background="@color/accent"
         android:visibility="invisible" />
 
-    <TextView
-        android:id="@+id/tvGroupName"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textColor="@color/text_group"
-        android:textSize="@dimen/sp_20"
+        android:layout_weight="1"
         android:layout_marginStart="@dimen/dp_10"
-        android:singleLine="true" />
+        android:layout_marginEnd="@dimen/dp_10"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvGroupName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_group"
+            android:textSize="@dimen/sp_20"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="1"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/tvGroupSource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_group"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp"
+            android:alpha="0.5"
+            android:visibility="gone"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="1"
+            android:singleLine="true" />
+    </LinearLayout>
 
 </LinearLayout>

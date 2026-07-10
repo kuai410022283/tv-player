@@ -42,7 +42,7 @@ func (s *PlanService) GetEPGTimeShift() int {
 }
 
 func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {
-	query := `SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM subscription_plans`
+	query := `SELECT id, name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at FROM subscription_plans`
 	var args []interface{}
 	if search != "" {
 		query += ` WHERE name LIKE ?`
@@ -58,7 +58,7 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 	var items []*models.SubscriptionPlan
 	for rows.Next() {
 		m := &models.SubscriptionPlan{}
-		if err := rows.Scan(&m.ID, &m.Name, &m.Days, &m.MaxStreams, &m.Price, &m.Description, &m.SubscriptionToken, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Days, &m.MaxStreams, &m.Price, &m.Description, &m.SubscriptionToken, &m.EnableAggregation, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, m)
@@ -87,8 +87,8 @@ func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 	if m.SubscriptionToken == "" {
 		m.SubscriptionToken = generateToken()
 	}
-	res, err := s.db.Exec(`INSERT INTO subscription_plans (name, days, max_streams, price, description, subscription_token, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
-		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, now, now)
+	res, err := s.db.Exec(`INSERT INTO subscription_plans (name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
+		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, m.EnableAggregation, now, now)
 	if err != nil {
 		return err
 	}
@@ -109,8 +109,8 @@ func (s *PlanService) UpdatePlan(m *models.SubscriptionPlan) error {
 	if m.SubscriptionToken == "" {
 		m.SubscriptionToken = generateToken()
 	}
-	_, err := s.db.Exec(`UPDATE subscription_plans SET name=?, days=?, max_streams=?, price=?, description=?, subscription_token=?, updated_at=? WHERE id=?`,
-		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, now, m.ID)
+	_, err := s.db.Exec(`UPDATE subscription_plans SET name=?, days=?, max_streams=?, price=?, description=?, subscription_token=?, enable_aggregation=?, updated_at=? WHERE id=?`,
+		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, m.EnableAggregation, now, m.ID)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,8 @@ func (s *PlanService) DeletePlan(id int64) error {
 func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models.SubscriptionChannel, error) {
 	// 1. 验证套餐及订阅 Token 匹配度
 	var planID int64
-	err := s.db.QueryRow(`SELECT id FROM subscription_plans WHERE name=? AND subscription_token=?`, planName, token).Scan(&planID)
+	var enableAggregation int
+	err := s.db.QueryRow(`SELECT id, enable_aggregation FROM subscription_plans WHERE name=? AND subscription_token=?`, planName, token).Scan(&planID, &enableAggregation)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("invalid plan or token")
@@ -147,7 +148,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 
 	// 2. 加载套餐关联分组下的非隐藏频道 (并按套餐分组排序和频道排序条件排序)
 	query := `
-		SELECT c.id, c.group_id, cg.name AS group_name, c.name, COALESCE(c.logo, '') AS logo, 
+		SELECT c.id, c.group_id, cg.name AS group_name, COALESCE(cg.source, '') AS group_source, c.name, COALESCE(c.logo, '') AS logo, 
 		       c.stream_url, COALESCE(c.stream_type, '') AS stream_type, COALESCE(c.epg_channel_id, '') AS epg_channel_id,
 		       c.is_direct, c.support_catchup, COALESCE(c.catchup_type, '') AS catchup_type, COALESCE(c.catchup_source, '') AS catchup_source, c.catchup_days,
 		       COALESCE(c.user_agent, '') AS user_agent, COALESCE(c.custom_headers, '') AS custom_headers, COALESCE(c.content_type, '') AS content_type
@@ -167,9 +168,13 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 	for rows.Next() {
 		m := &models.SubscriptionChannel{}
 		var isDirect, supportCatchup int
-		if err := rows.Scan(&m.ID, &m.GroupID, &m.GroupName, &m.Name, &m.Logo,
+		var groupSource string
+		if err := rows.Scan(&m.ID, &m.GroupID, &m.GroupName, &groupSource, &m.Name, &m.Logo,
 			&m.StreamURL, &m.StreamType, &m.EPGChannelID, &isDirect, &supportCatchup, &m.CatchupType, &m.CatchupSource, &m.CatchupDays, &m.UserAgent, &m.CustomHeaders, &m.ContentType); err != nil {
 			return nil, err
+		}
+		if enableAggregation == 0 && groupSource != "" && groupSource != "手动" {
+			m.GroupName = fmt.Sprintf("%s(%s)", m.GroupName, groupSource)
 		}
 		if m.StreamType == "" {
 			m.StreamType = "ts"
