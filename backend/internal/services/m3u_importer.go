@@ -346,6 +346,22 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		if catchupType != "" {
 			supportCatchup = 1
 		}
+
+		if supportCatchup == 0 {
+			u := mergedURLStr
+			if strings.Contains(u, "PLTV") || strings.Contains(u, "TVOD") || 
+			   strings.Contains(u, "itv.cmvideo.cn") || strings.Contains(u, "channel-id=") ||
+			   strings.Contains(u, "/live/program/live/") || strings.Contains(u, "/gitv/") ||
+			   strings.Contains(u, "/gitv_live/") || strings.Contains(u, "ysten-business") ||
+			   strings.Contains(u, "aishang.ctlcdn") || strings.Contains(u, "userid=gf001") ||
+			   (strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=")) || strings.Contains(u, "/cms001/") {
+				supportCatchup = 1
+				if catchupType == "" {
+					catchupType = "append"
+				}
+			}
+		}
+
 		catchupSource := ch["catchup-source"]
 
 		catchupDays := 0

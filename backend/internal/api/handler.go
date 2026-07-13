@@ -695,15 +695,74 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 }
 
 func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
-	if catchupSource == "" {
-		return streamURL
-	}
-
 	start := time.Unix(startUnix, 0).In(time.Local)
 	end := time.Unix(endUnix, 0).In(time.Local)
 	durationSec := endUnix - startUnix
 	if durationSec < 0 {
 		durationSec = 0
+	}
+
+	if catchupSource == "" {
+		u := streamURL
+		sep := "?"
+		if strings.Contains(u, "?") {
+			sep = "&"
+		}
+		timeStr1 := start.Format("20060102150405")
+		timeStr2 := end.Format("20060102150405")
+
+		if strings.Contains(u, "PLTV") || strings.Contains(u, "TVOD") {
+			if strings.Contains(u, "/PLTV/") {
+				u = strings.ReplaceAll(u, "/PLTV/", "/TVOD/")
+			}
+			return fmt.Sprintf("%s%splayseek=%s-%s", u, sep, timeStr1, timeStr2)
+		}
+		if strings.Contains(u, "itv.cmvideo.cn") || strings.Contains(u, "channel-id=") {
+			u = strings.ReplaceAll(u, "&livemode=1", "&livemode=4")
+			u = strings.ReplaceAll(u, "000000001000", "000000002000")
+			t1 := start.Format("20060102T150405.00Z")
+			t2 := end.Format("20060102T150405.00Z")
+			return fmt.Sprintf("%s%sstarttime=%s&endtime=%s", u, sep, t1, t2)
+		}
+		if strings.Contains(u, "/live/program/live/") {
+			return fmt.Sprintf("%s%sstarttime=%d&endtime=%d", u, sep, startUnix, endUnix)
+		}
+		if strings.Contains(u, "/gitv/") {
+			u = strings.ReplaceAll(u, "live1", "lookback")
+			return fmt.Sprintf("%s%splayseek=%s-%s", u, sep, timeStr1, timeStr2)
+		}
+		if strings.Contains(u, "/gitv_live/") {
+			return fmt.Sprintf("%s%sstart=%d&end=%d", u, sep, startUnix, endUnix)
+		}
+		if strings.Contains(u, "ysten-businessmobile") || strings.Contains(u, "ysten-business") {
+			idx := strings.LastIndex(u, "/")
+			if idx != -1 {
+				fileName := u[idx+1:]
+				base := strings.ReplaceAll(u[:idx], "live", "lookback")
+				return fmt.Sprintf("%s/%s/%s/%s", base, timeStr1, timeStr2, fileName)
+			}
+		}
+		if strings.Contains(u, "aishang.ctlcdn") {
+			u = strings.ReplaceAll(u, "live", "lb")
+			return fmt.Sprintf("%s%sstart=%s&end=%s", u, sep, timeStr1, timeStr2)
+		}
+		if strings.Contains(u, "userid=gf001") {
+			t1UTC := time.Unix(startUnix, 0).UTC().Format("20060102150405")
+			t2UTC := time.Unix(endUnix, 0).UTC().Format("20060102150405")
+			return fmt.Sprintf("%s%sutcprogrambegin=%s&utcprogramend=%s", u, sep, t1UTC, t2UTC)
+		}
+		if strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=") {
+			t1UTC := time.Unix(startUnix, 0).UTC().Format("20060102150405")
+			t2UTC := time.Unix(endUnix, 0).UTC().Format("20060102150405")
+			return fmt.Sprintf("%s%splayseek=%s-%s", u, sep, t1UTC, t2UTC)
+		}
+		if strings.Contains(u, "/cms001/") {
+			t1 := start.Format("20060102T150405.00Z")
+			t2 := end.Format("20060102T150405.00Z")
+			return fmt.Sprintf("%s%sstarttime=%s&endtime=%s", u, sep, t1, t2)
+		}
+
+		return streamURL
 	}
 
 	source := catchupSource
