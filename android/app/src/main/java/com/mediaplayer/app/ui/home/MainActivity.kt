@@ -917,12 +917,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         var showGroupSource = prefs.getBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, false)
         tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
-        tvSettingsGroupSourceValue?.setTextColor(android.graphics.Color.parseColor(if (showGroupSource) "#00E5FF" else "#AAAAAA"))
         
         btnSettingsGroupSource?.setOnClickListener {
             showGroupSource = !showGroupSource
             tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
-            tvSettingsGroupSourceValue?.setTextColor(android.graphics.Color.parseColor(if (showGroupSource) "#00E5FF" else "#AAAAAA"))
             prefs.edit().putBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, showGroupSource).apply()
             
             groupAdapter.showSource = showGroupSource
