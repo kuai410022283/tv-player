@@ -2,6 +2,7 @@ package com.mediaplayer.app.data.api
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.media.MediaDrm
 import android.os.Build
 import android.provider.Settings
 import com.mediaplayer.app.Prefs
@@ -9,6 +10,7 @@ import com.mediaplayer.app.data.model.ClientRegisterResp
 import com.mediaplayer.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -20,13 +22,56 @@ class ClientAuthManager(private val context: Context) {
 
     fun getDeviceId(): String {
         var id = prefs.getString(Prefs.KEY_DEVICE_ID, null)
-        if (id.isNullOrEmpty()) {
-            @SuppressLint("HardwareIds")
-            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-            id = androidId ?: UUID.randomUUID().toString()
+        // 发现无效 ID（比如老版本存入的全0，或者长度不对），强制重新生成
+        if (id.isNullOrEmpty() || id.replace("0", "").isEmpty() || id == "9774d56d682e549c" || id.length != 32) {
+            id = generateDeviceUniqueIdentifier()
             prefs.edit().putString(Prefs.KEY_DEVICE_ID, id).apply()
         }
-        return id
+        return id!!
+    }
+
+    private fun generateDeviceUniqueIdentifier(): String {
+        var rawId: String? = null
+
+        // 1. 优先尝试获取 MediaDrm ID (真·硬件级，防恢复出厂设置)
+        try {
+            val widevineUuid = UUID(-0x121074568629b532L, -0x5c37d8232ae2de13L)
+            val mediaDrm = MediaDrm(widevineUuid)
+            val deviceIdBytes = mediaDrm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                mediaDrm.close()
+            } else {
+                @Suppress("DEPRECATION")
+                mediaDrm.release()
+            }
+            rawId = deviceIdBytes.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            // 不支持 DRM 的山寨盒子会进这里
+        }
+
+        // 2. 如果不支持 DRM，降级尝试获取 ANDROID_ID
+        if (rawId.isNullOrEmpty()) {
+            @SuppressLint("HardwareIds")
+            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            if (androidId != null && androidId.replace("0", "").isNotEmpty() && androidId != "9774d56d682e549c") {
+                rawId = androidId
+            }
+        }
+
+        // 3. 如果连系统 ID 也是全 0，降级使用随机 UUID
+        if (rawId.isNullOrEmpty()) {
+            rawId = UUID.randomUUID().toString().replace("-", "")
+        }
+
+        // 4. 使用 MD5 算法统一折算为 32 位
+        // 无论是 64 位的 DRM ID，还是 16 位的 ANDROID_ID，通过 MD5 算法都能完美提炼出 32 位的均匀特征码
+        return md5(rawId!!)
+    }
+
+    private fun md5(input: String): String {
+        val md = MessageDigest.getInstance("MD5")
+        val digested = md.digest(input.toByteArray())
+        return digested.joinToString("") { "%02x".format(it) }
     }
 
     fun getToken(): String? = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
