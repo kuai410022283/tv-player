@@ -157,13 +157,13 @@ class IjkPlayerHelper(
 
         if (isLiveStream && !isHls) {
             // ----------------------------------------
-            // 裸 TS / FLV / UDPXY 直播流的“裸奔秒开”参数
-            // ----------------------------------------
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L) // 0 可以降低延迟
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L) // 不能在 chunked 里用 1
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 2L) // 最少缓冲帧
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒探针时长
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 2L) // 2MB 探针大小
+            // 为 4K/8K 高码率直播流专门重构的大缓存参数
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L) // 开启内置包缓冲，防卡顿
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max-buffer-size", 150 * 1024 * 1024L) // 最大缓冲提升到 150MB
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L) // 提升起播底线缓冲帧，保证画面不抖
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 5000000L) // 给足 5秒钟 时间让解码器嗅探音视频流
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 25L) // 探针拉大到 25MB，防止 4K 巨帧嗅探失败
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "flush_packets") // 禁用 fastseek
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 0)
         } else if (isHls) {

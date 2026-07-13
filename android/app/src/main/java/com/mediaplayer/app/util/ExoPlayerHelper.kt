@@ -2,6 +2,7 @@ package com.mediaplayer.app.util
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
 import android.view.ViewGroup
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -156,7 +157,7 @@ class ExoPlayerHelper(
                     newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
                         androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
                         androidx.media3.common.util.TimestampAdjuster(0),
-                        com.mediaplayer.app.av3a.Av3aTsPayloadReaderFactory()
+                        androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
                     ))
                 } else {
                     newExtractors.add(extractor)
@@ -213,7 +214,24 @@ class ExoPlayerHelper(
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
 
-        val renderersFactory = DefaultRenderersFactory(context).apply {
+        val renderersFactory = object : DefaultRenderersFactory(context) {
+            override fun buildAudioRenderers(
+                context: Context,
+                extensionRendererMode: Int,
+                mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
+                enableDecoderFallback: Boolean,
+                audioSink: androidx.media3.exoplayer.audio.AudioSink,
+                eventHandler: Handler,
+                eventListener: androidx.media3.exoplayer.audio.AudioRendererEventListener,
+                out: java.util.ArrayList<androidx.media3.exoplayer.Renderer>
+            ) {
+                // 原生的 Renderers
+                super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
+                
+                // 强制往队列里注入我们从 media 项目移植的、原生的 Av3aAudioRenderer！
+                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink))
+            }
+        }.apply {
             setEnableDecoderFallback(true) // 开启解码器容错回退机制
             setExtensionRendererMode(
                 when (currentDecoderMode) {
@@ -224,16 +242,23 @@ class ExoPlayerHelper(
             )
         }
 
+        // 开启时间优先的缓冲策略，无视默认内存红线，并把缓冲区硬上限暴力提升至 250MB。
+        // 核心原因：很多 IPTV 代理（udpxy/msd_lite）带有几十秒的环形缓存。如果播放器 maxBuffer 太小，
+        // 瞬间吃满缓存后就会暂停 TCP 读取。一旦 TCP 停止接收，代理服务端发送阻塞超时，就会强行切断连接（EOF），导致播一段卡一段！
+        // 解决办法：把 maxBufferMs 和 targetBufferBytes 拉到极大，让播放器一口气吞下服务端的历史缓存，并持续跟进直播流，永不暂停读取！
         val loadControlBuilder = DefaultLoadControl.Builder()
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .setTargetBufferBytes(250 * 1024 * 1024)
+            
         if (currentCacheMs > 0) {
             loadControlBuilder.setBufferDurationsMs(
                 currentCacheMs * 2,
-                currentCacheMs * 4,
+                currentCacheMs * 10,
                 currentCacheMs,
                 currentCacheMs
             )
         } else {
-            loadControlBuilder.setBufferDurationsMs(15000, 30000, 30, 3000)
+            loadControlBuilder.setBufferDurationsMs(15000, 120000, 30, 3000)
         }
         val loadControl = loadControlBuilder.build()
 
