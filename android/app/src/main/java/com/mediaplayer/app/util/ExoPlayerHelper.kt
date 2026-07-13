@@ -103,7 +103,7 @@ class ExoPlayerHelper(
         }
 
         isPlayerPlaying = false
-        exoPlayer?.stop()
+        exoPlayer?.stop() // 恢复 stop()，彻底解决 SurfaceView 的绿块撕裂花屏问题
 
         applyScaleMode()
 

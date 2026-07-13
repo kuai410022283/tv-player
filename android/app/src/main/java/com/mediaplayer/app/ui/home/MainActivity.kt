@@ -50,8 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import com.mediaplayer.app.util.VlcPlayerHelper
-import org.videolan.libvlc.util.VLCVideoLayout
+
 import kotlin.math.max
 
 class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCallback {
@@ -864,7 +863,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (currentCore) {
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-            Prefs.PLAYER_CORE_VLC -> "VLC"
+
             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
             else -> "智能切换"
         }
@@ -969,8 +968,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        // 迁移旧版本中 X5 内核的选择（X5 已移除，自动回退到智能切换）
-        if (currentCore == 4) {
+        // 整理内核序号，对于未知的核心序号（非 0, 1, 2）自动回退到智能切换
+        if (currentCore !in 0..2) {
             currentCore = Prefs.PLAYER_CORE_AUTO
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
         }
@@ -1116,8 +1115,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val channel = allChannels.getOrNull(currentChannelIndex)
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
-                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_VLC
-                Prefs.PLAYER_CORE_VLC -> Prefs.PLAYER_CORE_IJK
+                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
+                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_AUTO
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
@@ -1458,7 +1457,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         val coreStr = when (core) {
                             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                            else -> "VLC"
+                            else -> "Auto"
                         }
                         
                         val fullInfo = buildString {
@@ -1550,11 +1549,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
                 else -> {
-                    val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
-                    vlcVideoLayout.layoutParams = android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT)
-                    videoLayout?.addView(vlcVideoLayout)
-                    
-                    playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
+                    playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
             }
         } catch (e: Exception) {
@@ -1618,7 +1613,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private fun updateCoreText(core: Int) {
         findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-            Prefs.PLAYER_CORE_VLC -> "VLC"
+
             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
             else -> "智能切换"
         }
@@ -1682,7 +1677,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                     Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                    else -> "VLC"
+                    else -> "Auto"
                 }
                 Toast.makeText(this, "当前线路无法播放，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
                 com.mediaplayer.app.util.RemoteLogger.i("Player", "Manual core ($coreName) failed. Switching to line ${currentLineIndex + 1}")
@@ -1693,7 +1688,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                     Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                    else -> "VLC"
+                    else -> "Auto"
                 }
                 currentLineIndex = 0
                 osdOverlayView?.setInfoText("所有线路均无法播放，请切换为智能模式或更换其他频道".toString())
@@ -1716,12 +1711,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
 
         // 2. 所有线路都失败后，尝试切换内核（非网络超时情况）
-        if (!isNetworkTimeout && coreRetryLevel < 2) {
+        if (!isNetworkTimeout && coreRetryLevel < 1) {
             currentLineIndex = 0  // 重置线路索引，用新内核重新遍历所有线路
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
-                1 -> "VLC"
-                2 -> "IJKPlayer"
+                1 -> "IJKPlayer"
                 else -> "ExoPlayer"
             }
             Toast.makeText(this, "所有线路失败，尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
@@ -1895,7 +1889,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         // 核心匹配逻辑（优先使用独立记忆的内核）
         var globalCore = mem?.playerCore ?: prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore == 4) {
+        if (globalCore !in 0..2) {
             globalCore = Prefs.PLAYER_CORE_AUTO
             // 注意：这里不要覆盖 prefs，因为这可能是某个频道的临时回退
         }
@@ -1906,23 +1900,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             if (coreRetryLevel > 0) {
                 desiredCore = when (coreRetryLevel) {
-                    1 -> { coreText = "容灾 (VLC)"; Prefs.PLAYER_CORE_VLC }
-                    2 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
+                    1 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
+
                     else -> desiredCore
                 }
             } else {
                 desiredCore = when (line.streamType.lowercase()) {
-                    "vlc" -> {
-                        coreText = "智能 (VLC)"
-                        Prefs.PLAYER_CORE_VLC
-                    }
                     "ijk" -> {
                         coreText = "智能 (IJK)"
                         Prefs.PLAYER_CORE_IJK
-                    }
-                    "x5" -> {
-                        coreText = "智能 (VLC)"
-                        Prefs.PLAYER_CORE_VLC
                     }
                     "ts", "rtp", "udp" -> {
                         coreText = "智能 (Exo)"
@@ -1938,7 +1924,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                else -> "VLC"
+                else -> "Auto"
             }
         }
         val displayType = if (line.streamType.isEmpty()) "AUTO" else line.streamType.uppercase()
@@ -1948,7 +1934,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
-            else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
+            else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
 
         val isCoreChanged = playerHelper == null || !isCoreMatch
@@ -2355,7 +2341,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     when (it) {
                         is com.mediaplayer.app.util.ExoPlayerHelper -> "ExoPlayer"
                         is com.mediaplayer.app.util.IjkPlayerHelper -> "IJKPlayer"
-                        is com.mediaplayer.app.util.VlcPlayerHelper -> "VLC"
                         else -> ""
                     }
                 } ?: ""

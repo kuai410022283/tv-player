@@ -74,22 +74,27 @@ class IjkPlayerHelper(
 
     override fun play(url: String, userAgent: String, customHeaders: String) {
         if (ijkPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
-            buildPlayer()
+            buildPlayer(url)
         }
 
         isPlayerPlaying = false
+        videoWidth = 0
+        videoHeight = 0
         ijkPlayer?.reset()
-        applyPlayerOptions(ijkPlayer!!)
+        if (surfaceCreated) {
+            ijkPlayer?.setDisplay(surfaceView?.holder)
+        }
+        applyPlayerOptions(ijkPlayer!!, url)
         applyScaleMode()
         applyDataSource(ijkPlayer!!, url, userAgent, customHeaders)
     }
 
-    private fun buildPlayer() {
+    private fun buildPlayer(url: String) {
         releasePlayer()
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
         ijkPlayer = IjkMediaPlayer()
-        applyPlayerOptions(ijkPlayer!!)
+        applyPlayerOptions(ijkPlayer!!, url)
         if (surfaceCreated) {
             ijkPlayer?.setDisplay(surfaceView?.holder)
         }
@@ -97,7 +102,7 @@ class IjkPlayerHelper(
         applyScaleMode()
     }
 
-    private fun applyPlayerOptions(player: IjkMediaPlayer) {
+    private fun applyPlayerOptions(player: IjkMediaPlayer, url: String) {
         IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_ERROR)
 
         val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
@@ -124,7 +129,7 @@ class IjkPlayerHelper(
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-detect-range-support", 0)
-        // 降低极限丢帧率，防止画面变成幻灯片 (优化至 5)
+        // 丢帧机制对于网络直播流特别关键，防止音视频不同步导致卡死
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5L)
         
         // 纯解码性能优化（对 Go 后端绝对安全）
@@ -134,7 +139,6 @@ class IjkPlayerHelper(
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "fast", 1)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1L)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 30000000L) // 30秒超时 (单位为微秒)
 
         // 加入底层的 HTTP 断开重连机制，提升弱网抗性
@@ -143,22 +147,54 @@ class IjkPlayerHelper(
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_streamed", 1)
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect_delay_max", 5) // 最大重连延迟5秒
 
-        if (currentCacheMs <= 0) {
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L)
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1L)
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L)
+        // 格式化归类解析：像 ExoPlayer 那样根据不同的流格式应用不同的参数
+        val lowerUrl = url.lowercase()
+        val isLiveStream = lowerUrl.run { 
+            startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
+            contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") || contains("proxy") 
+        }
+        val isHls = lowerUrl.contains(".m3u8")
+
+        if (isLiveStream && !isHls) {
+            // ----------------------------------------
+            // 裸 TS / FLV / UDPXY 直播流的“裸奔秒开”参数
+            // ----------------------------------------
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L) // 0 可以降低延迟
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L) // 不能在 chunked 里用 1
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 2L) // 最少缓冲帧
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒探针时长
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 2L) // 2MB 探针大小
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "flush_packets") // 禁用 fastseek
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 0)
+        } else if (isHls) {
+            // ----------------------------------------
+            // HLS (m3u8) 分片流的参数
+            // ----------------------------------------
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L) // HLS 需要一定的包缓冲来合并切片
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
+            
+            if (currentCacheMs > 0) {
+                val minFrames = (currentCacheMs / 50).coerceIn(5, 60)
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
+            } else {
+                player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 5L)
+            }
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 5000000L) // 5秒
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 5L) // 5MB
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "flush_packets")
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 0)
         } else {
+            // ----------------------------------------
+            // 常规点播文件 (MP4, MKV 等)
+            // ----------------------------------------
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L)
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
-            val minFrames = (currentCacheMs / 50).coerceIn(5, 60)
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames.toLong())
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 15L) // 点播需要较大缓冲
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 10000000L) // 10秒探针
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 10L) // 10MB
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "fastseek") // 允许点播快速 Seek
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 1) // 开启精准 Seek
         }
-
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzemaxduration", 100L) 
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 2000000L) // 2秒嗅探时长 (单位为微秒)
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 512L * 1024L) // 512KB 探针大小，配合 FCC 缓存瞬间出画
-        player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "max-buffer-size", 50L * 1024L * 1024L)
 
         // 强制 RTSP 使用 TCP 传输，防止组播流被路由器拦截
         player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp")
@@ -281,8 +317,13 @@ class IjkPlayerHelper(
             return
         }
 
-        var targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
-        var targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
+        // 解决切换频道时画面瞬间充满全屏然后恢复的问题（保留上一个频道的画面比例直到新流解析出尺寸）
+        var targetWidth = sv.layoutParams.width
+        var targetHeight = sv.layoutParams.height
+        
+        // 初始状态下如果没有确定尺寸，默认给 MATCH_PARENT
+        if (targetWidth <= 0 && targetWidth != ViewGroup.LayoutParams.MATCH_PARENT) targetWidth = ViewGroup.LayoutParams.MATCH_PARENT
+        if (targetHeight <= 0 && targetHeight != ViewGroup.LayoutParams.MATCH_PARENT) targetHeight = ViewGroup.LayoutParams.MATCH_PARENT
 
         when (currentScaleMode) {
             Prefs.SCALE_MODE_DEFAULT -> {

@@ -19,7 +19,6 @@ import android.net.Uri
 import android.app.PictureInPictureParams
 import android.util.Rational
 import android.content.res.Configuration
-import org.videolan.libvlc.util.VLCVideoLayout
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
@@ -30,7 +29,6 @@ import com.mediaplayer.app.data.repository.ChannelRepository
 import com.mediaplayer.app.service.PlaybackService
 import com.mediaplayer.app.util.DeviceUtils
 import com.mediaplayer.app.util.PlayerGestureController
-import com.mediaplayer.app.util.VlcPlayerHelper
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -122,7 +120,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
     // ── Retry ──
     private var continuousSkipCount = 0
     private val maxAutoSkips = 5
-    private var coreRetryLevel = 0 // 0=默认, 1=VLC, 2=IJK
+    private var coreRetryLevel = 0 // 0=默认, 1=IJK
     private var backPressedTime = 0L
     private var isWatchdogEnabledForCurrentStream = false
 
@@ -473,11 +471,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
             else -> {
-                val vlcVideoLayout = org.videolan.libvlc.util.VLCVideoLayout(this)
-                vlcVideoLayout.layoutParams = android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT)
-                videoLayout?.addView(vlcVideoLayout)
-                
-                playerHelper = com.mediaplayer.app.util.VlcPlayerHelper(this, vlcVideoLayout, listener)
+                playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
         }
     }
@@ -502,7 +496,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore == 4) {
+        if (globalCore !in 0..2) {
             globalCore = Prefs.PLAYER_CORE_AUTO
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
@@ -513,8 +507,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             if (coreRetryLevel > 0) {
                 desiredCore = when (coreRetryLevel) {
-                    1 -> { coreText = "容灾 (VLC)"; Prefs.PLAYER_CORE_VLC }
-                    2 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
+                    1 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
                     else -> desiredCore
                 }
             } else {
@@ -523,21 +516,14 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 val isHighRiskMulticast = lowerUrl.startsWith("rtsp://") || lowerUrl.contains(".smil")
                 
                 if (isHighRiskMulticast) {
-                    coreText = "智能防灾 (VLC)"
-                    desiredCore = Prefs.PLAYER_CORE_VLC
+                    coreText = "智能防灾 (IJK)"
+                    desiredCore = Prefs.PLAYER_CORE_IJK
                 } else {
                     desiredCore = when (type.lowercase()) {
-                        "vlc" -> {
-                            coreText = "智能 (VLC)"
-                            Prefs.PLAYER_CORE_VLC
-                        }
+
                         "ijk" -> {
                             coreText = "智能 (IJK)"
                             Prefs.PLAYER_CORE_IJK
-                        }
-                        "x5" -> {
-                            coreText = "智能 (VLC)"
-                            Prefs.PLAYER_CORE_VLC
                         }
                         "ts", "rtp", "udp" -> {
                             coreText = "智能 (Exo)"
@@ -554,7 +540,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                else -> "VLC"
+                else -> "Auto"
             }
         }
         val displayType = if (type.isEmpty()) "AUTO" else type.uppercase()
@@ -563,7 +549,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
-            else -> playerHelper is com.mediaplayer.app.util.VlcPlayerHelper
+            else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
 
         var needsRebuildDelay = false
@@ -627,7 +613,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             val coreName = when (globalCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
-                else -> "VLC"
+                else -> "Auto"
             }
             currentPlaybackState = PlaybackState.IDLE
             progressBar?.visibility = View.GONE
@@ -660,11 +646,10 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     private fun executeRetry(isNetworkTimeout: Boolean) {
         // 智能切换模式下的内核容灾
-        if (coreRetryLevel < 2) {
+        if (coreRetryLevel < 1) {
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
-                1 -> "VLC"
-                2 -> "IJKPlayer"
+                1 -> "IJKPlayer"
                 else -> "ExoPlayer"
             }
             tvStatus?.text = "尝试使用 $coreName 重试该线路..."

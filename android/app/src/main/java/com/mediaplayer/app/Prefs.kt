@@ -37,9 +37,8 @@ object Prefs {
     // 播放内核
     const val KEY_PLAYER_CORE = "player_core"
     const val PLAYER_CORE_AUTO = 0
-    const val PLAYER_CORE_VLC = 1
-    const val PLAYER_CORE_EXO = 2
-    const val PLAYER_CORE_IJK = 3
+    const val PLAYER_CORE_EXO = 1
+    const val PLAYER_CORE_IJK = 2
     
     // 渲染引擎 (为未来做准备)
     const val KEY_RENDER_VIEW = "render_view_mode"

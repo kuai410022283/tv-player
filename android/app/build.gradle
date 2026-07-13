@@ -115,8 +115,7 @@ dependencies {
     // AV3A FFmpeg 扩展直接采用影子类源码集成，不再需要 AAR
     // implementation files('libs/lib-decoder-ffmpeg-release.aar')
 
-    // VLC Android SDK
-    implementation 'org.videolan.android:libvlc-all:3.5.1'
+    // VLC Android SDK removed
 
     // IJKPlayer - 使用自定义编译 native 库 (来自 jniLibs/)，已打 FFmpeg HTTP 补丁
     implementation 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'
