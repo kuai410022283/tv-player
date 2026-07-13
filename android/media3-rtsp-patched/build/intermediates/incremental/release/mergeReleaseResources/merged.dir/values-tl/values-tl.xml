@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Naghihintay ng network ang pag-download</string>
     <string name="exo_download_paused_for_wifi">Naghihintay ng WiFi ang mga pag-download</string>
     <string name="exo_download_removing">Inaalis ang mga na-download</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

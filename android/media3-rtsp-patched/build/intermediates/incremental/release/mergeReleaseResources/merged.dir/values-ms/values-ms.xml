@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Muat turun menunggu rangkaian</string>
     <string name="exo_download_paused_for_wifi">Muat turun menunggu Wi-Fi</string>
     <string name="exo_download_removing">Mengalih keluar muat turun</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

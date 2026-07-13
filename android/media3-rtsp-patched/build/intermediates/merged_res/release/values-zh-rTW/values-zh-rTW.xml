@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">系統會等到連上網路後再開始下載</string>
     <string name="exo_download_paused_for_wifi">系統會等到連上 Wi-Fi 後再開始下載</string>
     <string name="exo_download_removing">正在移除下載內容</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

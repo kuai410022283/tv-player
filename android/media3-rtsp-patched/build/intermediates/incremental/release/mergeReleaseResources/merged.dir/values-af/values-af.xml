@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Aflaaie wag tans vir netwerk</string>
     <string name="exo_download_paused_for_wifi">Aflaaie wag tans vir wi-fi</string>
     <string name="exo_download_removing">Verwyder tans aflaaie</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

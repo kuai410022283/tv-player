@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">ජාලය සඳහා බාගැනීම් රැඳී සිටී</string>
     <string name="exo_download_paused_for_wifi">WiFi සඳහා බාගැනීම් රැඳී සිටී</string>
     <string name="exo_download_removing">බාගැනීම් ඉවත් කිරීම</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

@@ -23,7 +23,7 @@ plugins {
 
 android {
     namespace 'androidx.media3.exoplayer.rtsp'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         minSdk 23
@@ -36,8 +36,8 @@ android {
 }
 
 dependencies {
-    // Same as upstream: androidx.media3:media3-exoplayer-rtsp:1.9.1 build.gradle
-    api 'androidx.media3:media3-exoplayer:1.9.1'
+    // Same as upstream: androidx.media3:media3-exoplayer-rtsp:1.10.1 build.gradle
+    api 'androidx.media3:media3-exoplayer:1.10.1'
     implementation 'androidx.annotation:annotation:1.9.1'
     compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
     compileOnly 'com.google.errorprone:error_prone_annotations:2.36.0'

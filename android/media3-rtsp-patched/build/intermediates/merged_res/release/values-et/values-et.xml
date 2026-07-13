@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Allalaadimised on võrgu ootel</string>
     <string name="exo_download_paused_for_wifi">Allalaadimised on WiFi-võrgu ootel</string>
     <string name="exo_download_removing">Allalaadimiste eemaldamine</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

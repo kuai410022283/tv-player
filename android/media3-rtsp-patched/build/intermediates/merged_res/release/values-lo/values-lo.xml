@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">ການດາວໂຫຼດກຳລັງລໍຖ້າເຄືອຂ່າຍຢູ່</string>
     <string name="exo_download_paused_for_wifi">ການດາວໂຫຼດກຳລັງລໍຖ້າ WiFi ຢູ່</string>
     <string name="exo_download_removing">ກຳລັງລຶບການດາວໂຫລດອອກ</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

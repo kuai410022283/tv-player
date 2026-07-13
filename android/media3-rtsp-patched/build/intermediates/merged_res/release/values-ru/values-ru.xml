@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Ожидание подключения к сети</string>
     <string name="exo_download_paused_for_wifi">Ожидание подключения к Wi-Fi</string>
     <string name="exo_download_removing">Удаление скачанных файлов…</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">">999"</string>
 </resources>

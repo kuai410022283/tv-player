@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Descărcările așteaptă rețeaua</string>
     <string name="exo_download_paused_for_wifi">Descărcările așteaptă rețeaua Wi-Fi</string>
     <string name="exo_download_removing">Se elimină descărcările</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

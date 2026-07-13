@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Οι λήψεις είναι σε αναμονή για δίκτυο.</string>
     <string name="exo_download_paused_for_wifi">Οι λήψεις είναι σε αναμονή για Wi-Fi.</string>
     <string name="exo_download_removing">Κατάργηση λήψεων</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

@@ -1,31 +1,31 @@
 {
     "logs": [
         {
-            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-merged_res-7:/values-or/values-or.xml",
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-merged_res-5:/values-or/values-or.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-or\\values-or.xml",
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\ce3d297c5eb6aeb113250c3348d2a074\\transformed\\jetified-media3-exoplayer-1.10.1\\res\\values-or\\values-or.xml",
                     "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "100",
-                        "endOffsets": "151"
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,131,199,266,333,408,484,585,681",
+                        "endColumns": "75,67,66,66,74,75,100,95,77",
+                        "endOffsets": "126,194,261,328,403,479,580,676,754"
                     }
                 }
             ]
         },
         {
-            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-5:/values-or/values-or.xml",
+            "outputFile": "androidx.media3.exoplayer.rtsp.media3-rtsp-patched-mergeReleaseResources-3:/values-or/values-or.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\b16807be399488cb7b2da1b3dcd8d24b\\transformed\\core-1.8.0\\res\\values-or\\values-or.xml",
+                    "source": "C:\\Users\\kuai\\.gradle\\caches\\transforms-3\\ce3d297c5eb6aeb113250c3348d2a074\\transformed\\jetified-media3-exoplayer-1.10.1\\res\\values-or\\values-or.xml",
                     "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "100",
-                        "endOffsets": "151"
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,131,199,266,333,408,484,585,681",
+                        "endColumns": "75,67,66,66,74,75,100,95,77",
+                        "endOffsets": "126,194,261,328,403,479,580,676,754"
                     }
                 }
             ]

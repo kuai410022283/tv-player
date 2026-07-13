@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace 'com.mediaplayer.app'
-    compileSdk 35
+    compileSdk 36
 
     packagingOptions {
         jniLibs {
@@ -101,17 +101,18 @@ dependencies {
     implementation 'androidx.leanback:leanback-tab:1.1.0-beta01'
 
     // Media3 / ExoPlayer
-    implementation 'androidx.media3:media3-exoplayer:1.9.1'
-    implementation 'androidx.media3:media3-exoplayer-hls:1.9.1'
-    implementation 'androidx.media3:media3-exoplayer-dash:1.9.1'
+    implementation 'androidx.media3:media3-exoplayer:1.10.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.10.1'
+    implementation 'androidx.media3:media3-exoplayer-dash:1.10.1'
     // PATCHED: using local module instead of AAR for RTSP SDP parsing fix
     // Search for "PATCHED" in :media3-rtsp-patched to see modifications.
-    // To revert: replace with  implementation 'androidx.media3:media3-exoplayer-rtsp:1.9.1'
+    // To revert: replace with  implementation 'androidx.media3:media3-exoplayer-rtsp:1.10.1'
     implementation project(':media3-rtsp-patched')
-    implementation 'androidx.media3:media3-ui:1.9.1'
-    implementation 'androidx.media3:media3-common:1.9.1'
-    implementation 'androidx.media3:media3-datasource-okhttp:1.9.1'
-    implementation files('libs/lib-decoder-ffmpeg-release.aar')
+    implementation 'androidx.media3:media3-ui:1.10.1'
+    implementation 'androidx.media3:media3-common:1.10.1'
+    implementation 'androidx.media3:media3-datasource-okhttp:1.10.1'
+    // AV3A FFmpeg 扩展直接采用影子类源码集成，不再需要 AAR
+    // implementation files('libs/lib-decoder-ffmpeg-release.aar')
 
     // VLC Android SDK
     implementation 'org.videolan.android:libvlc-all:3.5.1'

@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Таталтууд сүлжээг хүлээж байна</string>
     <string name="exo_download_paused_for_wifi">Таталтууд Wi-Fi-г хүлээж байна</string>
     <string name="exo_download_removing">Татаж авсан файлыг хасаж байна</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

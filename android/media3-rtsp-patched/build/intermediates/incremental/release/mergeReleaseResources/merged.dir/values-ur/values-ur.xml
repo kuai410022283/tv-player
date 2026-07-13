@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">ڈاؤن لوڈز نیٹ ورک کے منتظر ہیں</string>
     <string name="exo_download_paused_for_wifi">ڈاؤن لوڈز WiFi کے منتظر ہیں</string>
     <string name="exo_download_removing">ڈاؤن لوڈز کو ہٹایا جا رہا ہے</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"+999"</string>
 </resources>

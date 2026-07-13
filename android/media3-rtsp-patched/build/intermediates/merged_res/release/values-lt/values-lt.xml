@@ -9,5 +9,4 @@
     <string name="exo_download_paused_for_network">Norint tęsti atsis., laukiama tinklo</string>
     <string name="exo_download_paused_for_wifi">Norint tęsti atsis., laukiama „Wi-Fi“</string>
     <string name="exo_download_removing">Pašalinami atsisiuntimai</string>
-    <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
 </resources>

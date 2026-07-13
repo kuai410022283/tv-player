@@ -143,9 +143,27 @@ class ExoPlayerHelper(
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
         val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
-        // 注入自定义提取器，降低对 TS 流解析的严苛度（允许非 IDR 关键帧起播，增强容错）
-        val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
+        // 注入自定义提取器：引入 AV3A 嗅探工厂，同时保留允许非 IDR 关键帧起播的容错特性
+        val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
             .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+
+        val extractorsFactory = androidx.media3.extractor.ExtractorsFactory {
+            val extractors = defaultExtractorsFactory.createExtractors()
+            val newExtractors = mutableListOf<androidx.media3.extractor.Extractor>()
+            for (extractor in extractors) {
+                if (extractor is androidx.media3.extractor.ts.TsExtractor) {
+                    // 替换原生的 TsExtractor，注入我们的 Av3aTsPayloadReaderFactory
+                    newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
+                        androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
+                        androidx.media3.common.util.TimestampAdjuster(0),
+                        com.mediaplayer.app.av3a.Av3aTsPayloadReaderFactory()
+                    ))
+                } else {
+                    newExtractors.add(extractor)
+                }
+            }
+            newExtractors.toTypedArray()
+        }
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
             .setDataSourceFactory(defaultDataSourceFactory)
