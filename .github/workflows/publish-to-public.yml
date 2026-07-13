@@ -218,7 +218,7 @@ jobs:
             APK=$(find android/app/build/outputs/apk/release -name "*all*.apk" | head -1)
           fi
           echo "检查 APK: $APK"
-          unzip -l "$APK" | grep -E "lib/|libffmpeg|libvlc|libijk" | awk '{print $NF, $1}'
+          unzip -l "$APK" | grep -E "lib/|libffmpeg|libijk" | awk '{print $NF, $1}'
           echo "---"
           # 关键验证：libffmpegJNI.so 必须存在（来自本地 .aar）
           if unzip -l "$APK" | grep -q "libffmpegJNI.so"; then
@@ -227,14 +227,6 @@ jobs:
             echo "❌ 缺少 libffmpegJNI.so！MP2/MPEG-Audio 将无法解码！"
             exit 1
           fi
-          # 关键验证：libvlc.so 必须存在（来自 Maven 依赖）
-          if unzip -l "$APK" | grep -q "libvlc.so"; then
-            echo "✅ libvlc.so 已打包 (VLC 内核正常)"
-          else
-            echo "❌ 缺少 libvlc.so！VLC 播放将不可用！"
-            exit 1
-          fi
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

@@ -151,13 +151,6 @@ jobs:
             echo "❌ 缺少 libffmpegJNI.so！MP2 音频将无法解码！"
             exit 1
           fi
-          if unzip -l "$APK" | grep -q "libvlc.so"; then
-            echo "✅ libvlc.so 已打包 (VLC 内核正常)"
-          else
-            echo "❌ 缺少 libvlc.so！VLC 播放将不可用！"
-            exit 1
-          fi
-
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
