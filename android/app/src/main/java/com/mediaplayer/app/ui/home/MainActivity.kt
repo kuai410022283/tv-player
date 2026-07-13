@@ -912,6 +912,68 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             startGlobalProgressTicker()
         }
         
+        val btnSettingsPreferredServer = findViewById<View>(R.id.btnSettingsPreferredServer)
+        val tvSettingsPreferredServerValue = findViewById<TextView>(R.id.tvSettingsPreferredServerValue)
+        var currentPreferredIndex = prefs.getInt(Prefs.KEY_PREFERRED_SERVER_INDEX, -1)
+        
+        fun getAvailableServerCount(): Int {
+            val serverListJson = prefs.getString(Prefs.KEY_SERVER_URLS, null)
+            val serverList = if (serverListJson != null) {
+                try {
+                    com.google.gson.Gson().fromJson(serverListJson, Array<String>::class.java).toList().filter { it.isNotEmpty() }
+                } catch (e: Exception) { emptyList() }
+            } else { emptyList() }
+            return if (serverList.isNotEmpty()) serverList.size else 1
+        }
+        
+        fun updatePreferredServerText() {
+            val count = getAvailableServerCount()
+            if (count <= 1) {
+                tvSettingsPreferredServerValue?.text = "线路 1"
+                if (currentPreferredIndex != 0) {
+                    currentPreferredIndex = 0
+                    prefs.edit().putInt(Prefs.KEY_PREFERRED_SERVER_INDEX, 0).apply()
+                }
+                return
+            }
+            
+            if (currentPreferredIndex == -1 || currentPreferredIndex >= count) {
+                currentPreferredIndex = -1
+                tvSettingsPreferredServerValue?.text = "自动"
+            } else {
+                tvSettingsPreferredServerValue?.text = "线路 ${currentPreferredIndex + 1}"
+            }
+        }
+        
+        updatePreferredServerText()
+        
+        var serverSwitchRunnable: Runnable? = null
+        
+        btnSettingsPreferredServer?.setOnClickListener {
+            val count = getAvailableServerCount()
+            if (count <= 1) {
+                Toast.makeText(this@MainActivity, "当前仅有一条可用线路", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            currentPreferredIndex++
+            if (currentPreferredIndex >= count) {
+                currentPreferredIndex = -1
+            }
+            prefs.edit().putInt(Prefs.KEY_PREFERRED_SERVER_INDEX, currentPreferredIndex).apply()
+            updatePreferredServerText()
+            
+            // 防抖 1.2s 后直接激活切换
+            serverSwitchRunnable?.let { btnSettingsPreferredServer.removeCallbacks(it) }
+            serverSwitchRunnable = Runnable {
+                Toast.makeText(this@MainActivity, "正在应用线路配置，准备重新连接...", Toast.LENGTH_SHORT).show()
+                playerHelper?.release()
+                playerHelper = null
+                authFlowManager.startAuthFlow()
+            }
+            btnSettingsPreferredServer.postDelayed(serverSwitchRunnable, 1200L)
+        }
+        
         val btnSettingsGroupSource = findViewById<View>(R.id.btnSettingsGroupSource)
         val tvSettingsGroupSourceValue = findViewById<TextView>(R.id.tvSettingsGroupSourceValue)
         
@@ -1365,7 +1427,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val pName = if (planName.isNullOrEmpty()) "无" else planName
                 val expTime = if (expiresAt.isNullOrEmpty()) "永久" else expiresAt
                 val serverName = authManager.getServerName()
-                val serverLine = if (!serverName.isNullOrEmpty()) "$serverName\n" else ""
+                val serverLine = if (!serverName.isNullOrEmpty()) "服务器名称：$serverName\n" else ""
                 "${serverLine}套餐: $pName\n过期时间: $expTime"
             }
             "pending" -> "授权状态: 等待审批"
@@ -1569,7 +1631,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 runOnUiThread {
                     val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                     saveServerList(urls)
-                    prefs.edit().putString(Prefs.KEY_SERVER_URL, urls.first()).apply()
+                    prefs.edit()
+                        .putString(Prefs.KEY_SERVER_URL, urls.first())
+                        .putInt(Prefs.KEY_PREFERRED_SERVER_INDEX, -1) // 重置首选服务器为自动优选
+                        .apply()
                     com.mediaplayer.app.data.api.ApiClient.init(urls.first())
                     authManager.clearAuth()
                     onUrlUpdated()
@@ -2624,19 +2689,31 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                                         .apply()
                                     showContent()
                                 }
+                                // 心跳成功，必须重置定时器保证心跳永远活着 (3 分钟 = 180000 ms)
+                                authPollRunnable?.let { authPollHandler.postDelayed(it, 180_000) }
                             }.onFailure { 
-                                // 如果验证失败（如网络抖动），继续轮询不要停
-                                authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
+                                // verify 失败（服务器故障），果断断开并拉起 failover 流程
+                                playerHelper?.release()
+                                playerHelper = null
+                                authFlowManager.startAuthFlow()
                             }
                             return@launch 
                         }
-                        authPollRunnable?.let { authPollHandler.postDelayed(it, 10000) }
-                    }.onFailure { authPollRunnable?.let { authPollHandler.postDelayed(it, 15000) } }
+                        // status != approved
+                        playerHelper?.release()
+                        playerHelper = null
+                        authFlowManager.startAuthFlow()
+                    }.onFailure { 
+                        // checkStatus 失败（服务器完全失联或宕机），同样果断拉起 failover 流程
+                        playerHelper?.release()
+                        playerHelper = null
+                        authFlowManager.startAuthFlow()
+                    }
                 }
             }
         }
         authPollRunnable = runnable
-        authPollHandler.postDelayed(runnable, 10000)
+        authPollHandler.postDelayed(runnable, 180_000)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {

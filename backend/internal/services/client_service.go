@@ -619,3 +619,9 @@ func statusMessage(status string) string {
 		return "未知状态"
 	}
 }
+
+// UpdateRemark 更新设备的申请备注
+func (s *ClientService) UpdateRemark(id int64, note string) error {
+	_, err := s.db.Exec(`UPDATE clients SET request_note=?, updated_at=DATETIME('now','localtime') WHERE id=?`, note, id)
+	return err
+}

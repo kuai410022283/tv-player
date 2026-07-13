@@ -241,7 +241,19 @@ class ServerAuthFlowManager(
             emptyList()
         }
         val defaultUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-        return serverList.ifEmpty { listOf(defaultUrl) }
+        var candidates = serverList.ifEmpty { listOf(defaultUrl) }
+        
+        // 核心修复：不应该“只返回首选线路”导致一条路走到黑。
+        // 如果用户锁定了首选线路，应该将其“提拔”到列表最前面，依然保留后续备用节点作为防线。
+        // 这样既实现了秒进首选，又保证了遇到该线路维护/宕机时能按顺序向下轮询兜底。
+        val preferredIndex = prefs.getInt(Prefs.KEY_PREFERRED_SERVER_INDEX, -1)
+        if (preferredIndex in candidates.indices) {
+            val preferredUrl = candidates[preferredIndex]
+            val others = candidates.filterIndexed { index, _ -> index != preferredIndex }
+            candidates = listOf(preferredUrl) + others
+        }
+        
+        return candidates
     }
 
     /**

@@ -386,6 +386,23 @@ func (h *ClientHandler) Delete(c *gin.Context) {
 	ok(c, gin.H{"message": "已删除"})
 }
 
+func (h *ClientHandler) UpdateRemark(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var body struct {
+		Note string `json:"note"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.clientSvc.UpdateRemark(id, body.Note); err != nil {
+		slog.Error("update remark failed", "client_id", id, "error", err)
+		fail(c, 500, "更新备注失败")
+		return
+	}
+	ok(c, gin.H{"message": "已更新"})
+}
+
 // ── 管理端：访问日志 ───────────────────────────────────
 
 func (h *ClientHandler) GetLogs(c *gin.Context) {
