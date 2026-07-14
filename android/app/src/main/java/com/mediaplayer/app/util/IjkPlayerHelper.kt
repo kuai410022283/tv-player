@@ -72,7 +72,13 @@ class IjkPlayerHelper(
         videoLayout.addView(surfaceView)
     }
 
-    override fun play(url: String, userAgent: String, customHeaders: String) {
+    override fun play(originalUrl: String, userAgent: String, customHeaders: String) {
+        var url = originalUrl
+        val lowerUrl = url.lowercase()
+        if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("igmp://") || lowerUrl.startsWith("rtsp://")) {
+            url = "http://127.0.0.1:9530/proxy?url=${Uri.encode(originalUrl)}"
+        }
+
         if (ijkPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
             buildPlayer(url)
         }

@@ -90,7 +90,13 @@ class ExoPlayerHelper(
         playInternal(url, userAgent, customHeaders, null)
     }
 
-    private fun playInternal(url: String, userAgent: String, customHeaders: String, mimeType: String?) {
+    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?) {
+        var url = originalUrl
+        val lowerUrl = url.lowercase()
+        if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("igmp://") || lowerUrl.startsWith("rtsp://")) {
+            url = "http://127.0.0.1:9530/proxy?url=${Uri.encode(originalUrl)}"
+        }
+
         val isLiveStream = url.lowercase().run { 
             startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
             contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 

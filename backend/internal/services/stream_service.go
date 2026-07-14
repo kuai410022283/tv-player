@@ -489,6 +489,17 @@ func (sp *StreamProxy) ServeStream(channelID int64, clientID int64, clientIP str
 	return sp.serveDirectProxy(channelID, clientID, clientIP, clientName, w, r, ch, targetURL)
 }
 
+// ServeLocalProxy bypasses database lookups and directly proxies a targetURL. Used by the Android mobile wrapper.
+func (sp *StreamProxy) ServeLocalProxy(w http.ResponseWriter, r *http.Request, targetURL string) error {
+	ch := &models.Channel{
+		ID:        0,
+		Name:      "LocalProxy",
+		StreamURL: targetURL,
+	}
+	return sp.serveDirectProxy(0, 0, "127.0.0.1", "AndroidTV", w, r, ch, targetURL)
+}
+
+
 // getFlushThreshold returns the protocol-appropriate flush buffer size.
 // Priority: Channel.StreamType > Original source URL (ch.StreamURL) > Content-Type detection > finalURL.
 // Different protocols have different latency vs. TCP efficiency needs.

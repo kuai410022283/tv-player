@@ -3,7 +3,10 @@ package com.mediaplayer.app.ui.home
 import android.content.Intent
 import kotlin.coroutines.resume
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.content.Context
+import mobile.Mobile
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -169,6 +172,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private val uiHandler = Handler(Looper.getMainLooper())
     private var coreRetryLevel = 0
     private var isWatchdogEnabledForCurrentStream = false
+
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     // VOD 专业快进/快退状态
     private var vodSeekActive = false          // 快进或快退进行中
@@ -364,6 +369,24 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         setContentView(R.layout.activity_main)
         setupTvViews()
+
+        // 获取并持有 MulticastLock，允许 Android 接收 UDP 组播流
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        if (wifiManager != null) {
+            multicastLock = wifiManager.createMulticastLock("MediaPlayerMulticastLock")
+            multicastLock?.setReferenceCounted(true)
+            multicastLock?.acquire()
+            com.mediaplayer.app.util.RemoteLogger.i("Network", "MulticastLock acquired")
+        }
+
+        // 启动本地 Go 引擎代理
+        try {
+            Mobile.startLocalProxy(9530L)
+            com.mediaplayer.app.util.RemoteLogger.i("MobileProxy", "Go Mobile Proxy started on port 9530")
+        } catch (e: Exception) {
+            com.mediaplayer.app.util.RemoteLogger.e("MobileProxy", "Failed to start Go proxy: \${e.message}")
+        }
+
         // Player will be initialized when playing a channel
         setupTouchGestures()
 
@@ -4107,6 +4130,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     override fun onDestroy() {
         super.onDestroy()
+        multicastLock?.let {
+            if (it.isHeld) {
+                it.release()
+                com.mediaplayer.app.util.RemoteLogger.i("Network", "MulticastLock released")
+            }
+        }
         configWebServer?.stop()
         authFlowManager.cancelRetry()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
