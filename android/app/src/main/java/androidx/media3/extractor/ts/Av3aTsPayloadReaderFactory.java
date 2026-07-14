@@ -31,16 +31,13 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
 
     @Override
     public TsPayloadReader createPayloadReader(int streamType, TsPayloadReader.EsInfo esInfo) {
-        // If stream is an unknown or private audio stream, we inject our AV3A reader.
-        // It will sniff for 0xFFF sync word. If not AV3A, it will just drop frames.
+        // Intercept specific stream types and use SmartAudioSnifferReader to dynamically detect
+        // the true underlying format (AC-3, DTS, AV3A, etc.) instead of blindly assuming AV3A.
         if (streamType == STREAM_TYPE_AV3A_PRIVATE_1 || streamType == STREAM_TYPE_AV3A_PRIVATE_2 || streamType == 0x06 || streamType == 0x81) {
-            // For safety, we only return Av3aReader for specific stream types
-            // that are known to sometimes encapsulate AV3A audio streams.
-            // Returning Av3aReader wrapped in a PesReader to handle PES packet headers.
-            return new PesReader(new Av3aReader(esInfo.language, esInfo.getRoleFlags()));
+            return new PesReader(new SmartAudioSnifferReader(esInfo.language, esInfo.getRoleFlags()));
         }
 
-        // Delegate all other standard streams (H264, AAC, AC3, HEVC, etc.) to ExoPlayer's default implementation
+        // Delegate all other standard streams to ExoPlayer's default implementation
         return defaultFactory.createPayloadReader(streamType, esInfo);
     }
 }
