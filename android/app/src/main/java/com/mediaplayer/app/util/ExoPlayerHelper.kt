@@ -264,7 +264,7 @@ class ExoPlayerHelper(
                 currentCacheMs
             )
         } else {
-            loadControlBuilder.setBufferDurationsMs(15000, 120000, 30, 3000)
+            loadControlBuilder.setBufferDurationsMs(15000, 120000, 200, 3000)
         }
         val loadControl = loadControlBuilder.build()
 

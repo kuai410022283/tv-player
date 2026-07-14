@@ -91,6 +91,11 @@ func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient
 		}
 	}
 
+	// Start IGMP Heartbeat to keep router multicast forwarding alive (Android TV Wi-Fi fix)
+	if reader.mcastIP.IsMulticast() {
+		go reader.igmpHeartbeat(ctx)
+	}
+
 	return reader, nil
 }
 
@@ -120,6 +125,52 @@ func (r *MulticastReader) joinMulticast() error {
 	r.mcastJoined = true
 	slog.Info("Joined multicast group", "ip", r.mcastIP.String(), "port", r.mcastPort)
 	return nil
+}
+
+// igmpHeartbeat is a hack for Android TV / Wi-Fi environments.
+// Many routers have an "IGMP Snooping Aging Time" of 40-125 seconds. If the Android kernel
+// fails to reply to IGMP Queries, the router physically cuts off the multicast stream.
+// By periodically opening and closing a dummy multicast socket, we force the kernel
+// to broadcast an IGMP Membership Report, keeping the router's forwarding table alive!
+func (r *MulticastReader) igmpHeartbeat(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.mu.Lock()
+			joined := r.mcastJoined
+			var conn *net.UDPConn
+			if joined {
+				conn = r.conn
+			}
+			r.mu.Unlock()
+
+			if joined && conn != nil {
+				addr := &net.UDPAddr{
+					IP:   r.mcastIP,
+					Port: r.mcastPort, // Use the actual port to send dummy data
+				}
+				
+				// 策略 1：主动向该组播地址发送一个极小的废弃数据包。
+				// 很多光猫和路由器的 IGMP Snooping 只要看到有发往该组播 MAC 的上行流量，就会自动重置 40 秒的老化定时器。
+				_, errWrite := conn.WriteToUDP([]byte{0}, addr)
+				
+				// 策略 2：通过建立新 Socket 尝试强迫内核发送 IGMP Join（补充防御）
+				dummyConn, err := net.ListenMulticastUDP("udp", nil, &net.UDPAddr{IP: r.mcastIP, Port: 0})
+				if err == nil {
+					dummyConn.Close()
+				}
+				
+				if errWrite == nil {
+					slog.Debug("IGMP heartbeat (UDP packet & socket) sent at 15s", "ip", r.mcastIP.String())
+				}
+			}
+		}
+	}
 }
 
 // seqDiff computes the forward difference taking uint16 wraparound into account

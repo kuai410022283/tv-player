@@ -1643,11 +1643,17 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			if _, wErr := w.Write(buf[:n]); wErr != nil {
 				return nil
 			}
-			if canFlush {
-				flusher.Flush()
-			}
 			bytesRead += int64(n)
 			bytesSinceLastUpdate += int64(n)
+
+			// 智能合并 Flush：积累到 64KB 或距离上次 Flush 超过 50ms 才进行真正的 Flush
+			if canFlush {
+				if int64(n) >= 64*1024 || bytesSinceLastUpdate > 64*1024 || time.Since(lastUpdate) >= 50*time.Millisecond {
+					flusher.Flush()
+					lastUpdate = time.Now()
+					bytesSinceLastUpdate = 0
+				}
+			}
 		}
 		if err != nil {
 			slog.Error("multicast proxy read error", "session", sessionID, "error", err)
