@@ -224,7 +224,7 @@ class OsdOverlayView @JvmOverloads constructor(
             progressEpg.visibility = View.VISIBLE
         } else {
             progressEpg.progress = 0
-            progressEpg.visibility = View.GONE
+            progressEpg.visibility = View.INVISIBLE
         }
     }
 

@@ -444,13 +444,67 @@ class IjkPlayerHelper(
         ijkPlayer?.setSpeed(rate)
     }
 
-    // ── 音轨/字幕接口（IJK 不支持，全部降级为空实现） ──
+    // ── 音轨/字幕接口 ──
 
-    override fun getAudioTracks(): List<AudioTrackInfo> = emptyList()
-    override fun selectAudioTrack(index: Int) {}
-    override fun getSubtitleTracks(): List<SubtitleTrackInfo> = emptyList()
-    override fun selectSubtitleTrack(index: Int) {}
-    override fun disableSubtitle() {}
+    override fun getAudioTracks(): List<AudioTrackInfo> {
+        val player = ijkPlayer ?: return emptyList()
+        val trackInfos = player.trackInfo ?: return emptyList()
+        val result = mutableListOf<AudioTrackInfo>()
+        val selectedIndex = player.getSelectedTrack(tv.danmaku.ijk.media.player.misc.ITrackInfo.MEDIA_TRACK_TYPE_AUDIO)
+        
+        for ((i, track) in trackInfos.withIndex()) {
+            if (track.trackType == tv.danmaku.ijk.media.player.misc.ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                result.add(AudioTrackInfo(
+                    index = i,
+                    language = track.language ?: "und",
+                    label = track.infoInline ?: "音轨 ${result.size + 1}",
+                    codec = "",
+                    channelCount = -1,
+                    isSelected = (i == selectedIndex)
+                ))
+            }
+        }
+        return result
+    }
+
+    override fun selectAudioTrack(index: Int) {
+        ijkPlayer?.selectTrack(index)
+    }
+
+    override fun getSubtitleTracks(): List<SubtitleTrackInfo> {
+        val player = ijkPlayer ?: return emptyList()
+        val trackInfos = player.trackInfo ?: return emptyList()
+        val result = mutableListOf<SubtitleTrackInfo>()
+        val selectedIndex = player.getSelectedTrack(tv.danmaku.ijk.media.player.misc.ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT)
+        
+        for ((i, track) in trackInfos.withIndex()) {
+            if (track.trackType == tv.danmaku.ijk.media.player.misc.ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
+                result.add(SubtitleTrackInfo(
+                    index = i,
+                    language = track.language ?: "und",
+                    label = track.infoInline ?: "字幕 ${result.size + 1}",
+                    isEmbedded = true,
+                    mimeType = "",
+                    isSelected = (i == selectedIndex)
+                ))
+            }
+        }
+        return result
+    }
+
+    override fun selectSubtitleTrack(index: Int) {
+        ijkPlayer?.selectTrack(index)
+    }
+
+    override fun disableSubtitle() {
+        // IJKPlayer doesn't have a direct "disable" method, but we can deselect the current track
+        val player = ijkPlayer ?: return
+        val selectedIndex = player.getSelectedTrack(tv.danmaku.ijk.media.player.misc.ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT)
+        if (selectedIndex >= 0) {
+            player.deselectTrack(selectedIndex)
+        }
+    }
+
     override fun loadExternalSubtitle(uri: Uri, mimeType: String): Boolean = false
 
     override fun release() {

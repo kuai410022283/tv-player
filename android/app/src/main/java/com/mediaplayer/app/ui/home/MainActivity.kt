@@ -2229,10 +2229,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         } else {
             osdOverlayView?.updateSubtitleButton("")
         }
-
-        // IJK 降级检测：内核不支持音轨切换时禁用按钮
-        val isIjk = playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
-        osdOverlayView?.setTrackButtonsEnabled(!isIjk)
+        // IJKPlayer 也已经支持音轨切换，不再需要禁用按钮
+        osdOverlayView?.setTrackButtonsEnabled(true)
     }
 
     // ── 音轨/字幕选择面板 ──
