@@ -361,24 +361,22 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		if userAgent == "" {
 			userAgent = sourceUA
 		}
-		supportCatchup := 0
-		catchupType := ch["catchup"]
-		if catchupType != "" {
-			supportCatchup = 1
-		}
 
-		if supportCatchup == 0 {
+		// 乐观策略：所有导入的频道默认允许尝试回看。
+		// 若源不支持，后端在请求时会返回错误，而非在客户端提前屏蔽。
+		supportCatchup := 1
+		catchupType := ch["catchup"]
+
+		// 若 M3U 明确标注了已知运营商回看特征 URL，自动补全 catchup-type
+		if catchupType == "" {
 			u := mergedURLStr
-			if strings.Contains(u, "PLTV") || strings.Contains(u, "TVOD") || 
-			   strings.Contains(u, "itv.cmvideo.cn") || strings.Contains(u, "channel-id=") ||
-			   strings.Contains(u, "/live/program/live/") || strings.Contains(u, "/gitv/") ||
-			   strings.Contains(u, "/gitv_live/") || strings.Contains(u, "ysten-business") ||
-			   strings.Contains(u, "aishang.ctlcdn") || strings.Contains(u, "userid=gf001") ||
-			   (strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=")) || strings.Contains(u, "/cms001/") {
-				supportCatchup = 1
-				if catchupType == "" {
-					catchupType = "append"
-				}
+			if strings.Contains(u, "PLTV") || strings.Contains(u, "TVOD") ||
+				strings.Contains(u, "itv.cmvideo.cn") || strings.Contains(u, "channel-id=") ||
+				strings.Contains(u, "/live/program/live/") || strings.Contains(u, "/gitv/") ||
+				strings.Contains(u, "/gitv_live/") || strings.Contains(u, "ysten-business") ||
+				strings.Contains(u, "aishang.ctlcdn") || strings.Contains(u, "userid=gf001") ||
+				(strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=")) || strings.Contains(u, "/cms001/") {
+				catchupType = "append"
 			}
 		}
 
@@ -387,8 +385,8 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 		catchupDays := 0
 		if days, err := strconv.Atoi(ch["catchup-days"]); err == nil && days > 0 {
 			catchupDays = days
-		} else if supportCatchup == 1 {
-			catchupDays = 7
+		} else {
+			catchupDays = 7 // 默认保留 7 天回看
 		}
 
 		fcc := ch["fcc"]

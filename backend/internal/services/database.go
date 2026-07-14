@@ -156,7 +156,7 @@ func createTables(db *sql.DB) error {
 		source TEXT DEFAULT '手动',
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
-		support_catchup INTEGER DEFAULT 0,
+		support_catchup INTEGER DEFAULT 1,
 		catchup_type TEXT DEFAULT '',
 		catchup_source TEXT DEFAULT '',
 		catchup_days INTEGER DEFAULT 0,
@@ -322,6 +322,12 @@ func createTables(db *sql.DB) error {
 	`
 
 	_, err := db.Exec(schema)
+
+	// ── 存量数据兜底：将所有未开启回看的频道默认视为支持回看 ──────────
+	// 背景：旧版本导入时 support_catchup 默认值为 0，导致用户即使源地址
+	// 支持回看也无法使用该功能。此迁移将所有 support_catchup=0 的频道
+	// 统一修正为 1（乐观策略：允许尝试，不行则由后端报错而非客户端拦截）。
+	_, _ = db.Exec(`UPDATE channels SET support_catchup = 1 WHERE support_catchup = 0 OR support_catchup IS NULL`)
 
 	// 执行自动迁移
 	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN is_direct INTEGER DEFAULT 1;")

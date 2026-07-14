@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"compress/gzip"
 	"database/sql"
 	"encoding/xml"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -59,6 +61,8 @@ type epgIndex struct {
 	lastFetchDate string // "2006-01-02"
 	isFetching    bool
 }
+
+var epgEntityFixRegex = regexp.MustCompile(`&(amp|lt|gt|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);|&`)
 
 var globalEPGIndex = &epgIndex{
 	programs: make(map[string]map[string][]models.EPGProgram),
@@ -250,7 +254,22 @@ func (s *EPGService) FetchAndBuildIndex() {
 				reader = gr
 			}
 
-			decoder := xml.NewDecoder(reader)
+			// 读取全部内容进行 XML 实体容错处理
+			contentBytes, err := io.ReadAll(reader)
+			if err != nil {
+				slog.Error("EPG 内容读取失败", "url", sourceURL, "error", err)
+				return
+			}
+
+			// 修复非法的 & 符号（容错处理：匹配合法实体，剩下的孤立 & 替换为 &amp;）
+			fixedBytes := epgEntityFixRegex.ReplaceAllFunc(contentBytes, func(b []byte) []byte {
+				if len(b) == 1 && b[0] == '&' {
+					return []byte("&amp;")
+				}
+				return b
+			})
+
+			decoder := xml.NewDecoder(bytes.NewReader(fixedBytes))
 			var tv xmltvTV
 			if err := decoder.Decode(&tv); err != nil {
 				slog.Error("EPG XML 解析失败", "url", sourceURL, "error", err)
