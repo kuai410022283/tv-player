@@ -146,19 +146,39 @@ func (imp *M3UImporter) appendEPGURL(newURL string) {
 		current = ""
 	}
 
-	// deduplicate
-	urls := strings.Split(strings.ReplaceAll(current, "\r", "\n"), "\n")
-	for _, u := range urls {
-		if strings.TrimSpace(u) == newURL {
-			return // already exists
+	// 建立现存 URL 的去重字典，同时兼容换行符和逗号拆分
+	existingMap := make(map[string]bool)
+	existingLines := strings.Split(strings.ReplaceAll(current, "\r", "\n"), "\n")
+	for _, line := range existingLines {
+		parts := strings.Split(line, ",")
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				existingMap[trimmed] = true
+			}
 		}
 	}
 
-	// Append
-	if current != "" && !strings.HasSuffix(current, "\n") {
-		current += "\n"
+	// 将新传入的 URL 按照逗号拆分开
+	newUrls := strings.Split(newURL, ",")
+	addedAny := false
+	for _, u := range newUrls {
+		trimmed := strings.TrimSpace(u)
+		if trimmed == "" || existingMap[trimmed] {
+			continue // 如果为空或者已存在，则跳过
+		}
+		
+		// 追加时强制换行，保证每行只有一个标准 URL
+		if current != "" && !strings.HasSuffix(current, "\n") {
+			current += "\n"
+		}
+		current += trimmed
+		existingMap[trimmed] = true
+		addedAny = true
 	}
-	current += newURL
+
+	if !addedAny {
+		return // 如果没有新增任何新的合法 URL，直接返回
+	}
 
 	_, _ = imp.channelSvc.db.Exec(`
 		INSERT INTO user_settings (key, value) 

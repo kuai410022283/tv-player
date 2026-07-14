@@ -115,10 +115,14 @@ func (s *EPGService) FetchAndBuildIndex() {
 
 	rawUrls := strings.Split(strings.ReplaceAll(sourceURLRaw, "\r", "\n"), "\n")
 	var urls []string
-	for _, u := range rawUrls {
-		u = strings.TrimSpace(u)
-		if u != "" {
-			urls = append(urls, u)
+	for _, rawLine := range rawUrls {
+		// 进一步对逗号进行拆分，兼容同一行内用逗号分隔多个 URL 的情况
+		parts := strings.Split(rawLine, ",")
+		for _, u := range parts {
+			u = strings.TrimSpace(u)
+			if u != "" {
+				urls = append(urls, u)
+			}
 		}
 	}
 	if len(urls) == 0 {
