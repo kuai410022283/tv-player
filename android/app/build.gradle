@@ -118,8 +118,10 @@ dependencies {
     implementation project(':media3-rtsp-patched')
     implementation 'androidx.media3:media3-ui:1.10.1'
 
-    // MPV Network Dependency
-    implementation 'io.github.abdallahmehiz:mpv-android-lib:0.1.12'
+    // MPV Network Dependency updated
+    // implementation 'io.github.abdallahmehiz:mpv-android-lib:0.1.12'
+    // MPV Network Dependency (Converted to Local AAR for offline availability)
+    implementation files('libs/mpv-android-lib-0.1.12.aar')
 
     implementation 'androidx.media3:media3-common:1.10.1'
     implementation 'androidx.media3:media3-datasource-okhttp:1.10.1'
