@@ -164,6 +164,12 @@ class ExoPlayerHelper(
                         androidx.media3.common.util.TimestampAdjuster(0),
                         androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
                     ))
+                } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor) {
+                    // 替换原生的 Mp4Extractor，注入我们修改过 BoxParser 支持 av3a 的提取器
+                    newExtractors.add(com.mediaplayer.app.extractor.mp4.Mp4Extractor())
+                } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor) {
+                    // 同样替换 fMP4 提取器
+                    newExtractors.add(com.mediaplayer.app.extractor.mp4.FragmentedMp4Extractor())
                 } else {
                     newExtractors.add(extractor)
                 }
@@ -251,13 +257,16 @@ class ExoPlayerHelper(
             )
         }
 
-        // 开启时间优先的缓冲策略，无视默认内存红线，并把缓冲区硬上限暴力提升至 250MB。
-        // 核心原因：很多 IPTV 代理（udpxy/msd_lite）带有几十秒的环形缓存。如果播放器 maxBuffer 太小，
-        // 瞬间吃满缓存后就会暂停 TCP 读取。一旦 TCP 停止接收，代理服务端发送阻塞超时，就会强行切断连接（EOF），导致播一段卡一段！
-        // 解决办法：把 maxBufferMs 和 targetBufferBytes 拉到极大，让播放器一口气吞下服务端的历史缓存，并持续跟进直播流，永不暂停读取！
+        // 开启时间优先的缓冲策略，根据设备实际可用内存动态分配缓冲区上限。
+        // 原先固定 250MB 会导致在 256MB Heap 的电视上直接 OOM。
+        // 现在我们在不超过最大 Heap 的 1/3 的前提下，尽可能申请 250MB 缓冲，兼顾防卡顿和防崩溃。
+        val maxMemory = Runtime.getRuntime().maxMemory()
+        val maxSafeBuffer = maxMemory / 3
+        val targetBuffer = Math.min(250L * 1024 * 1024, maxSafeBuffer).toInt()
+
         val loadControlBuilder = DefaultLoadControl.Builder()
             .setPrioritizeTimeOverSizeThresholds(true)
-            .setTargetBufferBytes(250 * 1024 * 1024)
+            .setTargetBufferBytes(targetBuffer)
             
         if (currentCacheMs > 0) {
             loadControlBuilder.setBufferDurationsMs(

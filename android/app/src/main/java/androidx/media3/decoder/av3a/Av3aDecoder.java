@@ -23,14 +23,16 @@ public final class Av3aDecoder
   private static final int ERROR_OTHER = -2;
 
   private long nativeContext;
-  private volatile int channelCount;
-  private volatile int sampleRate;
+  private int channelCount;
+  private int sampleRate;
 
-  public Av3aDecoder(int numBuffers, int initialInputBufferSize) throws Av3aDecoderException {
+  public Av3aDecoder(int numBuffers, int initialInputBufferSize, int channelCount, int sampleRate) throws Av3aDecoderException {
     super(new DecoderInputBuffer[numBuffers], new SimpleDecoderOutputBuffer[numBuffers]);
     if (!Av3aLibrary.isAvailable()) {
       throw new Av3aDecoderException("Failed to load libav3aJNI.so");
     }
+    this.channelCount = channelCount;
+    this.sampleRate = sampleRate;
     nativeContext = av3aInit();
     if (nativeContext == 0) {
       throw new Av3aDecoderException("Failed to initialize AV3A decoder");
@@ -74,15 +76,25 @@ public final class Av3aDecoder
             inputData.limit(),
             outputData,
             OUTPUT_BUFFER_SIZE);
+    android.util.Log.e("Av3aDebug", "av3aDecode input size=" + inputData.limit() + ", result=" + result);
     if (result == ERROR_OTHER) {
+      android.util.Log.e("Av3aDebug", "av3aDecode returned ERROR_OTHER!");
       return new Av3aDecoderException("AV3A native decode failed; see logcat");
     }
     if (result == ERROR_INVALID_DATA || result == 0) {
+      android.util.Log.e("Av3aDebug", "av3aDecode returned ERROR_INVALID_DATA or 0!");
       outputBuffer.shouldBeSkipped = true;
       return null;
     }
-    channelCount = av3aGetChannelCount(nativeContext);
-    sampleRate = av3aGetSampleRate(nativeContext);
+    // WORKAROUND: Attenuate the PCM volume by 50% (-6dB) to prevent Android AudioTrack's
+    // 5.1-to-Stereo downmixer from clipping the audio and causing "electric static" noise.
+    // Downmixing sums channels (L + 0.707*C + 0.5*Ls), which easily exceeds 16-bit limits.
+    outputData.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    for (int i = 0; i < result; i += 2) {
+      short sample = outputData.getShort(i);
+      outputData.putShort(i, (short) (sample / 2));
+    }
+
     outputData.position(0);
     outputData.limit(result);
     return null;

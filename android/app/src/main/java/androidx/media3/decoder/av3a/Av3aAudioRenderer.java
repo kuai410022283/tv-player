@@ -53,10 +53,15 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
     if (sinkSupportsFormat(nativePcm)) {
       return C.FORMAT_HANDLED;
     }
+    Format pcm7point1 = Util.getPcmFormat(C.ENCODING_PCM_16BIT, 8, format.sampleRate);
+    if (format.channelCount >= 8 && sinkSupportsFormat(pcm7point1)) {
+      return C.FORMAT_HANDLED;
+    }
     Format bedPcm = Util.getPcmFormat(C.ENCODING_PCM_16BIT, 6, format.sampleRate);
-    return format.channelCount == 10 && sinkSupportsFormat(bedPcm)
-        ? C.FORMAT_HANDLED
-        : C.FORMAT_UNSUPPORTED_SUBTYPE;
+    if (format.channelCount >= 6 && sinkSupportsFormat(bedPcm)) {
+      return C.FORMAT_HANDLED;
+    }
+    return C.FORMAT_UNSUPPORTED_SUBTYPE;
   }
 
   @Override
@@ -70,7 +75,9 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
     TraceUtil.beginSection("createAv3aDecoder");
     int inputBufferSize =
         format.maxInputSize != Format.NO_VALUE ? format.maxInputSize : DEFAULT_INPUT_BUFFER_SIZE;
-    Av3aDecoder decoder = new Av3aDecoder(NUM_BUFFERS, inputBufferSize);
+    int channelCount = format.channelCount != Format.NO_VALUE ? format.channelCount : 6;
+    int sampleRate = format.sampleRate != Format.NO_VALUE ? format.sampleRate : 48000;
+    Av3aDecoder decoder = new Av3aDecoder(NUM_BUFFERS, inputBufferSize, channelCount, sampleRate);
     TraceUtil.endSection();
     return decoder;
   }
@@ -84,23 +91,33 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
   @Override
   @Nullable
   protected int[] getChannelMapping(Av3aDecoder decoder) {
-    if (decoder.getChannelCount() != 10) {
-      return null;
-    }
+    int channelCount = decoder.getChannelCount();
+    
     Format nativePcm =
         Util.getPcmFormat(
-            decoder.getEncoding(), decoder.getChannelCount(), decoder.getSampleRate());
-    boolean mapToBed =
-        Build.VERSION.SDK_INT < 32
-            || getSinkFormatSupport(nativePcm) != AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY;
-    Log.i(
-        TAG,
-        "AV3A PCM output: channels=10, sampleRate="
-            + decoder.getSampleRate()
-            + ", sdk="
-            + Build.VERSION.SDK_INT
-            + ", channelMapping="
-            + (mapToBed ? "0,1,2,3,4,5" : "native-5.1.4"));
-    return mapToBed ? BED_5_1_MAPPING : null;
+            decoder.getEncoding(), channelCount, decoder.getSampleRate());
+    boolean nativelySupported = 
+        Build.VERSION.SDK_INT >= 32 
+            && getSinkFormatSupport(nativePcm) == AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY;
+
+    if (nativelySupported) {
+      Log.i(TAG, "AV3A PCM output: " + channelCount + " channels supported directly by hardware.");
+      return null;
+    }
+
+    if (channelCount >= 8) {
+      Format pcm7point1 = Util.getPcmFormat(decoder.getEncoding(), 8, decoder.getSampleRate());
+      if (getSinkFormatSupport(pcm7point1) == AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY) {
+        Log.i(TAG, "AV3A PCM output: hardware supports 7.1. Mapping " + channelCount + " -> 8 channels.");
+        return new int[]{0, 1, 2, 3, 4, 5, 6, 7};
+      }
+    }
+
+    if (channelCount >= 6) {
+      Log.i(TAG, "AV3A PCM output: hardware falls back to 5.1. Mapping " + channelCount + " -> 6 channels.");
+      return BED_5_1_MAPPING;
+    }
+
+    return null;
   }
 }

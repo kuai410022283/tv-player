@@ -21,6 +21,10 @@ public final class Av3aLibrary {
       new LibraryLoader("av3aJNI") {
         @Override
         protected void loadLibrary(String name) {
+          // Android TV (older OS) requires explicit loading of libc++_shared
+          System.loadLibrary("c++_shared");
+          System.loadLibrary("av3a_binaural_render");
+          System.loadLibrary("AVS3AudioDec");
           System.loadLibrary(name);
         }
       };

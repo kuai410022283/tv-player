@@ -84,40 +84,53 @@ Java_androidx_media3_decoder_av3a_Av3aDecoder_av3aDecode(
     return kOtherError;
   }
 
-  int header_consumed = 0;
-  int result =
-      parse_header(
-          context->decoder,
-          input,
-          input_size,
-          context->first_frame ? 1 : 0,
-          &header_consumed,
-          nullptr);
-  if (result != AVS3_TRUE || header_consumed <= 0 || header_consumed >= input_size) {
-    return kInvalidData;
+  int total_output_bytes = 0;
+  int current_input_offset = 0;
+
+  while (current_input_offset < input_size) {
+    int header_consumed = 0;
+    int result =
+        parse_header(
+            context->decoder,
+            input + current_input_offset,
+            input_size - current_input_offset,
+            context->first_frame ? 1 : 0,
+            &header_consumed,
+            nullptr);
+            
+    if (result != AVS3_TRUE || header_consumed <= 0 || header_consumed > (input_size - current_input_offset)) {
+      break; // stop decoding this buffer, likely end of data
+    }
+
+    int output_bytes = 0;
+    int payload_consumed = 0;
+    result =
+        avs3_decode(
+            context->decoder,
+            input + current_input_offset + header_consumed,
+            input_size - current_input_offset - header_consumed,
+            output + total_output_bytes,
+            &output_bytes,
+            &payload_consumed);
+            
+    if (result != AVS3_TRUE || output_bytes <= 0 || payload_consumed <= 0) {
+      break;
+    }
+
+    if (total_output_bytes + output_bytes > output_size) {
+      LOGE("Decoder output overflow: %d > %d", total_output_bytes + output_bytes, output_size);
+      break;
+    }
+
+    total_output_bytes += output_bytes;
+    current_input_offset += (header_consumed + payload_consumed);
+    context->first_frame = false;
   }
 
-  int output_bytes = 0;
-  int payload_consumed = 0;
-  result =
-      avs3_decode(
-          context->decoder,
-          input + header_consumed,
-          input_size - header_consumed,
-          output,
-          &output_bytes,
-          &payload_consumed);
-  if (result != AVS3_TRUE || output_bytes <= 0) {
-    LOGE("Decode failed: result=%d input=%d header=%d payload=%d", result, input_size,
-         header_consumed, payload_consumed);
-    return result == AVS3_DATA_NOT_ENOUGH ? kInvalidData : kOtherError;
+  if (total_output_bytes == 0) {
+    return kInvalidData;
   }
-  if (output_bytes > output_size) {
-    LOGE("Decoder output overflow: %d > %d", output_bytes, output_size);
-    return kOtherError;
-  }
-  context->first_frame = false;
-  return output_bytes;
+  return total_output_bytes;
 }
 
 extern "C" JNIEXPORT jint JNICALL
