@@ -60,10 +60,10 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (count int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	if source.UserAgent != "" {
-		req.Header.Set("User-Agent", source.UserAgent)
+	if ua := source.UserAgent; ua != "" {
+		req.Header.Set("User-Agent", ua)
 	} else {
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0")
 	}
 	if source.CustomHeaders != "" {
 		var headers map[string]string
@@ -195,6 +195,12 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	for _, g := range existingGroups {
 		cacheKey := g.Source + "|" + g.Name
 		groupCache[cacheKey] = g.ID
+		// 如果该分组属于当前正在同步的来源，则更新其默认 UserAgent 和 CustomHeaders
+		if g.Source == sourceName && (g.UserAgent != sourceUA || g.CustomHeaders != sourceHeaders) {
+			g.UserAgent = sourceUA
+			g.CustomHeaders = sourceHeaders
+			_ = imp.channelSvc.UpdateGroup(&g)
+		}
 	}
 
 	for _, ch := range channels {

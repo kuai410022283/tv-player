@@ -193,7 +193,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 
 	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
 	if ua == "" {
-		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0"
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

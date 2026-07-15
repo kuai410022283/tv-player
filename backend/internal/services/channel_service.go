@@ -707,7 +707,7 @@ func (s *ChannelService) GetInheritedHeaders(channelID int64) (string, map[strin
 // computeInheritedHeaders 合并频道和分组的 UA/Headers
 func (s *ChannelService) computeInheritedHeaders(chUA, chHeaders, gpUA, gpHeaders string) (string, map[string]string, error) {
 	// Determine final UA
-	finalUA := "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player" // Global default
+	finalUA := "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0" // Global default
 	if chUA != "" {
 		finalUA = chUA
 	} else if gpUA != "" {

@@ -195,7 +195,7 @@ class MpvPlayerHelper(
             if (finalUserAgent.isNotEmpty()) {
                 mpv?.setOptionString("user-agent", finalUserAgent)
             } else {
-                mpv?.setOptionString("user-agent", "")
+                mpv?.setOptionString("user-agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0")
             }
 
             if (headersList.isNotEmpty()) {

@@ -79,7 +79,7 @@ object StreamResolver {
                 try {
                     val requestBuilder = Request.Builder().url(currentUrl)
 
-                    val ua = if (userAgent.isNullOrEmpty()) "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player" else userAgent
+                    val ua = if (userAgent.isNullOrEmpty()) "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0" else userAgent
                     requestBuilder.header("User-Agent", ua)
 
                     if (!customHeaders.isNullOrEmpty()) {

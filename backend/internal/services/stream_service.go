@@ -134,7 +134,7 @@ func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua
 			if ua != "" {
 				req.Header.Set("User-Agent", ua)
 			} else {
-				req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player")
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0")
 			}
 			for k, v := range headers {
 				req.Header.Set(k, v)
@@ -198,7 +198,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamT
 	// 获取自定义的 User-Agent 和 Headers
 	ua, headers, _ := sp.channelSvc.GetInheritedHeaders(channelID)
 	if ua == "" {
-		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0"
 	}
 
 	// 无论本地还是网络，探测前统一穿透可能的 .strm 壳
@@ -588,7 +588,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	// Apply inherited UA and custom headers
 	ua, headers, err := sp.channelSvc.GetInheritedHeaders(channelID)
 	if err != nil {
-		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 TV-Player"
+		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0"
 	}
 
 	validURLs := []string{}
@@ -1119,18 +1119,19 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
 		}
 	} else {
-		userAgents = []string{ua}
+		userAgents = []string{}
 		if ua != "" {
-			userAgents = append(userAgents,
-				"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
-				"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
-			)
-		} else {
-			userAgents = []string{
-				"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36",
-				"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",
-			}
+			userAgents = append(userAgents, ua)
 		}
+		
+		// 动态追加多个不同特征的兜底伪装
+		userAgents = append(userAgents,
+			"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36", // 移动端高频 Chrome
+			"AppleCoreMedia/1.0.0.19G82 (Apple TV; U; CPU OS 15_6 like Mac OS X; en_us)",                                                   // Apple 原生 HLS 引擎，对于部分严格校验的 HLS/m3u8 源有奇效
+			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",                                                                  // 安卓标准播放引擎
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",        // 桌面端 macOS Safari
+			"MediaPlayer-TV/1.0.0",                                                                                                         // 本项目的专属兜底特征 UA
+		)
 	}
 
 	// 最多尝试所有 UA，遇 403/5xx 时重试不同 UA

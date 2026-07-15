@@ -116,6 +116,8 @@ class ExoPlayerHelper(
         
         if (userAgent.isNotEmpty()) {
             okHttpDataSourceFactory.setUserAgent(userAgent)
+        } else {
+            okHttpDataSourceFactory.setUserAgent("Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0")
         }
         
         val headers = HashMap<String, String>()
