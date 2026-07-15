@@ -52,9 +52,11 @@ func main() {
 	})))
 
 	fmt.Println("项目名称：MediaPlayer")
+	fmt.Println("版本：", Version)
 	fmt.Println("作者：laok")
 	fmt.Println("邮箱：kuai410022283@qq.com")
-	fmt.Println("版本：", Version)
+	fmt.Println("TG群组: https://t.me/+3qS4i6yrHsc2MWNl")
+	fmt.Println("项目地址: https://github.com/kuai410022283/mediaplayer")
 
 	// ── 加载配置 ─────────────────────────────────────
 	cfgPath := "config.yaml"
