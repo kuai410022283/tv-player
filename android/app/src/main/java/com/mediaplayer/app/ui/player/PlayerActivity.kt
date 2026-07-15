@@ -120,7 +120,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
     // ── Retry ──
     private var continuousSkipCount = 0
     private val maxAutoSkips = 5
-    private var coreRetryLevel = 0 // 0=默认, 1=IJK
+    private var coreRetryLevel = 0 // 0=默认, 1=MPV
     private var backPressedTime = 0L
     private var isWatchdogEnabledForCurrentStream = false
 
@@ -467,9 +467,6 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             Prefs.PLAYER_CORE_EXO -> {
                 playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
-            Prefs.PLAYER_CORE_IJK -> {
-                playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-            }
             Prefs.PLAYER_CORE_MPV -> {
                 playerHelper = com.mediaplayer.app.util.MpvPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
@@ -510,7 +507,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             if (coreRetryLevel > 0) {
                 desiredCore = when (coreRetryLevel) {
-                    1 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
+                    1 -> { coreText = "容灾 (MPV)"; Prefs.PLAYER_CORE_MPV }
                     else -> desiredCore
                 }
             } else {
@@ -519,15 +516,10 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 val isHighRiskMulticast = lowerUrl.startsWith("rtsp://") || lowerUrl.contains(".smil")
                 
                 if (isHighRiskMulticast) {
-                    coreText = "智能防灾 (IJK)"
-                    desiredCore = Prefs.PLAYER_CORE_IJK
+                    coreText = "智能防灾 (MPV)"
+                    desiredCore = Prefs.PLAYER_CORE_MPV
                 } else {
                     desiredCore = when (type.lowercase()) {
-
-                        "ijk" -> {
-                            coreText = "智能 (IJK)"
-                            Prefs.PLAYER_CORE_IJK
-                        }
                         "ts", "rtp", "udp" -> {
                             coreText = "智能 (Exo)"
                             Prefs.PLAYER_CORE_EXO
@@ -542,7 +534,6 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                 Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
@@ -552,7 +543,6 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
-            Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
             Prefs.PLAYER_CORE_MPV -> playerHelper is com.mediaplayer.app.util.MpvPlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
@@ -629,7 +619,6 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (globalCore != Prefs.PLAYER_CORE_AUTO) {
             val coreName = when (globalCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                 Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
@@ -667,7 +656,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (coreRetryLevel < 1) {
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
-                1 -> "IJKPlayer"
+                1 -> "MPV"
                 else -> "ExoPlayer"
             }
             tvStatus?.text = "尝试使用 $coreName 重试该线路..."

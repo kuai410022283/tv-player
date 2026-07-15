@@ -39,7 +39,6 @@ object Prefs {
     const val KEY_PLAYER_CORE = "player_core"
     const val PLAYER_CORE_AUTO = 0
     const val PLAYER_CORE_EXO = 1
-    const val PLAYER_CORE_IJK = 2
     const val PLAYER_CORE_MPV = 3
     
     // 渲染引擎 (为未来做准备)

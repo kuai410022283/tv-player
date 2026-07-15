@@ -880,8 +880,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (currentCore) {
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-
-            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
             Prefs.PLAYER_CORE_MPV -> "MPV"
             else -> "智能切换"
         }
@@ -1199,8 +1197,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val channel = allChannels.getOrNull(currentChannelIndex)
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
-                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
-                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_MPV
+                Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_MPV
                 Prefs.PLAYER_CORE_MPV -> Prefs.PLAYER_CORE_AUTO
                 else -> Prefs.PLAYER_CORE_AUTO
             }
@@ -1362,23 +1359,50 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
         
-        findViewById<TextView>(R.id.tvQQGroup)?.setOnClickListener {
+        val btnCommunity = findViewById<TextView>(R.id.btnCommunity)
+        val layoutCommunityList = findViewById<View>(R.id.layoutCommunityList)
+        btnCommunity?.setOnClickListener {
+            if (layoutCommunityList?.visibility == View.VISIBLE) {
+                layoutCommunityList.visibility = View.GONE
+            } else {
+                layoutCommunityList?.visibility = View.VISIBLE
+            }
+        }
+        
+        findViewById<TextView>(R.id.tvQQGroup1)?.setOnClickListener {
+            joinQQGroup("292437580")
+        }
+        findViewById<TextView>(R.id.tvQQGroup2)?.setOnClickListener {
+            joinQQGroup("864744268")
+        }
+        findViewById<TextView>(R.id.tvTgGroup)?.setOnClickListener {
             try {
-                // 使用 mqqapi 协议直接唤起手机 QQ 加群页面
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("mqqapi://card/show_pslcard?src_type=internal&version=1&uin=864744268&card_type=group&source=qrcode"))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+3qS4i6yrHsc2MWNl"))
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
             } catch (e: Exception) {
-                // 未安装 QQ 或拉起失败，复制群号到剪贴板
                 val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("QQ群", "864744268")
+                val clip = android.content.ClipData.newPlainText("TG群", "https://t.me/+3qS4i6yrHsc2MWNl")
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(this@MainActivity, "未检测到QQ应用，已复制群号: 864744268", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "打开链接失败，已复制群链接", Toast.LENGTH_SHORT).show()
             }
         }
         
         btnSettingsAbout?.setOnClickListener {
             showAboutDevice()
+        }
+    }
+
+    private fun joinQQGroup(qqGroup: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("mqqapi://card/show_pslcard?src_type=internal&version=1&uin=$qqGroup&card_type=group&source=qrcode"))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (e: Exception) {
+            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("QQ群", qqGroup)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this@MainActivity, "未检测到QQ应用，已复制群号: $qqGroup", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1549,7 +1573,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         }
                         val coreStr = when (core) {
                             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                             Prefs.PLAYER_CORE_MPV -> "MPV"
                             else -> "Auto"
                         }
@@ -1639,9 +1662,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Prefs.PLAYER_CORE_EXO -> {
                     playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
-                Prefs.PLAYER_CORE_IJK -> {
-                    playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
-                }
                 Prefs.PLAYER_CORE_MPV -> {
                     playerHelper = com.mediaplayer.app.util.MpvPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
@@ -1713,8 +1733,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private fun updateCoreText(core: Int) {
         findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-
-            Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
             Prefs.PLAYER_CORE_MPV -> "MPV"
             else -> "智能切换"
         }
@@ -1777,7 +1795,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 currentLineIndex++
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                    Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                     Prefs.PLAYER_CORE_MPV -> "MPV"
                     else -> "Auto"
                 }
@@ -1789,7 +1806,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 // 所有线路都失败
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                    Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                     Prefs.PLAYER_CORE_MPV -> "MPV"
                     else -> "Auto"
                 }
@@ -1818,7 +1834,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentLineIndex = 0  // 重置线路索引，用新内核重新遍历所有线路
             coreRetryLevel++
             val coreName = when (coreRetryLevel) {
-                1 -> "IJKPlayer"
+                1 -> "MPV"
                 else -> "ExoPlayer"
             }
             Toast.makeText(this, "所有线路失败，尝试使用 $coreName 重试...", Toast.LENGTH_SHORT).show()
@@ -1876,7 +1892,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             }
                         }
                         // 优先对 videoLayout 内部的 SurfaceView 子视图截图
-                        // 这比对整个 window 截图对 VLC/IJK 更可靠
+                        // 这比对整个 window 截图对 Exo/MPV 更可靠
                         val surfaceChild = (vl as? android.view.ViewGroup)?.let { parent ->
                             (0 until parent.childCount)
                                 .mapNotNull { parent.getChildAt(it) }
@@ -2003,16 +2019,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         if (globalCore == Prefs.PLAYER_CORE_AUTO) {
             if (coreRetryLevel > 0) {
                 desiredCore = when (coreRetryLevel) {
-                    1 -> { coreText = "容灾 (IJK)"; Prefs.PLAYER_CORE_IJK }
-
+                    1 -> { coreText = "容灾 (MPV)"; Prefs.PLAYER_CORE_MPV }
                     else -> desiredCore
                 }
             } else {
                 desiredCore = when (line.streamType.lowercase()) {
-                    "ijk" -> {
-                        coreText = "智能 (IJK)"
-                        Prefs.PLAYER_CORE_IJK
-                    }
                     "ts", "rtp", "udp" -> {
                         coreText = "智能 (Exo)"
                         Prefs.PLAYER_CORE_EXO
@@ -2026,7 +2037,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         } else {
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-                Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
                 Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
@@ -2037,7 +2047,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         // 判断当前已经实例化的 playerHelper 是否与所需的一致
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
-            Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
             Prefs.PLAYER_CORE_MPV -> playerHelper is com.mediaplayer.app.util.MpvPlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
@@ -2283,7 +2292,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         } else {
             osdOverlayView?.updateSubtitleButton("")
         }
-        // IJKPlayer 也已经支持音轨切换，不再需要禁用按钮
+        // MPV 也已经支持音轨切换，不再需要禁用按钮
         osdOverlayView?.setTrackButtonsEnabled(true)
     }
 
@@ -2455,7 +2464,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val coreStr = playerHelper?.let {
                     when (it) {
                         is com.mediaplayer.app.util.ExoPlayerHelper -> "ExoPlayer"
-                        is com.mediaplayer.app.util.IjkPlayerHelper -> "IJKPlayer"
                         is com.mediaplayer.app.util.MpvPlayerHelper -> "MPV"
                         else -> ""
                     }

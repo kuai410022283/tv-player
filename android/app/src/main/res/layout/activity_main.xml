@@ -1208,23 +1208,77 @@
                     android:focusable="false" />
             </LinearLayout>
 
+            <!-- 交流互动 (Expandable Header) -->
             <TextView
-                android:id="@+id/tvQQGroup"
+                android:id="@+id/btnCommunity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="QQ群: 864744268 (点击加入)"
-                android:textColor="@color/accent"
+                android:text="交流互动"
+                android:textColor="#FFFFFF"
                 android:textSize="@dimen/sp_22"
                 android:layout_marginTop="@dimen/dp_32"
-                android:layout_marginBottom="@dimen/dp_32"
                 android:paddingHorizontal="@dimen/dp_16"
                 android:paddingVertical="@dimen/dp_12"
                 android:background="@drawable/selector_channel_item"
-                android:gravity="center"
+                android:gravity="center_vertical"
                 android:clickable="true"
-                android:focusable="true"
-                android:nextFocusUp="@+id/btnSettingsAbout"
-                android:nextFocusDown="@+id/tvQQGroup" />
+                android:focusable="true" />
+
+            <!-- 交流互动列表 (Expandable Content) -->
+            <LinearLayout
+                android:id="@+id/layoutCommunityList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="@dimen/dp_32">
+
+                <!-- QQ群1 -->
+                <TextView
+                    android:id="@+id/tvQQGroup1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="QQ群1: 292437580"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/sp_20"
+                    android:paddingHorizontal="@dimen/dp_32"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:background="@drawable/selector_channel_item"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <!-- QQ群2 -->
+                <TextView
+                    android:id="@+id/tvQQGroup2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="QQ群2: 864744268"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/sp_20"
+                    android:paddingHorizontal="@dimen/dp_32"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:background="@drawable/selector_channel_item"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <!-- TG群组 -->
+                <TextView
+                    android:id="@+id/tvTgGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="TG群组: 点击加入"
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/sp_20"
+                    android:paddingHorizontal="@dimen/dp_32"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:background="@drawable/selector_channel_item"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
