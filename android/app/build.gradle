@@ -117,6 +117,10 @@ dependencies {
     // To revert: replace with  implementation 'androidx.media3:media3-exoplayer-rtsp:1.10.1'
     implementation project(':media3-rtsp-patched')
     implementation 'androidx.media3:media3-ui:1.10.1'
+
+    // MPV Network Dependency
+    implementation 'io.github.abdallahmehiz:mpv-android-lib:0.1.12'
+
     implementation 'androidx.media3:media3-common:1.10.1'
     implementation 'androidx.media3:media3-datasource-okhttp:1.10.1'
     // AV3A FFmpeg 扩展直接采用影子类源码集成，不再需要 AAR
@@ -148,6 +152,5 @@ dependencies {
     // Splash Screen
     implementation 'androidx.core:core-splashscreen:1.0.1'
 
-    // Go Mobile Proxy Engine
-    implementation files('libs/mobile.aar')
+
 }

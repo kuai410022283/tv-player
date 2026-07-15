@@ -470,6 +470,9 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             Prefs.PLAYER_CORE_IJK -> {
                 playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
+            Prefs.PLAYER_CORE_MPV -> {
+                playerHelper = com.mediaplayer.app.util.MpvPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+            }
             else -> {
                 playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
             }
@@ -496,7 +499,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         var globalCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore !in 0..2) {
+        if (globalCore !in 0..3) {
             globalCore = Prefs.PLAYER_CORE_AUTO
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, globalCore).apply()
         }
@@ -540,6 +543,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
         }
@@ -549,6 +553,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
+            Prefs.PLAYER_CORE_MPV -> playerHelper is com.mediaplayer.app.util.MpvPlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
 
@@ -586,7 +591,19 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
-            playerHelper?.play(finalUrl, userAgent, customHeaders)
+            
+            var proxyUrl = finalUrl
+            val prefs = getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
+            val enableAdBlocker = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
+            
+            if (enableAdBlocker && lowerUrl.contains(".m3u8") && !lowerUrl.contains("127.0.0.1")) {
+                val encodedUrl = java.net.URLEncoder.encode(finalUrl, "UTF-8")
+                val port = com.mediaplayer.app.server.ConfigWebServer.globalPort
+                proxyUrl = "http://127.0.0.1:$port/proxy/m3u8?url=$encodedUrl"
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Using M3u8 Proxy (PlayerActivity): $proxyUrl")
+            }
+            
+            playerHelper?.play(proxyUrl, userAgent, customHeaders)
         }
         
         currentPlaybackState = PlaybackState.BUFFERING
@@ -613,6 +630,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             val coreName = when (globalCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
             currentPlaybackState = PlaybackState.IDLE

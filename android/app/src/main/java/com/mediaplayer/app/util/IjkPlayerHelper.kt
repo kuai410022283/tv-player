@@ -72,12 +72,9 @@ class IjkPlayerHelper(
         videoLayout.addView(surfaceView)
     }
 
-    override fun play(originalUrl: String, userAgent: String, customHeaders: String) {
+    override fun play(originalUrl: String, userAgent: String, customHeaders: String, startTimeMs: Long) {
         var url = originalUrl
         val lowerUrl = url.lowercase()
-        if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("igmp://") || lowerUrl.startsWith("rtsp://")) {
-            url = "http://127.0.0.1:9530/proxy?url=${Uri.encode(originalUrl)}"
-        }
 
         if (ijkPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
             buildPlayer(url)
@@ -93,6 +90,10 @@ class IjkPlayerHelper(
         applyPlayerOptions(ijkPlayer!!, url)
         applyScaleMode()
         applyDataSource(ijkPlayer!!, url, userAgent, customHeaders)
+        
+        if (startTimeMs > 0L) {
+            ijkPlayer?.seekTo(startTimeMs)
+        }
     }
 
     private fun buildPlayer(url: String) {
@@ -163,14 +164,14 @@ class IjkPlayerHelper(
 
         if (isLiveStream && !isHls) {
             // ----------------------------------------
-            // 为 4K/8K 高码率直播流专门重构的大缓存参数
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L) // 开启内置包缓冲，防卡顿
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max-buffer-size", 150 * 1024 * 1024L) // 最大缓冲提升到 150MB
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 0L)
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 10L) // 提升起播底线缓冲帧，保证画面不抖
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 5000000L) // 给足 5秒钟 时间让解码器嗅探音视频流
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 25L) // 探针拉大到 25MB，防止 4K 巨帧嗅探失败
-            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "flush_packets") // 禁用 fastseek
+            // 为组播流专门重构的 TVBox 风格秒播参数
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L) // 关闭内置包缓冲，实现秒播
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max-buffer-size", 1024 * 1024L) // 最大缓冲缩小到 1MB
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1L) // 开启无限缓冲
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", 2L) // 降低起播底线缓冲帧，加速出画
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "analyzeduration", 1000000L) // 缩短嗅探时间到 1 秒
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "probesize", 1024L * 1024L * 2L) // 探针缩小到 2MB
+            player.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer") // 禁用缓冲
             player.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "enable-accurate-seek", 0)
         } else if (isHls) {
             // ----------------------------------------

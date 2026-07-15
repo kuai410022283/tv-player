@@ -22,12 +22,22 @@ class ConfigWebServer(
     /** 实际监听端口（与传入 NanoHTTPD 构造函数的端口一致）。 */
     val actualPort: Int = if (port > 0) port else findAvailablePort(9528)
 
+    init {
+        globalPort = actualPort
+    }
+
+
+
     override fun serve(session: IHTTPSession): Response {
         val method = session.method
         val uri = session.uri
 
         if (method == Method.GET && uri == "/") {
             return newFixedLengthResponse(getHtmlForm())
+        }
+
+        if (method == Method.GET && uri == "/proxy/m3u8") {
+            return M3u8ProxyHandler.handle(session)
         }
 
         if (method == Method.POST && uri == "/save") {
@@ -70,6 +80,9 @@ class ConfigWebServer(
     // ──────────────────────────────────────────────
 
     companion object {
+        var globalPort: Int = 9528
+            private set
+
         /**
          * 从 [startPort] 开始递增探测可用端口，避免与已有服务冲突。
          * 最多尝试 10 个端口。

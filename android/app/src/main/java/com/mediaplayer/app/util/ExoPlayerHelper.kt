@@ -77,7 +77,7 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
-    override fun play(url: String, userAgent: String, customHeaders: String) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long) {
         currentUrl = url
         currentUserAgent = userAgent
         currentHeaders = customHeaders
@@ -87,15 +87,12 @@ class ExoPlayerHelper(
         criticalErrorCount = 0
         criticalErrorLastTime = 0L
         
-        playInternal(url, userAgent, customHeaders, null)
+        playInternal(url, userAgent, customHeaders, null, startTimeMs)
     }
 
-    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?) {
+    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?, startTimeMs: Long = 0L) {
         var url = originalUrl
         val lowerUrl = url.lowercase()
-        if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("igmp://") || lowerUrl.startsWith("rtsp://")) {
-            url = "http://127.0.0.1:9530/proxy?url=${Uri.encode(originalUrl)}"
-        }
 
         val isLiveStream = url.lowercase().run { 
             startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
@@ -210,6 +207,10 @@ class ExoPlayerHelper(
         }
         
         exoPlayer?.setMediaSource(mediaSource)
+        if (startTimeMs > 0L) {
+            exoPlayer?.seekTo(startTimeMs)
+        }
+        
         exoPlayer?.prepare()
         exoPlayer?.play()
     }

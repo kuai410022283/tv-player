@@ -62,6 +62,11 @@ if [ $? -ne 0 ]; then
 else
     echo "✅ 编译成功！"
     echo "📂 APK 位于: app/build/outputs/apk/release/"
+    
+    # 停止 gradle daemon 进程，释放 Java 占用的内存和文件锁
+    echo "🧹 正在停止 Gradle Daemon 以释放 Java 占用..."
+    ./gradlew --stop
+    
     # 尝试在 Windows 的 Bash 环境下调用资源管理器打开文件夹
     explorer.exe "app\\build\\outputs\\apk\\release" 2>/dev/null || echo "请手动前往 app/build/outputs/apk/release/ 查找 APK"
 fi

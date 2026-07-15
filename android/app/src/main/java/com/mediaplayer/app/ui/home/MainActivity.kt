@@ -6,7 +6,7 @@ import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.content.Context
-import mobile.Mobile
+
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -379,13 +379,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             com.mediaplayer.app.util.RemoteLogger.i("Network", "MulticastLock acquired")
         }
 
-        // 启动本地 Go 引擎代理
-        try {
-            Mobile.startLocalProxy(9530L)
-            com.mediaplayer.app.util.RemoteLogger.i("MobileProxy", "Go Mobile Proxy started on port 9530")
-        } catch (e: Exception) {
-            com.mediaplayer.app.util.RemoteLogger.e("MobileProxy", "Failed to start Go proxy: \${e.message}")
-        }
+        // Player will be initialized when playing a channel
 
         // Player will be initialized when playing a channel
         setupTouchGestures()
@@ -888,6 +882,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
 
             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+            Prefs.PLAYER_CORE_MPV -> "MPV"
             else -> "智能切换"
         }
     }
@@ -1048,11 +1043,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             tvSettingsGestureVolumeValue?.text = if (enabled) "开" else "关"
         }
         
+        fun updateM3u8AdBlockerText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsM3u8AdBlockerValue)?.text = if (enabled) "开" else "关"
+        }
+        
         
         currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        // 整理内核序号，对于未知的核心序号（非 0, 1, 2）自动回退到智能切换
-        if (currentCore !in 0..2) {
+        // 整理内核序号，对于未知的核心序号（非 0, 1, 2, 3）自动回退到智能切换
+        if (currentCore !in 0..3) {
             currentCore = Prefs.PLAYER_CORE_AUTO
             prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
         }
@@ -1064,6 +1063,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
         var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
         var currentGestureVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
+        var currentM3u8AdBlocker = prefs.getBoolean(Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
@@ -1083,6 +1083,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
         updateGestureVolumeText(currentGestureVolume)
+        updateM3u8AdBlockerText(currentM3u8AdBlocker)
         
         btnSettingsGestureBrightness?.setOnClickListener {
             currentGestureBrightness = !currentGestureBrightness
@@ -1199,7 +1200,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
                 Prefs.PLAYER_CORE_EXO -> Prefs.PLAYER_CORE_IJK
-                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_AUTO
+                Prefs.PLAYER_CORE_IJK -> Prefs.PLAYER_CORE_MPV
+                Prefs.PLAYER_CORE_MPV -> Prefs.PLAYER_CORE_AUTO
                 else -> Prefs.PLAYER_CORE_AUTO
             }
             updateCoreText(currentCore)
@@ -1224,6 +1226,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 channelAdapter.showLogo = currentShowLogo
                 channelAdapter.notifyDataSetChanged()
             }
+        }
+
+        val btnSettingsM3u8AdBlocker = findViewById<View>(R.id.btnSettingsM3u8AdBlocker)
+        btnSettingsM3u8AdBlocker?.setOnClickListener {
+            currentM3u8AdBlocker = !currentM3u8AdBlocker
+            updateM3u8AdBlockerText(currentM3u8AdBlocker)
+            prefs.edit().putBoolean(Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, currentM3u8AdBlocker).apply()
+            Toast.makeText(this, "M3U8 强插广告过滤已" + (if (currentM3u8AdBlocker) "开启" else "关闭") + "，下次播放生效", Toast.LENGTH_SHORT).show()
         }
 
         val btnSettingsTimeMode = findViewById<View>(R.id.btnSettingsTimeMode)
@@ -1540,6 +1550,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         val coreStr = when (core) {
                             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                            Prefs.PLAYER_CORE_MPV -> "MPV"
                             else -> "Auto"
                         }
                         
@@ -1631,6 +1642,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Prefs.PLAYER_CORE_IJK -> {
                     playerHelper = com.mediaplayer.app.util.IjkPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
+                Prefs.PLAYER_CORE_MPV -> {
+                    playerHelper = com.mediaplayer.app.util.MpvPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
+                }
                 else -> {
                     playerHelper = com.mediaplayer.app.util.ExoPlayerHelper(this, videoLayout as android.view.ViewGroup, listener)
                 }
@@ -1701,6 +1715,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
 
             Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+            Prefs.PLAYER_CORE_MPV -> "MPV"
             else -> "智能切换"
         }
     }
@@ -1763,6 +1778,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                     Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                    Prefs.PLAYER_CORE_MPV -> "MPV"
                     else -> "Auto"
                 }
                 Toast.makeText(this, "当前线路无法播放，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
@@ -1774,6 +1790,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val coreName = when (globalCore) {
                     Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                     Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                    Prefs.PLAYER_CORE_MPV -> "MPV"
                     else -> "Auto"
                 }
                 currentLineIndex = 0
@@ -1975,7 +1992,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         // 核心匹配逻辑（优先使用独立记忆的内核）
         var globalCore = mem?.playerCore ?: prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
-        if (globalCore !in 0..2) {
+        if (globalCore !in 0..3) {
             globalCore = Prefs.PLAYER_CORE_AUTO
             // 注意：这里不要覆盖 prefs，因为这可能是某个频道的临时回退
         }
@@ -2010,6 +2027,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             coreText = when (desiredCore) {
                 Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
                 Prefs.PLAYER_CORE_IJK -> "IJKPlayer"
+                Prefs.PLAYER_CORE_MPV -> "MPV"
                 else -> "Auto"
             }
         }
@@ -2020,6 +2038,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val isCoreMatch = when (desiredCore) {
             Prefs.PLAYER_CORE_EXO -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
             Prefs.PLAYER_CORE_IJK -> playerHelper is com.mediaplayer.app.util.IjkPlayerHelper
+            Prefs.PLAYER_CORE_MPV -> playerHelper is com.mediaplayer.app.util.MpvPlayerHelper
             else -> playerHelper is com.mediaplayer.app.util.ExoPlayerHelper
         }
 
@@ -2082,7 +2101,19 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
-            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
+            
+            var proxyUrl = finalUrl
+            val prefs = getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
+            val enableAdBlocker = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
+            
+            if (enableAdBlocker && lowerUrl.contains(".m3u8") && !lowerUrl.contains("127.0.0.1")) {
+                val port = com.mediaplayer.app.server.ConfigWebServer.globalPort
+                val encodedUrl = java.net.URLEncoder.encode(finalUrl, "UTF-8")
+                proxyUrl = "http://127.0.0.1:$port/proxy/m3u8?url=$encodedUrl"
+                com.mediaplayer.app.util.RemoteLogger.i("Player", "Using M3u8 Proxy: $proxyUrl")
+            }
+            
+            playerHelper?.play(proxyUrl, line.userAgent, line.customHeaders)
         }
         
         // 启动/重置看门狗
@@ -2425,6 +2456,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     when (it) {
                         is com.mediaplayer.app.util.ExoPlayerHelper -> "ExoPlayer"
                         is com.mediaplayer.app.util.IjkPlayerHelper -> "IJKPlayer"
+                        is com.mediaplayer.app.util.MpvPlayerHelper -> "MPV"
                         else -> ""
                     }
                 } ?: ""

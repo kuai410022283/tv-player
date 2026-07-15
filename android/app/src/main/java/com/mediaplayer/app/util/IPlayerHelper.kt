@@ -29,8 +29,9 @@ data class SubtitleTrackInfo(
 interface IPlayerHelper {
     /**
      * Start playback
+     * @param startTimeMs Offset in milliseconds to start playback from (for VOD resume)
      */
-    fun play(url: String, userAgent: String = "", customHeaders: String = "")
+    fun play(url: String, userAgent: String = "", customHeaders: String = "", startTimeMs: Long = 0L)
     
     fun pause()
     fun resume()
@@ -60,6 +61,11 @@ interface IPlayerHelper {
      * @param cacheMs 0=Auto, or value in milliseconds
      */
     fun setCacheDuration(cacheMs: Int)
+
+    /**
+     * Enable or disable audio passthrough (e.g. Dolby/DTS direct to receiver)
+     */
+    fun setAudioPassthrough(enable: Boolean) {}
 
     // ── 音轨/字幕接口（默认空实现，向后兼容） ──
 

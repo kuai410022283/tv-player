@@ -929,7 +929,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsGlobalProgress"
-                    android:nextFocusDown="@+id/btnSettingsPreferredServer">
+                    android:nextFocusDown="@+id/btnSettingsM3u8AdBlocker">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -939,6 +939,41 @@
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
                     <TextView
                         android:id="@+id/tvSettingsGroupSourceValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="关"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsM3u8AdBlocker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsGroupSource"
+                    android:nextFocusDown="@+id/btnSettingsPreferredServer">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="去广告引擎"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsM3u8AdBlockerValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="关"
@@ -982,7 +1017,7 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusUp="@+id/btnSettingsGroupSource"
+                    android:nextFocusUp="@+id/btnSettingsM3u8AdBlocker"
                     android:nextFocusDown="@+id/btnSettingsAutoStart">
                     <TextView
                         android:layout_width="wrap_content"
