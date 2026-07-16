@@ -582,18 +582,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            var proxyUrl = finalUrl
-            val prefs = getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
-            val enableAdBlocker = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
-            
-            if (enableAdBlocker && lowerUrl.contains(".m3u8") && !lowerUrl.contains("127.0.0.1")) {
-                val encodedUrl = java.net.URLEncoder.encode(finalUrl, "UTF-8")
-                val port = com.mediaplayer.app.server.ConfigWebServer.globalPort
-                proxyUrl = "http://127.0.0.1:$port/proxy/m3u8?url=$encodedUrl"
-                com.mediaplayer.app.util.RemoteLogger.i("Player", "Using M3u8 Proxy (PlayerActivity): $proxyUrl")
-            }
-            
-            playerHelper?.play(proxyUrl, userAgent, customHeaders)
+            playerHelper?.play(finalUrl, userAgent, customHeaders)
         }
         
         currentPlaybackState = PlaybackState.BUFFERING

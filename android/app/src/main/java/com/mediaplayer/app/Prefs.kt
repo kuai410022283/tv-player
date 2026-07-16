@@ -73,8 +73,6 @@ object Prefs {
     const val KEY_PLAN_NAME = "plan_name"
     const val KEY_EXPIRES_AT = "expires_at"
     const val KEY_SERVER_NAME = "server_name"
-    const val KEY_ENABLE_M3U8_AD_BLOCKER = "enable_m3u8_ad_blocker"
-
     // 时间显示模式：0=隐藏, 1=常显, 2=整点, 3=半点
     const val KEY_TIME_SHOW_MODE = "time_show_mode"
     const val TIME_SHOW_MODE_HIDDEN = 0

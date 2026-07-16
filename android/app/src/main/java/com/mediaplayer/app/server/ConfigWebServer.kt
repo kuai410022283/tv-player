@@ -36,10 +36,6 @@ class ConfigWebServer(
             return newFixedLengthResponse(getHtmlForm())
         }
 
-        if (method == Method.GET && uri == "/proxy/m3u8") {
-            return M3u8ProxyHandler.handle(session)
-        }
-
         if (method == Method.POST && uri == "/save") {
             try {
                 val map = HashMap<String, String>()

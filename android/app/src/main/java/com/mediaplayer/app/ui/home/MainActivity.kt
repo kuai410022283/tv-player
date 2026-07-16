@@ -1041,9 +1041,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             tvSettingsGestureVolumeValue?.text = if (enabled) "开" else "关"
         }
         
-        fun updateM3u8AdBlockerText(enabled: Boolean) {
-            findViewById<TextView>(R.id.tvSettingsM3u8AdBlockerValue)?.text = if (enabled) "开" else "关"
-        }
+        
         
         
         currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -1061,7 +1059,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
         var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
         var currentGestureVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
-        var currentM3u8AdBlocker = prefs.getBoolean(Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
@@ -1081,7 +1078,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
         updateGestureVolumeText(currentGestureVolume)
-        updateM3u8AdBlockerText(currentM3u8AdBlocker)
         
         btnSettingsGestureBrightness?.setOnClickListener {
             currentGestureBrightness = !currentGestureBrightness
@@ -1223,14 +1219,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 channelAdapter.showLogo = currentShowLogo
                 channelAdapter.notifyDataSetChanged()
             }
-        }
-
-        val btnSettingsM3u8AdBlocker = findViewById<View>(R.id.btnSettingsM3u8AdBlocker)
-        btnSettingsM3u8AdBlocker?.setOnClickListener {
-            currentM3u8AdBlocker = !currentM3u8AdBlocker
-            updateM3u8AdBlockerText(currentM3u8AdBlocker)
-            prefs.edit().putBoolean(Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, currentM3u8AdBlocker).apply()
-            Toast.makeText(this, "M3U8 强插广告过滤已" + (if (currentM3u8AdBlocker) "开启" else "关闭") + "，下次播放生效", Toast.LENGTH_SHORT).show()
         }
 
         val btnSettingsTimeMode = findViewById<View>(R.id.btnSettingsTimeMode)
@@ -2111,18 +2099,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            var proxyUrl = finalUrl
-            val prefs = getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
-            val enableAdBlocker = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_ENABLE_M3U8_AD_BLOCKER, false)
-            
-            if (enableAdBlocker && lowerUrl.contains(".m3u8") && !lowerUrl.contains("127.0.0.1")) {
-                val port = com.mediaplayer.app.server.ConfigWebServer.globalPort
-                val encodedUrl = java.net.URLEncoder.encode(finalUrl, "UTF-8")
-                proxyUrl = "http://127.0.0.1:$port/proxy/m3u8?url=$encodedUrl"
-                com.mediaplayer.app.util.RemoteLogger.i("Player", "Using M3u8 Proxy: $proxyUrl")
-            }
-            
-            playerHelper?.play(proxyUrl, line.userAgent, line.customHeaders)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
         }
         
         // 启动/重置看门狗
