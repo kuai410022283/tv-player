@@ -435,6 +435,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
         })
 
+        // 预连接：提前建立到服务器的TCP连接，减少首次请求延迟
+        com.mediaplayer.app.util.ConnectionWarmer.warmUp(serverUrl)
+
         // 启动认证流程
         authFlowManager.startAuthFlow()
 
