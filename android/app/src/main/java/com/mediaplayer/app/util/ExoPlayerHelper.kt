@@ -47,6 +47,9 @@ class ExoPlayerHelper(
     // 缓存 ExtractorsFactory，避免每次切换频道都重建（避免重复创建）
     private var cachedExtractorsFactory: androidx.media3.extractor.ExtractorsFactory? = null
 
+    // 性能追踪：记录 playInternal 开始时间
+    private var playStartTimeMs: Long = 0L
+
     init {
         initPlayerView()
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
@@ -71,6 +74,7 @@ class ExoPlayerHelper(
     private var currentUrl: String = ""
     private var currentUserAgent: String = ""
     private var currentHeaders: String = ""
+    private var currentContentType: String = ""
     private var isMimeTypeFallback: Boolean = false
     
     // Circuit breaker for Behind Live Window
@@ -81,33 +85,44 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
-    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String) {
         currentUrl = url
         currentUserAgent = userAgent
         currentHeaders = customHeaders
+        currentContentType = contentType
         isMimeTypeFallback = false
         behindLiveWindowCount = 0
         behindLiveWindowLastTime = 0L
         criticalErrorCount = 0
         criticalErrorLastTime = 0L
         
-        playInternal(url, userAgent, customHeaders, null, startTimeMs)
+        playInternal(url, userAgent, customHeaders, null, startTimeMs, contentType)
     }
 
-    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?, startTimeMs: Long = 0L) {
+    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?, startTimeMs: Long = 0L, contentType: String = "") {
+        playStartTimeMs = android.os.SystemClock.uptimeMillis()
         var url = originalUrl
         val lowerUrl = url.lowercase()
 
-        val isLiveStream = url.lowercase().run { 
-            startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
-            contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
+        // 优先使用服务端下发的 content_type，其次根据 URL 推断
+        val isLiveStream = when (contentType.lowercase().trim()) {
+            "live" -> true
+            "vod" -> false
+            else -> url.lowercase().run { 
+                startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
+                contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
+            }
         }
+        RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (contentType=$contentType, url=${url.take(80)})")
 
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)
 
-        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLive) {
+        val needRebuild = exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLive
+        if (needRebuild) {
+            val buildStart = android.os.SystemClock.uptimeMillis()
             buildPlayer(isLiveStream)
+            RemoteLogger.i("ExoPlayer", "[Perf] buildPlayer took ${android.os.SystemClock.uptimeMillis() - buildStart}ms")
         }
 
         isPlayerPlaying = false
@@ -244,6 +259,9 @@ class ExoPlayerHelper(
             playerView?.player = exoPlayer
         }
 
+        val now = android.os.SystemClock.uptimeMillis()
+        RemoteLogger.i("ExoPlayer", "[Perf] MediaSource created in ${now - playStartTimeMs}ms (needRebuild=$needRebuild)")
+
         exoPlayer?.setMediaSource(mediaSource)
         if (startTimeMs > 0L) {
             exoPlayer?.seekTo(startTimeMs)
@@ -251,6 +269,7 @@ class ExoPlayerHelper(
         
         exoPlayer?.prepare()
         exoPlayer?.play()
+        RemoteLogger.i("ExoPlayer", "[Perf] prepare+play issued in ${android.os.SystemClock.uptimeMillis() - playStartTimeMs}ms total")
     }
 
     private fun buildPlayer(isLiveStream: Boolean = false) {
@@ -359,12 +378,15 @@ class ExoPlayerHelper(
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
                     listener.onBuffering(0f)
+                    RemoteLogger.i("ExoPlayer", "[Perf] STATE_BUFFERING +${android.os.SystemClock.uptimeMillis() - playStartTimeMs}ms")
                 }
                 Player.STATE_READY -> {
                     listener.onBuffering(100f)
                     if (exoPlayer?.playWhenReady == true) {
                         if (!isPlayerPlaying) {
                             isPlayerPlaying = true
+                            val readyMs = android.os.SystemClock.uptimeMillis() - playStartTimeMs
+                            RemoteLogger.i("ExoPlayer", "[Perf] STATE_READY in ${readyMs}ms (first frame)")
                             // 在 STATE_READY 时主动上报可用信息
                             // （onVideoSizeChanged 可能因流未上报尺寸而不触发）
                             val videoFormat = exoPlayer?.videoFormat
@@ -479,7 +501,7 @@ class ExoPlayerHelper(
                     isMimeTypeFallback = true
                     com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Parsing error detected, falling back to M3U8 MimeType...")
                     // 强制使用 M3U8 MimeType 再次尝试播放
-                    playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+                    playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8, contentType = currentContentType)
                     return // 吞掉本次错误
                 }
             }

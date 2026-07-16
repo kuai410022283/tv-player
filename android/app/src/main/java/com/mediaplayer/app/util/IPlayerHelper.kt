@@ -30,8 +30,9 @@ interface IPlayerHelper {
     /**
      * Start playback
      * @param startTimeMs Offset in milliseconds to start playback from (for VOD resume)
+     * @param contentType Stream content type from server: "live", "vod", or "" (auto-detect)
      */
-    fun play(url: String, userAgent: String = "", customHeaders: String = "", startTimeMs: Long = 0L)
+    fun play(url: String, userAgent: String = "", customHeaders: String = "", startTimeMs: Long = 0L, contentType: String = "")
     
     fun pause()
     fun resume()

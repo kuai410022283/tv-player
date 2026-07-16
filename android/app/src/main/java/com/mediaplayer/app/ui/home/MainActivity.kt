@@ -707,7 +707,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         currentCatchupStartTime = prog.startTime
                         currentCatchupChannelIndex = currentChannelIndex
                         osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                        playerHelper?.play(url, ua, headers)
+                        playerHelper?.play(url, ua, headers, contentType = "live")
                         hideEpgMenu()
                     } else {
                         val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
@@ -2112,7 +2112,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType)
         }
         
         // 启动/重置看门狗

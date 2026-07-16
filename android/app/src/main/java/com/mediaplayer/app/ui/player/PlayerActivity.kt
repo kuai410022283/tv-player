@@ -582,7 +582,8 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            playerHelper?.play(finalUrl, userAgent, customHeaders)
+            val inferredContentType = if (streamType in listOf("ts", "hls", "flv", "rtsp", "rtmp")) "live" else "vod"
+            playerHelper?.play(finalUrl, userAgent, customHeaders, contentType = inferredContentType)
         }
         
         currentPlaybackState = PlaybackState.BUFFERING
