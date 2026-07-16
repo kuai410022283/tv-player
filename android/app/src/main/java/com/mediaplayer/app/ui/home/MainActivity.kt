@@ -1056,12 +1056,17 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
         var currentAudioPassthrough = prefs.getBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, false)
+        var currentStopPrevious = prefs.getBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, false)
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
         var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
         var currentGestureVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
+        }
+
+        fun updateStopPreviousText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsStopPreviousValue)?.text = if (enabled) "兼容" else "流畅"
         }
 
         fun updatePipText(enabled: Boolean) {
@@ -1075,6 +1080,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateShowLogoText(currentShowLogo)
         updateReverseChannelsText(currentReverseChannels)
         updateAudioPassthroughText(currentAudioPassthrough)
+        updateStopPreviousText(currentStopPrevious)
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
         updateGestureVolumeText(currentGestureVolume)
@@ -1096,6 +1102,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             updateAudioPassthroughText(currentAudioPassthrough)
             prefs.edit().putBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, currentAudioPassthrough).apply()
             Toast.makeText(this, "音频直通设置已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<View>(R.id.btnSettingsStopPrevious)?.setOnClickListener {
+            currentStopPrevious = !currentStopPrevious
+            updateStopPreviousText(currentStopPrevious)
+            prefs.edit().putBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, currentStopPrevious).apply()
+            Toast.makeText(this, if (currentStopPrevious) "切台模式：兼容（下次播放生效）" else "切台模式：流畅（下次播放生效）", Toast.LENGTH_SHORT).show()
         }
 
         val btnSettingsPip = findViewById<View>(R.id.btnSettingsPip)

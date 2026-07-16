@@ -602,7 +602,7 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/btnSettingsPip"
+                    android:id="@+id/btnSettingsStopPrevious"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
@@ -613,6 +613,41 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsAudioPassthrough"
+                    android:nextFocusDown="@+id/btnSettingsPip">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="切台模式"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsStopPreviousValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="流畅"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsPip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsStopPrevious"
                     android:nextFocusDown="@+id/btnSettingsShowLogo">
                     <TextView
                         android:layout_width="wrap_content"

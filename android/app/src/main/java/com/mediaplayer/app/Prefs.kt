@@ -34,6 +34,9 @@ object Prefs {
     
     // 音频直通开关
     const val KEY_AUDIO_PASSTHROUGH = "audio_passthrough"
+
+    // 切台时停止上一个媒体项（开=更稳定，关=切台更快）
+    const val KEY_STOP_PREVIOUS_MEDIA = "stop_previous_media"
     
     // 播放内核
     const val KEY_PLAYER_CORE = "player_core"

@@ -39,9 +39,13 @@ class ExoPlayerHelper(
 
     private var lastBuiltCacheMs: Int = -1
     private var lastBuiltDecoderMode: Int = -1
+    private var lastBuiltIsLive: Boolean = false
 
     // 复用 MediaSourceFactory（保留认证头等配置，用于外挂字幕加载）
     private var mediaSourceFactory: DefaultMediaSourceFactory? = null
+
+    // 缓存 ExtractorsFactory，避免每次切换频道都重建（避免重复创建）
+    private var cachedExtractorsFactory: androidx.media3.extractor.ExtractorsFactory? = null
 
     init {
         initPlayerView()
@@ -102,12 +106,27 @@ class ExoPlayerHelper(
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)
 
-        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode) {
-            buildPlayer()
+        if (exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLive) {
+            buildPlayer(isLiveStream)
         }
 
         isPlayerPlaying = false
-        exoPlayer?.stop() // 恢复 stop()，彻底解决 SurfaceView 的绿块撕裂花屏问题
+
+        // 读取切台模式设置
+        // 流畅模式（默认）：stop + clearMediaItems，保留 Surface 旧帧（setKeepContentOnPlayerReset）
+        // 兼容模式：额外分离-重挂 Surface，更兼容但有短暂黑屏
+        val compatibleMode = context.getSharedPreferences(Prefs.FILE, android.content.Context.MODE_PRIVATE)
+            .getBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, false)
+
+        // 两种模式都需要 stop + clearMediaItems，确保解码器状态彻底重置
+        // setKeepContentOnPlayerReset(true) 会在 stop 时保留旧帧
+        exoPlayer?.stop()
+        exoPlayer?.clearMediaItems()
+
+        if (compatibleMode) {
+            // 兼容模式：额外分离 Surface，后续重挂
+            exoPlayer?.clearVideoSurface()
+        }
 
         applyScaleMode()
 
@@ -149,33 +168,36 @@ class ExoPlayerHelper(
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
         val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
-        // 注入自定义提取器：引入 AV3A 嗅探工厂，同时保留允许非 IDR 关键帧起播的容错特性
-        val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
-            .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+        // 缓存 ExtractorsFactory，只创建一次，避免每次切换频道都重建（借鉴 mytv 项目的做法）
+        if (cachedExtractorsFactory == null) {
+            val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
+                .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
 
-        val extractorsFactory = androidx.media3.extractor.ExtractorsFactory {
-            val extractors = defaultExtractorsFactory.createExtractors()
-            val newExtractors = mutableListOf<androidx.media3.extractor.Extractor>()
-            for (extractor in extractors) {
-                if (extractor is androidx.media3.extractor.ts.TsExtractor) {
-                    // 替换原生的 TsExtractor，注入我们的 Av3aTsPayloadReaderFactory
-                    newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
-                        androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
-                        androidx.media3.common.util.TimestampAdjuster(0),
-                        androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
-                    ))
-                } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor) {
-                    // 替换原生的 Mp4Extractor，注入我们修改过 BoxParser 支持 av3a 的提取器
-                    newExtractors.add(com.mediaplayer.app.extractor.mp4.Mp4Extractor())
-                } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor) {
-                    // 同样替换 fMP4 提取器
-                    newExtractors.add(com.mediaplayer.app.extractor.mp4.FragmentedMp4Extractor())
-                } else {
-                    newExtractors.add(extractor)
+            cachedExtractorsFactory = androidx.media3.extractor.ExtractorsFactory {
+                val extractors = defaultExtractorsFactory.createExtractors()
+                val newExtractors = mutableListOf<androidx.media3.extractor.Extractor>()
+                for (extractor in extractors) {
+                    if (extractor is androidx.media3.extractor.ts.TsExtractor) {
+                        // 替换原生的 TsExtractor，注入我们的 Av3aTsPayloadReaderFactory
+                        newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
+                            androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
+                            androidx.media3.common.util.TimestampAdjuster(0),
+                            androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
+                        ))
+                    } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor) {
+                        // 替换原生的 Mp4Extractor，注入我们修改过 BoxParser 支持 av3a 的提取器
+                        newExtractors.add(com.mediaplayer.app.extractor.mp4.Mp4Extractor())
+                    } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor) {
+                        // 同样替换 fMP4 提取器
+                        newExtractors.add(com.mediaplayer.app.extractor.mp4.FragmentedMp4Extractor())
+                    } else {
+                        newExtractors.add(extractor)
+                    }
                 }
+                newExtractors.toTypedArray()
             }
-            newExtractors.toTypedArray()
         }
+        val extractorsFactory = cachedExtractorsFactory!!
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
             .setDataSourceFactory(defaultDataSourceFactory)
@@ -215,6 +237,13 @@ class ExoPlayerHelper(
             return
         }
         
+        // 兼容模式：重挂 Surface（前面已分离）
+        // 流畅模式：跳过，Surface 未分离，无需重挂
+        if (compatibleMode) {
+            playerView?.player = null
+            playerView?.player = exoPlayer
+        }
+
         exoPlayer?.setMediaSource(mediaSource)
         if (startTimeMs > 0L) {
             exoPlayer?.seekTo(startTimeMs)
@@ -224,11 +253,12 @@ class ExoPlayerHelper(
         exoPlayer?.play()
     }
 
-    private fun buildPlayer() {
+    private fun buildPlayer(isLiveStream: Boolean = false) {
         releasePlayer()
 
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
+        lastBuiltIsLive = isLiveStream
 
         val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
         val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
@@ -262,26 +292,36 @@ class ExoPlayerHelper(
             )
         }
 
-        // 开启时间优先的缓冲策略，根据设备实际可用内存动态分配缓冲区上限。
-        // 原先固定 250MB 会导致在 256MB Heap 的电视上直接 OOM。
-        // 现在我们在不超过最大 Heap 的 1/3 的前提下，尽可能申请 250MB 缓冲，兼顾防卡顿和防崩溃。
+        // 根据设备实际可用内存动态分配缓冲区上限
         val maxMemory = Runtime.getRuntime().maxMemory()
         val maxSafeBuffer = maxMemory / 3
         val targetBuffer = Math.min(250L * 1024 * 1024, maxSafeBuffer).toInt()
 
         val loadControlBuilder = DefaultLoadControl.Builder()
-            .setPrioritizeTimeOverSizeThresholds(true)
             .setTargetBufferBytes(targetBuffer)
-            
-        if (currentCacheMs > 0) {
-            loadControlBuilder.setBufferDurationsMs(
-                currentCacheMs * 2,
-                currentCacheMs * 10,
-                currentCacheMs,
-                currentCacheMs
-            )
+            .setBackBuffer(0, true) // 切台时保留前一帧，避免黑屏
+
+        if (isLiveStream) {
+            // 直播流（TS/UDP/RTSP）：激进策略，低延迟优先
+            // 参考 mytv 项目参数，1帧即播
+            loadControlBuilder
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBufferDurationsMs(0, 60000, 0, 0)
+        } else if (currentCacheMs > 0) {
+            // 点播流 + 用户自定义缓冲：适中策略
+            loadControlBuilder
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBufferDurationsMs(
+                    currentCacheMs * 2,
+                    currentCacheMs * 4,
+                    1000,
+                    2000
+                )
         } else {
-            loadControlBuilder.setBufferDurationsMs(15000, 120000, 30, 3000)
+            // 点播流 + 默认缓冲：适中策略，兼顾起播速度和 Seek 稳定性
+            loadControlBuilder
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBufferDurationsMs(5000, 60000, 1000, 2000)
         }
         val loadControl = loadControlBuilder.build()
 

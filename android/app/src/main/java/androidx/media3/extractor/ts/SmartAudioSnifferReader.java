@@ -14,8 +14,15 @@ import androidx.media3.extractor.ts.TsPayloadReader.TrackIdGenerator;
  */
 public final class SmartAudioSnifferReader implements ElementaryStreamReader {
 
+    /** Callback interface to report sniff results for caching. */
+    public interface SniffResultListener {
+        /** Called when sniffing determines the format. {@code isAv3a} is true for AV3A, false for others. */
+        void onSniffResult(boolean isAv3a);
+    }
+
     private final String language;
     private final int roleFlags;
+    @Nullable private final SniffResultListener sniffResultListener;
 
     private ElementaryStreamReader delegate;
     private ExtractorOutput extractorOutput;
@@ -33,8 +40,14 @@ public final class SmartAudioSnifferReader implements ElementaryStreamReader {
     private @TsPayloadReader.Flags int pesFlags;
 
     public SmartAudioSnifferReader(@Nullable String language, @C.RoleFlags int roleFlags) {
+        this(language, roleFlags, null);
+    }
+
+    public SmartAudioSnifferReader(@Nullable String language, @C.RoleFlags int roleFlags,
+                                    @Nullable SniffResultListener sniffResultListener) {
         this.language = language;
         this.roleFlags = roleFlags;
+        this.sniffResultListener = sniffResultListener;
     }
 
     @Override
@@ -91,6 +104,7 @@ public final class SmartAudioSnifferReader implements ElementaryStreamReader {
         
         // If still sniffing and buffer is full, fallback to default AC-3 to prevent stalling
         if (delegate == null && bufferLength >= buffer.capacity()) {
+            if (sniffResultListener != null) sniffResultListener.onSniffResult(false);
             initDelegate(new Ac3Reader(language));
         }
 
@@ -117,18 +131,23 @@ public final class SmartAudioSnifferReader implements ElementaryStreamReader {
 
     private void sniffAndDelegate() {
         byte[] data = buffer.getData();
+        // Scan for common audio sync words at every position.
+        // AC-3 sync word (0x0B77) is very specific and won't false-positive.
         for (int i = 0; i < bufferLength - 1; i++) {
-            // Check AC-3 / E-AC-3 sync word: 0x0B77
             if (data[i] == 0x0B && data[i + 1] == 0x77) {
+                if (sniffResultListener != null) sniffResultListener.onSniffResult(false);
                 initDelegate(new Ac3Reader(language));
                 return;
             }
-            
-            // Check AV3A sync word: (0xFF Fx)
-            if (data[i] == (byte) 0xFF && (data[i + 1] & 0xF0) == 0xF0) {
-                initDelegate(new Av3aReader(language, roleFlags));
-                return;
-            }
+        }
+        // AV3A sync word (0xFF Fx) is extremely loose — 0xFF is very common in binary data.
+        // Only check at position 0 (the start of the PES payload), because an AV3A frame
+        // MUST start with 0xFF 0xF0. Checking at arbitrary positions causes frequent
+        // false positives on non-AV3A TS streams, which triggers the Av3aLibrary to load
+        // ~12MB of native libraries (~3s delay on ARM devices).
+        if (bufferLength >= 2 && data[0] == (byte) 0xFF && (data[1] & 0xF0) == 0xF0) {
+            if (sniffResultListener != null) sniffResultListener.onSniffResult(true);
+            initDelegate(new Av3aReader(language, roleFlags));
         }
     }
 

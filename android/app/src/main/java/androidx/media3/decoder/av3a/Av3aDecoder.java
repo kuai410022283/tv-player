@@ -76,24 +76,21 @@ public final class Av3aDecoder
             inputData.limit(),
             outputData,
             OUTPUT_BUFFER_SIZE);
-    android.util.Log.e("Av3aDebug", "av3aDecode input size=" + inputData.limit() + ", result=" + result);
     if (result == ERROR_OTHER) {
-      android.util.Log.e("Av3aDebug", "av3aDecode returned ERROR_OTHER!");
       return new Av3aDecoderException("AV3A native decode failed; see logcat");
     }
     if (result == ERROR_INVALID_DATA || result == 0) {
-      android.util.Log.e("Av3aDebug", "av3aDecode returned ERROR_INVALID_DATA or 0!");
       outputBuffer.shouldBeSkipped = true;
       return null;
     }
-    // WORKAROUND: Attenuate the PCM volume by 50% (-6dB) to prevent Android AudioTrack's
-    // 5.1-to-Stereo downmixer from clipping the audio and causing "electric static" noise.
-    // Downmixing sums channels (L + 0.707*C + 0.5*Ls), which easily exceeds 16-bit limits.
-    outputData.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-    for (int i = 0; i < result; i += 2) {
-      short sample = outputData.getShort(i);
-      outputData.putShort(i, (short) (sample / 2));
-    }
+    // Update channel count and sample rate from native decoder.
+    // The binaural renderer (if active) outputs stereo regardless of input channel count.
+    // If native returns 0, keep the original values from the format (decoder library
+    // may not reliably set these fields in its wrapper struct).
+    int nativeChannels = av3aGetChannelCount(nativeContext);
+    int nativeSampleRate = av3aGetSampleRate(nativeContext);
+    if (nativeChannels > 0) channelCount = nativeChannels;
+    if (nativeSampleRate > 0) sampleRate = nativeSampleRate;
 
     outputData.position(0);
     outputData.limit(result);
