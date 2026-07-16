@@ -26,13 +26,25 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
   private static final String TAG = "Av3aAudioRenderer";
   private static final int NUM_BUFFERS = 16;
   private static final int DEFAULT_INPUT_BUFFER_SIZE = 4096 * 64;
+  private static final int[] CORE_STEREO_MAPPING = {0, 1};
   private static final int[] BED_5_1_MAPPING = {0, 1, 2, 3, 4, 5};
+
+  private final boolean tvStereoSafetyEnabled;
 
   public Av3aAudioRenderer(
       @Nullable Handler eventHandler,
       @Nullable AudioRendererEventListener eventListener,
       AudioSink audioSink) {
+    this(eventHandler, eventListener, audioSink, false);
+  }
+
+  public Av3aAudioRenderer(
+      @Nullable Handler eventHandler,
+      @Nullable AudioRendererEventListener eventListener,
+      AudioSink audioSink,
+      boolean tvStereoSafetyEnabled) {
     super(eventHandler, eventListener, audioSink);
+    this.tvStereoSafetyEnabled = tvStereoSafetyEnabled;
   }
 
   @Override
@@ -47,6 +59,12 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
     }
     if (format.cryptoType != C.CRYPTO_TYPE_NONE) {
       return C.FORMAT_UNSUPPORTED_DRM;
+    }
+    if (tvStereoSafetyEnabled && format.channelCount > 2) {
+      Format stereoPcm = Util.getPcmFormat(C.ENCODING_PCM_16BIT, 2, format.sampleRate);
+      if (sinkSupportsFormat(stereoPcm)) {
+        return C.FORMAT_HANDLED;
+      }
     }
     Format nativePcm =
         Util.getPcmFormat(C.ENCODING_PCM_16BIT, format.channelCount, format.sampleRate);
@@ -92,6 +110,19 @@ public final class Av3aAudioRenderer extends DecoderAudioRenderer<Av3aDecoder> {
   @Nullable
   protected int[] getChannelMapping(Av3aDecoder decoder) {
     int channelCount = decoder.getChannelCount();
+
+    if (tvStereoSafetyEnabled && channelCount > 2) {
+      Format stereoPcm = Util.getPcmFormat(decoder.getEncoding(), 2, decoder.getSampleRate());
+      if (getSinkFormatSupport(stereoPcm) == AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY) {
+        Log.i(
+            TAG,
+            "AV3A PCM output: TV stereo safety enabled. Mapping "
+                + channelCount
+                + " -> core stereo channels.");
+        return CORE_STEREO_MAPPING;
+      }
+      Log.w(TAG, "AV3A PCM output: TV stereo safety requested, but stereo sink is unavailable.");
+    }
     
     Format nativePcm =
         Util.getPcmFormat(

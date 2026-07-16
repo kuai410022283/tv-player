@@ -230,6 +230,10 @@ class ExoPlayerHelper(
         lastBuiltCacheMs = currentCacheMs
         lastBuiltDecoderMode = currentDecoderMode
 
+        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+        val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
+        val enableAv3aTvStereoSafety = !isPassthroughEnabled
+
         val renderersFactory = object : DefaultRenderersFactory(context) {
             override fun buildAudioRenderers(
                 context: Context,
@@ -245,7 +249,7 @@ class ExoPlayerHelper(
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
                 // 强制往队列里注入我们从 media 项目移植的、原生的 Av3aAudioRenderer！
-                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink))
+                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
             }
         }.apply {
             setEnableDecoderFallback(true) // 开启解码器容错回退机制
@@ -287,9 +291,6 @@ class ExoPlayerHelper(
                 .setAllowVideoMixedMimeTypeAdaptiveness(true)
             )
         }
-
-        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
-        val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
 
         val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
             .setUsage(androidx.media3.common.C.USAGE_MEDIA)
