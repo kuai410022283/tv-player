@@ -48,6 +48,7 @@ import com.mediaplayer.app.ui.settings.SettingsActivity
 import com.mediaplayer.app.util.DeviceUtils
 import com.mediaplayer.app.util.FocusHelper
 import com.mediaplayer.app.util.AudioTrackInfo
+import com.mediaplayer.app.util.NetworkUtils
 import com.mediaplayer.app.util.SubtitleTrackInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1003,6 +1004,58 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             groupAdapter.showSource = showGroupSource
             groupAdapter.notifyDataSetChanged()
+        }
+
+        // 网卡选择
+        val btnSettingsNetworkInterface = findViewById<View>(R.id.btnSettingsNetworkInterface)
+        val tvSettingsNetworkInterfaceValue = findViewById<TextView>(R.id.tvSettingsNetworkInterfaceValue)
+
+        fun updateNetworkInterfaceText() {
+            val selected = prefs.getString(Prefs.KEY_NETWORK_INTERFACE, "") ?: ""
+            if (selected.isEmpty()) {
+                tvSettingsNetworkInterfaceValue?.text = "自动"
+            } else {
+                // 检查选中的网卡是否还存在
+                val interfaces = NetworkUtils.getAvailableInterfaces()
+                val exists = interfaces.any { it.name == selected }
+                if (exists) {
+                    tvSettingsNetworkInterfaceValue?.text = selected
+                } else {
+                    // 网卡不存在了，清除选择
+                    prefs.edit().putString(Prefs.KEY_NETWORK_INTERFACE, "").apply()
+                    tvSettingsNetworkInterfaceValue?.text = "自动"
+                }
+            }
+        }
+        updateNetworkInterfaceText()
+
+        btnSettingsNetworkInterface?.setOnClickListener {
+            val interfaces = NetworkUtils.getAvailableInterfaces()
+            if (interfaces.isEmpty()) {
+                Toast.makeText(this, "未检测到可用网卡", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val items = mutableListOf("自动")
+            interfaces.forEach { intf ->
+                items.add("${intf.displayName} - ${intf.ip}")
+            }
+            val currentSelected = prefs.getString(Prefs.KEY_NETWORK_INTERFACE, "") ?: ""
+            val checkedIndex = if (currentSelected.isEmpty()) 0 else {
+                val idx = interfaces.indexOfFirst { it.name == currentSelected }
+                if (idx >= 0) idx + 1 else 0 // 如果网卡不存在，回退到"自动"
+            }
+
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("选择默认网卡")
+                .setSingleChoiceItems(items.toTypedArray(), checkedIndex) { dialog, which ->
+                    val selectedName = if (which == 0) "" else interfaces[which - 1].name
+                    prefs.edit().putString(Prefs.KEY_NETWORK_INTERFACE, selectedName).apply()
+                    updateNetworkInterfaceText()
+                    Toast.makeText(this, "网卡设置已保存，重启应用后生效", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+                .show()
         }
         
         fun updateDecoderText(mode: Int) {

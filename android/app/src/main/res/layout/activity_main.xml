@@ -578,7 +578,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsCore"
-                    android:nextFocusDown="@+id/btnSettingsPip">
+                    android:nextFocusDown="@+id/btnSettingsStopPrevious">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -746,7 +746,8 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginTop="@dimen/dp_16"
-                    android:layout_marginBottom="@dimen/dp_8">
+                    android:layout_marginBottom="@dimen/dp_8"
+                    android:paddingHorizontal="@dimen/dp_8">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -798,6 +799,7 @@
                     android:text="系统音量"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_22"
+                    android:paddingHorizontal="@dimen/dp_8"
                     android:layout_marginBottom="@dimen/dp_8"/>
                 <SeekBar
                     android:id="@+id/sbSettingsVolume"
@@ -816,6 +818,7 @@
                     android:text="画面亮度"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_22"
+                    android:paddingHorizontal="@dimen/dp_8"
                     android:layout_marginBottom="@dimen/dp_8"/>
                 <SeekBar
                     android:id="@+id/sbSettingsBrightness"
@@ -856,7 +859,7 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusUp="@+id/sbSettingsBrightness"
+                    android:nextFocusUp="@+id/btnSettingsNetworkInterface"
                     android:nextFocusDown="@+id/btnSettingsGestureVolume">
                     <TextView
                         android:layout_width="wrap_content"
@@ -964,7 +967,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsGlobalProgress"
-                    android:nextFocusDown="@+id/btnSettingsPreferredServer">
+                    android:nextFocusDown="@+id/btnSettingsNetworkInterface">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -977,6 +980,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="关"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsNetworkInterface"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsGroupSource"
+                    android:nextFocusDown="@+id/btnSettingsPreferredServer">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="默认网卡"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsNetworkInterfaceValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="自动"
                         android:textColor="#AAAAAA"
                         android:textSize="@dimen/sp_22"
                         android:layout_marginEnd="@dimen/dp_8"/>
@@ -1017,7 +1055,7 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusUp="@+id/btnSettingsGroupSource"
+                    android:nextFocusUp="@+id/btnSettingsNetworkInterface"
                     android:nextFocusDown="@+id/btnSettingsAutoStart">
                     <TextView
                         android:layout_width="wrap_content"
