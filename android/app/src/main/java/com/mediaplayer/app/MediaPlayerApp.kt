@@ -49,11 +49,8 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         // Restore access token
         ApiClient.accessToken = prefs.getString(Prefs.KEY_ACCESS_TOKEN, null)
 
-        // AV3A 开启时：异步预加载解码库（约 12MB），
-        // 确保首次播放 AV3A 流时无需等待 ~3 秒的库加载延迟
-        if (prefs.getBoolean(Prefs.KEY_AV3A_ENABLED, false)) {
-            androidx.media3.decoder.av3a.Av3aLibrary.preloadAsync()
-        }
+        // 异步预加载 AV3A 解码库（约 12MB），确保首次播放 AV3A 流时无需等待 ~3 秒的库加载延迟
+        androidx.media3.decoder.av3a.Av3aLibrary.preloadAsync()
     }
 
     override fun newImageLoader(): ImageLoader {

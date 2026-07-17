@@ -201,22 +201,20 @@ class ExoPlayerHelper(
 
             cachedExtractorsFactory = androidx.media3.extractor.ExtractorsFactory {
                 val extractors = defaultExtractorsFactory.createExtractors()
-                val av3aEnabled = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
-                    .getBoolean(com.mediaplayer.app.Prefs.KEY_AV3A_ENABLED, false)
                 val newExtractors = mutableListOf<androidx.media3.extractor.Extractor>()
                 for (extractor in extractors) {
-                    if (extractor is androidx.media3.extractor.ts.TsExtractor && av3aEnabled) {
-                        // AV3A 开启时：替换原生的 TsExtractor，注入 Av3aTsPayloadReaderFactory
+                    if (extractor is androidx.media3.extractor.ts.TsExtractor) {
+                        // 替换原生的 TsExtractor，注入 Av3aTsPayloadReaderFactory 以支持 AV3A 音频解码
                         newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
                             androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
                             androidx.media3.common.util.TimestampAdjuster(0),
                             androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
                         ))
-                    } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor && av3aEnabled) {
-                        // AV3A 开启时：替换原生的 Mp4Extractor，注入支持 av3a 的提取器
+                    } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor) {
+                        // 替换原生的 Mp4Extractor，注入支持 av3a 的提取器
                         newExtractors.add(com.mediaplayer.app.extractor.mp4.Mp4Extractor())
-                    } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor && av3aEnabled) {
-                        // AV3A 开启时：替换 fMP4 提取器
+                    } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor) {
+                        // 替换 fMP4 提取器
                         newExtractors.add(com.mediaplayer.app.extractor.mp4.FragmentedMp4Extractor())
                     } else {
                         newExtractors.add(extractor)
@@ -294,7 +292,6 @@ class ExoPlayerHelper(
 
         val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
         val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
-        val av3aEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AV3A_ENABLED, false)
         val enableAv3aTvStereoSafety = !isPassthroughEnabled
 
         val renderersFactory = object : DefaultRenderersFactory(context) {
@@ -311,10 +308,8 @@ class ExoPlayerHelper(
                 // 原生的 Renderers
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
-                // AV3A 开启时：注入 Av3aAudioRenderer
-                if (av3aEnabled) {
-                    out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
-                }
+                // 注入 Av3aAudioRenderer 以支持 AV3A 音频解码
+                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
             }
         }.apply {
             setEnableDecoderFallback(true) // 开启解码器容错回退机制

@@ -1061,17 +1061,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 .show()
         }
 
-        // AV3A 解码器开关
-        val av3aEnabled = prefs.getBoolean(Prefs.KEY_AV3A_ENABLED, false)
-        findViewById<TextView>(R.id.tvSettingsAv3aValue)?.text = if (av3aEnabled) "开启" else "关闭"
-        findViewById<LinearLayout>(R.id.btnSettingsAv3a)?.setOnClickListener {
-            val current = prefs.getBoolean(Prefs.KEY_AV3A_ENABLED, false)
-            val newValue = !current
-            prefs.edit().putBoolean(Prefs.KEY_AV3A_ENABLED, newValue).apply()
-            findViewById<TextView>(R.id.tvSettingsAv3aValue)?.text = if (newValue) "开启" else "关闭"
-            Toast.makeText(this, if (newValue) "AV3A 解码器已开启，重启应用后生效" else "AV3A 解码器已关闭，重启应用后生效", Toast.LENGTH_SHORT).show()
-        }
-        
         fun updateDecoderText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
                 Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
