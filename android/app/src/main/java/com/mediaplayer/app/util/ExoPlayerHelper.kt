@@ -452,6 +452,11 @@ class ExoPlayerHelper(
                 }
                 Player.STATE_ENDED -> {
                     listener.onPlaybackCompleted()
+                    // 点播流播放结束后，自动回到开头重新播放，避免黑屏
+                    if (currentContentType == "vod" || currentStreamType.lowercase() in listOf("mp4", "mkv", "avi", "mov", "webm")) {
+                        exoPlayer?.seekTo(0)
+                        exoPlayer?.play()
+                    }
                 }
             }
         }
