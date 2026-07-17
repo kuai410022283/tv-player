@@ -102,6 +102,8 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
     private var streamUrl = ""
     private var streamType = "hls"
     private var channelIndex = 0
+    private var proxyType = ""
+    private var proxyUrl = ""
     private var lineIndex = 0
     private var allChannels = listOf<Channel>()
     private var resolveJob: kotlinx.coroutines.Job? = null
@@ -229,6 +231,8 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         streamUrl = intent.getStringExtra("stream_url") ?: ""
         streamType = intent.getStringExtra("stream_type") ?: "hls"
         channelIndex = intent.getIntExtra("channel_index", 0)
+        proxyType = intent.getStringExtra("proxy_type") ?: ""
+        proxyUrl = intent.getStringExtra("proxy_url") ?: ""
         val userAgent = intent.getStringExtra("user_agent") ?: ""
         val customHeaders = intent.getStringExtra("custom_headers") ?: ""
 
@@ -583,7 +587,10 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             stateStartTime = System.currentTimeMillis()
             
             val inferredContentType = if (streamType in listOf("ts", "hls", "flv", "rtsp", "rtmp")) "live" else "vod"
-            playerHelper?.play(finalUrl, userAgent, customHeaders, contentType = inferredContentType, streamType = streamType)
+            val proxyChannel = if (proxyType.isNotEmpty() || proxyUrl.isNotEmpty()) {
+                Channel(proxyType = proxyType, proxyUrl = proxyUrl)
+            } else null
+            playerHelper?.play(finalUrl, userAgent, customHeaders, contentType = inferredContentType, streamType = streamType, channel = proxyChannel)
         }
         
         currentPlaybackState = PlaybackState.BUFFERING

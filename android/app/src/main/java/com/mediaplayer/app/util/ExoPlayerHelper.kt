@@ -77,6 +77,9 @@ class ExoPlayerHelper(
     private var currentContentType: String = ""
     private var currentStreamType: String = ""
     private var isMimeTypeFallback: Boolean = false
+    // SOCKS5 代理状态（用于重试时保持代理配置）
+    private var currentProxyType: String = ""
+    private var currentProxyUrl: String = ""
     
     // Circuit breaker for Behind Live Window
     private var behindLiveWindowCount: Int = 0
@@ -86,12 +89,14 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
-    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String, channel: com.mediaplayer.app.data.model.Channel?) {
         currentUrl = url
         currentUserAgent = userAgent
         currentHeaders = customHeaders
         currentContentType = contentType
         currentStreamType = streamType
+        currentProxyType = channel?.proxyType ?: ""
+        currentProxyUrl = channel?.proxyUrl ?: ""
         isMimeTypeFallback = false
         behindLiveWindowCount = 0
         behindLiveWindowLastTime = 0L
@@ -156,7 +161,7 @@ class ExoPlayerHelper(
 
         applyScaleMode()
 
-        val okHttpClient = com.mediaplayer.app.util.PlayerNetworkHelper.getPlayerOkHttpClient()
+        val okHttpClient = com.mediaplayer.app.util.PlayerNetworkHelper.getPlayerOkHttpClient(currentProxyType, currentProxyUrl)
         val okHttpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(okHttpClient)
         
         if (userAgent.isNotEmpty()) {

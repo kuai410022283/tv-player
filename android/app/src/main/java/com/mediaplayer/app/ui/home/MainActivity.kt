@@ -403,6 +403,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
 
             override fun onSuccess(resp: com.mediaplayer.app.data.model.VerifyResponse) {
+                configWebServer?.updateAuthStatus("approved")
                 handleAuthSuccess(
                     resp.announcement, resp.announcementInterval,
                     resp.startupMediaEnabled, resp.startupMedia,
@@ -413,19 +414,23 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
 
             override fun onPending(deviceId: String) {
+                configWebServer?.updateAuthStatus("pending")
                 showAuthWaiting("设备已注册，等待管理员审批...\n\n设备ID: $deviceId", showQr = true)
                 startAuthPolling()
             }
 
             override fun onRejected(message: String) {
+                configWebServer?.updateAuthStatus("failed")
                 showAuthWaiting(message, showQr = true)
             }
 
             override fun onBanned(message: String) {
+                configWebServer?.updateAuthStatus("failed")
                 showAuthWaiting(message, showQr = true)
             }
 
             override fun onAllFailed() {
+                configWebServer?.updateAuthStatus("retrying")
                 showAuthWaiting("所有服务器均无法连接，15秒后自动重试...\n请检查配置信息", showQr = true)
             }
 
@@ -710,7 +715,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         currentCatchupStartTime = prog.startTime
                         currentCatchupChannelIndex = currentChannelIndex
                         osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                        playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls")
+                        playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls", channel = channel)
                         hideEpgMenu()
                     } else {
                         val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
@@ -720,6 +725,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             putExtra("stream_type", "hls") // Catchup is usually HLS
                             putExtra("user_agent", ua)
                             putExtra("custom_headers", headers)
+                            putExtra("proxy_type", channel.proxyType)
+                            putExtra("proxy_url", channel.proxyUrl)
                         }
                         startActivity(intent)
                     }
@@ -2122,7 +2129,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType, streamType = line.streamType)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType, streamType = line.streamType, channel = channel)
         }
         
         // 启动/重置看门狗

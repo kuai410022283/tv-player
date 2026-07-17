@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mediaplayer/backend/internal/models"
+	"golang.org/x/net/proxy"
 )
 
 type M3UImporter struct {
@@ -20,6 +22,39 @@ type M3UImporter struct {
 
 func NewM3UImporter(channelSvc *ChannelService) *M3UImporter {
 	return &M3UImporter{channelSvc: channelSvc}
+}
+
+// buildProxyClient 创建带 SOCKS5 代理的 HTTP 客户端（用于 M3U 源文件下载）
+func (imp *M3UImporter) buildProxyClient(proxyURL string) (*http.Client, error) {
+	u, err := url.Parse(proxyURL)
+	if err != nil || u.Host == "" {
+		return nil, fmt.Errorf("invalid proxy URL: %s", proxyURL)
+	}
+
+	addr := u.Host
+	if u.Port() == "" {
+		addr = net.JoinHostPort(u.Hostname(), "1080")
+	}
+
+	var auth *proxy.Auth
+	if u.User != nil {
+		auth = &proxy.Auth{User: u.User.Username()}
+		if pass, ok := u.User.Password(); ok {
+			auth.Password = pass
+		}
+	}
+
+	dialer, err := proxy.SOCKS5("tcp", addr, auth, proxy.Direct)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SOCKS5 dialer: %w", err)
+	}
+
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Dial: dialer.Dial,
+		},
+	}, nil
 }
 
 // ImportFromURL fetches and imports an M3U source
@@ -53,8 +88,17 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (count int, err error) {
 		return 0, fmt.Errorf("M3U 源地址不安全: %w", err)
 	}
 
+	// 根据源的代理配置创建 HTTP 客户端
 	client := &http.Client{
 		Timeout: 30 * time.Second,
+	}
+	if source.ProxyType == "socks5" && source.ProxyURL != "" {
+		if proxyClient, err := imp.buildProxyClient(source.ProxyURL); err == nil {
+			client = proxyClient
+			slog.Info("M3U导入使用SOCKS5代理", "source_id", source.ID, "proxy", source.ProxyURL)
+		} else {
+			slog.Warn("M3U导入SOCKS5代理配置无效，降级为直连", "source_id", source.ID, "proxy", source.ProxyURL, "error", err)
+		}
 	}
 	req, err := http.NewRequest("GET", source.URL, nil)
 	if err != nil {

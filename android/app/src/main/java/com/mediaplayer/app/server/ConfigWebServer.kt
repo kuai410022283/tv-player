@@ -22,6 +22,17 @@ class ConfigWebServer(
     /** 实际监听端口（与传入 NanoHTTPD 构造函数的端口一致）。 */
     val actualPort: Int = if (port > 0) port else findAvailablePort(9528)
 
+    /**
+     * 授权状态，供 /status 端点读取。
+     * idle → 连接中 → pending/approved/failed
+     */
+    @Volatile var authStatus: String = "idle"
+
+    /** 更新授权状态并通知等待中的手机页面 */
+    fun updateAuthStatus(status: String) {
+        authStatus = status
+    }
+
     init {
         globalPort = actualPort
     }
@@ -34,6 +45,14 @@ class ConfigWebServer(
 
         if (method == Method.GET && uri == "/") {
             return newFixedLengthResponse(getHtmlForm())
+        }
+
+        // 授权状态轮询端点，供手机页面查询 TV 注册进度
+        if (method == Method.GET && uri == "/status") {
+            val resp = newFixedLengthResponse(Response.Status.OK, "application/json", """{"status":"$authStatus"}""")
+            resp.addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
+            resp.addHeader("Pragma", "no-cache")
+            return resp
         }
 
         if (method == Method.POST && uri == "/save") {
@@ -60,6 +79,7 @@ class ConfigWebServer(
                     prefs.edit().remove("device_location").apply()
                 }
 
+                authStatus = "connecting"
                 onUrlSaved(resolvedUrls)
                 return newFixedLengthResponse(getSuccessHtml())
             } catch (e: Exception) {
@@ -253,19 +273,50 @@ class ConfigWebServer(
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>配置成功</title>
+                <title>配置结果</title>
                 <style>
                     body { font-family: -apple-system, sans-serif; background: #f4f4f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-                    h2 { color: #28a745; margin-top: 0; }
-                    p { color: #666; }
+                    h2 { margin-top: 0; }
+                    p { color: #666; font-size: 14px; }
+                    .ok { color: #28a745; }
+                    .pending { color: #f0ad4e; }
+                    .fail { color: #dc3545; }
+                    .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #ddd; border-top-color: #007bff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+                    @keyframes spin { to { transform: rotate(360deg); } }
+                    a { display: inline-block; margin-top: 12px; padding: 10px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; }
                 </style>
             </head>
             <body>
                 <div class="card">
-                    <h2>✅ 配置保存成功</h2>
-                    <p>您的电视端已收到配置并正在重新连接服务器，您可以关闭此页面了。</p>
+                    <div id="result">
+                        <h2 style="color:#007bff"><span class="spinner"></span>正在连接服务器...</h2>
+                        <p>电视端已收到授权码，正在尝试连接后端服务器，请稍候...</p>
+                    </div>
                 </div>
+                <script>
+                    var count = 0;
+                    var timer = setInterval(function() {
+                        count++;
+                        fetch('/status').then(function(r) { return r.json(); }).then(function(d) {
+                            var el = document.getElementById('result');
+                            if (d.status === 'approved') {
+                                clearInterval(timer);
+                                el.innerHTML = '<h2 class="ok">授权成功</h2><p>电视端已成功连接服务器，可以关闭此页面了。</p>';
+                            } else if (d.status === 'pending') {
+                                clearInterval(timer);
+                                el.innerHTML = '<h2 class="pending">等待审批</h2><p>设备已注册，等待管理员审批通过后电视端将自动进入。</p>';
+                            } else if (d.status === 'failed') {
+                                clearInterval(timer);
+                                el.innerHTML = '<h2 class="fail">连接失败</h2><p>电视端无法连接后端服务器，请检查授权码是否正确、网络是否通畅。</p><a href="/">返回重试</a>';
+                            } else if (d.status === 'retrying') {
+                                el.innerHTML = '<h2 style="color:#f0ad4e"><span class="spinner"></span>连接失败，正在重试...</h2><p>电视端无法连接服务器，15秒后将自动重试，请耐心等待。</p>';
+                            }
+                            // connecting → 继续轮询
+                        }).catch(function() {});
+                        if (count > 30) { clearInterval(timer); }
+                    }, 2000);
+                </script>
             </body>
             </html>
         """.trimIndent()

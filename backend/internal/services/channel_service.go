@@ -970,6 +970,8 @@ func (s *ChannelService) MirrorChannel(sourceChannelID int64, targetGroupID int6
 		ContentType:     orig.ContentType,
 		Fcc:             orig.Fcc,
 		FccType:         orig.FccType,
+		ProxyType:       orig.ProxyType,
+		ProxyURL:        orig.ProxyURL,
 		LinkedChannelID: sourceChannelID,
 		IsProtected:     true,
 	}

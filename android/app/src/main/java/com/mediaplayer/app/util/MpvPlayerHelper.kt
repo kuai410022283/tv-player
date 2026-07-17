@@ -79,14 +79,23 @@ class MpvPlayerHelper(
         videoLayout.addView(surfaceView)
     }
 
-    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String, channel: com.mediaplayer.app.data.model.Channel?) {
         if (hasDestroyed) return
         isWaitingForNewFile = true
         isPlayerPlaying = false
         isPrepared = false
         videoWidth = 0
         videoHeight = 0
-        
+
+        // SOCKS5 代理支持
+        val proxyType = channel?.proxyType ?: ""
+        val proxyUrl = channel?.proxyUrl ?: ""
+        if (proxyType == "socks5" && proxyUrl.isNotEmpty()) {
+            mpv?.setOptionString("proxy", proxyUrl)
+        } else {
+            mpv?.setOptionString("proxy", "")
+        }
+
         applyPlayerOptions(url, startTimeMs)
         applyDataSource(url, userAgent, customHeaders)
     }

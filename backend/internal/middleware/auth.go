@@ -410,6 +410,14 @@ func Logger() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 		method := c.Request.Method
 
+		// 检测是否获取到真实 IP：如果 IP 是回环地址或私有地址，且有反向代理头，说明配置可能有问题
+		if clientIP == "127.0.0.1" || clientIP == "::1" {
+			if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+				slog.Warn("检测到 X-Forwarded-For 头但 client_ip 为回环地址，请检查 server.trusted_proxies 配置",
+					"client_ip", clientIP, "x_forwarded_for", xff, "x_real_ip", c.GetHeader("X-Real-IP"))
+			}
+		}
+
 		attrs := []slog.Attr{
 			slog.String("client_ip", clientIP),
 			slog.String("method", method),

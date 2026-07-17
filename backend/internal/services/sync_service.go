@@ -139,10 +139,10 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 
 	queries := []string{
 		"DELETE FROM main.channel_groups",
-		"INSERT INTO main.channel_groups (id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, created_at, updated_at) SELECT id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, created_at, updated_at FROM master_db.channel_groups",
+		"INSERT INTO main.channel_groups (id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, proxy_type, proxy_url, created_at, updated_at) SELECT id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, proxy_type, proxy_url, created_at, updated_at FROM master_db.channel_groups",
 		
 		"DELETE FROM main.channels",
-		"INSERT INTO main.channels (id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, created_at, updated_at) SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, created_at, updated_at FROM master_db.channels",
+		"INSERT INTO main.channels (id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, proxy_type, proxy_url, content_type, fcc, fcc_type, linked_channel_id, is_protected, created_at, updated_at) SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, proxy_type, proxy_url, COALESCE(content_type, ''), COALESCE(fcc, 0), COALESCE(fcc_type, ''), COALESCE(linked_channel_id, 0), COALESCE(is_protected, 0), created_at, updated_at FROM master_db.channels",
 		
 		"DELETE FROM main.subscription_plans",
 		"INSERT INTO main.subscription_plans (id, name, days, max_streams, price, description, subscription_token, created_at, updated_at) SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM master_db.subscription_plans",
@@ -151,11 +151,12 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 		"INSERT INTO main.plan_group_relations (plan_id, group_id, sort_order) SELECT plan_id, group_id, sort_order FROM master_db.plan_group_relations",
 		
 		"DELETE FROM main.m3u_sources",
-		"INSERT INTO main.m3u_sources (id, name, url, auto_sync, sync_interval, user_agent, custom_headers, last_sync, created_at) SELECT id, name, url, auto_sync, sync_interval, user_agent, custom_headers, last_sync, created_at FROM master_db.m3u_sources",
+		"INSERT INTO main.m3u_sources (id, name, url, auto_sync, sync_interval, user_agent, custom_headers, proxy_type, proxy_url, last_sync, created_at) SELECT id, name, url, auto_sync, sync_interval, user_agent, custom_headers, proxy_type, proxy_url, last_sync, created_at FROM master_db.m3u_sources",
 
 		`INSERT OR REPLACE INTO main.user_settings 
 		 SELECT * FROM master_db.user_settings 
 		 WHERE key NOT IN (
+			'server_name',
 			'server_url', 
 			'admin_password_hash',
 			'sync_enable', 

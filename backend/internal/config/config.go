@@ -17,8 +17,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port int    `yaml:"port"`
-	Host string `yaml:"host"`
+	Port           int      `yaml:"port"`
+	Host           string   `yaml:"host"`
+	TrustedProxies []string `yaml:"trusted_proxies"` // 反向代理 IP 列表，用于读取 X-Forwarded-For
 }
 
 type DatabaseConfig struct {
@@ -49,7 +50,7 @@ type RateLimitConfig struct {
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Server:   ServerConfig{Port: 9527, Host: "0.0.0.0"},
+		Server:   ServerConfig{Port: 9527, Host: "0.0.0.0", TrustedProxies: []string{"127.0.0.1", "::1"}},
 		Database: DatabaseConfig{Path: "./data/mediaplayer.db"},
 		Stream: StreamConfig{
 			CacheDir:      "./data/cache",

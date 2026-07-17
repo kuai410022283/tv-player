@@ -488,6 +488,8 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"support_catchup": items[i].SupportCatchup,
 						"catchup_days":    items[i].CatchupDays,
 						"lines":           linesForThisItem,
+						"proxy_type":      items[i].ProxyType,
+						"proxy_url":       maskProxyURL(items[i].ProxyURL),
 					}
 					groupedItems = append(groupedItems, newGroup)
 					groupMap[nameKey] = len(groupedItems) - 1

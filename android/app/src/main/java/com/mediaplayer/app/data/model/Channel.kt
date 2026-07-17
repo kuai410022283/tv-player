@@ -34,7 +34,10 @@ data class Channel(
     @SerializedName("support_catchup") val supportCatchup: Boolean = false,
     @SerializedName("catchup_type") val catchupType: String = "",
     @SerializedName("catchup_source") val catchupSource: String = "",
-    @SerializedName("catchup_days") val catchupDays: Int = 0
+    @SerializedName("catchup_days") val catchupDays: Int = 0,
+    // SOCKS5 代理配置（由后端 API 返回，客户端直连模式使用）
+    @SerializedName("proxy_type") val proxyType: String = "",
+    @SerializedName("proxy_url") val proxyUrl: String = ""
 ) {
     @Transient var globalIndex: Int = -1
 

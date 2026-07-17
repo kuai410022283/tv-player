@@ -33,7 +33,7 @@ interface IPlayerHelper {
      * @param contentType Stream content type from server: "live", "vod", or "" (auto-detect)
      * @param streamType Stream protocol type from server: "hls", "ts", "mp4", etc.
      */
-    fun play(url: String, userAgent: String = "", customHeaders: String = "", startTimeMs: Long = 0L, contentType: String = "", streamType: String = "")
+    fun play(url: String, userAgent: String = "", customHeaders: String = "", startTimeMs: Long = 0L, contentType: String = "", streamType: String = "", channel: com.mediaplayer.app.data.model.Channel? = null)
     
     fun pause()
     fun resume()

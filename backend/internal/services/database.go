@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -54,8 +55,6 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN linked_channel_id INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN is_protected INTEGER DEFAULT 0;")
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
-	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc TEXT DEFAULT ''`)
-	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN fcc_type TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT ''`)
@@ -104,11 +103,14 @@ func InitDB(dbPath string) (*sql.DB, error) {
 				source TEXT DEFAULT '手动',
 				user_agent TEXT DEFAULT '',
 				custom_headers TEXT DEFAULT '',
+				enable_multiplex INTEGER DEFAULT 0,
+				proxy_type TEXT DEFAULT '',
+				proxy_url TEXT DEFAULT '',
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			);`,
-			`INSERT INTO channel_groups_new (id, name, icon, sort_order, source, created_at, updated_at)
-			SELECT id, name, icon, sort_order, COALESCE(source, '手动'), created_at, updated_at FROM channel_groups;`,
+			`INSERT INTO channel_groups_new (id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, proxy_type, proxy_url, created_at, updated_at)
+		SELECT id, name, icon, sort_order, COALESCE(is_direct, 1), COALESCE(source, '手动'), COALESCE(user_agent, ''), COALESCE(custom_headers, ''), COALESCE(enable_multiplex, 0), COALESCE(proxy_type, ''), COALESCE(proxy_url, ''), created_at, updated_at FROM channel_groups;`,
 			"DROP TABLE channel_groups;",
 			"ALTER TABLE channel_groups_new RENAME TO channel_groups;",
 			"PRAGMA foreign_keys=on;",
@@ -334,7 +336,19 @@ func createTables(db *sql.DB) error {
 	WHERE NOT EXISTS (SELECT 1 FROM channel_groups WHERE name = '未分类');
 	`
 
-	_, err := db.Exec(schema)
+	// 逐条执行 schema 语句，确保每条 DDL 都被执行。
+	// modernc.org/sqlite 的 db.Exec() 对多语句长字符串的处理存在边界情况，
+	// 可能只执行第一条语句而静默跳过后续语句，导致表/索引/触发器未创建。
+	// 拆分为逐条执行可彻底避免此问题。
+	for _, stmt := range splitSQLStatements(schema) {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" || strings.HasPrefix(stmt, "--") {
+			continue
+		}
+		if _, err := db.Exec(stmt); err != nil {
+			slog.Warn("schema statement failed (may be expected for existing DB)", "error", err, "stmt", truncate(stmt, 80))
+		}
+	}
 
 	// ── 存量数据兜底：将所有未开启回看的频道默认视为支持回看 ──────────
 	// 背景：旧版本导入时 support_catchup 默认值为 0，导致用户即使源地址
@@ -349,24 +363,62 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN m3u_source_id INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN custom_headers TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_interval INTEGER DEFAULT 12;")
-	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN user_agent TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN custom_headers TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN user_agent TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN user_agent TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN custom_headers TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN support_catchup INTEGER DEFAULT 0;")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_type TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_source TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN catchup_days INTEGER DEFAULT 0;")
-	_, _ = db.Exec("ALTER TABLE channels ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
-	_, _ = db.Exec("ALTER TABLE channel_groups ADD COLUMN enable_multiplex INTEGER DEFAULT 0;")
-	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE clients ADD COLUMN is_tester INTEGER DEFAULT 0;")
-	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT '';")
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN enable_aggregation INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_status TEXT DEFAULT 'idle';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_error TEXT DEFAULT '';")
-	_, _ = db.Exec("ALTER TABLE plan_group_relations ADD COLUMN sort_order INTEGER DEFAULT 0;")
 
-	return err
+	return nil
+}
+
+// truncate 截断字符串用于日志输出
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// splitSQLStatements 按分号分割 SQL 语句，正确处理 BEGIN...END 块内的分号
+func splitSQLStatements(schema string) []string {
+	var result []string
+	var current strings.Builder
+	upper := strings.ToUpper(schema)
+	inBlock := 0
+	i := 0
+	for i < len(schema) {
+		// 检测 BEGIN 关键字（触发器/事务块）
+		if i+5 <= len(schema) && upper[i:i+5] == "BEGIN" &&
+			(i == 0 || upper[i-1] == ' ' || upper[i-1] == '\n' || upper[i-1] == '\t') &&
+			(i+5 >= len(upper) || upper[i+5] == ' ' || upper[i+5] == '\n' || upper[i+5] == '\t') {
+			inBlock++
+			current.WriteString(schema[i : i+5])
+			i += 5
+			continue
+		}
+		// 检测 END 关键字
+		if i+3 <= len(schema) && upper[i:i+3] == "END" &&
+			(i == 0 || upper[i-1] == ' ' || upper[i-1] == '\n' || upper[i-1] == '\t') &&
+			(i+3 >= len(upper) || upper[i+3] == ' ' || upper[i+3] == '\n' || upper[i+3] == '\t' || upper[i+3] == ';') {
+			if inBlock > 0 {
+				inBlock--
+			}
+			current.WriteString(schema[i : i+3])
+			i += 3
+			continue
+		}
+		// 分号：在块内则属于当前语句，否则为语句分隔符
+		if schema[i] == ';' && inBlock == 0 {
+			result = append(result, current.String())
+			current.Reset()
+			i++
+			continue
+		}
+		current.WriteByte(schema[i])
+		i++
+	}
+	if s := strings.TrimSpace(current.String()); s != "" {
+		result = append(result, s)
+	}
+	return result
 }

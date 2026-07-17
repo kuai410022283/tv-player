@@ -110,6 +110,13 @@ func main() {
 	// ── 初始化 Gin ──────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	// 信任反向代理，从 X-Forwarded-For/X-Real-IP 读取真实客户端 IP
+	// 默认信任本机代理，Docker 部署需在 config.yaml 中配置 server.trusted_proxies
+	trustedProxies := cfg.Server.TrustedProxies
+	if len(trustedProxies) == 0 {
+		trustedProxies = []string{"127.0.0.1", "::1"}
+	}
+	_ = r.SetTrustedProxies(trustedProxies)
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
 	r.Use(gzipMiddleware()) // 启用 gzip 压缩，优化大数据量传输
