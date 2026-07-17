@@ -111,7 +111,7 @@ object PlayerNetworkHelper {
                 RemoteLogger.i("PlayerNetworkHelper", "Creating SOCKS5 proxy client for: $proxyUrl")
                 getPlayerOkHttpClient().newBuilder().proxy(proxy).build()
             } else {
-                RemoteLogger.w("PlayerNetworkHelper", "Failed to parse proxy '$proxyUrl', falling back to direct")
+                RemoteLogger.log("W", "PlayerNetworkHelper", "Failed to parse proxy '$proxyUrl', falling back to direct")
                 getPlayerOkHttpClient()
             }
         }
