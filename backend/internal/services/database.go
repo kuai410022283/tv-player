@@ -60,6 +60,13 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE clients ADD COLUMN enable_log INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE subscription_plans ADD COLUMN subscription_token TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN content_type TEXT DEFAULT ''`)
+	// 代理配置字段
+	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN proxy_type TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE m3u_sources ADD COLUMN proxy_url TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN proxy_type TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN proxy_url TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN proxy_type TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN proxy_url TEXT DEFAULT ''`)
 	// Ensure fcc_type setting exists for existing databases
 	_, _ = db.Exec(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom')`)
 
@@ -134,6 +141,8 @@ func createTables(db *sql.DB) error {
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
 		enable_multiplex INTEGER DEFAULT 0,
+		proxy_type TEXT DEFAULT '',
+		proxy_url TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -163,6 +172,8 @@ func createTables(db *sql.DB) error {
 		enable_multiplex INTEGER DEFAULT 0,
 		fcc TEXT DEFAULT '',
 		fcc_type TEXT DEFAULT '',
+		proxy_type TEXT DEFAULT '',
+		proxy_url TEXT DEFAULT '',
 		linked_channel_id INTEGER DEFAULT 0,
 		is_protected INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -210,6 +221,8 @@ func createTables(db *sql.DB) error {
 		sync_interval INTEGER DEFAULT 12,
 		user_agent TEXT DEFAULT '',
 		custom_headers TEXT DEFAULT '',
+		proxy_type TEXT DEFAULT '',
+		proxy_url TEXT DEFAULT '',
 		last_sync DATETIME,
 		sync_status TEXT DEFAULT 'idle',
 		sync_error TEXT DEFAULT '',

@@ -151,7 +151,8 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		SELECT c.id, c.group_id, cg.name AS group_name, COALESCE(cg.source, '') AS group_source, c.name, COALESCE(c.logo, '') AS logo, 
 		       c.stream_url, COALESCE(c.stream_type, '') AS stream_type, COALESCE(c.epg_channel_id, '') AS epg_channel_id,
 		       c.is_direct, c.support_catchup, COALESCE(c.catchup_type, '') AS catchup_type, COALESCE(c.catchup_source, '') AS catchup_source, c.catchup_days,
-		       COALESCE(c.user_agent, '') AS user_agent, COALESCE(c.custom_headers, '') AS custom_headers, COALESCE(c.content_type, '') AS content_type
+		       COALESCE(c.user_agent, '') AS user_agent, COALESCE(c.custom_headers, '') AS custom_headers, COALESCE(c.content_type, '') AS content_type,
+		       COALESCE(c.proxy_type, '') AS proxy_type, COALESCE(c.proxy_url, '') AS proxy_url
 		FROM channels c
 		JOIN channel_groups cg ON c.group_id = cg.id
 		JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
@@ -170,7 +171,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		var isDirect, supportCatchup int
 		var groupSource string
 		if err := rows.Scan(&m.ID, &m.GroupID, &m.GroupName, &groupSource, &m.Name, &m.Logo,
-			&m.StreamURL, &m.StreamType, &m.EPGChannelID, &isDirect, &supportCatchup, &m.CatchupType, &m.CatchupSource, &m.CatchupDays, &m.UserAgent, &m.CustomHeaders, &m.ContentType); err != nil {
+			&m.StreamURL, &m.StreamType, &m.EPGChannelID, &isDirect, &supportCatchup, &m.CatchupType, &m.CatchupSource, &m.CatchupDays, &m.UserAgent, &m.CustomHeaders, &m.ContentType, &m.ProxyType, &m.ProxyURL); err != nil {
 			return nil, err
 		}
 		if enableAggregation == 0 && groupSource != "" && groupSource != "手动" {

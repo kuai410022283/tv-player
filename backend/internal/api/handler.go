@@ -157,6 +157,21 @@ func failInternal(c *gin.Context, err error, userMsg string) {
 	c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: userMsg})
 }
 
+// maskProxyURL 将代理地址中的密码脱敏，例如 socks5://user:secret@host:port -> socks5://user:***@host:port
+func maskProxyURL(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	if _, hasPassword := u.User.Password(); hasPassword {
+		u.User = url.UserPassword(u.User.Username(), "***")
+	}
+	return u.String()
+}
+
 // ── Groups ─────────────────────────────────────────────
 
 func (h *Handler) ListGroups(c *gin.Context) {
@@ -169,6 +184,12 @@ func (h *Handler) ListGroups(c *gin.Context) {
 	if err != nil {
 		failInternal(c, err, "获取分组列表失败")
 		return
+	}
+	// 客户端请求时，代理地址密码脱敏
+	if !isAdmin {
+		for i := range groups {
+			groups[i].ProxyURL = maskProxyURL(groups[i].ProxyURL)
+		}
 	}
 	ok(c, groups)
 }
@@ -411,6 +432,8 @@ func (h *Handler) ListChannels(c *gin.Context) {
 							"custom_headers":  items[i].CustomHeaders,
 							"support_catchup": items[i].SupportCatchup,
 							"catchup_days":    items[i].CatchupDays,
+							"proxy_type":      items[i].ProxyType,
+							"proxy_url":       maskProxyURL(items[i].ProxyURL),
 						})
 					}
 				} else {
@@ -436,6 +459,8 @@ func (h *Handler) ListChannels(c *gin.Context) {
 							"custom_headers":  items[i].CustomHeaders,
 							"support_catchup": items[i].SupportCatchup,
 							"catchup_days":    items[i].CatchupDays,
+							"proxy_type":      items[i].ProxyType,
+							"proxy_url":       maskProxyURL(items[i].ProxyURL),
 						})
 					}
 				}
@@ -528,6 +553,8 @@ func (h *Handler) GetChannel(c *gin.Context) {
 				ch.CustomHeaders = ""
 			}
 		}
+		// 代理地址密码脱敏
+		ch.ProxyURL = maskProxyURL(ch.ProxyURL)
 	}
 
 	ok(c, ch)
@@ -1351,7 +1378,7 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 
 		for i, u := range urls {
 			basePct := int32(float64(i) / float64(len(urls)) * 100)
-			
+
 			parts := strings.Split(u, "/")
 			filename := parts[len(parts)-1]
 			if filename == "" {

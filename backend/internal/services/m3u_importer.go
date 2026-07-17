@@ -95,7 +95,7 @@ func (imp *M3UImporter) ImportFromURL(sourceID int64) (count int, err error) {
 		imp.appendEPGURL(epgURL)
 	}
 
-	count, err = imp.importChannels(channels, sourceID, source.Name, source.UserAgent, source.CustomHeaders)
+	count, err = imp.importChannels(channels, sourceID, source.Name, source.UserAgent, source.CustomHeaders, source.ProxyType, source.ProxyURL)
 	return count, err
 }
 
@@ -135,7 +135,7 @@ func (imp *M3UImporter) ImportFromString(content string, sourceName string) (int
 	if epgURL != "" {
 		imp.appendEPGURL(epgURL)
 	}
-	return imp.importChannels(channels, 0, sourceName, "", "")
+	return imp.importChannels(channels, 0, sourceName, "", "", "", "")
 }
 
 func (imp *M3UImporter) appendEPGURL(newURL string) {
@@ -166,7 +166,7 @@ func (imp *M3UImporter) appendEPGURL(newURL string) {
 		if trimmed == "" || existingMap[trimmed] {
 			continue // 如果为空或者已存在，则跳过
 		}
-		
+
 		// 追加时强制换行，保证每行只有一个标准 URL
 		if current != "" && !strings.HasSuffix(current, "\n") {
 			current += "\n"
@@ -187,7 +187,7 @@ func (imp *M3UImporter) appendEPGURL(newURL string) {
 	`, current)
 }
 
-func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string) (int, error) {
+func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID int64, sourceName string, sourceUA string, sourceHeaders string, sourceProxyType string, sourceProxyURL string) (int, error) {
 	// 1. 预先处理所有分组，按 "来源+分组名" 作为复合键隔离，不同来源的同名分组各自独立
 	// 格式: "source|name" -> groupID
 	groupCache := make(map[string]int64)
@@ -195,10 +195,12 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	for _, g := range existingGroups {
 		cacheKey := g.Source + "|" + g.Name
 		groupCache[cacheKey] = g.ID
-		// 如果该分组属于当前正在同步的来源，则更新其默认 UserAgent 和 CustomHeaders
-		if g.Source == sourceName && (g.UserAgent != sourceUA || g.CustomHeaders != sourceHeaders) {
+		// 如果该分组属于当前正在同步的来源，则更新其默认配置
+		if g.Source == sourceName && (g.UserAgent != sourceUA || g.CustomHeaders != sourceHeaders || g.ProxyType != sourceProxyType || g.ProxyURL != sourceProxyURL) {
 			g.UserAgent = sourceUA
 			g.CustomHeaders = sourceHeaders
+			g.ProxyType = sourceProxyType
+			g.ProxyURL = sourceProxyURL
 			_ = imp.channelSvc.UpdateGroup(&g)
 		}
 	}
@@ -221,6 +223,8 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 				Source:        sourceName,
 				UserAgent:     sourceUA,
 				CustomHeaders: sourceHeaders,
+				ProxyType:     sourceProxyType,
+				ProxyURL:      sourceProxyURL,
 			}
 			if err := imp.channelSvc.CreateGroup(newGroup); err == nil {
 				groupCache[cacheKey] = newGroup.ID
@@ -322,13 +326,13 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, content_type, fcc, fcc_type, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`)
+	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, content_type, fcc, fcc_type, proxy_type, proxy_url, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return 0, err
 	}
 	defer stmtInsert.Close()
 
-	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_url = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, fcc = ?, fcc_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_url = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, fcc = ?, fcc_type = ?, proxy_type = ?, proxy_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
 	if err != nil {
 		return 0, err
 	}
@@ -405,7 +409,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 
 		if channelID, exists := existingDB[key]; exists {
 			// 更新已存在的频道
-			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, channelID)
+			_, _ = stmtUpdate.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, sourceProxyType, sourceProxyURL, channelID)
 			keptIDs[channelID] = true
 		} else {
 			// 插入新频道，使用分组独立的计数器
@@ -416,7 +420,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 			sortOrder := currentMax + 1
 			maxOrders[groupID] = sortOrder
 
-			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, sortOrder)
+			res, err := stmtInsert.Exec(groupID, ch["name"], ch["tvg-logo"], mergedURLStr, streamType, ch["tvg-id"], sourceID, sourceName, userAgent, customHeadersJSON, supportCatchup, catchupType, catchupSource, catchupDays, fcc, fccType, sourceProxyType, sourceProxyURL, sortOrder)
 			if err == nil {
 				imported++
 				if newID, err := res.LastInsertId(); err == nil {

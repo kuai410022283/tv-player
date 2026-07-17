@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4"
@@ -25,6 +27,7 @@ import (
 	"github.com/mediaplayer/backend/internal/models"
 	"github.com/mediaplayer/backend/internal/services/multicast"
 	"github.com/pion/rtp"
+	"golang.org/x/net/proxy"
 )
 
 var streamBufferPool = sync.Pool{
@@ -33,6 +36,9 @@ var streamBufferPool = sync.Pool{
 		return &buf
 	},
 }
+
+// proxyErrorCount 统计代理连接失败次数（运行时可观测指标）
+var proxyErrorCount int64
 
 // StreamProxy manages proxied streams with health checking
 type StreamProxy struct {
@@ -93,6 +99,98 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 	return sp
 }
 
+// getProxyClient 根据频道的代理配置创建带代理的 HTTP 客户端
+// 如果频道没有代理配置，返回默认客户端
+func (sp *StreamProxy) getProxyClient(ch *models.Channel) *http.Client {
+	// 获取继承的代理配置
+	proxyType, proxyURL := sp.getInheritedProxy(ch)
+
+	if proxyType == "" || proxyURL == "" {
+		return sp.client
+	}
+
+	proxyParsed, err := url.Parse(proxyURL)
+	if err != nil {
+		atomic.AddInt64(&proxyErrorCount, 1)
+		slog.Error("SOCKS5代理地址格式错误，已回退直连", "proxy_url", proxyURL, "error", err, "total_errors", atomic.LoadInt64(&proxyErrorCount))
+		return sp.client
+	}
+
+	switch proxyType {
+	case "socks5":
+		// 创建 SOCKS5 代理拨号器
+		var auth *proxy.Auth
+		if proxyParsed.User != nil {
+			password, _ := proxyParsed.User.Password()
+			auth = &proxy.Auth{
+				User:     proxyParsed.User.Username(),
+				Password: password,
+			}
+		}
+		dialer, err := proxy.SOCKS5("tcp", proxyParsed.Host, auth, proxy.Direct)
+		if err != nil {
+			atomic.AddInt64(&proxyErrorCount, 1)
+			slog.Error("SOCKS5代理服务器连接失败，已回退直连", "proxy_url", proxyURL, "error", err, "total_errors", atomic.LoadInt64(&proxyErrorCount))
+			return sp.client
+		}
+
+		return &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return dialer.Dial(network, addr)
+				},
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 30 * time.Second,
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   10,
+			},
+			CheckRedirect: sp.client.CheckRedirect,
+		}
+	default:
+		slog.Warn("不支持的代理类型", "proxy_type", proxyType)
+		return sp.client
+	}
+}
+
+// getInheritedProxy 获取频道继承的代理配置（Channel > ChannelGroup > M3USource）
+// proxyType="none" 表示显式禁用代理（覆盖继承），空字符串表示继续向上继承
+func (sp *StreamProxy) getInheritedProxy(ch *models.Channel) (string, string) {
+	// 1. 频道级别
+	if ch.ProxyType == "none" {
+		return "", "" // 显式禁用代理，不继承
+	}
+	if ch.ProxyType != "" && ch.ProxyURL != "" {
+		return ch.ProxyType, ch.ProxyURL
+	}
+
+	// 2. 分组级别
+	if ch.GroupID > 0 {
+		group, err := sp.channelSvc.GetGroup(ch.GroupID)
+		if err == nil {
+			if group.ProxyType == "none" {
+				return "", "" // 分组显式禁用，不继承源
+			}
+			if group.ProxyType != "" && group.ProxyURL != "" {
+				return group.ProxyType, group.ProxyURL
+			}
+		}
+	}
+
+	// 3. 源级别（通过 m3u_source_id）
+	if ch.M3USourceID > 0 {
+		var proxyType, proxyURL string
+		err := sp.channelSvc.db.QueryRow(
+			"SELECT proxy_type, proxy_url FROM m3u_sources WHERE id = ?", ch.M3USourceID,
+		).Scan(&proxyType, &proxyURL)
+		if err == nil && proxyType != "" && proxyURL != "" {
+			return proxyType, proxyURL
+		}
+	}
+
+	return "", ""
+}
+
 // SetRedirectedURL 存储频道的重定向 URL
 func (sp *StreamProxy) SetRedirectedURL(channelID int64, url string) {
 	sp.mu.Lock()
@@ -109,7 +207,7 @@ func (sp *StreamProxy) GetRedirectedURL(channelID int64) string {
 
 // resolveStrmUrl intercepts .strm URLs, fetches them, and extracts the first valid http(s) link.
 // It supports up to 5 levels of redirection (nested .strm files).
-func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua string, headers map[string]string) (string, error) {
+func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua string, headers map[string]string, ch *models.Channel) (string, error) {
 	currentURL := initialURL
 	for i := 0; i < 5; i++ {
 		if !strings.HasSuffix(strings.ToLower(currentURL), ".strm") {
@@ -140,7 +238,9 @@ func (sp *StreamProxy) resolveStrmUrl(ctx context.Context, initialURL string, ua
 				req.Header.Set(k, v)
 			}
 
-			resp, err := sp.client.Do(req)
+			// 使用带代理的客户端
+			proxyClient := sp.getProxyClient(ch)
+			resp, err := proxyClient.Do(req)
 			if err != nil {
 				return currentURL, err
 			}
@@ -201,8 +301,11 @@ func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamT
 		ua = "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 MediaPlayer-TV/1.0.0"
 	}
 
+	// 获取频道信息（用于代理配置）
+	ch, _ := sp.channelSvc.GetChannel(channelID, 0)
+
 	// 无论本地还是网络，探测前统一穿透可能的 .strm 壳
-	resolvedURL, err := sp.resolveStrmUrl(context.Background(), url, ua, headers)
+	resolvedURL, err := sp.resolveStrmUrl(context.Background(), url, ua, headers, ch)
 	if err == nil && resolvedURL != "" {
 		url = resolvedURL
 		status.URL = url // 更新 status 里的 URL 为真实流地址
@@ -499,7 +602,6 @@ func (sp *StreamProxy) ServeLocalProxy(w http.ResponseWriter, r *http.Request, t
 	return sp.serveDirectProxy(0, 0, "127.0.0.1", "AndroidTV", w, r, ch, targetURL)
 }
 
-
 // getFlushThreshold returns the protocol-appropriate flush buffer size.
 // Priority: Channel.StreamType > Original source URL (ch.StreamURL) > Content-Type detection > finalURL.
 // Different protocols have different latency vs. TCP efficiency needs.
@@ -614,7 +716,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 
 	// 提前进行 strm 穿透清洗，无论 HTTP 还是本地路径
 	for i, u := range validURLs {
-		resolvedURL, err := sp.resolveStrmUrl(r.Context(), u, ua, headers)
+		resolvedURL, err := sp.resolveStrmUrl(r.Context(), u, ua, headers, ch)
 		if err == nil && resolvedURL != "" {
 			validURLs[i] = resolvedURL
 		}
@@ -825,12 +927,12 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	reader := bufio.NewReaderSize(resp.Body, 128*1024)
 	readBuf := make([]byte, 128*1024)
 	writeBuf := make([]byte, 0, maxThreshold+128*1024) // 预留余量
-	
+
 	lastUpdate := time.Now()
 	lastFlush := time.Now()
 	var bytesSinceLastUpdate int64 = 0
 	var bytesRead int64 = 0
-	
+
 	currentThreshold := baseThreshold
 	hasFlushed := false
 
@@ -922,7 +1024,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 			if newThreshold > maxThreshold {
 				newThreshold = maxThreshold
 			}
-			
+
 			if newThreshold != currentThreshold {
 				// slog.Debug("stream proxy dynamic shift", "session", sessionID, "speed", bytesSinceLastUpdate, "old", currentThreshold, "new", newThreshold)
 				currentThreshold = newThreshold
@@ -933,6 +1035,7 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 		}
 	}
 }
+
 // KillStream forces a specific proxy stream to disconnect
 func (sp *StreamProxy) KillStream(sessionID string) bool {
 	sp.mu.Lock()
@@ -1100,7 +1203,7 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 	}
 
 	// 解析可能存在的 strm 直链
-	resolvedURL, err := sp.resolveStrmUrl(ctx, targetURL, ua, headers)
+	resolvedURL, err := sp.resolveStrmUrl(ctx, targetURL, ua, headers, ch)
 	if err == nil && resolvedURL != "" {
 		targetURL = resolvedURL
 	}
@@ -1123,16 +1226,19 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 		if ua != "" {
 			userAgents = append(userAgents, ua)
 		}
-		
+
 		// 动态追加多个不同特征的兜底伪装
 		userAgents = append(userAgents,
 			"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36", // 移动端高频 Chrome
-			"AppleCoreMedia/1.0.0.19G82 (Apple TV; U; CPU OS 15_6 like Mac OS X; en_us)",                                                   // Apple 原生 HLS 引擎，对于部分严格校验的 HLS/m3u8 源有奇效
-			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",                                                                  // 安卓标准播放引擎
-			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",        // 桌面端 macOS Safari
-			"MediaPlayer-TV/1.0.0",                                                                                                         // 本项目的专属兜底特征 UA
+			"AppleCoreMedia/1.0.0.19G82 (Apple TV; U; CPU OS 15_6 like Mac OS X; en_us)",                                                  // Apple 原生 HLS 引擎，对于部分严格校验的 HLS/m3u8 源有奇效
+			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",                                                                 // 安卓标准播放引擎
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",       // 桌面端 macOS Safari
+			"MediaPlayer-TV/1.0.0", // 本项目的专属兜底特征 UA
 		)
 	}
+
+	// 获取带代理的 HTTP 客户端
+	proxyClient := sp.getProxyClient(ch)
 
 	// 最多尝试所有 UA，遇 403/5xx 时重试不同 UA
 	for attempt, currentUA := range userAgents {
@@ -1159,7 +1265,7 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 			req.Header.Set(k, v)
 		}
 
-		rResp, rErr := sp.client.Do(req)
+		rResp, rErr := proxyClient.Do(req)
 		if rErr != nil {
 			if attempt < len(userAgents)-1 {
 				continue
