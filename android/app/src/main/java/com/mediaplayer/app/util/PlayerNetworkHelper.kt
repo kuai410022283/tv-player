@@ -3,6 +3,8 @@ package com.mediaplayer.app.util
 import android.annotation.SuppressLint
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -38,12 +40,16 @@ object PlayerNetworkHelper {
                 .retryOnConnectionFailure(true)
                 // 连接池复用
                 .connectionPool(connectionPool)
-                // DNS缓存：减少DNS查询，降低光猫压力
+                // DNS缓存 + IPv4 优先：减少DNS查询，避免 IPv6 Happy Eyeballs 延迟
                 .dns(object : okhttp3.Dns {
-                    private val cache = mutableMapOf<String, List<java.net.InetAddress>>()
-                    override fun lookup(hostname: String): List<java.net.InetAddress> {
+                    private val cache = mutableMapOf<String, List<InetAddress>>()
+                    override fun lookup(hostname: String): List<InetAddress> {
                         return cache.getOrPut(hostname) {
-                            okhttp3.Dns.SYSTEM.lookup(hostname)
+                            val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                            // IPv4 优先，避免 IPv6 Happy Eyeballs 延迟
+                            val ipv4 = all.filter { it is Inet4Address }
+                            val ipv6 = all.filter { it !is Inet4Address }
+                            ipv4 + ipv6
                         }
                     }
                 })

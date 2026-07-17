@@ -6,6 +6,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 object StreamResolver {
@@ -16,6 +18,15 @@ object StreamResolver {
         .readTimeout(5, TimeUnit.SECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
+        .dns(object : okhttp3.Dns {
+            override fun lookup(hostname: String): List<InetAddress> {
+                val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                // IPv4 优先，避免 IPv6 Happy Eyeballs 延迟
+                val ipv4 = all.filter { it is Inet4Address }
+                val ipv6 = all.filter { it !is Inet4Address }
+                return ipv4 + ipv6
+            }
+        })
         .build()
 
     suspend fun resolve(originalUrl: String, userAgent: String?, customHeaders: String?): String {

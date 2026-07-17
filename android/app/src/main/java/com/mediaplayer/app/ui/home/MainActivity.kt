@@ -711,7 +711,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         currentCatchupStartTime = prog.startTime
                         currentCatchupChannelIndex = currentChannelIndex
                         osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                        playerHelper?.play(url, ua, headers, contentType = "live")
+                        playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls")
                         hideEpgMenu()
                     } else {
                         val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
@@ -1059,6 +1059,17 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     dialog.dismiss()
                 }
                 .show()
+        }
+
+        // AV3A 解码器开关
+        val av3aEnabled = prefs.getBoolean(Prefs.KEY_AV3A_ENABLED, false)
+        findViewById<TextView>(R.id.tvSettingsAv3aValue)?.text = if (av3aEnabled) "开启" else "关闭"
+        findViewById<LinearLayout>(R.id.btnSettingsAv3a)?.setOnClickListener {
+            val current = prefs.getBoolean(Prefs.KEY_AV3A_ENABLED, false)
+            val newValue = !current
+            prefs.edit().putBoolean(Prefs.KEY_AV3A_ENABLED, newValue).apply()
+            findViewById<TextView>(R.id.tvSettingsAv3aValue)?.text = if (newValue) "开启" else "关闭"
+            Toast.makeText(this, if (newValue) "AV3A 解码器已开启，重启应用后生效" else "AV3A 解码器已关闭，重启应用后生效", Toast.LENGTH_SHORT).show()
         }
         
         fun updateDecoderText(mode: Int) {
@@ -2168,7 +2179,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType, streamType = line.streamType)
         }
         
         // 启动/重置看门狗

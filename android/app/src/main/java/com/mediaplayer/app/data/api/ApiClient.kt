@@ -5,6 +5,8 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.net.Inet4Address
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 /**
@@ -82,6 +84,15 @@ object ApiClient {
                     chain.proceed(builder.build())
                 }
                 .addInterceptor(logging)
+                .dns(object : okhttp3.Dns {
+                    override fun lookup(hostname: String): List<InetAddress> {
+                        val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                        // IPv4 优先，避免 IPv6 Happy Eyeballs 延迟
+                        val ipv4 = all.filter { it is Inet4Address }
+                        val ipv6 = all.filter { it !is Inet4Address }
+                        return ipv4 + ipv6
+                    }
+                })
                 .build()
         }
         return okHttpClient!!

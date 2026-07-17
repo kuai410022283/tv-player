@@ -75,6 +75,7 @@ class ExoPlayerHelper(
     private var currentUserAgent: String = ""
     private var currentHeaders: String = ""
     private var currentContentType: String = ""
+    private var currentStreamType: String = ""
     private var isMimeTypeFallback: Boolean = false
     
     // Circuit breaker for Behind Live Window
@@ -85,35 +86,45 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
-    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String) {
         currentUrl = url
         currentUserAgent = userAgent
         currentHeaders = customHeaders
         currentContentType = contentType
+        currentStreamType = streamType
         isMimeTypeFallback = false
         behindLiveWindowCount = 0
         behindLiveWindowLastTime = 0L
         criticalErrorCount = 0
         criticalErrorLastTime = 0L
         
-        playInternal(url, userAgent, customHeaders, null, startTimeMs, contentType)
+        playInternal(url, userAgent, customHeaders, null, startTimeMs, contentType, streamType)
     }
 
-    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?, startTimeMs: Long = 0L, contentType: String = "") {
+    private fun playInternal(originalUrl: String, userAgent: String, customHeaders: String, mimeType: String?, startTimeMs: Long = 0L, contentType: String = "", streamType: String = "") {
         playStartTimeMs = android.os.SystemClock.uptimeMillis()
         var url = originalUrl
         val lowerUrl = url.lowercase()
 
-        // 优先使用服务端下发的 content_type，其次根据 URL 推断
-        val isLiveStream = when (contentType.lowercase().trim()) {
-            "live" -> true
-            "vod" -> false
-            else -> url.lowercase().run { 
-                startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || 
-                contains("/udp/") || contains("/rtp/") || contains(".ts") || contains(".flv") 
+        // isLiveStream 判断优先级：
+        // 1. contentType (管理员手动设置: "live"/"vod")
+        // 2. streamType (后端协议类型: "ts"/"rtp"/"udp"=直播, "mp4"/"mkv"=点播)
+        // 3. URL 推断（兜底，排除代理 URL 避免误判）
+        val st = streamType.lowercase().trim()
+        val ct = contentType.lowercase().trim()
+        val isLiveStream = when {
+            ct == "live" -> true
+            ct == "vod" -> false
+            st in listOf("rtp", "udp", "rtsp", "rtmp") -> true
+            st in listOf("mp4", "mkv", "avi", "mov", "webm") -> false
+            st == "flv" -> true
+            st == "ts" -> !lowerUrl.contains("/stream/proxy/")  // 代理TS流按点播处理
+            st == "hls" -> false  // HLS 默认按点播（缓冲更稳），如需直播由管理员设 content_type=live
+            else -> lowerUrl.run {
+                startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || contains("/udp/") || contains("/rtp/")
             }
         }
-        RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (contentType=$contentType, url=${url.take(80)})")
+        RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (streamType=$st, contentType=$ct, url=${url.take(80)})")
 
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)
@@ -190,20 +201,22 @@ class ExoPlayerHelper(
 
             cachedExtractorsFactory = androidx.media3.extractor.ExtractorsFactory {
                 val extractors = defaultExtractorsFactory.createExtractors()
+                val av3aEnabled = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+                    .getBoolean(com.mediaplayer.app.Prefs.KEY_AV3A_ENABLED, false)
                 val newExtractors = mutableListOf<androidx.media3.extractor.Extractor>()
                 for (extractor in extractors) {
-                    if (extractor is androidx.media3.extractor.ts.TsExtractor) {
-                        // 替换原生的 TsExtractor，注入我们的 Av3aTsPayloadReaderFactory
+                    if (extractor is androidx.media3.extractor.ts.TsExtractor && av3aEnabled) {
+                        // AV3A 开启时：替换原生的 TsExtractor，注入 Av3aTsPayloadReaderFactory
                         newExtractors.add(androidx.media3.extractor.ts.TsExtractor(
                             androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES,
                             androidx.media3.common.util.TimestampAdjuster(0),
                             androidx.media3.extractor.ts.Av3aTsPayloadReaderFactory()
                         ))
-                    } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor) {
-                        // 替换原生的 Mp4Extractor，注入我们修改过 BoxParser 支持 av3a 的提取器
+                    } else if (extractor is androidx.media3.extractor.mp4.Mp4Extractor && av3aEnabled) {
+                        // AV3A 开启时：替换原生的 Mp4Extractor，注入支持 av3a 的提取器
                         newExtractors.add(com.mediaplayer.app.extractor.mp4.Mp4Extractor())
-                    } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor) {
-                        // 同样替换 fMP4 提取器
+                    } else if (extractor is androidx.media3.extractor.mp4.FragmentedMp4Extractor && av3aEnabled) {
+                        // AV3A 开启时：替换 fMP4 提取器
                         newExtractors.add(com.mediaplayer.app.extractor.mp4.FragmentedMp4Extractor())
                     } else {
                         newExtractors.add(extractor)
@@ -281,6 +294,7 @@ class ExoPlayerHelper(
 
         val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
         val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
+        val av3aEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AV3A_ENABLED, false)
         val enableAv3aTvStereoSafety = !isPassthroughEnabled
 
         val renderersFactory = object : DefaultRenderersFactory(context) {
@@ -297,8 +311,10 @@ class ExoPlayerHelper(
                 // 原生的 Renderers
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
-                // 强制往队列里注入我们从 media 项目移植的、原生的 Av3aAudioRenderer！
-                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
+                // AV3A 开启时：注入 Av3aAudioRenderer
+                if (av3aEnabled) {
+                    out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
+                }
             }
         }.apply {
             setEnableDecoderFallback(true) // 开启解码器容错回退机制
@@ -501,7 +517,7 @@ class ExoPlayerHelper(
                     isMimeTypeFallback = true
                     com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Parsing error detected, falling back to M3U8 MimeType...")
                     // 强制使用 M3U8 MimeType 再次尝试播放
-                    playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8, contentType = currentContentType)
+                    playInternal(currentUrl, currentUserAgent, currentHeaders, androidx.media3.common.MimeTypes.APPLICATION_M3U8, contentType = currentContentType, streamType = currentStreamType)
                     return // 吞掉本次错误
                 }
             }

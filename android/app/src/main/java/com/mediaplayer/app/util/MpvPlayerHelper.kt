@@ -79,7 +79,7 @@ class MpvPlayerHelper(
         videoLayout.addView(surfaceView)
     }
 
-    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String) {
+    override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String) {
         if (hasDestroyed) return
         isWaitingForNewFile = true
         isPlayerPlaying = false
