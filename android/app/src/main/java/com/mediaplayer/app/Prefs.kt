@@ -83,6 +83,5 @@ object Prefs {
     const val TIME_SHOW_MODE_EVERY_HOUR = 2
     const val TIME_SHOW_MODE_HALF_HOUR = 3
 
-    // 网卡选择：空字符串=自动, 其他=指定网卡名称
-    const val KEY_NETWORK_INTERFACE = "network_interface"
+
 }

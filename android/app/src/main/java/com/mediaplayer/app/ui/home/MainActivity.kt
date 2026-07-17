@@ -48,7 +48,6 @@ import com.mediaplayer.app.ui.settings.SettingsActivity
 import com.mediaplayer.app.util.DeviceUtils
 import com.mediaplayer.app.util.FocusHelper
 import com.mediaplayer.app.util.AudioTrackInfo
-import com.mediaplayer.app.util.NetworkUtils
 import com.mediaplayer.app.util.SubtitleTrackInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1007,58 +1006,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             groupAdapter.showSource = showGroupSource
             groupAdapter.notifyDataSetChanged()
-        }
-
-        // 网卡选择
-        val btnSettingsNetworkInterface = findViewById<View>(R.id.btnSettingsNetworkInterface)
-        val tvSettingsNetworkInterfaceValue = findViewById<TextView>(R.id.tvSettingsNetworkInterfaceValue)
-
-        fun updateNetworkInterfaceText() {
-            val selected = prefs.getString(Prefs.KEY_NETWORK_INTERFACE, "") ?: ""
-            if (selected.isEmpty()) {
-                tvSettingsNetworkInterfaceValue?.text = "自动"
-            } else {
-                // 检查选中的网卡是否还存在
-                val interfaces = NetworkUtils.getAvailableInterfaces()
-                val exists = interfaces.any { it.name == selected }
-                if (exists) {
-                    tvSettingsNetworkInterfaceValue?.text = selected
-                } else {
-                    // 网卡不存在了，清除选择
-                    prefs.edit().putString(Prefs.KEY_NETWORK_INTERFACE, "").apply()
-                    tvSettingsNetworkInterfaceValue?.text = "自动"
-                }
-            }
-        }
-        updateNetworkInterfaceText()
-
-        btnSettingsNetworkInterface?.setOnClickListener {
-            val interfaces = NetworkUtils.getAvailableInterfaces()
-            if (interfaces.isEmpty()) {
-                Toast.makeText(this, "未检测到可用网卡", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val items = mutableListOf("自动")
-            interfaces.forEach { intf ->
-                items.add("${intf.displayName} - ${intf.ip}")
-            }
-            val currentSelected = prefs.getString(Prefs.KEY_NETWORK_INTERFACE, "") ?: ""
-            val checkedIndex = if (currentSelected.isEmpty()) 0 else {
-                val idx = interfaces.indexOfFirst { it.name == currentSelected }
-                if (idx >= 0) idx + 1 else 0 // 如果网卡不存在，回退到"自动"
-            }
-
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("选择默认网卡")
-                .setSingleChoiceItems(items.toTypedArray(), checkedIndex) { dialog, which ->
-                    val selectedName = if (which == 0) "" else interfaces[which - 1].name
-                    prefs.edit().putString(Prefs.KEY_NETWORK_INTERFACE, selectedName).apply()
-                    updateNetworkInterfaceText()
-                    Toast.makeText(this, "网卡设置已保存，重启应用后生效", Toast.LENGTH_SHORT).show()
-                    dialog.dismiss()
-                }
-                .show()
         }
 
         fun updateDecoderText(mode: Int) {
@@ -2112,30 +2059,37 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         resolveJob = lifecycleScope.launch {
             val gen = ++playGeneration
-            
-            // 1. 方案一：异步截图，掩盖黑屏，且为方案二预留豁免逻辑
-            if (!isCurrentChannelVod()) {
+
+            // 读取切台模式：流畅模式（默认）不截图，依赖 setKeepContentOnPlayerReset(true) 保留旧帧
+            // 兼容模式：截图叠加，防止部分设备 stop 后黑屏
+            val useSnapshot = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                .getBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, false)
+
+            // 1. 仅兼容模式下截图，流畅模式直接依赖 PlayerView 的旧帧冻结
+            if (useSnapshot && !isCurrentChannelVod()) {
                 captureSnapshotAsync(30L)
             }
-            
+
             if (gen != playGeneration) return@launch
-            
+
             // 2. 清理与重建播放器画布
             if (isCoreChanged) {
                 // 先把截图遮罩从父容器摘出，防止 removeAllViews() 将其销毁
                 snapshotOverlay?.let { iv -> (iv.parent as? android.view.ViewGroup)?.removeView(iv) }
-                
+
                 playerHelper?.release()
                 videoLayout?.removeAllViews()
                 initPlayerWithCore(desiredCore)
             }
-            
-            // 确保遮罩在最顶层（无论是否切换了内核都需要执行）
-            snapshotOverlay?.let { iv ->
-                if (iv.parent == null) {
-                    videoLayout?.addView(iv)
+
+            // 仅兼容模式下确保遮罩在最顶层
+            if (useSnapshot) {
+                snapshotOverlay?.let { iv ->
+                    if (iv.parent == null) {
+                        videoLayout?.addView(iv)
+                    }
+                    iv.bringToFront()
                 }
-                iv.bringToFront()
             }
             
             playerHelper?.setDecoderMode(currentDecoderMode)
@@ -3201,6 +3155,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
             } catch (e: Exception) {
                 progressBuffering?.visibility = View.GONE
+                com.mediaplayer.app.util.RemoteLogger.e("HomeActivity", "loadData failed: ${e.message}", e)
+                // 显示错误提示，5秒后自动重试
+                Toast.makeText(this@MainActivity, "加载频道数据失败，5秒后自动重试...", Toast.LENGTH_LONG).show()
+                uiHandler.postDelayed({
+                    isLoadingData = false
+                    loadData()
+                }, 5000)
             } finally {
                 isLoadingData = false
             }

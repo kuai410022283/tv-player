@@ -194,7 +194,7 @@ class ExoPlayerHelper(
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
         val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
-        // 缓存 ExtractorsFactory，只创建一次，避免每次切换频道都重建（借鉴 mytv 项目的做法）
+        // 缓存 ExtractorsFactory，只创建一次，避免每次切换频道都重建
         if (cachedExtractorsFactory == null) {
             val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
                 .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
@@ -333,7 +333,6 @@ class ExoPlayerHelper(
 
         if (isLiveStream) {
             // 直播流（TS/UDP/RTSP）：激进策略，低延迟优先
-            // 参考 mytv 项目参数，1帧即播
             loadControlBuilder
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .setBufferDurationsMs(0, 60000, 0, 0)

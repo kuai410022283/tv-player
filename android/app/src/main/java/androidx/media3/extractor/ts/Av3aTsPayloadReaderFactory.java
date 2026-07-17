@@ -45,7 +45,6 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
                 || streamType == 0x06 || streamType == 0x81) {
 
             // If we already sniffed this stream type and it was NOT AV3A, skip sniffing
-            // and let the default factory handle it directly (like mytv project does).
             Boolean cached = sniffCache.get(streamType);
             if (cached != null && !cached) {
                 return defaultFactory.createPayloadReader(streamType, esInfo);
