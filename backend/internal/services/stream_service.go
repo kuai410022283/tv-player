@@ -319,11 +319,25 @@ func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamT
 	}
 
 	// 健康检查用独立短超时 client，禁用 KeepAlive 避免关闭未读完的响应体导致闲置连接接收到乱码
-	healthClient := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-		},
+	// 如果频道配置了代理，健康检查也需要走代理
+	var healthClient *http.Client
+	proxyClient := sp.getProxyClient(ch)
+	if proxyClient != sp.client {
+		// 有代理配置：复制一份并设置健康检查专用参数
+		transport := proxyClient.Transport.(*http.Transport).Clone()
+		transport.DisableKeepAlives = true
+		healthClient = &http.Client{
+			Timeout:   10 * time.Second,
+			Transport: transport,
+		}
+	} else {
+		// 无代理：使用独立短超时 client
+		healthClient = &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+			},
+		}
 	}
 
 	if streamType == "" {
