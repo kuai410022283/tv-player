@@ -398,7 +398,7 @@ func (s *ChannelService) AdminListGroups(search string, p *models.PageRequest) (
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []*models.ChannelGroup
 	for rows.Next() {
@@ -509,7 +509,7 @@ func (s *ChannelService) ListChannels(groupID int64, search string, source strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	channels := make([]models.Channel, 0)
 	for rows.Next() {
@@ -801,7 +801,7 @@ func (s *ChannelService) BatchGetInheritedHeaders(channelIDs []int64) (map[int64
 				groupIDs[groupID] = true
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 
 	// 批量查询分组的 UA/Headers（分组数量通常很少，不需要分批）
@@ -1055,7 +1055,7 @@ func (s *ChannelService) BatchUpdateChannels(ids []int64, action string) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, id := range ids {
 		if _, err := stmt.Exec(id); err != nil {

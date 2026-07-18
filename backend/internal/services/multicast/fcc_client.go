@@ -207,12 +207,12 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 
 	if fccType == FccTypeHuawei {
 		if err := client.handshakeHuawei(localPort); err != nil {
-			client.Close()
+			_ = client.Close()
 			return nil, err
 		}
 	} else {
 		if err := client.handshakeTelecom(localPort); err != nil {
-			client.Close()
+			_ = client.Close()
 			return nil, err
 		}
 	}

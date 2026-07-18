@@ -479,7 +479,7 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 		return
 	}
 
-	os.MkdirAll("library/logs", 0755)
+	_ = os.MkdirAll("library/logs", 0755)
 	logPath := fmt.Sprintf("library/logs/%s.log", client.DeviceID)
 
 	// Check size (5MB limit)
@@ -495,7 +495,7 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 		fail(c, 500, "服务端错误")
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	src, err := file.Open()
 	if err != nil {

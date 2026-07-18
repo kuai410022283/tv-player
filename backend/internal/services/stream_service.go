@@ -1411,7 +1411,7 @@ func (sp *StreamProxy) serveLocalFileProxy(channelID int64, clientID int64, clie
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// 解析 Range 请求头，支持拖动进度条
 	rangeHeader := r.Header.Get("Range")

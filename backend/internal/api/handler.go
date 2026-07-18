@@ -1441,17 +1441,17 @@ func (h *Handler) PullAppUpdate(c *gin.Context) {
 				src := io.TeeReader(resp.Body, pw)
 
 				if _, err := io.Copy(out, src); err != nil {
-					out.Close()
-					resp.Body.Close()
-					os.Remove(tmpPath)
+					_ = out.Close()
+					_ = resp.Body.Close()
+					_ = os.Remove(tmpPath)
 					pullUpdateState.Store(updateTaskState{Status: "error", Message: "保存文件失败: " + err.Error()})
 					return
 				}
-				out.Close()
+				_ = out.Close()
 				resp.Body.Close()
 
 				if err := os.Rename(tmpPath, apkPath); err != nil {
-					os.Remove(tmpPath)
+					_ = os.Remove(tmpPath)
 					pullUpdateState.Store(updateTaskState{Status: "error", Message: "重命名文件失败: " + err.Error()})
 					return
 				}

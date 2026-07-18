@@ -35,13 +35,13 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		{
 			groupWrite.POST("", hs.CreateGroup)
 			groupWrite.PUT("/:id", hs.UpdateGroup)
-			groupWrite.DELETE("/:id", hs.Handler.DeleteGroup)
-			groupWrite.POST("/batch", hs.Handler.BatchGroup)
+			groupWrite.DELETE("/:id", hs.DeleteGroup)
+			groupWrite.POST("/batch", hs.BatchGroup)
 		}
 
 		// 频道
 		channels := api.Group("/channels")
-		channels.GET("", hs.Handler.ListChannels)
+		channels.GET("", hs.ListChannels)
 		channels.GET("/:id", hs.Handler.GetChannel)
 
 		channelWrite := channels.Group("")
@@ -109,9 +109,9 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		{
 			clients.GET("", hs.List)
 			clients.GET("/stats", hs.ClientHandler.GetStats)
-			clients.GET("/logs", hs.ClientHandler.GetRecentLogs)
-			clients.GET("/:id", hs.ClientHandler.Get)
-			clients.POST("/:id/approve", hs.ClientHandler.Approve)
+			clients.GET("/logs", hs.GetRecentLogs)
+			clients.GET("/:id", hs.Get)
+			clients.POST("/:id/approve", hs.Approve)
 			clients.POST("/:id/reject", hs.ClientHandler.Reject)
 			clients.POST("/:id/ban", hs.ClientHandler.Ban)
 			clients.POST("/:id/unban", hs.ClientHandler.Unban)

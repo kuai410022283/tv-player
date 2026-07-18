@@ -234,7 +234,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 					if r.mcastJoined && r.hasSeq && r.nextSeq > seq && (r.nextSeq-seq) < 1000 {
 						// Multicast has caught up, seamless transition!
 						r.fccActive = false
-						r.fccClient.Close()
+						_ = r.fccClient.Close()
 						slog.Info("✅ FCC stream successfully merged with multicast stream")
 						break
 					} else {
@@ -254,7 +254,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 			} else {
 				// FCC timeout or error
 				r.fccActive = false
-				r.fccClient.Close()
+				_ = r.fccClient.Close()
 				slog.Warn("⚠️ FCC receive failed or timed out, falling back to pure multicast", "error", err)
 				_ = r.joinMulticast()
 				break
@@ -386,7 +386,7 @@ func (r *MulticastReader) Close() error {
 		return r.conn.Close()
 	}
 	if r.fccClient != nil {
-		r.fccClient.Close()
+		_ = r.fccClient.Close()
 	}
 	return nil
 }

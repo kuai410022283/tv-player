@@ -243,7 +243,7 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 		masterHash, exists := masterLogos[name]
 		if !exists {
 			// Master deleted it, remove locally
-			os.Remove(filePath)
+			_ = os.Remove(filePath)
 			continue
 		}
 		
@@ -258,7 +258,7 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 					delete(masterLogos, name)
 				}
 			}
-			f.Close()
+			_ = f.Close()
 		}
 	}
 
@@ -281,7 +281,7 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 				if _, err := io.Copy(out, resp.Body); err != nil {
 					slog.Error("failed to write downloaded logo", "file", name, "error", err)
 				}
-				out.Close()
+				_ = out.Close()
 			}
 		}
 		resp.Body.Close()
