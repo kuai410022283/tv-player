@@ -1790,7 +1790,7 @@ func (h *Handler) GetDBSnapshot(c *gin.Context) {
 		return
 	}
 
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
@@ -1840,7 +1840,7 @@ func (h *Handler) GetLogosSnapshot(c *gin.Context) {
 		if _, err := io.Copy(h, f); err == nil {
 			snapshots[entry.Name()] = fmt.Sprintf("%x", h.Sum(nil))
 		}
-		f.Close()
+		_ = f.Close()
 	}
 
 	ok(c, gin.H{"logos": snapshots})

@@ -42,54 +42,54 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		// 频道
 		channels := api.Group("/channels")
 		channels.GET("", hs.ListChannels)
-		channels.GET("/:id", hs.Handler.GetChannel)
+		channels.GET("/:id", hs.GetChannel)
 
 		channelWrite := channels.Group("")
 		channelWrite.Use(middleware.RequireAdmin())
 		{
-			channelWrite.POST("", hs.Handler.CreateChannel)
-			channelWrite.PUT("/:id", hs.Handler.UpdateChannel)
-			channelWrite.DELETE("/:id", hs.Handler.DeleteChannel)
-			channelWrite.DELETE("/batch", hs.Handler.BatchChannel)
-			channelWrite.PUT("/batch", hs.Handler.BatchUpdateChannel)
-			channelWrite.POST("/mirror", hs.Handler.MirrorChannel)
-			channelWrite.POST("/health-check/start", hs.Handler.TriggerHealthCheck)
-			channelWrite.GET("/health-check/status", hs.Handler.GetHealthCheckStatus)
+			channelWrite.POST("", hs.CreateChannel)
+			channelWrite.PUT("/:id", hs.UpdateChannel)
+			channelWrite.DELETE("/:id", hs.DeleteChannel)
+			channelWrite.DELETE("/batch", hs.BatchChannel)
+			channelWrite.PUT("/batch", hs.BatchUpdateChannel)
+			channelWrite.POST("/mirror", hs.MirrorChannel)
+			channelWrite.POST("/health-check/start", hs.TriggerHealthCheck)
+			channelWrite.GET("/health-check/status", hs.GetHealthCheckStatus)
 		}
 
 		// M3U 源 (仅限管理员)
 		m3u := api.Group("/m3u")
 		m3u.Use(middleware.RequireAdmin())
 		{
-			m3u.GET("", hs.Handler.ListM3USources)
-			m3u.POST("", hs.Handler.AddM3USource)
-			m3u.POST("/:id/import", hs.Handler.ImportM3U)
-			m3u.POST("/import-string", hs.Handler.ImportM3UString)
-			m3u.POST("/format", hs.Handler.FormatSourceString)
-			m3u.PUT("/:id", hs.Handler.UpdateM3USource)
-			m3u.DELETE("/:id", hs.Handler.DeleteM3USource)
+			m3u.GET("", hs.ListM3USources)
+			m3u.POST("", hs.AddM3USource)
+			m3u.POST("/:id/import", hs.ImportM3U)
+			m3u.POST("/import-string", hs.ImportM3UString)
+			m3u.POST("/format", hs.FormatSourceString)
+			m3u.PUT("/:id", hs.UpdateM3USource)
+			m3u.DELETE("/:id", hs.DeleteM3USource)
 		}
 
 		// 历史 & EPG & 版本 & 设置
-		api.GET("/history", hs.Handler.GetHistory)
-		api.POST("/history", hs.Handler.AddHistory)
-		api.GET("/epg", hs.Handler.GetEPG)
-		api.GET("/version", hs.Handler.GetVersion)
-		api.GET("/settings", hs.Handler.GetSettings)
+		api.GET("/history", hs.GetHistory)
+		api.POST("/history", hs.AddHistory)
+		api.GET("/epg", hs.GetEPG)
+		api.GET("/version", hs.GetVersion)
+		api.GET("/settings", hs.GetSettings)
 
 		// 流媒体管理 (admin 权限)
 		streamWrite := api.Group("/stream")
 		streamWrite.Use(middleware.RequireAdmin())
 		{
-			streamWrite.GET("/active", hs.Handler.GetActiveStreams)
-			streamWrite.DELETE("/active/:id", hs.Handler.KillStream)
+			streamWrite.GET("/active", hs.GetActiveStreams)
+			streamWrite.DELETE("/active/:id", hs.KillStream)
 		}
 
 		// 管理端专属
 		adminRoot := api.Group("")
 		adminRoot.Use(middleware.RequireAdmin())
 		{
-			adminRoot.POST("/settings", hs.Handler.SetSetting)
+			adminRoot.POST("/settings", hs.SetSetting)
 			adminRoot.GET("/stats", hs.Handler.GetStats)
 
 			adminLogs := adminRoot.Group("/admin/logs")
@@ -112,18 +112,18 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			clients.GET("/logs", hs.GetRecentLogs)
 			clients.GET("/:id", hs.Get)
 			clients.POST("/:id/approve", hs.Approve)
-			clients.POST("/:id/reject", hs.ClientHandler.Reject)
-			clients.POST("/:id/ban", hs.ClientHandler.Ban)
-			clients.POST("/:id/unban", hs.ClientHandler.Unban)
-			clients.POST("/:id/revoke", hs.ClientHandler.RevokeToken)
-			clients.POST("/:id/regenerate", hs.ClientHandler.RegenerateToken)
-			clients.GET("/:id/logs", hs.ClientHandler.GetLogs)
-			clients.POST("/:id/log-config", hs.ClientHandler.UpdateLogConfig)
-			clients.GET("/:id/download-log", hs.ClientHandler.DownloadLog)
-			clients.POST("/:id/tester", hs.ClientHandler.SetTester)
-			clients.POST("/:id/remark", hs.ClientHandler.UpdateRemark)
-			clients.DELETE("/:id", hs.ClientHandler.Delete)
-			clients.POST("/batch", hs.ClientHandler.Batch)
+			clients.POST("/:id/reject", hs.Reject)
+			clients.POST("/:id/ban", hs.Ban)
+			clients.POST("/:id/unban", hs.Unban)
+			clients.POST("/:id/revoke", hs.RevokeToken)
+			clients.POST("/:id/regenerate", hs.RegenerateToken)
+			clients.GET("/:id/logs", hs.GetLogs)
+			clients.POST("/:id/log-config", hs.UpdateLogConfig)
+			clients.GET("/:id/download-log", hs.DownloadLog)
+			clients.POST("/:id/tester", hs.SetTester)
+			clients.POST("/:id/remark", hs.UpdateRemark)
+			clients.DELETE("/:id", hs.Delete)
+			clients.POST("/batch", hs.Batch)
 		}
 
 		// 管理端：套餐管理
@@ -140,54 +140,54 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		adminGroups := api.Group("/admin/groups")
 		adminGroups.Use(middleware.RequireAdmin())
 		{
-			adminGroups.GET("", hs.Handler.AdminListGroups)
-			adminGroups.PUT("/sort", hs.Handler.BatchSortGroups)
+			adminGroups.GET("", hs.AdminListGroups)
+			adminGroups.PUT("/sort", hs.BatchSortGroups)
 		}
 
 		// 管理端：频道排序
 		adminChannels := api.Group("/admin/channels")
 		adminChannels.Use(middleware.RequireAdmin())
 		{
-			adminChannels.PUT("/sort", hs.Handler.BatchSortChannels)
-			adminChannels.GET("/sources", hs.Handler.GetChannelSources)
+			adminChannels.PUT("/sort", hs.BatchSortChannels)
+			adminChannels.GET("/sources", hs.GetChannelSources)
 		}
 
 		// 管理端：EPG 管理
 		adminEpg := api.Group("/admin/epg")
 		adminEpg.Use(middleware.RequireAdmin())
 		{
-			adminEpg.POST("/refresh", hs.Handler.RefreshEPG)
+			adminEpg.POST("/refresh", hs.RefreshEPG)
 		}
 
 		// 管理端：系统设置
 		adminSettings := api.Group("/admin/settings")
 		adminSettings.Use(middleware.RequireAdmin())
 		{
-			adminSettings.POST("/update", hs.Handler.SetAppUpdate)
-			adminSettings.POST("/pull-update", hs.Handler.PullAppUpdate)
-			adminSettings.GET("/pull-update/progress", hs.Handler.PullAppUpdateProgress)
-			adminSettings.POST("/pull-update/cancel", hs.Handler.CancelPullAppUpdate)
-			adminSettings.PUT("/password", hs.Handler.UpdateAdminPassword)
+			adminSettings.POST("/update", hs.SetAppUpdate)
+			adminSettings.POST("/pull-update", hs.PullAppUpdate)
+			adminSettings.GET("/pull-update/progress", hs.PullAppUpdateProgress)
+			adminSettings.POST("/pull-update/cancel", hs.CancelPullAppUpdate)
+			adminSettings.PUT("/password", hs.UpdateAdminPassword)
 		}
 
 		// 管理端：系统同步
 		// Note: db_snapshot can be called by external standby nodes, so it uses its own auth inside the handler, NOT RequireAdmin.
-		api.GET("/admin/system/db_snapshot", hs.Handler.GetDBSnapshot)
-		api.GET("/admin/system/logos_snapshot", hs.Handler.GetLogosSnapshot)
+		api.GET("/admin/system/db_snapshot", hs.GetDBSnapshot)
+		api.GET("/admin/system/logos_snapshot", hs.GetLogosSnapshot)
 
 		adminSystem := api.Group("/admin/system")
 		adminSystem.Use(middleware.RequireAdmin())
 		{
-			adminSystem.POST("/sync_from_master", hs.Handler.SyncFromMaster)
-			adminSystem.POST("/ping-master", hs.Handler.PingMaster)
+			adminSystem.POST("/sync_from_master", hs.SyncFromMaster)
+			adminSystem.POST("/ping-master", hs.PingMaster)
 		}
 
 		// 管理端：台标管理
 		adminLogo := api.Group("/admin/logo")
 		adminLogo.Use(middleware.RequireAdmin())
 		{
-			adminLogo.POST("/cache", hs.Handler.TriggerCacheLogos)
-			adminLogo.POST("/fetch", hs.Handler.TriggerBatchFetchLogos)
+			adminLogo.POST("/cache", hs.TriggerCacheLogos)
+			adminLogo.POST("/fetch", hs.TriggerBatchFetchLogos)
 		}
 	}
 
@@ -195,16 +195,16 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	logo := r.Group("")
 	logo.Use(middleware.LogoRateLimit())
 	{
-		logo.GET("/logo", hs.Handler.GetLogo)
+		logo.GET("/logo", hs.GetLogo)
 	}
 
 	// ── 流代理接口（独立限流 60次/分）───────────────
 	stream := r.Group("/stream")
 	stream.Use(middleware.StreamRateLimit())
 	{
-		stream.GET("/proxy/:id", hs.Handler.ProxyStream)
-		stream.GET("/proxy/:id/*path", hs.Handler.ProxyStream)
-		stream.GET("/catchup/:id", hs.Handler.CatchupStream)
-		stream.GET("/check/:id", hs.Handler.CheckStream)
+		stream.GET("/proxy/:id", hs.ProxyStream)
+		stream.GET("/proxy/:id/*path", hs.ProxyStream)
+		stream.GET("/catchup/:id", hs.CatchupStream)
+		stream.GET("/check/:id", hs.CheckStream)
 	}
 }

@@ -841,7 +841,7 @@ func (s *ChannelService) BatchGetInheritedHeaders(channelIDs []int64) (map[int64
 						groupHeaderMap[gid] = struct{ ua, headers string }{ua: ua, headers: headers}
 					}
 				}
-				rows.Close()
+				_ = rows.Close()
 			}
 		}
 	}
@@ -1127,7 +1127,7 @@ func (s *ChannelService) GetHistory(limit int) ([]models.PlayHistory, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.PlayHistory
 	for rows.Next() {
@@ -1170,7 +1170,7 @@ func (s *ChannelService) GetAllSettings() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	m := make(map[string]string)
 	for rows.Next() {
