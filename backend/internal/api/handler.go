@@ -411,6 +411,14 @@ func (h *Handler) ListChannels(c *gin.Context) {
 					}
 				}
 
+				// 自动推断回看支持：对于 URL 匹配已知回看模式的频道，
+				// 即使数据库标记为不支持也返回 true，与 generateCatchupURL 中的模式保持一致
+				if !items[i].SupportCatchup {
+					if canSupportCatchup(items[i].StreamURL, items[i].CatchupSource) {
+						items[i].SupportCatchup = true
+					}
+				}
+
 				if !items[i].IsDirect {
 					rawURLs := strings.Split(items[i].StreamURL, "#")
 					types := strings.Split(items[i].StreamType, "#")
@@ -539,6 +547,13 @@ func (h *Handler) GetChannel(c *gin.Context) {
 		ch.Logo = h.logoSvc.ResolveLogo(ch.Name, ch.EPGChannelID, ch.Logo, ch.ID, strategy, "")
 
 		// token 已经被去除，不在这里获取了
+
+		// 自动推断回看支持
+		if !ch.SupportCatchup {
+			if canSupportCatchup(ch.StreamURL, ch.CatchupSource) {
+				ch.SupportCatchup = true
+			}
+		}
 
 		if !ch.IsDirect {
 			types := strings.Split(ch.StreamType, "#")
@@ -733,6 +748,26 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 	}
 }
 
+// canSupportCatchup 根据 URL 模式自动判断频道是否支持回看。
+// 与 generateCatchupURL 中的 URL 模式匹配逻辑保持一致。
+func canSupportCatchup(streamURL, catchupSource string) bool {
+	if catchupSource != "" {
+		return true
+	}
+	u := streamURL
+	if strings.Contains(u, "PLTV") || strings.Contains(u, "TVOD") ||
+		strings.Contains(u, "itv.cmvideo.cn") || strings.Contains(u, "channel-id=") ||
+		strings.Contains(u, "/live/program/live/") || strings.Contains(u, "/gitv/") ||
+		strings.Contains(u, "/gitv_live/") || strings.Contains(u, "ysten-businessmobile") ||
+		strings.Contains(u, "ysten-business") || strings.Contains(u, "aishang.ctlcdn") ||
+		strings.Contains(u, "userid=gf001") ||
+		(strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=")) ||
+		strings.Contains(u, "/cms001/") {
+		return true
+	}
+	return false
+}
+
 func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
 	start := time.Unix(startUnix, 0).In(time.Local)
 	end := time.Unix(endUnix, 0).In(time.Local)
@@ -890,6 +925,13 @@ func (h *Handler) CatchupStream(c *gin.Context) {
 	if err != nil {
 		fail(c, 404, "频道不存在")
 		return
+	}
+
+	// 自动推断回看支持（与 ListChannels/GetChannel 保持一致）
+	if !ch.SupportCatchup {
+		if canSupportCatchup(ch.StreamURL, ch.CatchupSource) {
+			ch.SupportCatchup = true
+		}
 	}
 
 	if !ch.SupportCatchup {

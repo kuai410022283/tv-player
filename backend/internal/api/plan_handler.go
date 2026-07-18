@@ -108,6 +108,15 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		return
 	}
 
+	// 自动推断回看支持（与 ListChannels/GetChannel 保持一致）
+	for _, ch := range channels {
+		if !ch.SupportCatchup {
+			if canSupportCatchup(ch.StreamURL, ch.CatchupSource) {
+				ch.SupportCatchup = true
+			}
+		}
+	}
+
 	// 确定代理及台标的 baseURL
 	baseURL := strings.TrimSuffix(h.svc.GetServerURL(), "/")
 	if baseURL == "" {
