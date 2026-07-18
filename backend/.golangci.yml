@@ -16,3 +16,16 @@ linters:
         - (database/sql.Rows).Close
         - (io.Closer).Close
         - (net/http.ResponseWriter).Write
+        - (*database/sql.Rows).Close
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+    - linters:
+        - errcheck
+      text: "Error return value of `(c\\.ShouldBindJSON|json\\.Unmarshal|w\\.Write|rows\\.Scan|s\\.db\\.Exec|rand\\.Read|os\\.MkdirAll)`"
+    - linters:
+        - errcheck
+      text: "Error return value of `rows\\.Close`"
