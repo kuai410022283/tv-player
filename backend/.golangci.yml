@@ -1,6 +1,7 @@
 version: "2"
 
 linters:
+  default: none
   enable:
     - errcheck
     - gosimple
@@ -16,14 +17,3 @@ linters:
         - (database/sql.Rows).Close
         - (io.Closer).Close
         - (net/http.ResponseWriter).Write
-
-issues:
-  exclusions:
-    rules:
-      - path: _test\.go
-        linters:
-          - errcheck
-      # 忽略某些常见的不需要检查的函数
-      - linters:
-          - errcheck
-        text: "Error return value of `(c\\.ShouldBindJSON|json\\.Unmarshal|w\\.Write|rows\\.Scan|s\\.db\\.Exec|rand\\.Read|os\\.MkdirAll)`"
