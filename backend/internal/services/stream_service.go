@@ -1743,10 +1743,6 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	}
 	defer func() { _ = reader.Close() }()
 
-	w.Header().Set("Content-Type", "video/mp2t")
-	w.Header().Set("X-Stream-Type", "multicast")
-	w.WriteHeader(http.StatusOK)
-
 	sp.mu.Lock()
 	sp.streams[sessionID] = &models.ActiveStream{
 		Mu:          &sync.RWMutex{},
@@ -1780,6 +1776,9 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64
 
+	// 先读第一块数据，检测实际封装格式后再设置 Content-Type
+	firstChunk := true
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -1790,6 +1789,14 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 
 		n, err := reader.Read(buf)
 		if n > 0 {
+			if firstChunk {
+				firstChunk = false
+				// 从第一块数据检测实际封装格式
+				detectedType := detectContentType(buf[:n])
+				w.Header().Set("Content-Type", detectedType)
+				w.Header().Set("X-Stream-Type", "multicast")
+				w.WriteHeader(http.StatusOK)
+			}
 			if _, wErr := w.Write(buf[:n]); wErr != nil {
 				return nil
 			}
@@ -1818,6 +1825,33 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			lastUpdate = now
 		}
 	}
+}
+
+// detectContentType 从流数据的第一个 chunk 检测实际封装格式。
+// 用于 serveMulticastProxy 动态设置 Content-Type，代替硬编码 video/mp2t。
+// 检测策略：
+//   - MPEG-TS: sync byte 0x47 每 188 字节
+//   - FLV: 0x46 0x4C 0x56 ("FLV")
+//   - H.264 Annex B: 0x00 0x00 0x00 0x01 (NAL start code)
+//   - 默认回退到 video/mp2t（IPTV 组播最常用）
+func detectContentType(data []byte) string {
+	if len(data) < 4 {
+		return "video/mp2t"
+	}
+	// MPEG-TS: sync byte 0x47 每 188 字节
+	if data[0] == 0x47 && len(data) > 188 && data[188] == 0x47 {
+		return "video/mp2t"
+	}
+	// FLV: 0x46 0x4C 0x56 ("FLV")
+	if data[0] == 'F' && data[1] == 'L' && data[2] == 'V' {
+		return "video/x-flv"
+	}
+	// H.264/H.265 Annex B: 0x00 0x00 0x00 0x01 (NAL start code)
+	if data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x00 && data[3] == 0x01 {
+		return "video/avc"
+	}
+	// 默认回退到 TS（IPTV 组播最常用）
+	return "video/mp2t"
 }
 
 func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP string, clientName string, w http.ResponseWriter, r *http.Request, ch *models.Channel, targetURL string) error {

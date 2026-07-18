@@ -132,12 +132,13 @@ class ExoPlayerHelper(
         }
         RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (streamType=$st, contentType=$ct, url=${url.take(80)})")
 
-        // 直连组播流（udp:///rtp:///rtsp:///igmp://）走本地 Go 代理
+        // 直连组播流（udp:///rtp:///igmp://）走本地 Go 代理
+        // RTSP 由 ExoPlayer 原生 RtspMediaSource 支持，无需走代理（与酷9方案一致）
         // 仅当 ExoPlayer 播放时生效，MPV 原生支持这些协议
         if (MediaPlayerApp.localProxyPort > 0) {
             val originalLower = originalUrl.lowercase()
             if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
-                originalLower.startsWith("rtsp://") || originalLower.startsWith("igmp://")) {
+                originalLower.startsWith("igmp://")) {
                 val proxyUrl = "http://127.0.0.1:${MediaPlayerApp.localProxyPort}/proxy?url=${Uri.encode(originalUrl)}"
                 RemoteLogger.i("ExoPlayer", "直连组播流走本地代理: ${proxyUrl.take(80)}")
                 url = proxyUrl

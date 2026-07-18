@@ -15,6 +15,7 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         com.mediaplayer.app.util.RemoteLogger.init(this)
 
         // 启动本地 Go 代理（随机端口），用于直连组播流（udp:///rtp:///rtsp://）
+        // 注意：必须用 Throwable 捕获，因为 System.loadLibrary 失败会抛出 UnsatisfiedLinkError（Error 子类）
         try {
             val port = `mobile`.Mobile.startLocalProxy().toInt()
             if (port > 0) {
@@ -23,7 +24,7 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
             } else {
                 com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy returned invalid port: $port, proxy disabled")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy failed to start: ${e.message}")
             // 失败不影响正常播放，只是本地代理不可用
         }
