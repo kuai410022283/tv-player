@@ -96,6 +96,28 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		sem: make(chan struct{}, maxConcurrent),
 	}
 	_ = os.MkdirAll(cfg.CacheDir, 0755)
+
+	// 后台定期清理陈旧流（超过 60 秒无活动的会话）
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			sp.mu.Lock()
+			now := time.Now()
+			for sid, s := range sp.streams {
+				if now.Sub(s.LastActive) > 60*time.Second {
+					slog.Warn("cleaning stale stream", "session", sid, "channel", s.ChannelName, "last_active", s.LastActive)
+					if cancel, ok := sp.cancels[sid]; ok {
+						cancel()
+					}
+					delete(sp.streams, sid)
+					delete(sp.cancels, sid)
+				}
+			}
+			sp.mu.Unlock()
+		}
+	}()
+
 	return sp
 }
 
@@ -885,6 +907,12 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	}
 	sp.cancels[sessionID] = finalCancel
 	sp.mu.Unlock()
+
+	// 监听客户端断开连接，主动取消 upstream 请求，使 resp.Body.Read() 立即返回错误
+	go func() {
+		<-r.Context().Done()
+		finalCancel()
+	}()
 
 	defer func() {
 		finalCancel()

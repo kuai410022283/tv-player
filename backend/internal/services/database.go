@@ -178,6 +178,7 @@ func createTables(db *sql.DB) error {
 		proxy_url TEXT DEFAULT '',
 		linked_channel_id INTEGER DEFAULT 0,
 		is_protected INTEGER DEFAULT 0,
+		content_type TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (group_id) REFERENCES channel_groups(id) ON DELETE SET DEFAULT
@@ -387,6 +388,13 @@ func splitSQLStatements(schema string) []string {
 	inBlock := 0
 	i := 0
 	for i < len(schema) {
+		// 处理 -- 行注释：跳过到行尾
+		if i+1 < len(schema) && schema[i] == '-' && schema[i+1] == '-' {
+			for i < len(schema) && schema[i] != '\n' {
+				i++
+			}
+			continue
+		}
 		// 检测 BEGIN 关键字（触发器/事务块）
 		if i+5 <= len(schema) && upper[i:i+5] == "BEGIN" &&
 			(i == 0 || upper[i-1] == ' ' || upper[i-1] == '\n' || upper[i-1] == '\t') &&

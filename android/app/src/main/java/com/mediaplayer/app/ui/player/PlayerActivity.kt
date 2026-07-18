@@ -933,7 +933,6 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             pipController.release()
             stopService(Intent(this, PlaybackService::class.java))
             finishAffinity()
-            System.exit(0)
         }
     }
 
