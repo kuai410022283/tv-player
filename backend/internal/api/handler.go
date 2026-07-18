@@ -401,6 +401,16 @@ func (h *Handler) ListChannels(c *gin.Context) {
 				nameKey := items[i].Name
 				var linesForThisItem []map[string]interface{}
 
+				// 自动推断直连模式：对于 udp:// / rtp:// / rtsp:// 协议的频道，
+				// 如果分组未强制设为代理模式，自动启用直连，让客户端直接播放组播流
+				if !items[i].IsDirect {
+					lowerURL := strings.ToLower(items[i].StreamURL)
+					// 只对纯 udp/rtp/rtsp 协议推断，混有 HTTP 的不影响
+					if strings.HasPrefix(lowerURL, "udp://") || strings.HasPrefix(lowerURL, "rtp://") || strings.HasPrefix(lowerURL, "rtsp://") {
+						items[i].IsDirect = true
+					}
+				}
+
 				if !items[i].IsDirect {
 					rawURLs := strings.Split(items[i].StreamURL, "#")
 					types := strings.Split(items[i].StreamType, "#")

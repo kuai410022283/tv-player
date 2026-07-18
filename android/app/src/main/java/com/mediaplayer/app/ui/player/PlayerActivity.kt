@@ -516,11 +516,16 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 }
             } else {
                 val lowerUrl = url.lowercase()
-                // 识别高危的 IPTV / 组播流（特别是 rtsp 协议和 smil 扩展名，ExoPlayer 解析 Payload 33 容易闪退）
-                val isHighRiskMulticast = lowerUrl.startsWith("rtsp://") || lowerUrl.contains(".smil")
-                
-                if (isHighRiskMulticast) {
-                    coreText = "智能防灾 (MPV)"
+                // 识别直连组播协议：udp:// / rtp:// / rtsp://
+                // 这些协议 ExoPlayer 不支持或支持不好，优先使用 MPV 播放
+                // 转为 HTTP 代理的组播流（/api/v1/stream/proxy/...）不在此列，正常走 ExoPlayer
+                val isDirectMulticast = lowerUrl.startsWith("udp://") ||
+                        lowerUrl.startsWith("rtp://") ||
+                        lowerUrl.startsWith("rtsp://") ||
+                        lowerUrl.contains(".smil")
+
+                if (isDirectMulticast) {
+                    coreText = "MPV直连"
                     desiredCore = Prefs.PLAYER_CORE_MPV
                 } else {
                     desiredCore = when (type.lowercase()) {
@@ -652,13 +657,22 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         // 智能切换模式下的内核容灾
         if (coreRetryLevel < 1) {
             coreRetryLevel++
-            val coreName = when (coreRetryLevel) {
-                1 -> "MPV"
-                else -> "ExoPlayer"
+
+            // 直连组播流（udp:///rtp:///rtsp://）首次起播已经是 MPV，
+            // 失败后再次用 MPV 重试相同地址毫无意义，直接跳到线路切换
+            val lowerUrl = streamUrl.lowercase()
+            if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("rtsp://")) {
+                coreRetryLevel = 0
+                // 重置后直接走后续的线路切换逻辑
+            } else {
+                val coreName = when (coreRetryLevel) {
+                    1 -> "MPV"
+                    else -> "ExoPlayer"
+                }
+                tvStatus?.text = "尝试使用 $coreName 重试该线路..."
+                playCurrentLine()
+                return
             }
-            tvStatus?.text = "尝试使用 $coreName 重试该线路..."
-            playCurrentLine()
-            return
         }
 
         coreRetryLevel = 0

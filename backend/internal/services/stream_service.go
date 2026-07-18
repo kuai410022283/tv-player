@@ -1716,6 +1716,7 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	defer reader.Close()
 
 	w.Header().Set("Content-Type", "video/mp2t")
+	w.Header().Set("X-Stream-Type", "multicast")
 	w.WriteHeader(http.StatusOK)
 
 	sp.mu.Lock()
