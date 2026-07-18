@@ -1858,7 +1858,31 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 	lastUpdate := time.Now()
 	var bytesSinceLastUpdate int64
 
+	// Track RTP sequence numbers and fix TS continuity counters on packet loss
+	tsCCFixer := multicast.NewTsCCFixer()
+	var prevSeq uint16
+	var hasSeq bool
+
 	c.OnPacketRTPAny(func(medi *description.Media, forma format.Format, pkt *rtp.Packet) {
+		// Detect RTP packet loss via sequence number gap
+		packetLossDetected := false
+		if hasSeq {
+			expectedSeq := prevSeq + 1
+			if pkt.SequenceNumber != expectedSeq {
+				packetLossDetected = true
+				slog.Debug("rtsp proxy RTP packet loss detected",
+					"channel_id", channelID,
+					"expected", expectedSeq,
+					"received", pkt.SequenceNumber,
+					"diff", pkt.SequenceNumber-expectedSeq)
+			}
+		}
+		prevSeq = pkt.SequenceNumber
+		hasSeq = true
+
+		// Fix TS continuity counters to prevent TsExtractor freezing
+		tsCCFixer.Process(pkt.Payload, packetLossDetected)
+
 		// Just strip RTP header and write payload assuming it's TS over RTSP or playable raw payload
 		n, wErr := w.Write(pkt.Payload)
 		if wErr != nil {

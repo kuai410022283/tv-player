@@ -22,9 +22,9 @@ var udpBufferPool = sync.Pool{
 const maxJitterPackets = 128 // max buffered packets (approx 100-200ms depending on bitrate)
 
 type MulticastReader struct {
-	conn       *net.UDPConn
-	buffer     *[]byte
-	isRTP      bool
+	conn   *net.UDPConn
+	buffer *[]byte
+	isRTP  bool
 
 	remainderBuf [65536]byte
 	remainderOff int
@@ -35,19 +35,21 @@ type MulticastReader struct {
 	jitterLen   [maxJitterPackets]int
 	jitterSeq   [maxJitterPackets]uint16
 	jitterValid [maxJitterPackets]bool
-	
-	nextSeq   uint16
-	hasSeq    bool
-	mu        sync.Mutex
+
+	nextSeq uint16
+	hasSeq  bool
+	mu      sync.Mutex
 
 	fccClient   *FCCClient
 	fccActive   bool
 	fccFirstPkt bool
 
 	// Delayed Multicast Join fields
-	mcastIP   net.IP
-	mcastPort int
+	mcastIP     net.IP
+	mcastPort   int
 	mcastJoined bool
+
+	tsCCFixer *TsCCFixer
 }
 
 func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient) (*MulticastReader, error) {
@@ -81,6 +83,7 @@ func NewMulticastReader(ctx context.Context, rawURL string, fccClient *FCCClient
 		mcastIP:     mcastIP,
 		mcastPort:   port,
 		mcastJoined: false,
+		tsCCFixer:   NewTsCCFixer(),
 	}
 
 	// If FCC is not active, or if it's Telecom (Telecom doesn't usually use Sync Notification), we join immediately
@@ -98,7 +101,7 @@ func (r *MulticastReader) joinMulticast() error {
 	if r.mcastJoined {
 		return nil
 	}
-	
+
 	addr := &net.UDPAddr{
 		IP:   r.mcastIP,
 		Port: r.mcastPort,
@@ -169,7 +172,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 
 			// Read from FCC socket
 			nRead, err := r.fccClient.Read(*r.buffer)
-			
+
 			// Handle Redirect
 			if redirectErr, ok := err.(*FCCRedirectError); ok {
 				slog.Info("FCC Redirected", "new_ip", redirectErr.NewIP, "new_port", redirectErr.NewPort)
@@ -226,9 +229,9 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 				data := (*r.buffer)[:nRead]
 				if len(data) >= 12 && (data[0]&0xC0) == 0x80 {
 					seq := uint16(data[2])<<8 | uint16(data[3])
-					
+
 					// Check if multicast has caught up.
-					if r.mcastJoined && r.hasSeq && r.nextSeq > seq && (r.nextSeq - seq) < 1000 {
+					if r.mcastJoined && r.hasSeq && r.nextSeq > seq && (r.nextSeq-seq) < 1000 {
 						// Multicast has caught up, seamless transition!
 						r.fccActive = false
 						r.fccClient.Close()
@@ -241,7 +244,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 							if !r.hasSeq {
 								r.nextSeq = seq + 1
 								r.hasSeq = true
-							} else if seq >= r.nextSeq && (seq - r.nextSeq) < 1000 {
+							} else if seq >= r.nextSeq && (seq-r.nextSeq) < 1000 {
 								r.nextSeq = seq + 1
 							}
 							return r.emitPayload(p, data[payloadStart:payloadStart+payloadLength])
@@ -358,6 +361,10 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 }
 
 func (r *MulticastReader) emitPayload(p []byte, payload []byte) (int, error) {
+	// Fix TS continuity counters to prevent ExoPlayer TsExtractor from freezing
+	// when RTP packet loss causes CC discontinuities.
+	r.tsCCFixer.Process(payload, true)
+
 	n := copy(p, payload)
 	if n < len(payload) {
 		r.remainderLen = len(payload) - n
@@ -370,7 +377,7 @@ func (r *MulticastReader) emitPayload(p []byte, payload []byte) (int, error) {
 func (r *MulticastReader) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	if r.buffer != nil {
 		udpBufferPool.Put(r.buffer)
 		r.buffer = nil
