@@ -8,6 +8,10 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 object StreamResolver {
@@ -28,6 +32,187 @@ object StreamResolver {
             }
         })
         .build()
+
+    /**
+     * 根据频道原始 URL 和 EPG 时间戳生成回看 URL。
+     * 采用与服务端 generateCatchupURL 一致的 URL 模式匹配逻辑（酷9实现方式），
+     * 客户端直接生成回看 URL，无需请求服务端 API。
+     *
+     * @param streamUrl 频道原始流地址
+     * @param catchupSource catchup-source 模板（M3U 中的 catchup-source 属性），为空时自动根据 URL 模式推断
+     * @param startUnix 回看开始时间（Unix 秒级时间戳）
+     * @param endUnix 回看结束时间（Unix 秒级时间戳）
+     * @param catchupDays 回看天数限制（0 表示不限制）
+     * @return 回看 URL，如果 catchupDays > 0 且 startUnix 超出范围则返回原始 URL
+     */
+    fun generateCatchupUrl(streamUrl: String, catchupSource: String, startUnix: Long, endUnix: Long, catchupDays: Int = 0): String {
+        // catchup-days 范围校验
+        if (catchupDays > 0 && startUnix > 0) {
+            val earliest = System.currentTimeMillis() / 1000 - catchupDays * 86400L
+            if (startUnix < earliest) {
+                return streamUrl
+            }
+        }
+
+        if (catchupSource.isNotEmpty()) {
+            var source = catchupSource
+            val startDate = Date(startUnix * 1000)
+            val endDate = Date(endUnix * 1000)
+            val durationSec = if (endUnix - startUnix < 0) 0 else endUnix - startUnix
+
+            // \${} 格式（兼容旧版）
+            val sdf = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+            source = source.replace("\${(b)yyyyMMddHHmmss}", sdf.format(startDate))
+            source = source.replace("\${(e)yyyyMMddHHmmss}", sdf.format(endDate))
+            source = source.replace("\${b}", startUnix.toString())
+            source = source.replace("\${e}", endUnix.toString())
+            // TIMESTAMP/TIMESTAMPL 格式（xteve 预处理后）
+            source = source.replace("TIMESTAMPL", endUnix.toString())
+            source = source.replace("TIMESTAMP", startUnix.toString())
+            // {timestamp}/{utc}/{lutc}/{duration} 格式（XC/IPTV 标准）
+            // 注意：{lutc} 必须在 {utc} 之前替换，否则 {lutc} 中的 utc 部分会被误替换
+            source = source.replace("{timestamp}", startUnix.toString())
+            source = source.replace("{lutc}", endUnix.toString())
+            source = source.replace("{utc}", startUnix.toString())
+            source = source.replace("{duration}", durationSec.toString())
+            // 分段日期格式 {YYYY}-{MM}-{DD}--{HH}-{mm}-{ss}
+            val sdfY = SimpleDateFormat("yyyy", Locale.getDefault())
+            val sdfM = SimpleDateFormat("MM", Locale.getDefault())
+            val sdfD = SimpleDateFormat("dd", Locale.getDefault())
+            val sdfH = SimpleDateFormat("HH", Locale.getDefault())
+            val sdfMm = SimpleDateFormat("mm", Locale.getDefault())
+            val sdfSs = SimpleDateFormat("ss", Locale.getDefault())
+            source = source.replace("{YYYY}", sdfY.format(startDate))
+            source = source.replace("{MM}", sdfM.format(startDate))
+            source = source.replace("{DD}", sdfD.format(startDate))
+            source = source.replace("{HH}", sdfH.format(startDate))
+            source = source.replace("{mm}", sdfMm.format(startDate))
+            source = source.replace("{ss}", sdfSs.format(startDate))
+            // XC PHP 风格 {Y}-{m}-{d}:{H}-{M}-{S}
+            source = source.replace("{Y}", sdfY.format(startDate))
+            source = source.replace("{m}", sdfM.format(startDate))
+            source = source.replace("{d}", sdfD.format(startDate))
+            source = source.replace("{H}", sdfH.format(startDate))
+            source = source.replace("{M}", sdfMm.format(startDate))
+            source = source.replace("{S}", sdfSs.format(startDate))
+            // {id} 占位符（XC provider）
+            if (source.contains("{id}")) {
+                source = source.replace("{id}", extractStreamId(streamUrl))
+            }
+            // 分隔符处理
+            val separator = if (!source.startsWith("?") && !source.startsWith("&")) {
+                if (streamUrl.contains("?")) "&" else "?"
+            } else if (source.startsWith("?") && streamUrl.contains("?")) {
+                source = "&" + source.substring(1)
+                ""
+            } else {
+                ""
+            }
+            return streamUrl + separator + source
+        }
+
+        val u = streamUrl
+        val sep = if (u.contains("?")) "&" else "?"
+        val sdf = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+        val startDate = Date(startUnix * 1000)
+        val endDate = Date(endUnix * 1000)
+        val timeStr1 = sdf.format(startDate)
+        val timeStr2 = sdf.format(endDate)
+
+        // PLTV / TVOD 模式（同 酷9 实现）
+        if (u.contains("PLTV") || u.contains("TVOD")) {
+            var url = u
+            if (u.contains("/PLTV/")) url = url.replace("/PLTV/", "/TVOD/")
+            return "$url${sep}playseek=$timeStr1-$timeStr2"
+        }
+
+        // itv.cmvideo.cn / channel-id= 模式
+        if (u.contains("itv.cmvideo.cn") || u.contains("channel-id=")) {
+            var url = u.replace("&livemode=1", "&livemode=4")
+                .replace("000000001000", "000000002000")
+            val sdf2 = SimpleDateFormat("yyyyMMdd'T'HHmmss'.00Z'", Locale.getDefault())
+            val t1 = sdf2.format(startDate)
+            val t2 = sdf2.format(endDate)
+            return "$url${sep}starttime=$t1&endtime=$t2"
+        }
+
+        // /live/program/live/ 模式
+        if (u.contains("/live/program/live/")) {
+            return "$u${sep}starttime=$startUnix&endtime=$endUnix"
+        }
+
+        // /gitv/ 模式
+        if (u.contains("/gitv/")) {
+            val url = u.replace("live1", "lookback")
+            return "$url${sep}playseek=$timeStr1-$timeStr2"
+        }
+
+        // /gitv_live/ 模式
+        if (u.contains("/gitv_live/")) {
+            return "$u${sep}start=$startUnix&end=$endUnix"
+        }
+
+        // ysten 模式
+        if (u.contains("ysten-businessmobile") || u.contains("ysten-business")) {
+            val idx = u.lastIndexOf("/")
+            if (idx != -1) {
+                val fileName = u.substring(idx + 1)
+                val base = u.substring(0, idx).replace("live", "lookback")
+                return "$base/$timeStr1/$timeStr2/$fileName"
+            }
+        }
+
+        // aishang.ctlcdn 模式
+        if (u.contains("aishang.ctlcdn")) {
+            val url = u.replace("live", "lb")
+            return "$url${sep}start=$timeStr1&end=$timeStr2"
+        }
+
+        // userid=gf001 模式
+        if (u.contains("userid=gf001")) {
+            val sdfUtc = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+            sdfUtc.timeZone = TimeZone.getTimeZone("UTC")
+            val t1 = sdfUtc.format(startDate)
+            val t2 = sdfUtc.format(endDate)
+            return "$u${sep}utcprogrambegin=$t1&utcprogramend=$t2"
+        }
+
+        // RTSP + AuthInfo 模式（同 酷9 实现）
+        if (u.contains("rtsp") && u.contains("AuthInfo=")) {
+            val sdfUtc = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+            sdfUtc.timeZone = TimeZone.getTimeZone("UTC")
+            val t1 = sdfUtc.format(startDate)
+            val t2 = sdfUtc.format(endDate)
+            return "$u${sep}playseek=$t1-$t2"
+        }
+
+        // /cms001/ 模式
+        if (u.contains("/cms001/")) {
+            val sdf2 = SimpleDateFormat("yyyyMMdd'T'HHmmss'.00Z'", Locale.getDefault())
+            val t1 = sdf2.format(startDate)
+            val t2 = sdf2.format(endDate)
+            return "$u${sep}starttime=$t1&endtime=$t2"
+        }
+
+        // 未知模式，返回原始 URL
+        return streamUrl
+    }
+
+    /**
+     * 从 URL 路径中提取数字 ID（用于 XC provider 的 {id} 占位符），
+     * 与服务端 extractStreamID 逻辑一致。
+     */
+    private fun extractStreamId(url: String): String {
+        val parts = url.split("/")
+        for (i in parts.indices.reversed()) {
+            var cleaned = parts[i].removeSuffix(".m3u8")
+            cleaned = cleaned.removeSuffix(".ts")
+            if (cleaned.isNotEmpty() && cleaned.all { it.isDigit() }) {
+                return cleaned
+            }
+        }
+        return ""
+    }
 
     suspend fun resolve(originalUrl: String, userAgent: String?, customHeaders: String?): String {
         return withContext(Dispatchers.IO) {

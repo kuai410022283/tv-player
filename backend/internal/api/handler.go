@@ -956,7 +956,9 @@ func (h *Handler) CatchupStream(c *gin.Context) {
 	targetURL := generateCatchupURL(ch.StreamURL, ch.CatchupSource, startUnix, endUnix)
 
 	if ch.IsDirect {
-		c.Redirect(http.StatusFound, targetURL)
+		// 直连模式：返回 JSON 格式的回看 URL，客户端读取后直接播放
+		// 不返回 302 重定向，因为 ExoPlayer 无法处理 HTTP→RTSP/UDP/RTP 的重定向
+		ok(c, gin.H{"url": targetURL})
 		return
 	}
 

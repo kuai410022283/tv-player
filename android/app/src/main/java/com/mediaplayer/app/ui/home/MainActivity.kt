@@ -706,29 +706,68 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val startUnix = sdf.parse(prog.startTime)?.time?.div(1000) ?: 0L
                 val endUnix = sdf.parse(prog.endTime)?.time?.div(1000) ?: 0L
                 if (startUnix > 0 && endUnix > 0) {
-                    val url = ApiClient.getCatchupUrl(channel.id, startUnix, endUnix)
                     val lines = channel.getLinesSafely()
                     val ua = if (lines.isNotEmpty()) lines[0].userAgent else ""
                     val headers = if (lines.isNotEmpty()) lines[0].customHeaders else ""
                     
-                    if (isTvMode) {
-                        currentCatchupStartTime = prog.startTime
-                        currentCatchupChannelIndex = currentChannelIndex
-                        osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                        playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls", channel = channel)
-                        hideEpgMenu()
-                    } else {
-                        val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
-                            putExtra("channel_id", channel.id)
-                            putExtra("channel_name", channel.name)
-                            putExtra("stream_url", url)
-                            putExtra("stream_type", "hls") // Catchup is usually HLS
-                            putExtra("user_agent", ua)
-                            putExtra("custom_headers", headers)
-                            putExtra("proxy_type", channel.proxyType)
-                            putExtra("proxy_url", channel.proxyUrl)
+                    // 判断是否为直连模式：代理模式 stream_url 为相对路径（/api/v1/stream/proxy/...），
+                    // 直连模式 stream_url 为完整 URL
+                    val isDirect = lines.isNotEmpty() && (
+                        lines[0].streamUrl.startsWith("http://", ignoreCase = true) ||
+                        lines[0].streamUrl.startsWith("https://", ignoreCase = true) ||
+                        lines[0].streamUrl.startsWith("rtsp://", ignoreCase = true) ||
+                        lines[0].streamUrl.startsWith("udp://", ignoreCase = true) ||
+                        lines[0].streamUrl.startsWith("rtp://", ignoreCase = true)
+                    )
+                    
+                    if (isDirect) {
+                        // 直连模式：采用酷9方式，客户端直接根据原始 URL 生成回看 URL
+                        // 无需请求服务端 API，适用于 HTTP/RTSP/UDP/RTP 所有协议
+                        val streamUrl = if (lines.isNotEmpty()) lines[0].streamUrl else channel.legacyStreamUrl
+                        val catchupUrl = com.mediaplayer.app.util.StreamResolver.generateCatchupUrl(
+                            streamUrl, channel.catchupSource, startUnix, endUnix, channel.catchupDays
+                        )
+                        if (isTvMode) {
+                            currentCatchupStartTime = prog.startTime
+                            currentCatchupChannelIndex = currentChannelIndex
+                            osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
+                            playerHelper?.play(catchupUrl, ua, headers, contentType = "live", streamType = "hls", channel = channel)
+                            hideEpgMenu()
+                        } else {
+                            val intent = android.content.Intent(this@MainActivity, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
+                                putExtra("channel_id", channel.id)
+                                putExtra("channel_name", channel.name)
+                                putExtra("stream_url", catchupUrl)
+                                putExtra("stream_type", "hls")
+                                putExtra("user_agent", ua)
+                                putExtra("custom_headers", headers)
+                                putExtra("proxy_type", channel.proxyType)
+                                putExtra("proxy_url", channel.proxyUrl)
+                            }
+                            startActivity(intent)
                         }
-                        startActivity(intent)
+                    } else {
+                        // 代理模式：直接使用服务端回看 URL（服务端会代理流）
+                        val url = com.mediaplayer.app.data.api.ApiClient.getCatchupUrl(channel.id, startUnix, endUnix)
+                        if (isTvMode) {
+                            currentCatchupStartTime = prog.startTime
+                            currentCatchupChannelIndex = currentChannelIndex
+                            osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
+                            playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls", channel = channel)
+                            hideEpgMenu()
+                        } else {
+                            val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
+                                putExtra("channel_id", channel.id)
+                                putExtra("channel_name", channel.name)
+                                putExtra("stream_url", url)
+                                putExtra("stream_type", "hls")
+                                putExtra("user_agent", ua)
+                                putExtra("custom_headers", headers)
+                                putExtra("proxy_type", channel.proxyType)
+                                putExtra("proxy_url", channel.proxyUrl)
+                            }
+                            startActivity(intent)
+                        }
                     }
                 }
             } catch (e: Exception) {

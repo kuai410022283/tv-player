@@ -1,8 +1,12 @@
 package com.mediaplayer.app.data.api
 
 import com.google.gson.GsonBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
+import org.json.JSONObject
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.net.Inet4Address
@@ -121,5 +125,22 @@ object ApiClient {
     /** 获取回看流 URL */
     fun getCatchupUrl(channelId: Long, startTimeUnix: Long, endTimeUnix: Long): String {
         return "$serverUrl/api/v1/stream/catchup/$channelId?start=$startTimeUnix&end=$endTimeUnix"
+    }
+
+    /**
+     * 获取直连模式下的回看 URL
+     * 直连模式下，服务端不再返回 302 重定向，而是返回 JSON 格式的回看 URL
+     * 客户端需要先请求该接口获取实际的回看 URL，再直接播放
+     */
+    suspend fun fetchDirectCatchupUrl(channelId: Long, startTimeUnix: Long, endTimeUnix: Long): String {
+        val url = getCatchupUrl(channelId, startTimeUnix, endTimeUnix)
+        return withContext(Dispatchers.IO) {
+            val request = Request.Builder().url(url).build()
+            getOkHttpClient().newCall(request).execute().use { response ->
+                val body = response.body?.string() ?: throw Exception("回看URL获取失败：空响应")
+                val json = JSONObject(body)
+                json.getString("url")
+            }
+        }
     }
 }
