@@ -250,7 +250,7 @@ func (s *EPGService) FetchAndBuildIndex() {
 					slog.Error("EPG Gzip 解压失败", "url", sourceURL, "error", err)
 					return
 				}
-				defer gr.Close()
+				defer func() { _ = gr.Close() }()
 				reader = gr
 			}
 

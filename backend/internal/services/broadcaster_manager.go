@@ -320,10 +320,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 		buf := make([]byte, bufferSize)
 		reader := bufio.NewReaderSize(body, bufferSize)
 
-		for {
-			if !b.active {
-				break
-			}
+		for b.active {
 			n, err := reader.Read(buf)
 			if n > 0 {
 				chunk := make([]byte, n)

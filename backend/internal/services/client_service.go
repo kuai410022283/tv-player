@@ -191,7 +191,7 @@ func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, ap
 
 	maxStreams := req.MaxStreams
 	var expiresAt *time.Time
-	var planID int64 = req.PlanID
+	planID := req.PlanID
 
 	// 若选择了套餐，获取套餐详情
 	if planID > 0 {
@@ -344,7 +344,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.Replace(where, "status", "c.status", -1)), queryArgs...)
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.ReplaceAll(where, "status", "c.status")), queryArgs...)
 	if err != nil {
 		return nil, err
 	}

@@ -260,7 +260,9 @@ func (h *ClientHandler) Get(c *gin.Context) {
 func (h *ClientHandler) Approve(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var req models.ClientApproveReq
-	c.ShouldBindJSON(&req)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Warn("approve: invalid request body", "error", err)
+	}
 
 	approver := c.GetString("operator")
 	if approver == "" {
@@ -302,7 +304,9 @@ func (h *ClientHandler) Ban(c *gin.Context) {
 	var body struct {
 		Reason string `json:"reason"`
 	}
-	c.ShouldBindJSON(&body)
+	if err := c.ShouldBindJSON(&body); err != nil {
+		slog.Warn("ban: invalid request body", "error", err)
+	}
 
 	if err := h.clientSvc.Ban(id, body.Reason); err != nil {
 		slog.Error("client ban failed", "client_id", id, "error", err)
@@ -500,7 +504,7 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 	}
 	defer src.Close()
 
-	if _, err := f.WriteString(fmt.Sprintf("\n--- Log Upload: %s ---\n", time.Now().Format(time.RFC3339))); err != nil {
+	if _, err := fmt.Fprintf(f, "\n--- Log Upload: %s ---\n", time.Now().Format(time.RFC3339)); err != nil {
 		fail(c, 500, "写入日志失败")
 		return
 	}

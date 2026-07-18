@@ -155,7 +155,7 @@ func (s *LogoService) downloadImage(url, cleanName string, overwrite bool) bool 
 		slog.Error("Failed to create logo file", "path", path, "error", err)
 		return false
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {

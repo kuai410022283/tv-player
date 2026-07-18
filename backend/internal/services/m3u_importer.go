@@ -353,7 +353,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	maxOrders := make(map[int64]int)
 	rowsMax, err := imp.channelSvc.db.Query("SELECT group_id, COALESCE(MAX(sort_order), -1) FROM channels WHERE source = ? GROUP BY group_id", sourceName)
 	if err == nil {
-		defer rowsMax.Close()
+		defer func() { _ = rowsMax.Close() }()
 		for rowsMax.Next() {
 			var gID int64
 			var m int
@@ -374,13 +374,13 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	if err != nil {
 		return 0, err
 	}
-	defer stmtInsert.Close()
+	defer func() { _ = stmtInsert.Close() }()
 
 	stmtUpdate, err := tx.Prepare(`UPDATE channels SET group_id = ?, name = ?, logo = ?, stream_url = ?, stream_type = ?, epg_channel_id = ?, m3u_source_id = ?, user_agent = ?, custom_headers = ?, support_catchup = ?, catchup_type = ?, catchup_source = ?, catchup_days = ?, fcc = ?, fcc_type = ?, proxy_type = ?, proxy_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
 	if err != nil {
 		return 0, err
 	}
-	defer stmtUpdate.Close()
+	defer func() { _ = stmtUpdate.Close() }()
 
 	for i, key := range mergedKeys {
 		mc := mergedMap[key]

@@ -12,7 +12,7 @@ import (
 type LogService struct{}
 
 func NewLogService() *LogService {
-	os.MkdirAll("library/logs", 0755)
+	_ = os.MkdirAll("library/logs", 0755)
 	return &LogService{}
 }
 
@@ -24,7 +24,7 @@ func (s *LogService) ReadLogIncremental(path string, cursor int64, maxRead int64
 		}
 		return "", cursor, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	stat, err := file.Stat()
 	if err != nil {
@@ -104,7 +104,7 @@ func (s *LogService) ReadClientLog(clientID string, cursor int64) (string, int64
 
 func (s *LogService) DeleteClientLog(clientID string) error {
 	path := filepath.Join("library/logs", fmt.Sprintf("%s.log", clientID))
-	os.Remove(path)
-	os.Remove(path + ".bak")
+	_ = os.Remove(path)
+	_ = os.Remove(path + ".bak")
 	return nil
 }

@@ -75,7 +75,7 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 					m.GroupIDs = append(m.GroupIDs, gID)
 				}
 			}
-			gRows.Close()
+			_ = gRows.Close()
 		}
 	}
 

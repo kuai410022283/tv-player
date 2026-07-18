@@ -95,7 +95,7 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		},
 		sem: make(chan struct{}, maxConcurrent),
 	}
-	os.MkdirAll(cfg.CacheDir, 0755)
+	_ = os.MkdirAll(cfg.CacheDir, 0755)
 	return sp
 }
 
@@ -1207,7 +1207,7 @@ func ParseM3UFile(path string) ([]map[string]string, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return ParseM3U(f)
 }
 
@@ -1328,7 +1328,7 @@ func (sp *StreamProxy) openUDPStreamWithFCC(ctx context.Context, targetURL strin
 		fccType := multicast.FccType(fccTypeStr)
 		slog.Info("FCC Config Evaluated (openUDP)", "fccServer", fccServer, "fccType", fccTypeStr, "ch.Fcc", ch.Fcc, "ch.FccType", ch.FccType)
 
-		var portStart, portEnd int = 40000, 40050
+		portStart, portEnd := 40000, 40050
 		pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 		pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
 		if pStart != "" {
@@ -1382,11 +1382,11 @@ func (sp *StreamProxy) openLocalFile(filePath string) (*os.File, int64, string, 
 
 	info, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, 0, "", fmt.Errorf("获取文件信息失败: %w", err)
 	}
 	if info.IsDir() {
-		f.Close()
+		_ = f.Close()
 		return nil, 0, "", fmt.Errorf("路径是一个目录，不是文件")
 	}
 
@@ -1689,7 +1689,7 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 
 			slog.Info("FCC Config Evaluated", "fccServer", fccServer, "fccType", fccTypeStr, "ch.FccType", ch.FccType, "publicIP", publicIP)
 
-			var portStart, portEnd int = 40000, 40050
+			portStart, portEnd := 40000, 40050
 			pStart, _ := sp.channelSvc.GetSetting("fcc_port_start")
 			pEnd, _ := sp.channelSvc.GetSetting("fcc_port_end")
 			if pStart != "" {
@@ -1713,7 +1713,7 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	if err != nil {
 		return fmt.Errorf("failed to open multicast reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	w.Header().Set("Content-Type", "video/mp2t")
 	w.Header().Set("X-Stream-Type", "multicast")

@@ -49,7 +49,7 @@ func (s *ChannelService) ListGroups(clientID int64, includeEmpty bool) ([]models
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var groups []models.ChannelGroup
 	for rows.Next() {
@@ -235,7 +235,7 @@ func (s *ChannelService) BatchUpdateGroups(ids []int64, action string) error {
 		if err != nil {
 			return err
 		}
-		defer stmtGroup.Close()
+		defer func() { _ = stmtGroup.Close() }()
 	}
 
 	var stmtChannel *sql.Stmt
@@ -244,7 +244,7 @@ func (s *ChannelService) BatchUpdateGroups(ids []int64, action string) error {
 		if err != nil {
 			return err
 		}
-		defer stmtChannel.Close()
+		defer func() { _ = stmtChannel.Close() }()
 	}
 
 	for _, id := range ids {
@@ -309,7 +309,7 @@ func (s *ChannelService) BatchUpdateGroupSort(items []struct {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, item := range items {
 		if _, err := stmt.Exec(item.Order, item.ID); err != nil {
@@ -326,7 +326,7 @@ func (s *ChannelService) ReorderAllGroups() error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []int64
 	for rows.Next() {
@@ -347,7 +347,7 @@ func (s *ChannelService) ReorderAllGroups() error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for i, id := range ids {
 		if _, err := stmt.Exec(i, id); err != nil {
@@ -1006,7 +1006,7 @@ func (s *ChannelService) BatchDeleteChannels(ids []int64) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, id := range ids {
 		if _, err := stmt.Exec(id); err != nil {

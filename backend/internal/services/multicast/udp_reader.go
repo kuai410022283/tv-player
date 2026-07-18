@@ -176,7 +176,7 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 			// Handle Redirect
 			if redirectErr, ok := err.(*FCCRedirectError); ok {
 				slog.Info("FCC Redirected", "new_ip", redirectErr.NewIP, "new_port", redirectErr.NewPort)
-				r.fccClient.Close()
+				_ = r.fccClient.Close()
 				newFccIP := fmt.Sprintf("%s:%d", redirectErr.NewIP, redirectErr.NewPort)
 				newFccClient, err := NewFCCClient(context.Background(), newFccIP, 10000, 60000, fmt.Sprintf("udp://%s:%d", r.mcastIP.String(), r.mcastPort), r.fccClient.fccType)
 				if err == nil {
@@ -213,14 +213,14 @@ func (r *MulticastReader) Read(p []byte) (n int, err error) {
 						if payloadLength > 0 {
 							// 标记FCC完成，切换到组播模式
 							r.fccActive = false
-							r.fccClient.Close()
+							_ = r.fccClient.Close()
 							slog.Info("✅ FCC completed, switching to multicast stream")
 							return r.emitPayload(p, data[payloadStart:payloadStart+payloadLength])
 						}
 					}
 					// 如果第一个包无法解析，直接切换到组播
 					r.fccActive = false
-					r.fccClient.Close()
+					_ = r.fccClient.Close()
 					slog.Info("✅ FCC completed, switching to multicast stream")
 					break
 				}

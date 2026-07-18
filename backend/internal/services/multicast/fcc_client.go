@@ -146,7 +146,7 @@ func NewFCCClient(ctx context.Context, fccServerIP string, fccPortStart, fccPort
 				sigAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: port + 1}
 				signalConn, err = net.ListenUDP("udp", sigAddr)
 				if err != nil {
-					conn.Close()
+					_ = conn.Close()
 					conn = nil
 					continue // Try the next even port
 				}
@@ -460,7 +460,7 @@ func (c *FCCClient) Close() error {
 			slog.Debug("Sent FCC Telecom Terminate packet")
 		}
 		if c.signalConn != nil {
-			c.signalConn.Close()
+			_ = c.signalConn.Close()
 		}
 		return c.conn.Close()
 	}
@@ -498,7 +498,7 @@ func (c *FCCClient) handshakeHuawei(localPort int) error {
 			if udpAddr, ok := tempConn.LocalAddr().(*net.UDPAddr); ok {
 				localIP = udpAddr.IP.To4()
 			}
-			tempConn.Close()
+			_ = tempConn.Close()
 		} else {
 			slog.Warn("FCC Huawei: Failed to detect local IP via Dial", "error", err, "server", c.serverAddr.String())
 		}

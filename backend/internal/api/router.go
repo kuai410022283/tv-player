@@ -23,18 +23,18 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 	api.Use(middleware.APIRateLimit())
 	{
 		// 客户端自服务
-		api.GET("/client/me", hs.ClientHandler.Me)
-		api.POST("/client/logs", hs.ClientHandler.UploadLog)
+		api.GET("/client/me", hs.Me)
+		api.POST("/client/logs", hs.UploadLog)
 
 		// 频道组
 		groups := api.Group("/groups")
-		groups.GET("", hs.Handler.ListGroups)
+		groups.GET("", hs.ListGroups)
 
 		groupWrite := groups.Group("")
 		groupWrite.Use(middleware.RequireAdmin())
 		{
-			groupWrite.POST("", hs.Handler.CreateGroup)
-			groupWrite.PUT("/:id", hs.Handler.UpdateGroup)
+			groupWrite.POST("", hs.CreateGroup)
+			groupWrite.PUT("/:id", hs.UpdateGroup)
 			groupWrite.DELETE("/:id", hs.Handler.DeleteGroup)
 			groupWrite.POST("/batch", hs.Handler.BatchGroup)
 		}
@@ -107,7 +107,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		clients := api.Group("/admin/clients")
 		clients.Use(middleware.RequireAdmin())
 		{
-			clients.GET("", hs.ClientHandler.List)
+			clients.GET("", hs.List)
 			clients.GET("/stats", hs.ClientHandler.GetStats)
 			clients.GET("/logs", hs.ClientHandler.GetRecentLogs)
 			clients.GET("/:id", hs.ClientHandler.Get)

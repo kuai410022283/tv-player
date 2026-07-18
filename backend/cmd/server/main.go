@@ -37,7 +37,7 @@ func main() {
 		logLevel = slog.LevelDebug
 	}
 
-	os.MkdirAll("./data/logs", 0755)
+	_ = os.MkdirAll("./data/logs", 0755)
 	logFile := &lumberjack.Logger{
 		Filename:   "./data/logs/backend.log",
 		MaxSize:    10, // megabytes
@@ -76,13 +76,13 @@ func main() {
 
 	// ── 初始化数据库 ─────────────────────────────────
 	dbPath := cfg.Database.Path
-	os.MkdirAll("./data", 0755)
+	_ = os.MkdirAll("./data", 0755)
 	db, err := services.InitDB(dbPath)
 	if err != nil {
 		slog.Error("database init failed", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// ── 初始化服务 ───────────────────────────────────
 	channelSvc := services.NewChannelService(db)
@@ -196,11 +196,11 @@ func main() {
 		hs.RegisterRoutes(v1)
 	}
 
-	os.MkdirAll("./library/channel_logo", 0755)
+	_ = os.MkdirAll("./library/channel_logo", 0755)
 	r.Static("/library/channel_logo", "./library/channel_logo")
 
 	// 开机广告支持
-	os.MkdirAll("./library/ad", 0755)
+	_ = os.MkdirAll("./library/ad", 0755)
 	r.Static("/ad", "./library/ad")
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
@@ -327,7 +327,7 @@ func gzipMiddleware() gin.HandlerFunc {
 		c.Header("Vary", "Accept-Encoding")
 
 		gz := gzip.NewWriter(c.Writer)
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 
 		c.Writer = &gzipResponseWriter{ResponseWriter: c.Writer, Writer: gz}
 		c.Next()

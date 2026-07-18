@@ -84,16 +84,16 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create local file: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to write snapshot: %w", err)
 	}
-	out.Close() // Explicit close before attaching
+	_ = out.Close() // Explicit close before attaching
 
 	// Ensure cleanup
-	defer os.Remove(downloadPath)
+	defer func() { _ = os.Remove(downloadPath) }()
 
 	// 2. ATTACH DATABASE and execute sync transaction
 	// Warning: The path in ATTACH DATABASE must be an absolute or correct relative path.
@@ -118,7 +118,7 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 		// SQLite forbids DETACH when there are active statements, so DETACH always fails silently.
 		// This poisons the connection. Destroying it is the only 100% safe workaround.
 		_ = conn.Raw(func(any) error { return driver.ErrBadConn })
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	// ATTACH must be done on the connection OUTSIDE the transaction
@@ -227,7 +227,7 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 	}
 
 	dir := "./library/channel_logo"
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
 
 	entries, _ := os.ReadDir(dir)
 	
