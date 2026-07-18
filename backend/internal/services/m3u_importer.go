@@ -333,7 +333,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	keptIDs := make(map[int64]bool)
 	rows, err := imp.channelSvc.db.Query("SELECT id, group_id, name, COALESCE(is_protected, 0) FROM channels WHERE source = ?", sourceName)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id, groupID int64
 			var name string

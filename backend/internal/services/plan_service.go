@@ -53,7 +53,7 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []*models.SubscriptionPlan
 	for rows.Next() {
@@ -163,7 +163,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []*models.SubscriptionChannel
 	for rows.Next() {

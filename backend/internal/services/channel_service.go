@@ -1193,7 +1193,7 @@ func (s *ChannelService) ListM3USources() ([]models.M3USource, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.M3USource
 	for rows.Next() {
@@ -1259,7 +1259,7 @@ func (s *ChannelService) GetEPGPrograms(channelID string) ([]models.EPGProgram, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.EPGProgram
 	for rows.Next() {

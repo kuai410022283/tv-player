@@ -184,7 +184,7 @@ func (s *EPGService) FetchAndBuildIndex() {
 	neededChannels := make(map[string]bool)
 	rows, dbErr := s.db.Query("SELECT epg_channel_id, name FROM channels")
 	if dbErr == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var epgID, name string
 			if rows.Scan(&epgID, &name) == nil {
@@ -564,9 +564,9 @@ func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, string
 				if !now.Before(p.StartTime) && now.Before(p.EndTime) {
 					total := p.EndTime.Sub(p.StartTime).Seconds()
 					elapsed := now.Sub(p.StartTime).Seconds()
-					
+
 					currentTitle := fmt.Sprintf("%s-%s %s", p.StartTime.Format("15:04"), p.EndTime.Format("15:04"), p.Title)
-					
+
 					nextTitle := ""
 					if i+1 < len(progs) {
 						nextP := progs[i+1]
@@ -593,7 +593,7 @@ func (s *EPGService) GetCurrentEPGWithProgress(channelID string) (string, string
 
 	for key, dateMap := range globalEPGIndex.programs {
 		if key == chID {
-			continue 
+			continue
 		}
 		if normalizeChannelName(key) == chIDClean {
 			if title, nextTitle, pct, found := findProgram(dateMap); found {
@@ -654,7 +654,7 @@ func (s *EPGService) autoCompleteEPGChannelIDs() {
 		slog.Error("自动补全 EPG 频道 ID 时查询失败", "error", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	updatedCount := 0
 	for rows.Next() {

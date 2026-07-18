@@ -71,7 +71,7 @@ func (s *LogoService) scanDirectory() {
 // CleanName 清洗频道名称，用于本地存储文件名匹配
 func (s *LogoService) CleanName(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
-	
+
 	// 移除常见后缀
 	suffixes := []string{"hd", "4k", "fhd", "超清", "高清", "频道", "测试"}
 	for _, suffix := range suffixes {
@@ -179,7 +179,7 @@ func (s *LogoService) CacheExistingLogos() {
 		slog.Error("CacheExistingLogos db query failed", "error", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	count := 0
 	for rows.Next() {
@@ -187,7 +187,7 @@ func (s *LogoService) CacheExistingLogos() {
 		if err := rows.Scan(&name, &logoURL, &epgID); err != nil {
 			continue
 		}
-		
+
 		// 按照需求：先拿到 epg_channel_id，如果为空则跳过
 		if epgID == "" {
 			continue
@@ -204,7 +204,7 @@ func (s *LogoService) CacheExistingLogos() {
 // FetchLogosFromSources 后台任务：从全局设置的源库中拉取缺失台标
 func (s *LogoService) FetchLogosFromSources(overwrite bool) {
 	slog.Info("开始从源库批量拉取台标...")
-	
+
 	var urlsStr string
 	err := s.db.QueryRow("SELECT value FROM user_settings WHERE key = 'local_logo_urls'").Scan(&urlsStr)
 	if err != nil || strings.TrimSpace(urlsStr) == "" {
@@ -233,7 +233,7 @@ func (s *LogoService) FetchLogosFromSources(overwrite bool) {
 		slog.Error("FetchLogosFromSources db query failed", "error", err)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type chanInfo struct {
 		Name  string
@@ -384,4 +384,3 @@ func (s *LogoService) ResolveLogo(name, epg, dbLogo string, id int64, strategy s
 		return formatDefaultURL()
 	}
 }
-

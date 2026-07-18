@@ -348,7 +348,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var clients []models.Client
 	for rows.Next() {
@@ -517,7 +517,7 @@ func (s *ClientService) GetLogs(clientID int64, limit int, search string) ([]mod
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []models.AccessLog
 	for rows.Next() {
@@ -556,7 +556,7 @@ func (s *ClientService) GetRecentLogs(limit int, search string) ([]models.Access
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []models.AccessLog
 	for rows.Next() {
