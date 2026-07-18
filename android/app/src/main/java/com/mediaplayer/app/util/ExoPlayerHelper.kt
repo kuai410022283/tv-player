@@ -17,6 +17,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.R as media3R
+import com.mediaplayer.app.MediaPlayerApp
 import com.mediaplayer.app.Prefs
 
 @UnstableApi
@@ -130,6 +131,18 @@ class ExoPlayerHelper(
             }
         }
         RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (streamType=$st, contentType=$ct, url=${url.take(80)})")
+
+        // 直连组播流（udp:///rtp:///rtsp:///igmp://）走本地 Go 代理
+        // 仅当 ExoPlayer 播放时生效，MPV 原生支持这些协议
+        if (MediaPlayerApp.localProxyPort > 0) {
+            val originalLower = originalUrl.lowercase()
+            if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
+                originalLower.startsWith("rtsp://") || originalLower.startsWith("igmp://")) {
+                val proxyUrl = "http://127.0.0.1:${MediaPlayerApp.localProxyPort}/proxy?url=${Uri.encode(originalUrl)}"
+                RemoteLogger.i("ExoPlayer", "直连组播流走本地代理: ${proxyUrl.take(80)}")
+                url = proxyUrl
+            }
+        }
 
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)

@@ -5,6 +5,20 @@ echo "🚀 开始编译 Android TV 客户端 Release APK..."
 # 修复 JAVA_HOME 指向错误的问题（去掉末尾的 \bin）
 export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
 
+echo "📝 正在编译后端 Go 代理代码为 AAR 库..."
+# 解决 Git Bash 中 Windows 路径包含冒号导致 PATH 被错误分割的问题
+GOPATH_UNIX=$(cygpath -u "$(go env GOPATH)")
+export PATH="$PATH:$GOPATH_UNIX/bin"
+pushd ../backend > /dev/null
+# 编译 AAR 直接输出到 Android 项目的 libs 目录
+"$(go env GOPATH)/bin/gomobile" bind -target=android -androidapi 21 -o ../android/app/libs/mobile.aar ./cmd/mobile
+if [ $? -ne 0 ]; then
+    echo "❌ Go 代码编译为 AAR 失败！请检查 gomobile 环境配置。"
+    exit 1
+fi
+popd > /dev/null
+echo "✅ Go 代码编译完成！已更新 mobile.aar"
+
 if [ -f "keystore.env" ]; then
     echo "🔑 加载本地签名配置 (keystore.env)"
     source keystore.env

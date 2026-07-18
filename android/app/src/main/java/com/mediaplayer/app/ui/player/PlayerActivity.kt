@@ -515,28 +515,16 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     else -> desiredCore
                 }
             } else {
-                val lowerUrl = url.lowercase()
-                // 识别直连组播协议：udp:// / rtp:// / rtsp://
-                // 这些协议 ExoPlayer 不支持或支持不好，优先使用 MPV 播放
-                // 转为 HTTP 代理的组播流（/api/v1/stream/proxy/...）不在此列，正常走 ExoPlayer
-                val isDirectMulticast = lowerUrl.startsWith("udp://") ||
-                        lowerUrl.startsWith("rtp://") ||
-                        lowerUrl.startsWith("rtsp://") ||
-                        lowerUrl.contains(".smil")
-
-                if (isDirectMulticast) {
-                    coreText = "MPV直连"
-                    desiredCore = Prefs.PLAYER_CORE_MPV
-                } else {
-                    desiredCore = when (type.lowercase()) {
-                        "ts", "rtp", "udp" -> {
-                            coreText = "智能 (Exo)"
-                            Prefs.PLAYER_CORE_EXO
-                        }
-                        else -> {
-                            coreText = "智能 (Exo)"
-                            Prefs.PLAYER_CORE_EXO
-                        }
+                // 所有流默认优先 ExoPlayer（直连组播流通过本地 Go 代理转 HTTP 播放）
+                // 播放失败时容灾机制会自动切换到 MPV 重试
+                desiredCore = when (type.lowercase()) {
+                    "ts", "rtp", "udp" -> {
+                        coreText = "智能 (Exo)"
+                        Prefs.PLAYER_CORE_EXO
+                    }
+                    else -> {
+                        coreText = "智能 (Exo)"
+                        Prefs.PLAYER_CORE_EXO
                     }
                 }
             }

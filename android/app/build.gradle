@@ -6,6 +6,7 @@ plugins {
 android {
     namespace 'com.mediaplayer.app'
     compileSdk 36
+    ndkVersion "25.1.8937393"
 
     packagingOptions {
         jniLibs {
@@ -153,5 +154,6 @@ dependencies {
     // Splash Screen
     implementation 'androidx.core:core-splashscreen:1.0.1'
 
-
+    // Go Mobile Proxy Engine (本地代理，用于直连组播流)
+    implementation files('libs/mobile.aar')
 }

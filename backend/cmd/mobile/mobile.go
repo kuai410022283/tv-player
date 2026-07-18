@@ -1,8 +1,8 @@
 package mobile
 
 import (
-	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 
@@ -11,23 +11,31 @@ import (
 )
 
 var (
-	streamProxy *services.StreamProxy
+	streamProxy  *services.StreamProxy
+	proxyStarted bool
 )
 
 // StartLocalProxy 启动客户端本地的 HTTP 到 UDP/RTSP 代理层
+// 自动分配随机端口，返回端口号（失败返回 -1）
 // 这个方法由 Android 的 JNI (gomobile) 调用
-func StartLocalProxy(port int) error {
+func StartLocalProxy() int {
+	// 防止重复启动
+	if proxyStarted {
+		return -1
+	}
+
 	// 初始化简易日志
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
 
-	slog.Info("Starting local Go proxy engine...", "port", port)
+	slog.Info("Starting local Go proxy engine...")
 
 	// 在本地初始一个纯内存的无状态 SQLite，用来满足 ChannelService 依赖，防止空指针
 	db, err := services.InitDB(":memory:")
 	if err != nil {
-		return fmt.Errorf("failed to init memory db: %w", err)
+		slog.Error("Failed to init memory db", "error", err)
+		return -1
 	}
 
 	channelSvc := services.NewChannelService(db)
@@ -56,15 +64,22 @@ func StartLocalProxy(port int) error {
 		}
 	})
 
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	slog.Info("Local proxy listening on", "addr", addr)
+	// 自动分配随机端口，避免冲突
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		slog.Error("Failed to listen", "error", err)
+		return -1
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	slog.Info("Local proxy listening on", "port", port)
 
-	// 后台运行，不要阻塞主线程，因为这是在 Android 进程里
+	// 后台运行，使用 listener 直接 Serve，无竞态风险
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		if err := http.Serve(listener, mux); err != nil {
 			slog.Error("Local proxy server crashed", "error", err)
 		}
 	}()
 
-	return nil
+	proxyStarted = true
+	return port
 }

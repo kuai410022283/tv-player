@@ -14,6 +14,20 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         com.mediaplayer.app.util.CrashHandler.instance.init(this)
         com.mediaplayer.app.util.RemoteLogger.init(this)
 
+        // 启动本地 Go 代理（随机端口），用于直连组播流（udp:///rtp:///rtsp://）
+        try {
+            val port = `mobile`.Mobile.startLocalProxy().toInt()
+            if (port > 0) {
+                com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy started on port $port")
+                localProxyPort = port
+            } else {
+                com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy returned invalid port: $port, proxy disabled")
+            }
+        } catch (e: Exception) {
+            com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy failed to start: ${e.message}")
+            // 失败不影响正常播放，只是本地代理不可用
+        }
+
         try {
             val clazz = Class.forName("androidx.media3.exoplayer.rtsp.RtspMessageLogger")
             val delegateClass = Class.forName("androidx.media3.exoplayer.rtsp.RtspMessageLogger\$LoggerDelegate")
@@ -64,5 +78,9 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: MediaPlayerApp
             private set
+        /** 本地 Go 代理端口号，-1 表示不可用 */
+        @JvmStatic
+        var localProxyPort: Int = -1
+            internal set
     }
 }
