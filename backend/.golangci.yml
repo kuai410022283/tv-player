@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -7,13 +9,13 @@ linters:
     - staticcheck
     - unused
 
-  settings:
-    errcheck:
-      # 不检查这些函数的错误返回值
-      exclude-functions:
-        - (database/sql.Rows).Close
-        - (io.Closer).Close
-        - (net/http.ResponseWriter).Write
+linters-settings:
+  errcheck:
+    # 不检查这些函数的错误返回值
+    exclude-functions:
+      - (database/sql.Rows).Close
+      - (io.Closer).Close
+      - (net/http.ResponseWriter).Write
 
 issues:
   # 允许现有代码的 errcheck 问题，只检查新增代码
