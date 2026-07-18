@@ -88,15 +88,26 @@ object ApiClient {
                     chain.proceed(builder.build())
                 }
                 .addInterceptor(logging)
-                .dns(object : okhttp3.Dns {
-                    override fun lookup(hostname: String): List<InetAddress> {
-                        val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                .apply {
+                    try {
                         // IPv4 优先，避免 IPv6 Happy Eyeballs 延迟
-                        val ipv4 = all.filter { it is Inet4Address }
-                        val ipv6 = all.filter { it !is Inet4Address }
-                        return ipv4 + ipv6
+                        // 部分设备（如小米电视）自定义 DNS 可能导致闪退，加 try-catch 保护
+                        dns(object : okhttp3.Dns {
+                            override fun lookup(hostname: String): List<InetAddress> {
+                                return try {
+                                    val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                                    val ipv4 = all.filter { it is Inet4Address }
+                                    val ipv6 = all.filter { it !is Inet4Address }
+                                    ipv4 + ipv6
+                                } catch (e: Exception) {
+                                    okhttp3.Dns.SYSTEM.lookup(hostname)
+                                }
+                            }
+                        })
+                    } catch (e: Exception) {
+                        // 设备不支持 IPv4 优先策略，使用系统默认 DNS
                     }
-                })
+                }
                 .build()
         }
         return okHttpClient!!

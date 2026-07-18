@@ -49,18 +49,28 @@ object PlayerNetworkHelper {
                 // 连接池复用
                 .connectionPool(connectionPool)
                 // DNS缓存 + IPv4 优先：减少DNS查询，避免 IPv6 Happy Eyeballs 延迟
-                .dns(object : okhttp3.Dns {
-                    private val cache = mutableMapOf<String, List<InetAddress>>()
-                    override fun lookup(hostname: String): List<InetAddress> {
-                        return cache.getOrPut(hostname) {
-                            val all = okhttp3.Dns.SYSTEM.lookup(hostname)
-                            // IPv4 优先，避免 IPv6 Happy Eyeballs 延迟
-                            val ipv4 = all.filter { it is Inet4Address }
-                            val ipv6 = all.filter { it !is Inet4Address }
-                            ipv4 + ipv6
-                        }
+                // 部分设备（如小米电视）自定义 DNS 可能导致闪退，加 try-catch 保护
+                .apply {
+                    try {
+                        dns(object : okhttp3.Dns {
+                            private val cache = mutableMapOf<String, List<InetAddress>>()
+                            override fun lookup(hostname: String): List<InetAddress> {
+                                return try {
+                                    cache.getOrPut(hostname) {
+                                        val all = okhttp3.Dns.SYSTEM.lookup(hostname)
+                                        val ipv4 = all.filter { it is Inet4Address }
+                                        val ipv6 = all.filter { it !is Inet4Address }
+                                        ipv4 + ipv6
+                                    }
+                                } catch (e: Exception) {
+                                    okhttp3.Dns.SYSTEM.lookup(hostname)
+                                }
+                            }
+                        })
+                    } catch (e: Exception) {
+                        // 设备不支持 IPv4 优先策略，使用系统默认 DNS
                     }
-                })
+                }
 
             try {
                 // 创建一个不验证证书链的信任管理器
