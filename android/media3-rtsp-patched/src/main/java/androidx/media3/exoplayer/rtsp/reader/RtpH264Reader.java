@@ -171,6 +171,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     startTimeOffsetUs = timeUs;
   }
 
+  @Override
+  public void onPacketLossDetected() {
+    isCurrentAccessUnitCorrupted = true;
+  }
+
   // Internal methods.
 
   /**

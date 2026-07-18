@@ -47,6 +47,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private boolean firstPacketRead;
   private volatile long firstTimestamp;
   private volatile int firstSequenceNumber;
+  private int previousSequenceNumber;
 
   @GuardedBy("lock")
   private boolean isSeekPending;
@@ -68,6 +69,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     reorderingQueue = new RtpPacketReorderingQueue();
     firstTimestamp = C.TIME_UNSET;
     firstSequenceNumber = C.INDEX_UNSET;
+    previousSequenceNumber = C.INDEX_UNSET;
     nextRtpTimestamp = C.TIME_UNSET;
     playbackStartTimeUs = C.TIME_UNSET;
   }
@@ -173,6 +175,16 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         }
       } else {
         do {
+          // Detect sequence number gap (possible packet loss).
+          if (firstPacketRead && previousSequenceNumber != C.INDEX_UNSET) {
+            int expectedSequenceNumber =
+                RtpPacket.getNextSequenceNumber(previousSequenceNumber);
+            if (packet.sequenceNumber != expectedSequenceNumber) {
+              payloadReader.onPacketLossDetected();
+            }
+          }
+          previousSequenceNumber = packet.sequenceNumber;
+
           // Deplete the reordering queue as much as possible.
           rtpPacketDataBuffer.reset(packet.payloadData);
           payloadReader.consume(
@@ -192,6 +204,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         // require RTSP message exchange. For example, playing back with non-zero start position.
         isSeekPending = true;
       }
+      previousSequenceNumber = C.INDEX_UNSET;
       this.nextRtpTimestamp = nextRtpTimestamp;
       this.playbackStartTimeUs = playbackStartTimeUs;
     }
@@ -209,8 +222,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * given RtpPacket arrival time.
    */
   private static long getCutoffTimeMs(long packetArrivalTimeMs) {
-    // TODO(internal b/172331505) 30ms is roughly the time for one video frame. It is not rigorously
-    // chosen and will need fine tuning in the future.
-    return packetArrivalTimeMs - 30;
+    // PATCHED: Increased from 30ms to 500ms to give more time for out-of-order RTP packets.
+    // This is critical for IPTV/RTSP streams where network jitter can cause packets to arrive
+    // out of order. The old 30ms cutoff too aggressively marked packets as lost, causing the
+    // reordering queue to skip packets that arrived slightly late, which in turn triggered
+    // false packet loss detection and unnecessary decoder corruption.
+    return packetArrivalTimeMs - 500;
   }
 }

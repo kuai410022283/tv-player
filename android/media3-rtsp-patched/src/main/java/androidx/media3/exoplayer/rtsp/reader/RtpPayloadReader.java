@@ -84,4 +84,12 @@ public interface RtpPayloadReader {
    * @param timeUs The server acknowledged seek time in microseconds.
    */
   void seek(long nextRtpTimestamp, long timeUs);
+
+  /**
+   * Called when the RTP packet sequence number gap is detected, indicating possible packet loss.
+   *
+   * <p>Implementations should handle this by marking the current access unit as corrupted, so that
+   * corrupted data is not sent to the decoder. The default implementation does nothing.
+   */
+  default void onPacketLossDetected() {}
 }

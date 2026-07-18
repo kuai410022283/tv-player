@@ -119,6 +119,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     sampleLength = 0;
   }
 
+  @Override
+  public void onPacketLossDetected() {
+    // Discard accumulated sample data when packet loss is detected,
+    // as the data is corrupted and cannot be decoded correctly.
+    sampleLength = 0;
+  }
+
   // Internal methods.
 
   /**
