@@ -15,18 +15,17 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         com.mediaplayer.app.util.RemoteLogger.init(this)
 
         // 启动本地 Go 代理（随机端口），用于直连组播流（udp:///rtp:///rtsp://）
-        // 注意：必须用 Throwable 捕获，因为 System.loadLibrary 失败会抛出 UnsatisfiedLinkError（Error 子类）
-        try {
-            val port = `mobile`.Mobile.startLocalProxy().toInt()
-            if (port > 0) {
-                com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy started on port $port")
-                localProxyPort = port
+        // 默认关闭，仅当用户在设置中开启后才启动，避免部分设备（如小米电视）Go runtime 兼容性问题导致闪退
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        if (prefs.getBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false)) {
+            val success = tryStartProxy()
+            if (success) {
+                isProxyEnabled = true
             } else {
-                com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy returned invalid port: $port, proxy disabled")
+                // 启动失败（如 MIUI TV 上 Go runtime 不兼容），自动回退关闭，避免下次启动再次尝试
+                prefs.edit().putBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false).apply()
+                com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy failed on startup, auto-disabled")
             }
-        } catch (e: Throwable) {
-            com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy failed to start: ${e.message}")
-            // 失败不影响正常播放，只是本地代理不可用
         }
 
         try {
@@ -57,7 +56,6 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
         }
 
         // Initialize API with saved server URL or default
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
         ApiClient.init(serverUrl)
         
@@ -79,9 +77,38 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: MediaPlayerApp
             private set
-        /** 本地 Go 代理端口号，-1 表示不可用 */
+        /** 本地 Go 代理端口号，-1 表示不可用（一旦启动成功就不会重置，因为 Go 侧 proxyStarted 无法撤销） */
         @JvmStatic
         var localProxyPort: Int = -1
             internal set
+
+        /** 用户是否开启了本地代理功能（控制 ExoPlayer 是否使用代理） */
+        @JvmStatic
+        var isProxyEnabled: Boolean = false
+            internal set
+
+        /**
+         * 尝试启动本地 Go 代理，返回 true 表示启动成功或已启动。
+         * 注意：必须用 Throwable 捕获，因为 System.loadLibrary 失败会抛出 UnsatisfiedLinkError（Error 子类）。
+         * 部分设备（如小米电视）Go runtime 初始化可能触发原生层 SIGSEGV，该场景无法被捕获，
+         * 因此此功能默认关闭，仅由用户在设置中手动开启。
+         */
+        fun tryStartProxy(): Boolean {
+            if (localProxyPort > 0) return true // 已启动，直接复用
+            return try {
+                val port = `mobile`.Mobile.startLocalProxy().toInt()
+                if (port > 0) {
+                    com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy started on port $port")
+                    localProxyPort = port
+                    true
+                } else {
+                    com.mediaplayer.app.util.RemoteLogger.i("MediaPlayerApp", "Go proxy returned invalid port: $port")
+                    false
+                }
+            } catch (e: Throwable) {
+                com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy failed to start: ${e.message}")
+                false
+            }
+        }
     }
 }

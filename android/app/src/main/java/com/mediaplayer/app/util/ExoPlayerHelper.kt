@@ -145,7 +145,7 @@ class ExoPlayerHelper(
         // 通过本地 Go 代理（gortsplib）转 HTTP 后播放更可靠
         // RTP/UDP/IGMP：ExoPlayer 无法直接处理，必须经 Go 代理转 HTTP
         // 仅当 ExoPlayer 播放时生效，MPV 原生支持这些协议无需代理
-        if (MediaPlayerApp.localProxyPort > 0) {
+        if (MediaPlayerApp.isProxyEnabled && MediaPlayerApp.localProxyPort > 0) {
             val originalLower = originalUrl.lowercase()
             if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
                 originalLower.startsWith("igmp://") || originalLower.startsWith("rtsp://")) {

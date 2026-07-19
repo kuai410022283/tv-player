@@ -8,12 +8,14 @@ COPY . .
 
 # 注入版本号
 ARG VERSION=dev
-# TARGETOS / TARGETARCH 由 docker buildx 自动传入（多平台构建）
+# TARGETOS / TARGETARCH / TARGETVARIANT 由 docker buildx 自动传入（多平台构建）
 ARG TARGETOS
 ARG TARGETARCH
+ARG TARGETVARIANT
 
-RUN GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} CGO_ENABLED=0 go build \
-    -ldflags "-X main.Version=${VERSION}" \
+RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = "v6" ] && echo "6" || echo "") \
+    GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} CGO_ENABLED=0 go build \
+    -ldflags "-s -w -X main.Version=${VERSION}" \
     -o mediaplayer ./cmd/server
 
 # ── 运行阶段 ─────────────────────────────────────────

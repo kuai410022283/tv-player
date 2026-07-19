@@ -90,18 +90,46 @@ jobs:
     strategy:
       matrix:
         include:
+          # ── x86 ───────────────────────────────────────────
           - goos: linux
             goarch: amd64
             suffix: ""
+          # ── ARM ───────────────────────────────────────────
           - goos: linux
             goarch: arm64
             suffix: ""
+          - goos: linux           # ARMv7l（树莓派2/3、晶晨旧款S805等）
+            goarch: arm
+            goarm: "7"
+            suffix: "-armv7l"
+          # ── 龙芯 Loongson ─────────────────────────────────
+          - goos: linux           # 龙芯 LoongArch（3A5000/3A6000，Go 1.19+）
+            goarch: loong64
+            suffix: ""
+          - goos: linux           # 龙芯 MIPS 旧款（3A1000-3A4000）
+            goarch: mips64le
+            suffix: ""
+          # ── 路由器 MIPS ──────────────────────────────────
+          - goos: linux           # MIPS LE softfloat（MediaTek MT7628/MT7688，OpenWrt）
+            goarch: mipsle
+            gomips: softfloat
+            suffix: "-softfloat"
+          - goos: linux           # MIPS BE softfloat（Atheros AR9xxx/QCA956x，OpenWrt）
+            goarch: mips
+            gomips: softfloat
+            suffix: "-softfloat"
+          # ── RISC-V ────────────────────────────────────────
+          - goos: linux           # RISC-V 64（VisionFive 2、Milk-V Pioneer 等新兴平台）
+            goarch: riscv64
+            suffix: ""
+          # ── macOS ─────────────────────────────────────────
           - goos: darwin
             goarch: amd64
             suffix: ""
           - goos: darwin
             goarch: arm64
             suffix: ""
+          # ── Windows ──────────────────────────────────────
           - goos: windows
             goarch: amd64
             suffix: ""
@@ -121,6 +149,8 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          GOMIPS: ${{ matrix.gomips }}
           CGO_ENABLED: "0"
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
@@ -160,7 +190,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mediaplayer-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: mediaplayer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
           path: |
             backend/*.tar.gz
             backend/*.zip
@@ -246,6 +276,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,arm
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -270,6 +305,8 @@ jobs:
         with:
           context: backend
           push: true
+          # 支持三大主流平台：x86软路由/NAS、ARM64(晶晨S905/树莓派4+)、ARMv7(树莓派2/3/NAS)
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

@@ -50,6 +50,11 @@ func StartLocalProxy() int {
 	// 启动一个精简版的 HTTP 服务
 	mux := http.NewServeMux()
 	mux.HandleFunc("/proxy", func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				slog.Error("proxy handler panic recovered", "panic", rec)
+			}
+		}()
 		// 提取 url 参数
 		targetURL := r.URL.Query().Get("url")
 		if targetURL == "" {
@@ -75,6 +80,11 @@ func StartLocalProxy() int {
 
 	// 后台运行，使用 listener 直接 Serve，无竞态风险
 	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				slog.Error("local proxy server panic recovered", "panic", rec)
+			}
+		}()
 		if err := http.Serve(listener, mux); err != nil {
 			slog.Error("Local proxy server crashed", "error", err)
 		}

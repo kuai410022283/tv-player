@@ -33,6 +33,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.mediaplayer.app.MediaPlayerApp
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
@@ -1335,6 +1336,38 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentReverseChannels = !currentReverseChannels
             updateReverseChannelsText(currentReverseChannels)
             prefs.edit().putBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, currentReverseChannels).apply()
+        }
+
+        // 本地代理开关
+        val btnSettingsLocalProxy = findViewById<View>(R.id.btnSettingsLocalProxy)
+        val tvSettingsLocalProxyStatus = findViewById<TextView>(R.id.tvSettingsLocalProxyStatus)
+        var localProxyEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false)
+
+        fun updateLocalProxyText() {
+            tvSettingsLocalProxyStatus?.text = if (localProxyEnabled) "开" else "关"
+        }
+        updateLocalProxyText()
+
+        btnSettingsLocalProxy?.setOnClickListener {
+            localProxyEnabled = !localProxyEnabled
+            prefs.edit().putBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, localProxyEnabled).apply()
+
+            if (localProxyEnabled) {
+                // 尝试启动代理，如果失败则自动回退
+                val success = MediaPlayerApp.tryStartProxy()
+                if (success) {
+                    MediaPlayerApp.isProxyEnabled = true
+                    Toast.makeText(this@MainActivity, "本地代理已开启，端口 ${MediaPlayerApp.localProxyPort}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "本地代理启动失败，已自动关闭", Toast.LENGTH_LONG).show()
+                    localProxyEnabled = false
+                    prefs.edit().putBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false).apply()
+                }
+            } else {
+                MediaPlayerApp.isProxyEnabled = false
+                Toast.makeText(this@MainActivity, "本地代理已关闭", Toast.LENGTH_SHORT).show()
+            }
+            updateLocalProxyText()
         }
 
         btnSettingsCheckUpdate?.setOnClickListener {

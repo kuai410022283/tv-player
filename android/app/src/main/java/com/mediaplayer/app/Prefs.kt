@@ -52,6 +52,9 @@ object Prefs {
     // 开机自启
     const val KEY_AUTO_START = "auto_start"
 
+    // 本地代理（直连组播流），默认关闭，避免部分设备（如小米电视）Go runtime 兼容性问题导致闪退
+    const val KEY_LOCAL_PROXY_ENABLED = "local_proxy_enabled"
+
     // 画中画
     const val KEY_ENABLE_PIP = "enable_pip"
 
