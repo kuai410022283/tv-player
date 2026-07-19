@@ -515,17 +515,24 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     else -> desiredCore
                 }
             } else {
-                // 所有流默认优先 ExoPlayer（直连组播流通过本地 Go 代理转 HTTP 播放）
-                // 播放失败时容灾机制会自动切换到 MPV 重试
-                // RTSP 流使用 FFmpeg/libavformat 的 MPV 解码器，兼容性优于 ExoPlayer 自研 RtspMediaSource
+                // 智能模式内核选择策略：
+                // - RTP/UDP/TS：始终优先 ExoPlayer（直连时经 Go 代理转 HTTP，关代理时会失败后容灾 MPV）
+                // - RTSP：代理开启时走 ExoPlayer（Go 代理把 rtsp→HTTP，Exo 更稳定）；
+                //         代理关闭时走 MPV（MPV 原生 RTSP 兼容性更好）
+                val proxyEnabled = MediaPlayerApp.isProxyEnabled && MediaPlayerApp.localProxyPort > 0
                 desiredCore = when (type.lowercase()) {
                     "ts", "rtp", "udp" -> {
                         coreText = "智能 (Exo)"
                         Prefs.PLAYER_CORE_EXO
                     }
                     "rtsp" -> {
-                        coreText = "智能 (MPV)"
-                        Prefs.PLAYER_CORE_MPV
+                        if (proxyEnabled) {
+                            coreText = "智能 (Exo+代理)"
+                            Prefs.PLAYER_CORE_EXO
+                        } else {
+                            coreText = "智能 (MPV)"
+                            Prefs.PLAYER_CORE_MPV
+                        }
                     }
                     else -> {
                         coreText = "智能 (Exo)"
@@ -651,13 +658,21 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (coreRetryLevel < 1) {
             coreRetryLevel++
 
-            // 直连组播流（udp:///rtp://）走本地 Go 代理转 HTTP，ExoPlayer 和 MPV 都依赖代理，
-            // 失败后重试无意义，直接跳到线路切换
-            // RTSP 首次起播走 ExoPlayer RtspMediaSource，失败后可尝试 MPV 容灾
-            val lowerUrl = streamUrl.lowercase()
-            if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://")) {
+            // 直连 RTP/UDP 流判断：用原始 URL（代理化后 streamUrl 已变为 http://127.0.0.1:xxx/proxy?...）
+            val originalLower = streamUrl.lowercase()
+            val isDirectRtpOrUdp = originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
+                originalLower.contains("proxy?url=udp") || originalLower.contains("proxy?url=rtp")
+            val proxyEnabled = MediaPlayerApp.isProxyEnabled && MediaPlayerApp.localProxyPort > 0
+
+            if (isDirectRtpOrUdp && proxyEnabled) {
+                // 代理已开启时：RTP/UDP 经代理播放失败，MPV 无法通过代理URL直接获益，跳过容灾直接换线路
                 coreRetryLevel = 0
-                // 重置后直接走后续的线路切换逻辑
+            } else if (isDirectRtpOrUdp && !proxyEnabled) {
+                // 代理未开启时：RTP/UDP 可以让 MPV 原生处理（MPV 支持 rtp:// udp://）
+                val coreName = "MPV"
+                tvStatus?.text = "尝试使用 $coreName 重试该线路..."
+                playCurrentLine()
+                return
             } else {
                 val coreName = when (coreRetryLevel) {
                     1 -> "MPV"

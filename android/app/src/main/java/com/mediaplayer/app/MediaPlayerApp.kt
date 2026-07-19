@@ -94,7 +94,19 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
          * 因此此功能默认关闭，仅由用户在设置中手动开启。
          */
         fun tryStartProxy(): Boolean {
-            if (localProxyPort > 0) return true // 已启动，直接复用
+            if (localProxyPort > 0) {
+                // 复用前先 TCP 探活，确认代理仍在监听（App 重启后 Go 运行时会重新初始化，旧端口可能已失效）
+                val alive = try {
+                    java.net.Socket().use { socket ->
+                        socket.connect(java.net.InetSocketAddress("127.0.0.1", localProxyPort), 500)
+                        true
+                    }
+                } catch (_: Exception) { false }
+                if (alive) return true
+                // 端口失效，清除旧端口，重新启动
+                com.mediaplayer.app.util.RemoteLogger.w("MediaPlayerApp", "Go proxy port $localProxyPort no longer alive, restarting...")
+                localProxyPort = -1
+            }
             return try {
                 val port = `mobile`.Mobile.startLocalProxy().toInt()
                 if (port > 0) {
