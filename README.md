@@ -91,7 +91,6 @@ sudo chmod 0755 mediaplayer
 | ARMv7l | `mediaplayer-linux-arm-armv7l.tar.gz` | 树莓派2/3、晶晨旧款 S805、老款 NAS | 二进制 |
 | 龙芯 LoongArch | `mediaplayer-linux-loong64.tar.gz` | 龙芯 3A5000 / 3A6000 及以上 | 二进制 |
 | 龙芯 MIPS | `mediaplayer-linux-mips64le.tar.gz` | 龙芯 3A1000 / 3A2000 / 3A4000（MIPS 旧款） | 二进制 |
-| MIPS LE 路由器 | `mediaplayer-linux-mipsle-softfloat.tar.gz` | MediaTek MT7628/MT7688 OpenWrt 路由器 | 二进制 |
 | RISC-V 64 | `mediaplayer-linux-riscv64.tar.gz` | VisionFive 2、Milk-V Pioneer 等新兴平台 | 二进制 |
 | macOS (Intel) | `mediaplayer-darwin-amd64.tar.gz` | Intel Mac | 二进制 |
 | macOS (Apple) | `mediaplayer-darwin-arm64.tar.gz` | Apple Silicon Mac（M1/M2/M3） | 二进制 |
