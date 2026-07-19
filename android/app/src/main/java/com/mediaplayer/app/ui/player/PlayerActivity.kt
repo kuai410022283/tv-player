@@ -517,10 +517,15 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             } else {
                 // 所有流默认优先 ExoPlayer（直连组播流通过本地 Go 代理转 HTTP 播放）
                 // 播放失败时容灾机制会自动切换到 MPV 重试
+                // RTSP 流使用 FFmpeg/libavformat 的 MPV 解码器，兼容性优于 ExoPlayer 自研 RtspMediaSource
                 desiredCore = when (type.lowercase()) {
                     "ts", "rtp", "udp" -> {
                         coreText = "智能 (Exo)"
                         Prefs.PLAYER_CORE_EXO
+                    }
+                    "rtsp" -> {
+                        coreText = "智能 (MPV)"
+                        Prefs.PLAYER_CORE_MPV
                     }
                     else -> {
                         coreText = "智能 (Exo)"

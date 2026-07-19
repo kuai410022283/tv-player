@@ -90,6 +90,14 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
+    // 缓冲超时兜底：ExoPlayer 卡在 STATE_BUFFERING 超过 15 秒自动触发降级
+    // 解决某些 RTSP 或异常流不报错也不就绪的卡死问题
+    private val bufferingTimeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val bufferingTimeoutRunnable = Runnable {
+        com.mediaplayer.app.util.RemoteLogger.e("ExoPlayer", "Buffering timeout! No STATE_READY within 15s, triggering fallback.")
+        listener.onError()
+    }
+
     override fun play(url: String, userAgent: String, customHeaders: String, startTimeMs: Long, contentType: String, streamType: String, channel: com.mediaplayer.app.data.model.Channel?) {
         currentUrl = url
         currentUserAgent = userAgent
@@ -132,15 +140,17 @@ class ExoPlayerHelper(
         }
         RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (streamType=$st, contentType=$ct, url=${url.take(80)})")
 
-        // 直连组播流（udp:///rtp:///igmp://）走本地 Go 代理
-        // RTSP 由 ExoPlayer 原生 RtspMediaSource 支持，无需走代理（与酷9方案一致）
-        // 仅当 ExoPlayer 播放时生效，MPV 原生支持这些协议
+        // 直连流走本地 Go 代理
+        // RTSP：ExoPlayer 原生 RtspMediaSource 对部分非标 RTSP 服务器兼容性有限，
+        // 通过本地 Go 代理（gortsplib）转 HTTP 后播放更可靠
+        // RTP/UDP/IGMP：ExoPlayer 无法直接处理，必须经 Go 代理转 HTTP
+        // 仅当 ExoPlayer 播放时生效，MPV 原生支持这些协议无需代理
         if (MediaPlayerApp.localProxyPort > 0) {
             val originalLower = originalUrl.lowercase()
             if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
-                originalLower.startsWith("igmp://")) {
+                originalLower.startsWith("igmp://") || originalLower.startsWith("rtsp://")) {
                 val proxyUrl = "http://127.0.0.1:${MediaPlayerApp.localProxyPort}/proxy?url=${Uri.encode(originalUrl)}"
-                RemoteLogger.i("ExoPlayer", "直连组播流走本地代理: ${proxyUrl.take(80)}")
+                RemoteLogger.i("ExoPlayer", "直连流走本地代理: ${proxyUrl.take(80)}")
                 url = proxyUrl
             }
         }
@@ -156,6 +166,9 @@ class ExoPlayerHelper(
         }
 
         isPlayerPlaying = false
+
+        // 每次起播重置缓冲超时
+        bufferingTimeoutHandler.removeCallbacks(bufferingTimeoutRunnable)
 
         // 读取切台模式设置
         // 流畅模式（默认）：stop + clearMediaItems，保留 Surface 旧帧（setKeepContentOnPlayerReset）
@@ -248,20 +261,24 @@ class ExoPlayerHelper(
             .setDataSourceFactory(defaultDataSourceFactory)
         this.mediaSourceFactory = mediaSourceFactory
 
-        val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
-        if (mimeType != null) {
-            mediaItemBuilder.setMimeType(mimeType)
+        val mediaItem = if (url.lowercase().startsWith("rtsp://")) {
+            // RTSP 流：使用纯净 MediaItem，不附加 LiveConfiguration
+            // LiveConfiguration 为 HLS/DASH 设计，RtspMediaSource 无法正确处理会导致连接挂起
+            // 与酷9方案一致：MediaItem.fromUri(parse)
+            MediaItem.fromUri(Uri.parse(url))
+        } else {
+            val builder = MediaItem.Builder().setUri(Uri.parse(url))
+            if (mimeType != null) {
+                builder.setMimeType(mimeType)
+            }
+            if (isLiveStream) {
+                val liveConfig = MediaItem.LiveConfiguration.Builder()
+                    .setMaxPlaybackSpeed(1.02f)
+                    .build()
+                builder.setLiveConfiguration(liveConfig)
+            }
+            builder.build()
         }
-        
-        // 针对 UDP 或 RTSP 直播源，注入 LiveConfiguration 以优化时钟同步
-        if (isLiveStream) {
-            val liveConfig = MediaItem.LiveConfiguration.Builder()
-                .setMaxPlaybackSpeed(1.02f)
-                .build()
-            mediaItemBuilder.setLiveConfiguration(liveConfig)
-        }
-        
-        val mediaItem = mediaItemBuilder.build()
         
         // RTSP 流需要使用 RtspMediaSource，而非默认的 ProgressiveMediaSource
         val isRtsp = url.lowercase().startsWith("rtsp://")
@@ -408,8 +425,13 @@ class ExoPlayerHelper(
                 Player.STATE_BUFFERING -> {
                     listener.onBuffering(0f)
                     RemoteLogger.i("ExoPlayer", "[Perf] STATE_BUFFERING +${android.os.SystemClock.uptimeMillis() - playStartTimeMs}ms")
+                    // 缓冲超时兜底：15秒后未就绪触发降级
+                    bufferingTimeoutHandler.removeCallbacks(bufferingTimeoutRunnable)
+                    bufferingTimeoutHandler.postDelayed(bufferingTimeoutRunnable, 15000)
                 }
                 Player.STATE_READY -> {
+                    // 取消缓冲超时
+                    bufferingTimeoutHandler.removeCallbacks(bufferingTimeoutRunnable)
                     listener.onBuffering(100f)
                     if (exoPlayer?.playWhenReady == true) {
                         if (!isPlayerPlaying) {
@@ -469,6 +491,8 @@ class ExoPlayerHelper(
                     }
                 }
                 Player.STATE_ENDED -> {
+                    // 取消缓冲超时
+                    bufferingTimeoutHandler.removeCallbacks(bufferingTimeoutRunnable)
                     listener.onPlaybackCompleted()
                     // 点播流播放结束后，自动回到开头重新播放，避免黑屏
                     if (currentContentType == "vod" || currentStreamType.lowercase() in listOf("mp4", "mkv", "avi", "mov", "webm")) {
@@ -832,6 +856,8 @@ class ExoPlayerHelper(
     }
     
     private fun releasePlayer() {
+        // 清理缓冲超时
+        bufferingTimeoutHandler.removeCallbacks(bufferingTimeoutRunnable)
         exoPlayer?.release()
         exoPlayer = null
         isPlayerPlaying = false

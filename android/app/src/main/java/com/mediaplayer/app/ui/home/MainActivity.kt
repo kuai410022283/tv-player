@@ -709,6 +709,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     val lines = channel.getLinesSafely()
                     val ua = if (lines.isNotEmpty()) lines[0].userAgent else ""
                     val headers = if (lines.isNotEmpty()) lines[0].customHeaders else ""
+                    // 保留原始流类型，使智能模式正确选择播放器核心
+                    // 如 RTSP 回看继续走 MPV，HLS 回看走 ExoPlayer，避免切换核心导致异常
+                    val originalStreamType = if (lines.isNotEmpty()) lines[0].streamType else "hls"
                     
                     // 使用服务端返回的 is_direct 字段判断模式，避免 URL 前缀误判
                     val isDirect = channel.isDirect
@@ -724,14 +727,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             currentCatchupStartTime = prog.startTime
                             currentCatchupChannelIndex = currentChannelIndex
                             osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                            playerHelper?.play(catchupUrl, ua, headers, contentType = "live", streamType = "hls", channel = channel)
+                            playerHelper?.play(catchupUrl, ua, headers, contentType = "live", streamType = originalStreamType, channel = channel)
                             hideEpgMenu()
                         } else {
                             val intent = android.content.Intent(this@MainActivity, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
                                 putExtra("channel_id", channel.id)
                                 putExtra("channel_name", channel.name)
                                 putExtra("stream_url", catchupUrl)
-                                putExtra("stream_type", "hls")
+                                putExtra("stream_type", originalStreamType)
                                 putExtra("user_agent", ua)
                                 putExtra("custom_headers", headers)
                                 putExtra("proxy_type", channel.proxyType)
@@ -746,14 +749,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             currentCatchupStartTime = prog.startTime
                             currentCatchupChannelIndex = currentChannelIndex
                             osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
-                            playerHelper?.play(url, ua, headers, contentType = "live", streamType = "hls", channel = channel)
+                            playerHelper?.play(url, ua, headers, contentType = "live", streamType = originalStreamType, channel = channel)
                             hideEpgMenu()
                         } else {
                             val intent = android.content.Intent(this, com.mediaplayer.app.ui.player.PlayerActivity::class.java).apply {
                                 putExtra("channel_id", channel.id)
                                 putExtra("channel_name", channel.name)
                                 putExtra("stream_url", url)
-                                putExtra("stream_type", "hls")
+                                putExtra("stream_type", originalStreamType)
                                 putExtra("user_agent", ua)
                                 putExtra("custom_headers", headers)
                                 putExtra("proxy_type", channel.proxyType)
