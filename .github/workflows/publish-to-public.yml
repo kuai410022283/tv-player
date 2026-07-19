@@ -81,7 +81,7 @@ jobs:
             fi
           fi
 
-  # ── Go 多平台二进制 ───────────────────────────────────
+  # -- Go 多平台二进制 --
   go-release:
     needs: prepare-release
     if: needs.prepare-release.outputs.should_release == 'true'
@@ -90,34 +90,34 @@ jobs:
     strategy:
       matrix:
         include:
-          # ── x86 ───────────────────────────────────────────
+          # -- x86 --
           - goos: linux
             goarch: amd64
             suffix: ""
-          # ── ARM ───────────────────────────────────────────
+          # -- ARM --
           - goos: linux
             goarch: arm64
             suffix: ""
-          - goos: linux           # ARMv7l（树莓派2/3、晶晨旧款S805等）
+          - goos: linux           # ARMv7l (树莓派2/3、晶晨旧款S805等)
             goarch: arm
             goarm: "7"
             suffix: "-armv7l"
-          # ── 龙芯 Loongson ─────────────────────────────────
+          # -- 龙芯 Loongson --
           - goos: linux           # 龙芯 LoongArch A5000/3A6000，Go 1.19+
             goarch: loong64
             suffix: ""
-          # ── RISC-V ────────────────────────────────────────
-          - goos: linux           # RISC-V 64（VisionFive 2、Milk-V Pioneer 等新兴平台）
+          # -- RISC-V --
+          - goos: linux           # RISC-V 64 (VisionFive 2、Milk-V Pioneer 等)
             goarch: riscv64
             suffix: ""
-          # ── macOS ─────────────────────────────────────────
+          # -- macOS --
           - goos: darwin
             goarch: amd64
             suffix: ""
           - goos: darwin
             goarch: arm64
             suffix: ""
-          # ── Windows ──────────────────────────────────────
+          # -- Windows --
           - goos: windows
             goarch: amd64
             suffix: ""
@@ -184,7 +184,7 @@ jobs:
             backend/*.zip
           retention-days: 3
 
-  # ── Android APK ────────────────────────────────────────
+  # -- Android APK --
   android-release:
     needs: prepare-release
     if: needs.prepare-release.outputs.should_release == 'true'
@@ -201,7 +201,6 @@ jobs:
       - name: Setup Gradle (no dependency cache)
         uses: gradle/actions/setup-gradle@v3
         with:
-          # 禁用 Gradle 依赖缓存，防止旧缓存中损坏的 .aar/.so 污染 Release 构建
           cache-disabled: true
 
       - name: Set up Go
@@ -216,10 +215,13 @@ jobs:
           gomobile init
 
       - name: Build Go AAR
-        working-directory: android
         run: |
           GOPATH=$(go env GOPATH)
-          "$GOPATH/bin/gomobile" bind -target=android -androidapi 21 -o app/libs/mobile.aar ../backend/cmd/mobile
+          # 在 backend 目录下添加 golang.org/x/mobile 模块依赖（gomobile bind 需要）
+          cd backend
+          go get -tool golang.org/x/mobile/cmd/gobind
+          # 从 backend 目录编译 AAR 输出到 android/app/libs/
+          "$GOPATH/bin/gomobile" bind -target=android -androidapi 21 -o ../android/app/libs/mobile.aar ./cmd/mobile
 
       - name: Verify local native libs exist
         run: |
@@ -247,19 +249,19 @@ jobs:
 
       - name: Verify APK native lib contents
         run: |
-          echo "=== 验证 arm64-v8a Release APK 内的 native �?==="
+          echo "=== 验证 arm64-v8a Release APK 内的 native 库 ==="
           APK=$(find android/app/build/outputs/apk/release -name "*arm64-v8a*.apk" | head -1)
           if [ -z "$APK" ]; then
             APK=$(find android/app/build/outputs/apk/release -name "*all*.apk" | head -1)
           fi
-          echo "检�?APK: $APK"
+          echo "检查 APK: $APK"
           unzip -l "$APK" | grep -E "lib/|libffmpeg|libijk" | awk '{print $NF, $1}'
           echo "---"
-          # 关键验证：libffmpegJNI.so 必须存在（来自本�?.aar�?
+          # 关键验证：libffmpegJNI.so 必须存在（来自本地 .aar）
           if unzip -l "$APK" | grep -q "libffmpegJNI.so"; then
-            echo "�?libffmpegJNI.so 已打�?(FFmpeg 音频解码正常)"
+            echo "libffmpegJNI.so 已打包 (FFmpeg 音频解码正常)"
           else
-            echo "�?缺少 libffmpegJNI.so！MP2/MPEG-Audio 将无法解码！"
+            echo "缺少 libffmpegJNI.so！MP2/MPEG-Audio 将无法解码！"
             exit 1
           fi
       - name: Upload APK
@@ -269,7 +271,7 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 3
 
-  # ── Docker 镜像 ────────────────────────────────────────
+  # -- Docker 镜像 --
   docker-release:
     needs: prepare-release
     if: needs.prepare-release.outputs.should_release == 'true'
@@ -310,7 +312,7 @@ jobs:
         with:
           context: backend
           push: true
-          # 支持三大主流平台：x86软路�?NAS、ARM64(晶晨S905/树莓�?+)、ARMv7(树莓�?/3/NAS)
+          # 支持三大主流平台：x86软路由/NAS、ARM64(晶晨S905/树莓派4+)、ARMv7(树莓派2/3/NAS)
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -319,7 +321,7 @@ jobs:
           build-args: |
             VERSION=${{ needs.prepare-release.outputs.version }}
 
-  # ── 跨仓�?GitHub Release ───────────────────────────────
+  # -- 跨仓库 GitHub Release --
   github-release:
     name: Cross-Repo Release
     runs-on: ubuntu-latest
