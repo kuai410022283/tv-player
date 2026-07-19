@@ -90,7 +90,6 @@ sudo chmod 0755 mediaplayer
 | ARM64 | `mediaplayer-linux-arm64.tar.gz` | 晶晨 S905/S922X、树莓派4+、NAS、瑞芯微 RK3588 | 二进制 |
 | ARMv7l | `mediaplayer-linux-arm-armv7l.tar.gz` | 树莓派2/3、晶晨旧款 S805、老款 NAS | 二进制 |
 | 龙芯 LoongArch | `mediaplayer-linux-loong64.tar.gz` | 龙芯 3A5000 / 3A6000 及以上 | 二进制 |
-| 龙芯 MIPS | `mediaplayer-linux-mips64le.tar.gz` | 龙芯 3A1000 / 3A2000 / 3A4000（MIPS 旧款） | 二进制 |
 | RISC-V 64 | `mediaplayer-linux-riscv64.tar.gz` | VisionFive 2、Milk-V Pioneer 等新兴平台 | 二进制 |
 | macOS (Intel) | `mediaplayer-darwin-amd64.tar.gz` | Intel Mac | 二进制 |
 | macOS (Apple) | `mediaplayer-darwin-arm64.tar.gz` | Apple Silicon Mac（M1/M2/M3） | 二进制 |
@@ -108,7 +107,6 @@ sudo chmod 0755 mediaplayer
 > - `x86_64` → 下载 `amd64`
 > - `aarch64` / `arm64` → 下载 `arm64`
 > - `armv7l` → 下载 `arm-armv7l`
-> - `mips` / `mipsel` → 下载对应 MIPS 版本
 > - `loongarch64` → 下载 `loong64`
 > - `riscv64` → 下载 `riscv64`
 

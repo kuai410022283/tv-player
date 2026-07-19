@@ -106,8 +106,6 @@ jobs:
           - goos: linux           # 龙芯 LoongArch�?A5000/3A6000，Go 1.19+�?
             goarch: loong64
             suffix: ""
-          - goos: linux           # 龙芯 MIPS 旧款�?A1000-3A4000�?
-            goarch: mips64le
             suffix: ""
           # ── RISC-V ────────────────────────────────────────
           - goos: linux           # RISC-V 64（VisionFive 2、Milk-V Pioneer 等新兴平台）
