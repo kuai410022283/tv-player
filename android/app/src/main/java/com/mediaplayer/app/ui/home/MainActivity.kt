@@ -710,15 +710,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     val ua = if (lines.isNotEmpty()) lines[0].userAgent else ""
                     val headers = if (lines.isNotEmpty()) lines[0].customHeaders else ""
                     
-                    // 判断是否为直连模式：代理模式 stream_url 为相对路径（/api/v1/stream/proxy/...），
-                    // 直连模式 stream_url 为完整 URL
-                    val isDirect = lines.isNotEmpty() && (
-                        lines[0].streamUrl.startsWith("http://", ignoreCase = true) ||
-                        lines[0].streamUrl.startsWith("https://", ignoreCase = true) ||
-                        lines[0].streamUrl.startsWith("rtsp://", ignoreCase = true) ||
-                        lines[0].streamUrl.startsWith("udp://", ignoreCase = true) ||
-                        lines[0].streamUrl.startsWith("rtp://", ignoreCase = true)
-                    )
+                    // 使用服务端返回的 is_direct 字段判断模式，避免 URL 前缀误判
+                    val isDirect = channel.isDirect
                     
                     if (isDirect) {
                         // 直连模式：采用酷9方式，客户端直接根据原始 URL 生成回看 URL

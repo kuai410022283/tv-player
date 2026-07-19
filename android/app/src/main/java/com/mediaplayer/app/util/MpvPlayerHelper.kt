@@ -166,7 +166,7 @@ class MpvPlayerHelper(
             mpv?.setOptionString("start", "none")
         }
 
-        // 不强制 rtsp-transport，让 libavformat 自动协商传输协议
+        mpv?.setOptionString("rtsp-transport", "tcp")
         mpv?.setOptionString("network-timeout", "15")
         
         applyAudioPassthrough()

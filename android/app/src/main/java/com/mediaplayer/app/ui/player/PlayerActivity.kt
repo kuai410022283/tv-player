@@ -646,10 +646,11 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (coreRetryLevel < 1) {
             coreRetryLevel++
 
-            // 直连组播流（udp:///rtp:///rtsp://）首次起播已经是 MPV，
-            // 失败后再次用 MPV 重试相同地址毫无意义，直接跳到线路切换
+            // 直连组播流（udp:///rtp://）走本地 Go 代理转 HTTP，ExoPlayer 和 MPV 都依赖代理，
+            // 失败后重试无意义，直接跳到线路切换
+            // RTSP 首次起播走 ExoPlayer RtspMediaSource，失败后可尝试 MPV 容灾
             val lowerUrl = streamUrl.lowercase()
-            if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://") || lowerUrl.startsWith("rtsp://")) {
+            if (lowerUrl.startsWith("udp://") || lowerUrl.startsWith("rtp://")) {
                 coreRetryLevel = 0
                 // 重置后直接走后续的线路切换逻辑
             } else {

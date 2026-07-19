@@ -503,7 +503,9 @@ func (h *Handler) ListChannels(c *gin.Context) {
 						"epg_percent": items[i].EpgPercent,
 
 						"sort_order":      items[i].SortOrder,
+						"is_direct":       items[i].IsDirect,
 						"support_catchup": items[i].SupportCatchup,
+						"catchup_source":  items[i].CatchupSource,
 						"catchup_days":    items[i].CatchupDays,
 						"lines":           linesForThisItem,
 						"proxy_type":      items[i].ProxyType,

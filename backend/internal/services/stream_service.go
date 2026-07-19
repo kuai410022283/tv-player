@@ -1774,7 +1774,15 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 	var bytesRead int64
 
 	lastUpdate := time.Now()
+	lastFlush := time.Now()
 	var bytesSinceLastUpdate int64
+	var bytesSinceLastFlush int64
+
+	// 组播流动态 Flush 阈值：避免每次 RTP 包都 Flush 导致 HTTP chunk 碎片化
+	// 初始 64KB，根据网速动态调整（16KB ~ 512KB）
+	const minFlushThreshold = 16 * 1024
+	const maxFlushThreshold = 512 * 1024
+	flushThreshold := 64 * 1024
 
 	// 先读第一块数据，检测实际封装格式后再设置 Content-Type
 	firstChunk := true
@@ -1800,11 +1808,19 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 			if _, wErr := w.Write(buf[:n]); wErr != nil {
 				return nil
 			}
-			if canFlush {
-				flusher.Flush()
-			}
 			bytesRead += int64(n)
 			bytesSinceLastUpdate += int64(n)
+			bytesSinceLastFlush += int64(n)
+
+			// 动态 Flush：攒够阈值或超过 100ms 才刷，避免高频小包 Flush
+			now := time.Now()
+			shouldFlush := bytesSinceLastFlush >= int64(flushThreshold) ||
+				(canFlush && now.Sub(lastFlush) >= 100*time.Millisecond && bytesSinceLastFlush > 0)
+			if shouldFlush && canFlush {
+				flusher.Flush()
+				bytesSinceLastFlush = 0
+				lastFlush = now
+			}
 		}
 		if err != nil {
 			slog.Error("multicast proxy read error", "session", sessionID, "error", err)
@@ -1821,6 +1837,26 @@ func (sp *StreamProxy) serveMulticastProxy(channelID int64, clientID int64, clie
 				s.Mu.Unlock()
 			}
 			sp.mu.RUnlock()
+
+			// 动态调整 Flush 阈值：目标每秒 4~8 次 Flush
+			targetSize := int(bytesSinceLastUpdate / 6)
+			newThreshold := minFlushThreshold
+			if targetSize >= 512*1024 {
+				newThreshold = maxFlushThreshold
+			} else if targetSize >= 256*1024 {
+				newThreshold = 256 * 1024
+			} else if targetSize >= 128*1024 {
+				newThreshold = 128 * 1024
+			} else if targetSize >= 64*1024 {
+				newThreshold = 64 * 1024
+			} else if targetSize >= 32*1024 {
+				newThreshold = 32 * 1024
+			}
+			if newThreshold > maxFlushThreshold {
+				newThreshold = maxFlushThreshold
+			}
+			flushThreshold = newThreshold
+
 			bytesSinceLastUpdate = 0
 			lastUpdate = now
 		}

@@ -270,7 +270,7 @@ class ExoPlayerHelper(
                 com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Creating RtspMediaSource for: $url")
                 androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
                     .setTimeoutMs(15000)
-                    // 不强制传输协议，让 RtspMediaSource 按标准协商（TCP/UDP 均可）
+                    .setForceUseRtpTcp(true)
                     .setDebugLoggingEnabled(true)
                     .createMediaSource(mediaItem)
             } else {

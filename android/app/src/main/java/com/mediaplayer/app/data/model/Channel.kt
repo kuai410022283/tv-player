@@ -24,6 +24,7 @@ data class Channel(
     @SerializedName("epg_percent") var epgPercent: Int = 0,
 
     @SerializedName("sort_order") val sortOrder: Int = 0,
+    @SerializedName("is_direct") val isDirect: Boolean = false,
     @SerializedName("lines") val lines: List<ChannelLine> = emptyList(),
     
     // 兼容旧接口的冗余字段（避免崩溃）
