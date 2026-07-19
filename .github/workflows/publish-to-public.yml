@@ -103,9 +103,8 @@ jobs:
             goarm: "7"
             suffix: "-armv7l"
           # ── 龙芯 Loongson ─────────────────────────────────
-          - goos: linux           # 龙芯 LoongArch�?A5000/3A6000，Go 1.19+�?
+          - goos: linux           # 龙芯 LoongArch A5000/3A6000，Go 1.19+
             goarch: loong64
-            suffix: ""
             suffix: ""
           # ── RISC-V ────────────────────────────────────────
           - goos: linux           # RISC-V 64（VisionFive 2、Milk-V Pioneer 等新兴平台）
@@ -205,11 +204,28 @@ jobs:
           # 禁用 Gradle 依赖缓存，防止旧缓存中损坏的 .aar/.so 污染 Release 构建
           cache-disabled: true
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: backend/go.sum
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+
+      - name: Build Go AAR
+        working-directory: android
+        run: |
+          GOPATH=$(go env GOPATH)
+          "$GOPATH/bin/gomobile" bind -target=android -androidapi 21 -o app/libs/mobile.aar ../backend/cmd/mobile
+
       - name: Verify local native libs exist
         run: |
-          echo "=== 检查本�?.aar 文件 ==="
+          echo "=== 检查本地 .aar 文件 ==="
           ls -lh android/app/libs/
-          echo "=== 检�?jniLibs .so 文件 ==="
+          echo "=== 检查 jniLibs .so 文件 ==="
           find android/app/src/main/jniLibs -name "*.so" | sort | xargs ls -lh
 
       - name: Decode Keystore
