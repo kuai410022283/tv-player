@@ -311,7 +311,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private var activeListArea = "channels" // "groups", "channels", "epg", "track"
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        try {
+            installSplashScreen()
+        } catch (e: Throwable) {
+            // MIUI TV 等系统可能不支持 SplashScreen API，主主题无法自动切换
+            // 必须手动切回正常主题，否则 Activity 会一直停留在 SplashScreen 主题上
+            com.mediaplayer.app.util.RemoteLogger.e("MainActivity", "installSplashScreen failed: ${e.message}")
+            setTheme(R.style.Theme_MediaPlayer)
+        }
         super.onCreate(savedInstanceState)
         
         // 终极全局焦点防溢出守护神：监听由系统(如RecyclerView回收)引发的非自愿焦点跳转
@@ -1792,15 +1799,17 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         currentPlaybackState = PlaybackState.IDLE
         progressBuffering?.visibility = View.GONE
 
-        // 回看流自然结束
+        // 回看流自然结束，自动恢复直播频道
         if (currentCatchupStartTime != null) {
-            osdOverlayView?.setInfoText("回看播放完毕".toString())
-            showOsd()
             currentCatchupStartTime = null
             currentCatchupChannelIndex = -1
             val channel = allChannels.getOrNull(currentChannelIndex)
             if (channel != null) loadEpgForChannel(channel)
-            com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback completed naturally.")
+            com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback completed, restoring live channel.")
+            osdOverlayView?.setInfoText("回看播放完毕，返回直播".toString())
+            showOsd()
+            // 重新播放当前频道的直播流，自动恢复原始频道
+            playCurrentLineInTv()
             return
         }
 
