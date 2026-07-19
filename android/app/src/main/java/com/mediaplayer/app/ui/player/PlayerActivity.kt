@@ -29,6 +29,7 @@ import com.mediaplayer.app.data.repository.ChannelRepository
 import com.mediaplayer.app.service.PlaybackService
 import com.mediaplayer.app.util.DeviceUtils
 import com.mediaplayer.app.util.PlayerGestureController
+import com.mediaplayer.app.MediaPlayerApp
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max

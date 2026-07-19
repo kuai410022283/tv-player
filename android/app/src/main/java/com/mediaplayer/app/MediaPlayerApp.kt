@@ -104,7 +104,7 @@ class MediaPlayerApp : Application(), ImageLoaderFactory {
                 } catch (_: Exception) { false }
                 if (alive) return true
                 // 端口失效，清除旧端口，重新启动
-                com.mediaplayer.app.util.RemoteLogger.w("MediaPlayerApp", "Go proxy port $localProxyPort no longer alive, restarting...")
+                com.mediaplayer.app.util.RemoteLogger.e("MediaPlayerApp", "Go proxy port $localProxyPort no longer alive, restarting...")
                 localProxyPort = -1
             }
             return try {

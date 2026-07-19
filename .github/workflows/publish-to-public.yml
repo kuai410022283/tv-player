@@ -114,10 +114,7 @@ jobs:
             goarch: mipsle
             gomips: softfloat
             suffix: "-softfloat"
-          - goos: linux           # MIPS BE softfloat（Atheros AR9xxx/QCA956x，OpenWrt）
-            goarch: mips
-            gomips: softfloat
-            suffix: "-softfloat"
+          # MIPS BE (big-endian) 不支持：modernc.org/libc 无 MIPS BE 构建约束，暂不编译
           # ── RISC-V ────────────────────────────────────────
           - goos: linux           # RISC-V 64（VisionFive 2、Milk-V Pioneer 等新兴平台）
             goarch: riscv64
