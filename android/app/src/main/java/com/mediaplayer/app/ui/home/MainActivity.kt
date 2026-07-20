@@ -4192,21 +4192,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             finish()
             return
         }
-        
-        // 如果处于回看状态（时移），按返回键优先退出时移返回直播
-        if (currentCatchupStartTime != null) {
-            currentCatchupStartTime = null
-            currentCatchupChannelIndex = -1
-            osdOverlayView?.setVodMode(false)
-            osdOverlayView?.stopVodProgressUpdater()
-            
-            val channel = allChannels.getOrNull(currentChannelIndex)
-            if (channel != null) loadEpgForChannel(channel)
-            osdOverlayView?.setInfoText("已退出回看，返回直播".toString())
-            showOsd()
-            playCurrentLineInTv()
-            return
-        }
 
         val layoutAboutDevice = findViewById<View>(R.id.layoutAboutDevice)
         if (layoutAboutDevice?.visibility == View.VISIBLE) {
