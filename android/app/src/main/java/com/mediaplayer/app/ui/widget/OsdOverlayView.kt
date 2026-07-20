@@ -210,7 +210,7 @@ class OsdOverlayView @JvmOverloads constructor(
     fun setNextEpgText(nextEpgStr: String) {
         if (nextEpgStr.isNotEmpty()) {
             tvOsdNextEpg.text = nextEpgStr
-            tvOsdNextEpg.visibility = View.VISIBLE
+            tvOsdNextEpg.visibility = if (isVodMode) View.GONE else View.VISIBLE
             tvOsdNextEpg.isSelected = true
         } else {
             tvOsdNextEpg.text = ""
@@ -221,10 +221,10 @@ class OsdOverlayView @JvmOverloads constructor(
     fun setEpgProgress(progress: Int) {
         if (progress in 1..100) {
             progressEpg.progress = progress
-            progressEpg.visibility = View.VISIBLE
+            progressEpg.visibility = if (isVodMode) View.GONE else View.VISIBLE
         } else {
             progressEpg.progress = 0
-            progressEpg.visibility = View.INVISIBLE
+            progressEpg.visibility = if (isVodMode) View.GONE else View.INVISIBLE
         }
     }
 
