@@ -176,6 +176,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private var multicastLock: WifiManager.MulticastLock? = null
 
+    // 操控方案：0=现代(默认), 1=传统
+    private var controlScheme = Prefs.CONTROL_SCHEME_MODERN
+    private var isLongPressHandled = false // 防重叠拦截标志位
+
     // VOD 专业快进/快退状态
     private var vodSeekActive = false          // 快进或快退进行中
     private var vodSeekDirection = 0           // -1=快退, 1=快进
@@ -288,6 +292,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
     }
 
+    private var lastZappingOpenTime: Long = 0L
 
     private val hideZappingRunnable = Runnable { 
         layoutZappingMenu?.visibility = View.GONE
@@ -397,6 +402,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val serverUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
+        controlScheme = prefs.getInt(Prefs.KEY_CONTROL_SCHEME, Prefs.CONTROL_SCHEME_MODERN)
         ApiClient.init(serverUrl)
         
         ChannelMemoryManager.init(this)
@@ -506,7 +512,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
             override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
                 var menuHidden = false
-                if (layoutZappingMenu?.visibility == View.VISIBLE) {
+                
+                // 防抖：如果是 onSingleTapUp 刚打开的菜单，或者遥控器刚打开的菜单，不要因为 300ms 后的此回调将其错误关闭
+                val justOpened = (System.currentTimeMillis() - lastZappingOpenTime) < 500
+
+                if (layoutZappingMenu?.visibility == View.VISIBLE && !justOpened) {
                     uiHandler.removeCallbacks(hideZappingRunnable)
                     hideZappingRunnable.run()
                     menuHidden = true
@@ -528,8 +538,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     return true
                 }
 
-                // 单点：显示 OSD（5s 自动隐藏）
-                showOsd()
+                // 因为 onSingleTapUp 里已经处理了唤出逻辑，如果这里再次调用唤出（且不关闭面板）
+                // 就会重复唤出。其实这里不需要做什么了，因为真正唤出面板的操作都在 onSingleTapUp 完成。
                 return true
             }
 
@@ -589,8 +599,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     if (osdOverlayView?.isOsdVisible() == true) {
                         toggleVodPauseResume()
                     }
+                    showOsd()
+                } else {
+                    // 修正疏漏：单点屏幕时，回看模式必须一致呼出 OSD
+                    if (controlScheme == Prefs.CONTROL_SCHEME_TRADITIONAL && currentCatchupStartTime == null) {
+                        showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                    } else {
+                        showOsd()
+                    }
                 }
-                showOsd()
                 return true
             }
 
@@ -735,6 +752,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             currentCatchupStartTime = prog.startTime
                             currentCatchupChannelIndex = currentChannelIndex
                             osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
+                            osdOverlayView?.setVodMode(true)
+                            osdOverlayView?.startVodProgressUpdater(
+                                positionProvider = { playerHelper?.getTime() ?: 0L },
+                                durationProvider = { playerHelper?.getDuration() ?: 0L }
+                            )
                             playerHelper?.play(catchupUrl, ua, headers, contentType = "live", streamType = originalStreamType, channel = channel)
                             hideEpgMenu()
                         } else {
@@ -757,6 +779,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             currentCatchupStartTime = prog.startTime
                             currentCatchupChannelIndex = currentChannelIndex
                             osdOverlayView?.setInfoText("回看: ${prog.title}".toString())
+                            osdOverlayView?.setVodMode(true)
+                            osdOverlayView?.startVodProgressUpdater(
+                                positionProvider = { playerHelper?.getTime() ?: 0L },
+                                durationProvider = { playerHelper?.getDuration() ?: 0L }
+                            )
                             playerHelper?.play(url, ua, headers, contentType = "live", streamType = originalStreamType, channel = channel)
                             hideEpgMenu()
                         } else {
@@ -960,6 +987,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val btnSettingsGestureVolume = findViewById<View>(R.id.btnSettingsGestureVolume)
         val tvSettingsGestureVolumeValue = findViewById<TextView>(R.id.tvSettingsGestureVolumeValue)
         
+        val btnSettingsControlScheme = findViewById<View>(R.id.btnSettingsControlScheme)
+        val tvSettingsControlSchemeValue = findViewById<TextView>(R.id.tvSettingsControlSchemeValue)
+        
         val btnSettingsGlobalProgress = findViewById<View>(R.id.btnSettingsGlobalProgress)
         val tvSettingsGlobalProgressValue = findViewById<TextView>(R.id.tvSettingsGlobalProgressValue)
         
@@ -1089,9 +1119,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         fun updateGestureBrightnessText(enabled: Boolean) {
             tvSettingsGestureBrightnessValue?.text = if (enabled) "开" else "关"
         }
-        
+
         fun updateGestureVolumeText(enabled: Boolean) {
             tvSettingsGestureVolumeValue?.text = if (enabled) "开" else "关"
+        }
+
+        fun updateControlSchemeText(scheme: Int) {
+            tvSettingsControlSchemeValue?.text = if (scheme == Prefs.CONTROL_SCHEME_TRADITIONAL) "传统" else "现代"
         }
         
         
@@ -1137,6 +1171,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
         updateGestureVolumeText(currentGestureVolume)
+        controlScheme = prefs.getInt(Prefs.KEY_CONTROL_SCHEME, Prefs.CONTROL_SCHEME_MODERN)
+        updateControlSchemeText(controlScheme)
         
         btnSettingsGestureBrightness?.setOnClickListener {
             currentGestureBrightness = !currentGestureBrightness
@@ -1148,6 +1184,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentGestureVolume = !currentGestureVolume
             updateGestureVolumeText(currentGestureVolume)
             prefs.edit().putBoolean(Prefs.KEY_GESTURE_VOLUME, currentGestureVolume).apply()
+        }
+        
+        btnSettingsControlScheme?.setOnClickListener {
+            controlScheme = if (controlScheme == Prefs.CONTROL_SCHEME_MODERN) Prefs.CONTROL_SCHEME_TRADITIONAL else Prefs.CONTROL_SCHEME_MODERN
+            updateControlSchemeText(controlScheme)
+            prefs.edit().putInt(Prefs.KEY_CONTROL_SCHEME, controlScheme).commit()
         }
         
         btnSettingsAudioPassthrough?.setOnClickListener {
@@ -1839,6 +1881,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val channel = allChannels.getOrNull(currentChannelIndex)
             if (channel != null) loadEpgForChannel(channel)
             com.mediaplayer.app.util.RemoteLogger.i("Player", "Catchup playback completed, restoring live channel.")
+            
+            // 清理因为伪装成 VOD 而设置的状态
+            osdOverlayView?.setVodMode(false)
+            osdOverlayView?.stopVodProgressUpdater()
+            
             osdOverlayView?.setInfoText("回看播放完毕，返回直播".toString())
             showOsd()
             // 重新播放当前频道的直播流，自动恢复原始频道
@@ -2325,6 +2372,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
      * 优先使用服务端下发的 content_type 字段，兜底用 stream_type 推断
      */
     private fun isCurrentChannelVod(): Boolean {
+        // 回看模式(时移)在 OSD 及操作上完全视为 VOD
+        if (currentCatchupStartTime != null) return true
+        
         val channel = allChannels.getOrNull(currentChannelIndex) ?: return false
         val lines = channel.getLinesSafely()
         val line = lines.getOrNull(currentLineIndex) ?: return false
@@ -2682,6 +2732,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         channelAdapter = ChannelAdapter(
             isTvMode = isTvMode,
             onClick = { channel, _ ->
+                    // 防抖：防止遥控器双发或刚打开列表时触发误点，导致菜单刚打开就自动关闭
+                    if (System.currentTimeMillis() - lastZappingOpenTime < 400) {
+                        return@ChannelAdapter
+                    }
                     val realIndex = allChannels.indexOf(channel)
                     playTvChannel(realIndex)
                     uiHandler.postDelayed(hideZappingRunnable, 500)
@@ -3464,6 +3518,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         tvGroupsRv?.descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
 
         layoutZappingMenu?.visibility = View.VISIBLE
+        lastZappingOpenTime = System.currentTimeMillis()
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "ZappingMenu VISIBLE")
         uiHandler.removeCallbacks(hideZappingRunnable)
         uiHandler.postDelayed(hideZappingRunnable, 10000)
@@ -3734,7 +3789,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     if (isViewDescendantOf(focusedView, tvChannelsRv)) activeListArea = "groups"
                     else if (isViewDescendantOf(focusedView, rvEpgList)) activeListArea = "channels"
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    if (isViewDescendantOf(focusedView, tvGroupsRv)) activeListArea = "channels"
+                    if (isViewDescendantOf(focusedView, tvGroupsRv)) {
+                        if (filteredChannels.isNotEmpty()) {
+                            activeListArea = "channels"
+                        } else {
+                            return true
+                        }
+                    }
                     else if (isViewDescendantOf(focusedView, tvChannelsRv)) activeListArea = "epg"
                 }
             }
@@ -3838,8 +3899,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         if (isCurrentChannelVod() && osdOverlayView?.isOsdVisible() == true) {
                             // 不拦截，传递到 onKeyUp 处理 toggle
                         } else {
-                            com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for OSD")
-                            showOsd()
+                            // 修正疏漏：回看模式下拦截 OK 必须显示 OSD
+                            if (controlScheme == Prefs.CONTROL_SCHEME_TRADITIONAL && currentCatchupStartTime == null) {
+                                com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for Zapping")
+                                showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                            } else {
+                                com.mediaplayer.app.util.RemoteLogger.i("KeyEvent", "OK on channel item - intercepted for OSD")
+                                showOsd()
+                            }
                             return true
                         }
                     }
@@ -3860,7 +3927,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_INFO) {
-            if (isTrackPanelOpen) hideTrackSelectionPanel() else showTrackPanel("audio")
+            if (controlScheme == Prefs.CONTROL_SCHEME_TRADITIONAL && !isCurrentChannelVod() && currentCatchupStartTime == null) {
+                // 传统方案且为 LIVE 模式，INFO 呼出 OSD
+                showOsd()
+            } else {
+                if (isTrackPanelOpen) hideTrackSelectionPanel() else showTrackPanel("audio")
+            }
             return true
         }
 
@@ -3944,6 +4016,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             } else {
                                 groupsRv.requestFocus()
                             }
+                            return true
+                        } else if (groupsRv != null && groupsRv.hasFocus()) {
+                            // 焦点已经在组别列表，按左键关闭频道列表
+                            uiHandler.removeCallbacks(hideZappingRunnable)
+                            hideZappingRunnable.run()
                             return true
                         }
                     } else {
@@ -4049,6 +4126,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             if (!isZappingVisible && !isEpgVisible && !isSettingsVisible && !isOsdVisible && !isLineVisible) {
                 // 长按 OK 键呼出手动切源菜单
+                isLongPressHandled = true
                 showLineSelectionMenu()
                 return true
             }
@@ -4072,7 +4150,17 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val isLineVisible = layoutLineMenu?.visibility == View.VISIBLE
 
             if (!isMenuVisible && !isSettingsVisible && !isEpgVisible && !isLineVisible && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
-                if (event?.isTracking == true && !event.isCanceled) {
+                if (isLongPressHandled) {
+                    isLongPressHandled = false
+                    return true
+                }
+                if (event?.isTracking == true) {
+                    if (isInputtingChannel) {
+                        // 修正疏漏 1：数字换台期间按 OK，应立即确认换台，而不是呼出 OSD 或 Zapping
+                        uiHandler.removeCallbacks(channelInputRunnable)
+                        channelInputRunnable.run()
+                        return true
+                    }
                     if (isCurrentChannelVod()) {
                         // VOD：第一次 OK 显示 OSD，OSD 已显示时再按才暂停/恢复
                         if (osdOverlayView?.isOsdVisible() == true) {
@@ -4080,7 +4168,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         }
                         showOsd()
                     } else {
-                        showOsd()
+                        // LIVE / 回看
+                        // 修正疏漏 2：回看模式（currentCatchupStartTime != null）下必须保持跨方案一致，只呼出 OSD
+                        if (controlScheme == Prefs.CONTROL_SCHEME_TRADITIONAL && currentCatchupStartTime == null) {
+                            showZappingMenu(focusOnGroups = false, resetToPlaying = true)
+                        } else {
+                            showOsd()
+                        }
                     }
                 }
                 return true
@@ -4099,6 +4193,21 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             return
         }
         
+        // 如果处于回看状态（时移），按返回键优先退出时移返回直播
+        if (currentCatchupStartTime != null) {
+            currentCatchupStartTime = null
+            currentCatchupChannelIndex = -1
+            osdOverlayView?.setVodMode(false)
+            osdOverlayView?.stopVodProgressUpdater()
+            
+            val channel = allChannels.getOrNull(currentChannelIndex)
+            if (channel != null) loadEpgForChannel(channel)
+            osdOverlayView?.setInfoText("已退出回看，返回直播".toString())
+            showOsd()
+            playCurrentLineInTv()
+            return
+        }
+
         val layoutAboutDevice = findViewById<View>(R.id.layoutAboutDevice)
         if (layoutAboutDevice?.visibility == View.VISIBLE) {
             hideAboutDevice()

@@ -86,5 +86,8 @@ object Prefs {
     const val TIME_SHOW_MODE_EVERY_HOUR = 2
     const val TIME_SHOW_MODE_HALF_HOUR = 3
 
-
+    // 操控方案：0=现代(默认, 信息优先), 1=传统(频道优先)
+    const val KEY_CONTROL_SCHEME = "control_scheme"
+    const val CONTROL_SCHEME_MODERN = 0
+    const val CONTROL_SCHEME_TRADITIONAL = 1
 }
