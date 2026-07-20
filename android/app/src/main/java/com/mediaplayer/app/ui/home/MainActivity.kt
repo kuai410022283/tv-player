@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     // ── Data ──
     private var groups = listOf<ChannelGroup>()
+    private var baseGroups = listOf<ChannelGroup>()
     private var allChannels: MutableList<Channel> = mutableListOf()
     private var channelIndexById = HashMap<Long, Channel>() // ID 索引，加速查找
     private var channelsByGroup: Map<Long, List<Channel>> = emptyMap()
@@ -2745,9 +2746,20 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val msg = if (isAdded) "已添加到收藏" else "已取消收藏"
                 android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
                 
+                refreshGroupsList()
+                
                 if (currentGroupId == -1L) {
-                    // 如果在收藏分组内取消收藏，立即移除并刷新列表
-                    filterChannels(scrollToTop = false)
+                    if (com.mediaplayer.app.data.FavoriteManager.getFavorites().isEmpty()) {
+                        // 最后一个收藏被移除了，收藏分组消失，强制将焦点逃生到"全部"分组
+                        currentGroupId = 0L
+                        groupAdapter.setSelected(0L)
+                        // 立即让左侧接管焦点，避免在消失的右侧列表中游离
+                        tvGroupsRv?.requestFocus()
+                        filterChannels(scrollToTop = true)
+                    } else {
+                        // 如果在收藏分组内取消收藏，立即移除并刷新列表
+                        filterChannels(scrollToTop = false)
+                    }
                 } else {
                     // 在其他分组内，仅局部刷新心形图标状态
                     channelAdapter.notifyItemChanged(position, "fav_update")
@@ -3182,6 +3194,19 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     }
 
 
+    private fun refreshGroupsList() {
+        val hasFavorites = com.mediaplayer.app.data.FavoriteManager.getFavorites().isNotEmpty()
+        val newGroups = mutableListOf<ChannelGroup>()
+        if (hasFavorites) {
+            newGroups.add(ChannelGroup(id = -1, name = "收藏", icon = ""))
+        }
+        newGroups.add(ChannelGroup(id = 0, name = "全部"))
+        newGroups.addAll(baseGroups)
+        
+        groups = newGroups
+        groupAdapter.submitList(groups)
+    }
+
     private fun loadData() {
         if (isLoadingData) return
         isLoadingData = true
@@ -3190,12 +3215,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             try {
                 // 1. 先拉分组列表
                 val realGroups = repo.getGroups().getOrElse { emptyList() }
-                groups = listOf(
-                    ChannelGroup(id = -1, name = "收藏", icon = ""),
-                    ChannelGroup(id = 0, name = "全部")
-                ) + realGroups
-                groupAdapter.submitList(groups)
-                groupAdapter.setSelected(0)
+                baseGroups = realGroups
+                
+                withContext(Dispatchers.Main) {
+                    refreshGroupsList()
+                    groupAdapter.setSelected(0)
+                }
 
                 val groupOrderMap = realGroups.mapIndexed { index, group -> group.id to index }.toMap()
 
