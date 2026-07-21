@@ -770,7 +770,7 @@ func canSupportCatchup(streamURL, catchupSource string) bool {
 	return false
 }
 
-func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
+func generateSingleCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
 	start := time.Unix(startUnix, 0).In(time.Local)
 	end := time.Unix(endUnix, 0).In(time.Local)
 	durationSec := endUnix - startUnix
@@ -888,6 +888,27 @@ func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int6
 	}
 
 	return streamURL + separator + source
+}
+
+// generateCatchupURL 包装了 generateSingleCatchupURL，支持处理带 "#" 的多线路流地址。
+func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
+	if !strings.Contains(streamURL, "#") {
+		return generateSingleCatchupURL(streamURL, catchupSource, startUnix, endUnix)
+	}
+
+	rawURLs := strings.Split(streamURL, "#")
+	var results []string
+	for _, u := range rawURLs {
+		trimmed := strings.TrimSpace(u)
+		if trimmed == "" {
+			continue
+		}
+		results = append(results, generateSingleCatchupURL(trimmed, catchupSource, startUnix, endUnix))
+	}
+	if len(results) == 0 {
+		return streamURL
+	}
+	return strings.Join(results, "#")
 }
 
 // extractStreamID 从 URL 路径中提取数字 ID（用于 XC provider 的 {id} 占位符）

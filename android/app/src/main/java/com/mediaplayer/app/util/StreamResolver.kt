@@ -56,7 +56,7 @@ object StreamResolver {
      * @param catchupDays 回看天数限制（0 表示不限制）
      * @return 回看 URL，如果 catchupDays > 0 且 startUnix 超出范围则返回原始 URL
      */
-    fun generateCatchupUrl(streamUrl: String, catchupSource: String, startUnix: Long, endUnix: Long, catchupDays: Int = 0): String {
+    fun generateSingleCatchupUrl(streamUrl: String, catchupSource: String, startUnix: Long, endUnix: Long, catchupDays: Int = 0): String {
         // catchup-days 范围校验
         if (catchupDays > 0 && startUnix > 0) {
             val earliest = System.currentTimeMillis() / 1000 - catchupDays * 86400L
@@ -207,6 +207,26 @@ object StreamResolver {
 
         // 未知模式，返回原始 URL
         return streamUrl
+    }
+
+    /**
+     * generateCatchupUrl 包装了 generateSingleCatchupUrl，支持处理带 "#" 的多线路流地址。
+     */
+    fun generateCatchupUrl(streamUrl: String, catchupSource: String, startUnix: Long, endUnix: Long, catchupDays: Int = 0): String {
+        if (!streamUrl.contains("#")) {
+            return generateSingleCatchupUrl(streamUrl, catchupSource, startUnix, endUnix, catchupDays)
+        }
+        
+        val rawUrls = streamUrl.split("#")
+        val results = mutableListOf<String>()
+        for (u in rawUrls) {
+            val trimmed = u.trim()
+            if (trimmed.isEmpty()) continue
+            results.add(generateSingleCatchupUrl(trimmed, catchupSource, startUnix, endUnix, catchupDays))
+        }
+        
+        if (results.isEmpty()) return streamUrl
+        return results.joinToString("#")
     }
 
     /**
