@@ -1654,17 +1654,18 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 authFlowManager.startAuthFlow()
             }
             val qrPort = configWebServer?.actualPort ?: 9528
-            val qrUrl = "http://$ip:$qrPort/"
-            val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+            val webUrls = com.mediaplayer.app.util.NetworkUtils.getAvailableWebUrls(qrPort)
+            val primaryUrl = webUrls.firstOrNull() ?: "http://$ip:$qrPort/"
+            val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(primaryUrl, 400)
             ivQrCode?.setImageBitmap(bitmap)
-            tvQrConfigHint?.text = "手机扫码快速配置服务器\n或者访问: $qrUrl"
+            tvQrConfigHint?.text = "手机扫码配置服务器\n或者访问: $primaryUrl"
             tvQrConfigHint?.setOnClickListener {
                 try {
-                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(primaryUrl))
                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } catch (e: Throwable) {
+                    Toast.makeText(this@MainActivity, "当前设备未安装浏览器，请使用手机扫码访问", Toast.LENGTH_SHORT).show()
                 }
             }
             layoutQrConfig?.visibility = View.VISIBLE
@@ -2977,17 +2978,18 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
                 
                 val qrPort = configWebServer?.actualPort ?: 9528
-                val qrUrl = "http://$ip:$qrPort/"
-                val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(qrUrl, 400)
+                val webUrls = com.mediaplayer.app.util.NetworkUtils.getAvailableWebUrls(qrPort)
+                val primaryUrl = webUrls.firstOrNull() ?: "http://$ip:$qrPort/"
+                val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(primaryUrl, 400)
                 ivAuthQrCode?.setImageBitmap(bitmap)
-                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $qrUrl"
+                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $primaryUrl"
                 tvAuthQrConfigHint?.setOnClickListener {
                     try {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrUrl))
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(primaryUrl))
                         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                         startActivity(intent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    } catch (e: Throwable) {
+                        Toast.makeText(this@MainActivity, "当前设备未安装浏览器，请使用手机扫码访问", Toast.LENGTH_SHORT).show()
                     }
                 }
                 layoutAuthQrConfig?.visibility = View.VISIBLE
