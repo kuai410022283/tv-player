@@ -22,6 +22,9 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
 
     private static final int STREAM_TYPE_AV3A_PRIVATE_1 = 0x8A;
     private static final int STREAM_TYPE_AV3A_PRIVATE_2 = 129; // 0x81
+    private static final int STREAM_TYPE_AV3A_STANDARD = 0xD5;
+    private static final int STREAM_TYPE_AV3A_ALT1 = 0xD1;
+    private static final int STREAM_TYPE_AV3A_ALT2 = 0xDA;
 
     // Cache: streamType -> isAv3a (once sniffed).  Key present means "sniffed, result known".
     private static final ConcurrentHashMap<Integer, Boolean> sniffCache = new ConcurrentHashMap<>();
@@ -42,6 +45,7 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
     @Override
     public TsPayloadReader createPayloadReader(int streamType, TsPayloadReader.EsInfo esInfo) {
         if (streamType == STREAM_TYPE_AV3A_PRIVATE_1 || streamType == STREAM_TYPE_AV3A_PRIVATE_2
+                || streamType == STREAM_TYPE_AV3A_STANDARD || streamType == STREAM_TYPE_AV3A_ALT1 || streamType == STREAM_TYPE_AV3A_ALT2
                 || streamType == 0x06 || streamType == 0x81) {
 
             // If we already sniffed this stream type and it was NOT AV3A, skip sniffing

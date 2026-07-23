@@ -280,8 +280,11 @@ class ExoPlayerHelper(
             builder.build()
         }
         
-        // RTSP 流需要使用 RtspMediaSource，而非默认的 ProgressiveMediaSource
-        val isRtsp = url.lowercase().startsWith("rtsp://")
+        // RTSP 流需要使用 RtspMediaSource，HLS 流需使用带有 Av3aHlsExtractorFactory 的 HlsMediaSource
+        val lowerUrlForType = url.lowercase()
+        val isRtsp = lowerUrlForType.startsWith("rtsp://")
+        val isHls = lowerUrlForType.contains(".m3u8") || mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8 || ct == "hls" || st == "hls"
+        
         val mediaSource = try {
             if (isRtsp) {
                 com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Creating RtspMediaSource for: $url")
@@ -289,6 +292,11 @@ class ExoPlayerHelper(
                     .setTimeoutMs(15000)
                     .setForceUseRtpTcp(true)
                     .setDebugLoggingEnabled(true)
+                    .createMediaSource(mediaItem)
+            } else if (isHls) {
+                com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Creating HlsMediaSource with Av3aHlsExtractorFactory for: $url")
+                androidx.media3.exoplayer.hls.HlsMediaSource.Factory(defaultDataSourceFactory)
+                    .setExtractorFactory(androidx.media3.extractor.ts.Av3aHlsExtractorFactory())
                     .createMediaSource(mediaItem)
             } else {
                 mediaSourceFactory.createMediaSource(mediaItem)
