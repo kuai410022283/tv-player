@@ -48,8 +48,7 @@ object PlayerNetworkHelper {
                 .retryOnConnectionFailure(true)
                 // 连接池复用
                 .connectionPool(connectionPool)
-                // DNS缓存 + IPv4 优先：减少DNS查询，避免 IPv6 Happy Eyeballs 延迟
-                // 部分设备（如小米电视）自定义 DNS 可能导致闪退，加 try-catch 保护
+                // DNS策略拦截器：根据设置项 (自动/优先IPv4/优先IPv6) 动态排列 DNS 解析逻辑
                 .apply {
                     try {
                         dns(object : okhttp3.Dns {
@@ -58,9 +57,22 @@ object PlayerNetworkHelper {
                                 return try {
                                     cache.getOrPut(hostname) {
                                         val all = okhttp3.Dns.SYSTEM.lookup(hostname)
-                                        val ipv4 = all.filter { it is Inet4Address }
-                                        val ipv6 = all.filter { it !is Inet4Address }
-                                        ipv4 + ipv6
+                                        val prefs = com.mediaplayer.app.MediaPlayerApp.instance.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
+                                        val policy = prefs.getInt(com.mediaplayer.app.Prefs.KEY_DNS_POLICY, com.mediaplayer.app.Prefs.DNS_POLICY_AUTO)
+                                        
+                                        when (policy) {
+                                            com.mediaplayer.app.Prefs.DNS_POLICY_IPV4_FIRST -> {
+                                                val ipv4 = all.filter { it is Inet4Address }
+                                                val ipv6 = all.filter { it !is Inet4Address }
+                                                ipv4 + ipv6
+                                            }
+                                            com.mediaplayer.app.Prefs.DNS_POLICY_IPV6_FIRST -> {
+                                                val ipv4 = all.filter { it is Inet4Address }
+                                                val ipv6 = all.filter { it !is Inet4Address }
+                                                ipv6 + ipv4
+                                            }
+                                            else -> all // 自动：使用系统默认顺序
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     okhttp3.Dns.SYSTEM.lookup(hostname)
@@ -68,7 +80,7 @@ object PlayerNetworkHelper {
                             }
                         })
                     } catch (e: Exception) {
-                        // 设备不支持 IPv4 优先策略，使用系统默认 DNS
+                        // 设备不支持自定义 DNS 策略，降级为系统默认 DNS
                     }
                 }
 
@@ -102,6 +114,14 @@ object PlayerNetworkHelper {
             playerOkHttpClient = builder.build()
         }
         return playerOkHttpClient!!
+    }
+
+    /**
+     * 重置播放器 OkHttpClient 单例（网络 DNS 策略变更时调用）
+     */
+    fun reset() {
+        playerOkHttpClient = null
+        proxyClientCache.clear()
     }
 
     /**

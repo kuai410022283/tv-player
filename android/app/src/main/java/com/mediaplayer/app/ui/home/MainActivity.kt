@@ -1128,10 +1128,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         fun updateControlSchemeText(scheme: Int) {
             tvSettingsControlSchemeValue?.text = if (scheme == Prefs.CONTROL_SCHEME_TRADITIONAL) "传统" else "现代"
         }
-        
-        
-        
-        
+
+        fun updateDnsPolicyText(policy: Int) {
+            findViewById<TextView>(R.id.tvSettingsDnsPolicyValue)?.text = when (policy) {
+                Prefs.DNS_POLICY_IPV4_FIRST -> "优先 IPv4"
+                Prefs.DNS_POLICY_IPV6_FIRST -> "优先 IPv6"
+                else -> "自动"
+            }
+        }
+
         currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
         currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
         // 整理内核序号，对于未知的核心序号（非 0, 1, 2, 3）自动回退到智能切换
@@ -1148,6 +1153,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
         var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
         var currentGestureVolume = prefs.getBoolean(Prefs.KEY_GESTURE_VOLUME, true)
+        var currentDnsPolicy = prefs.getInt(Prefs.KEY_DNS_POLICY, Prefs.DNS_POLICY_AUTO)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
@@ -1172,9 +1178,24 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
         updateGestureVolumeText(currentGestureVolume)
+        updateDnsPolicyText(currentDnsPolicy)
         controlScheme = prefs.getInt(Prefs.KEY_CONTROL_SCHEME, Prefs.CONTROL_SCHEME_MODERN)
         updateControlSchemeText(controlScheme)
         
+        findViewById<View>(R.id.btnSettingsDnsPolicy)?.setOnClickListener {
+            currentDnsPolicy = (currentDnsPolicy + 1) % 3
+            updateDnsPolicyText(currentDnsPolicy)
+            prefs.edit().putInt(Prefs.KEY_DNS_POLICY, currentDnsPolicy).apply()
+            com.mediaplayer.app.util.PlayerNetworkHelper.reset()
+            com.mediaplayer.app.data.api.ApiClient.resetOkHttpClient()
+            val text = when (currentDnsPolicy) {
+                Prefs.DNS_POLICY_IPV4_FIRST -> "优先 IPv4"
+                Prefs.DNS_POLICY_IPV6_FIRST -> "优先 IPv6"
+                else -> "自动"
+            }
+            Toast.makeText(this, "网络 DNS 策略更新为：$text", Toast.LENGTH_SHORT).show()
+        }
+
         btnSettingsGestureBrightness?.setOnClickListener {
             currentGestureBrightness = !currentGestureBrightness
             updateGestureBrightnessText(currentGestureBrightness)

@@ -26,6 +26,12 @@ object Prefs {
     const val KEY_NETWORK_CACHE = "network_cache_ms"
     const val DEFAULT_NETWORK_CACHE = 0
     
+    // 网络 DNS 策略：0=自动(系统默认), 1=优先 IPv4, 2=优先 IPv6
+    const val KEY_DNS_POLICY = "dns_policy"
+    const val DNS_POLICY_AUTO = 0
+    const val DNS_POLICY_IPV4_FIRST = 1
+    const val DNS_POLICY_IPV6_FIRST = 2
+    
     // 解码模式：0=自动, 1=强制硬解, 2=强制软解
     const val KEY_DECODER_MODE = "decoder_mode"
     const val DECODER_MODE_AUTO = 0
