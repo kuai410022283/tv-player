@@ -1271,6 +1271,7 @@ func (sp *StreamProxy) openStreamTarget(ctx context.Context, targetURL string, u
 
 		// 动态追加多个不同特征的兜底伪装
 		userAgents = append(userAgents,
+			"okhttp/4.12.0", // 标准 OkHttp 引擎特征（适用于部分防爬/IPTV网关）
 			"Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36", // 移动端高频 Chrome
 			"AppleCoreMedia/1.0.0.19G82 (Apple TV; U; CPU OS 15_6 like Mac OS X; en_us)",                                                  // Apple 原生 HLS 引擎，对于部分严格校验的 HLS/m3u8 源有奇效
 			"ExoPlayerLib/2.19.1 (Linux; Android 14) ExoPlayerLib/2.19.1",                                                                 // 安卓标准播放引擎

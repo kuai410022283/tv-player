@@ -288,7 +288,9 @@ class ExoPlayerHelper(
         val mediaSource = try {
             if (isRtsp) {
                 com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Creating RtspMediaSource for: $url")
+                val rtspUserAgent = if (userAgent.isNotEmpty()) userAgent else "okhttp/4.12.0"
                 androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
+                    .setUserAgent(rtspUserAgent)
                     .setTimeoutMs(15000)
                     .setForceUseRtpTcp(true)
                     .setDebugLoggingEnabled(true)
