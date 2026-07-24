@@ -103,22 +103,22 @@ class MpvPlayerHelper(
     private fun applyPlayerOptions(url: String, startTimeMs: Long) {
         val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
         if (enableHw) {
-            // 核心修复：摸鱼和酷9 都使用的是 mediacodec（直通渲染），而你之前用的是 mediacodec-copy。
-            // mediacodec-copy 会把解码后的画面强制拷贝回 CPU 内存，这在电视盒子上是导致严重卡顿的元凶！
+            // 核心配置：使用 mediacodec 直通渲染硬解，避免 mediacodec-copy 的内存拷贝性能消耗
             mpv?.setOptionString("hwdec", "mediacodec")
             mpv?.setOptionString("hwdec-codecs", "all")
         } else {
             mpv?.setOptionString("hwdec", "no")
         }
 
-        // 引入酷9与摸鱼的通用优化策略
+        // 高级播放优化策略
         mpv?.setOptionString("profile", "fast")
         mpv?.setOptionString("vo", "gpu")
         mpv?.setOptionString("gpu-context", "android")
         mpv?.setOptionString("opengl-es", "yes")
+        mpv?.setOptionString("ao", "audiotrack,opensles")            // 优先 AudioTrack 输出，兼容 OpenSL ES，解决部分盒子声音丢失
+        mpv?.setOptionString("audio-set-media-role", "yes")          // 规范音频角色，防止抢占系统音频通道
+        mpv?.setOptionString("video-latency-hacks", "yes")           // 开启低延迟 hack 优化，提升起播秒开速度
         
-        // 开启反交错，彻底解决 IPTV (1080i) 体育频道高速运动画面的横向拉丝/梳齿效应
-        mpv?.setOptionString("deinterlace", "yes")
         // 软解多线程优化
         mpv?.setOptionString("vd-lavc-threads", "4")
         
@@ -136,24 +136,29 @@ class MpvPlayerHelper(
         val isVod = lowerUrl.contains(".mp4") || lowerUrl.contains(".mkv") || lowerUrl.contains(".avi")
         val isLiveStream = !isHls && !isVod
 
-        if (isLiveStream) {
-            // 直播流（代理、TS、RTP/UDP组播、无后缀防盗链）
-            // 核心策略：永不暂停读取 (cache-pause=no)，超大缓存 (250MB)，防止因组播或代理网络波动导致的 EOF 断流
-            mpv?.setOptionString("cache", "yes")
-            mpv?.setOptionString("cache-pause", "no")
-            mpv?.setOptionString("demuxer-max-bytes", "250MiB")
-            mpv?.setOptionString("demuxer-max-back-bytes", "50MiB")
-            mpv?.setOptionString("demuxer-lavf-o", "probesize=5000000,analyzeduration=5000000") // 提升秒开速度
-        } else {
-            // HLS 和 VOD 点播文件
-            // 核心策略：允许缓存暂停 (cache-pause=yes)，标准缓存 (128MB)，保证网络差时暂停缓冲而不是强制掉帧播放
-            mpv?.setOptionString("cache", "yes")
-            mpv?.setOptionString("cache-pause", "yes")
-            mpv?.setOptionString("demuxer-max-bytes", "128MiB")
-            mpv?.setOptionString("demuxer-max-back-bytes", "32MiB")
-            mpv?.setOptionString("demuxer-lavf-o", "") // 使用默认探测
+        // 动态阶梯缓冲区策略（16MB / 32MB / 64MB / 128MB / 256MB）
+        // 自动根据用户的 network_cache_ms 设置与流媒体类型计算最适合的缓冲空间
+        val cacheSec = currentCacheMs / 1000
+        val baseMb = when {
+            cacheSec <= 0 -> if (isLiveStream) 16 else 64        // 自动秒开模式：低配/切台极速
+            cacheSec in 1..2 -> if (isLiveStream) 32 else 64     // 低缓冲：常规 1080P
+            cacheSec in 3..4 -> if (isLiveStream) 64 else 128    // 中缓冲：4K60帧/小幅波动
+            cacheSec in 5..9 -> if (isLiveStream) 128 else 256   // 高缓冲：4K原画/网络抗抖动
+            else -> 256                                          // 超大缓冲(>=10s)：8K极高码率/跨国弱网防卡顿
         }
-        
+
+        val demuxerBytes = baseMb * 1024 * 1024
+        val backBytes = (demuxerBytes / 4).coerceAtLeast(4 * 1024 * 1024)
+
+        mpv?.setOptionString("cache", "yes")
+        mpv?.setOptionString("cache-pause", if (isLiveStream) "no" else "yes")
+        mpv?.setOptionString("demuxer-max-bytes", demuxerBytes.toString())
+        mpv?.setOptionString("demuxer-max-back-bytes", backBytes.toString())
+        mpv?.setOptionString(
+            "demuxer-lavf-o",
+            if (isLiveStream) "probesize=5000000,analyzeduration=5000000" else ""
+        )
+
         if (currentCacheMs > 0) {
             mpv?.setOptionString("demuxer-readahead-secs", (currentCacheMs / 1000).coerceAtLeast(1).toString())
         } else {

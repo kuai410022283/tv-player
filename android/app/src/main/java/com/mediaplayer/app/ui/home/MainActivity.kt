@@ -743,7 +743,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     val isDirect = channel.isDirect
                     
                     if (isDirect) {
-                        // 直连模式：采用酷9方式，客户端直接根据原始 URL 生成回看 URL
+                        // 直连模式：客户端直接根据原始 URL 生成回看 URL
                         // 无需请求服务端 API，适用于 HTTP/RTSP/UDP/RTP 所有协议
                         val streamUrl = if (lines.isNotEmpty()) lines[0].streamUrl else channel.legacyStreamUrl
                         val catchupUrl = com.mediaplayer.app.util.StreamResolver.generateCatchupUrl(

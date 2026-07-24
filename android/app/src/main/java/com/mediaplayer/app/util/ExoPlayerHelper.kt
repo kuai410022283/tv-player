@@ -264,7 +264,6 @@ class ExoPlayerHelper(
         val mediaItem = if (url.lowercase().startsWith("rtsp://")) {
             // RTSP 流：使用纯净 MediaItem，不附加 LiveConfiguration
             // LiveConfiguration 为 HLS/DASH 设计，RtspMediaSource 无法正确处理会导致连接挂起
-            // 与酷9方案一致：MediaItem.fromUri(parse)
             MediaItem.fromUri(Uri.parse(url))
         } else {
             val builder = MediaItem.Builder().setUri(Uri.parse(url))

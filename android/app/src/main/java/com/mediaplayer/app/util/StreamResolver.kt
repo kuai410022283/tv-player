@@ -46,7 +46,7 @@ object StreamResolver {
 
     /**
      * 根据频道原始 URL 和 EPG 时间戳生成回看 URL。
-     * 采用与服务端 generateCatchupURL 一致的 URL 模式匹配逻辑（酷9实现方式），
+     * 采用与服务端 generateCatchupURL 一致的 URL 模式匹配逻辑，
      * 客户端直接生成回看 URL，无需请求服务端 API。
      *
      * @param streamUrl 频道原始流地址
@@ -130,7 +130,7 @@ object StreamResolver {
         val timeStr1 = sdf.format(startDate)
         val timeStr2 = sdf.format(endDate)
 
-        // PLTV / TVOD 模式（同 酷9 实现）
+        // PLTV / TVOD 模式
         if (u.contains("PLTV") || u.contains("TVOD")) {
             var url = u
             if (u.contains("/PLTV/")) url = url.replace("/PLTV/", "/TVOD/")
@@ -188,7 +188,7 @@ object StreamResolver {
             return "$u${sep}utcprogrambegin=$t1&utcprogramend=$t2"
         }
 
-        // RTSP + AuthInfo 模式（同 酷9 实现）
+        // RTSP + AuthInfo 模式
         if (u.contains("rtsp") && u.contains("AuthInfo=")) {
             val sdfUtc = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
             sdfUtc.timeZone = TimeZone.getTimeZone("UTC")
