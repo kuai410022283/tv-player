@@ -366,6 +366,10 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
       <td>${gm[c.group_id] || '-'}</td>
       <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
       <td><label class="switch" style="transform: scale(0.8); margin: 0">
+        <input type="checkbox" onchange="toggleChannelEnabled(${c.id}, this.checked)" ${c.is_enabled !== false ? 'checked' : ''}>
+        <span class="slider"></span>
+      </label></td>
+      <td><label class="switch" style="transform: scale(0.8); margin: 0">
         <input type="checkbox" onchange="toggleChannelDirect(${c.id}, this.checked)" ${c.is_direct !== false ? 'checked' : ''}>
         <span class="slider"></span>
       </label></td>
@@ -434,6 +438,8 @@ function handleChannelBatchAction(action) {
   window.pendingBatchAction = action;
   const actionNames = {
     'delete': '删除',
+    'enable_on': '批量启用',
+    'enable_off': '批量禁用',
     'direct_on': '开启直连模式',
     'direct_off': '关闭直连模式',
     'mux_on': '开启复用状态',
@@ -684,6 +690,7 @@ function showAddChannelModal() {
   document.getElementById('ch-type').value = '';
   document.getElementById('ch-logo').value = '';
   document.getElementById('ch-epg').value = '';
+  document.getElementById('ch-is-enabled').checked = true;
   document.getElementById('ch-is-direct').checked = true;
   document.getElementById('ch-enable-multiplex').checked = false;
   document.getElementById('ch-multiplex-group').style.display = 'none';
@@ -711,6 +718,7 @@ async function saveChannel() {
     logo: document.getElementById('ch-logo').value,
     epg_channel_id: document.getElementById('ch-epg').value,
     is_direct: document.getElementById('ch-is-direct').checked,
+    is_enabled: document.getElementById('ch-is-enabled').checked,
     enable_multiplex: document.getElementById('ch-enable-multiplex').checked ? 1 : 0,
     user_agent: document.getElementById('ch-user-agent').value,
     custom_headers: document.getElementById('ch-headers').value,
@@ -751,6 +759,7 @@ async function editChannel(id) {
   document.getElementById('ch-logo').value = c.logo || '';
   document.getElementById('ch-epg').value = c.epg_channel_id || '';
   document.getElementById('ch-is-direct').checked = c.is_direct !== false;
+  document.getElementById('ch-is-enabled').checked = c.is_enabled !== false;
   document.getElementById('ch-enable-multiplex').checked = c.enable_multiplex === 1;
   document.getElementById('ch-multiplex-group').style.display = c.can_multiplex ? 'block' : 'none';
   document.getElementById('ch-user-agent').value = c.user_agent || '';
@@ -791,6 +800,20 @@ async function toggleChannelDirect(id, enable) {
     console.error(err);
     toast('操作失败', 'error');
     loadChannels(); // revert UI switch
+  }
+}
+
+async function toggleChannelEnabled(id, enable) {
+  try {
+    await api('/channels/batch', {
+      method: 'PUT',
+      body: JSON.stringify({ ids: [id], action: enable ? 'enable_on' : 'enable_off' })
+    });
+    toast(enable ? '频道已启用' : '频道已禁用');
+  } catch (err) {
+    console.error(err);
+    toast('操作失败', 'error');
+    loadChannels();
   }
 }
 

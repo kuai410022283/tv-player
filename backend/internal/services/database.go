@@ -66,6 +66,7 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	_, _ = db.Exec(`ALTER TABLE channel_groups ADD COLUMN proxy_url TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN proxy_type TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN proxy_url TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE channels ADD COLUMN is_enabled INTEGER DEFAULT 1`)
 	// Ensure fcc_type setting exists for existing databases
 	_, _ = db.Exec(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom')`)
 
@@ -159,6 +160,7 @@ func createTables(db *sql.DB) error {
 		stream_type TEXT NOT NULL DEFAULT 'hls',
 		epg_channel_id TEXT DEFAULT '',
 		is_hidden INTEGER DEFAULT 0,
+		is_enabled INTEGER DEFAULT 1,
 		is_direct INTEGER DEFAULT 1,
 		sort_order INTEGER DEFAULT 0,
 		status TEXT DEFAULT 'unknown',
@@ -188,6 +190,8 @@ func createTables(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_channels_group_id ON channels(group_id);
 	CREATE INDEX IF NOT EXISTS idx_channels_is_hidden ON channels(is_hidden);
 	CREATE INDEX IF NOT EXISTS idx_channels_group_hidden ON channels(group_id, is_hidden);
+	CREATE INDEX IF NOT EXISTS idx_channels_is_enabled ON channels(is_enabled);
+	CREATE INDEX IF NOT EXISTS idx_channels_group_enabled ON channels(group_id, is_enabled);
 	CREATE INDEX IF NOT EXISTS idx_channels_sort_order ON channels(group_id, sort_order);
 
 	-- 级联删除触发器

@@ -156,7 +156,7 @@ func (s *PlanService) GetSubscriptionChannels(planName, token string) ([]*models
 		FROM channels c
 		JOIN channel_groups cg ON c.group_id = cg.id
 		JOIN plan_group_relations pgr ON c.group_id = pgr.group_id
-		WHERE pgr.plan_id = ? AND c.is_hidden = 0
+		WHERE pgr.plan_id = ? AND c.is_hidden = 0 AND c.is_enabled = 1
 		ORDER BY pgr.sort_order ASC, cg.id ASC, c.sort_order ASC, c.id ASC
 	`
 	rows, err := s.db.Query(query, planID)

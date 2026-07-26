@@ -42,6 +42,7 @@ type Channel struct {
 	EpgPercent   int    `json:"epg_percent,omitempty" db:"-"`
 
 	IsHidden        bool      `json:"is_hidden" db:"is_hidden"`
+	IsEnabled       bool      `json:"is_enabled" db:"is_enabled"`
 	IsDirect        bool      `json:"is_direct" db:"is_direct"`
 	SortOrder       int       `json:"sort_order" db:"sort_order"`
 	Status          string    `json:"status" db:"status"` // online, offline, unknown

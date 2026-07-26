@@ -249,6 +249,8 @@
               style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
               <option value="">批量操作...</option>
               <option value="delete">删除选中频道</option>
+              <option value="enable_on">批量启用</option>
+              <option value="enable_off">批量禁用</option>
               <option value="direct_on">开启直连模式</option>
               <option value="direct_off">关闭直连模式</option>
               <option value="mux_on">开启复用状态</option>
@@ -273,6 +275,7 @@
                 <th>EPG匹配ID</th>
                 <th>分组</th>
                 <th>来源</th>
+                <th>启用</th>
                 <th>直连模式</th>
                 <th>状态</th>
                 <th>复用状态</th>
@@ -1081,6 +1084,15 @@
               <option value="live">直播 (Live)</option>
               <option value="vod">点播 (VOD)</option>
             </select>
+          </div>
+          <div class="form-group"><label>启用频道</label>
+            <div style="margin-top: 8px;">
+              <label class="switch">
+                <input type="checkbox" id="ch-is-enabled" checked>
+                <span class="slider"></span>
+              </label>
+              <span style="margin-left:8px;font-size:12px;color:var(--text3)">关闭后客户端和订阅中不显示此频道</span>
+            </div>
           </div>
           <div class="form-group"><label>直连模式</label>
             <div style="margin-top: 8px;">

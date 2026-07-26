@@ -370,7 +370,7 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, content_type, fcc, fcc_type, proxy_type, proxy_url, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`)
+	stmtInsert, err := tx.Prepare(`INSERT INTO channels (group_id, name, logo, stream_url, stream_type, epg_channel_id, m3u_source_id, status, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, content_type, fcc, fcc_type, proxy_type, proxy_url, is_enabled, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, 1, ?)`)
 	if err != nil {
 		return 0, err
 	}
