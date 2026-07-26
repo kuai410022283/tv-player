@@ -319,9 +319,12 @@ class ExoPlayerHelper(
         val now = android.os.SystemClock.uptimeMillis()
         RemoteLogger.i("ExoPlayer", "[Perf] MediaSource created in ${now - playStartTimeMs}ms (needRebuild=$needRebuild)")
 
-        exoPlayer?.setMediaSource(mediaSource)
+        // 使用 setMediaSource(源, startPositionMs) 将进度与媒体源绑定，
+        // 这比 setMediaSource()+seekTo() 更可靠：ExoPlayer 在 prepare 过程中会直接从该位置开始解领。
         if (startTimeMs > 0L) {
-            exoPlayer?.seekTo(startTimeMs)
+            exoPlayer?.setMediaSource(mediaSource, startTimeMs)
+        } else {
+            exoPlayer?.setMediaSource(mediaSource)
         }
         
         exoPlayer?.prepare()

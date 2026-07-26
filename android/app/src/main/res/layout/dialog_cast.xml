@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="@dimen/menu_line_width"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/bg_channel_info"
+        android:padding="@dimen/dp_24">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择投屏设备"
+            android:textColor="@color/accent"
+            android:textSize="@dimen/sp_22"
+            android:textStyle="bold"
+            android:layout_marginBottom="@dimen/dp_8"
+            android:gravity="center_horizontal"/>
+
+        <TextView
+            android:id="@+id/tvScanStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="正在搜索局域网电视..."
+            android:textColor="#AAAAAA"
+            android:textSize="@dimen/sp_14"
+            android:layout_marginBottom="@dimen/dp_16"
+            android:gravity="center_horizontal"/>
+
+        <ProgressBar
+            android:id="@+id/progressScan"
+            android:layout_width="@dimen/dp_32"
+            android:layout_height="@dimen/dp_32"
+            android:layout_gravity="center_horizontal"
+            android:indeterminateTint="@color/accent"
+            android:layout_marginBottom="@dimen/dp_16" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvDevices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"/>
+            
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="未发现可用设备"
+            android:textColor="#888"
+            android:textSize="@dimen/sp_16"
+            android:gravity="center"
+            android:padding="@dimen/dp_16"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+</FrameLayout>

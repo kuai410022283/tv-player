@@ -1,5 +1,6 @@
 package com.mediaplayer.app.ui.player
 
+import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
@@ -19,6 +20,8 @@ import android.net.Uri
 import android.app.PictureInPictureParams
 import android.util.Rational
 import android.content.res.Configuration
+import android.content.IntentFilter
+import android.widget.ImageView
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
@@ -311,6 +314,13 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         tvEpgNow = findViewById(R.id.tvEpgNow)
         tvEpgNext = findViewById(R.id.tvEpgNext)
         layoutRemoteHint = findViewById(R.id.layoutRemoteHint)
+
+        val btnCast = findViewById<ImageView>(R.id.btnCast)
+        btnCast?.setOnClickListener {
+            val currentChannel = if (channelIndex in allChannels.indices) allChannels[channelIndex].id else -1L
+            val currentPosition = playerHelper?.getTime() ?: 0L
+            com.mediaplayer.app.ui.widget.CastDialog(this, currentChannel, currentPosition).show()
+        }
 
         layoutGestureHint = findViewById(R.id.layoutGestureHint)
         layoutVolumeIndicator = findViewById(R.id.layoutVolumeIndicator)
@@ -1007,6 +1017,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     override fun onDestroy() {
         super.onDestroy()
+        com.mediaplayer.app.util.NsdHelper.unregisterService(this)
         stopService(Intent(this, PlaybackService::class.java))
         handler.removeCallbacksAndMessages(null)
         pipController.release()

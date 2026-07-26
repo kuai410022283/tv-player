@@ -54,7 +54,8 @@
                 android:ellipsize="marquee"
                 android:marqueeRepeatLimit="1"
                 android:focusable="true"
-                android:focusableInTouchMode="true" />
+                android:focusableInTouchMode="true"
+                android:nextFocusRight="@id/btnCast" />
 
             <TextView
                 android:id="@+id/tvStreamType"
@@ -66,6 +67,21 @@
                 android:paddingHorizontal="@dimen/dp_8"
                 android:paddingVertical="@dimen/dp_2"
                 android:layout_marginStart="@dimen/dp_10" />
+
+            <ImageView
+                android:id="@+id/btnCast"
+                android:layout_width="@dimen/dp_32"
+                android:layout_height="@dimen/dp_32"
+                android:layout_marginStart="@dimen/dp_16"
+                android:src="@drawable/ic_cast"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="@dimen/dp_4"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:clickable="true"
+                android:nextFocusLeft="@id/tvChannelName"
+                android:nextFocusDown="@id/tvEpgNow"
+                android:contentDescription="投屏到电视" />
         </LinearLayout>
 
         <LinearLayout

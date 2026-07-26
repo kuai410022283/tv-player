@@ -36,6 +36,7 @@ class OsdOverlayView @JvmOverloads constructor(
     private val tvBtnAudio: TextView
     private val tvBtnSubtitle: TextView
     private val seekBarVod: SeekBar
+    private val btnCast: ImageView
 
     // VOD 模式状态
     private var isVodMode = false
@@ -69,6 +70,12 @@ class OsdOverlayView @JvmOverloads constructor(
         trackButtonListener = listener
     }
 
+    private var castButtonListener: (() -> Unit)? = null
+
+    fun setCastButtonListener(listener: () -> Unit) {
+        castButtonListener = listener
+    }
+
     init {
         LayoutInflater.from(context).inflate(R.layout.view_osd_overlay, this, true)
 
@@ -86,6 +93,11 @@ class OsdOverlayView @JvmOverloads constructor(
         tvVodTotalTime = findViewById(R.id.tvVodTotalTime)
         tvBtnAudio = findViewById(R.id.tvBtnAudio)
         tvBtnSubtitle = findViewById(R.id.tvBtnSubtitle)
+        btnCast = findViewById(R.id.btnCast)
+
+        btnCast.setOnClickListener {
+            castButtonListener?.invoke()
+        }
 
         // 音轨/字幕按钮点击 → 通知 MainActivity 打开选择面板
         tvBtnAudio.setOnClickListener {
@@ -118,6 +130,7 @@ class OsdOverlayView @JvmOverloads constructor(
             }
         }
         tvVodIcon.onFocusChangeListener = iconFocusListener
+        btnCast.onFocusChangeListener = iconFocusListener
 
         seekBarVod = findViewById(R.id.seekBarVod)
 

@@ -60,9 +60,28 @@
                 android:layout_marginEnd="@dimen/dp_16"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toEndOf="@id/tvOsdChannelName"
-                app:layout_constraintEnd_toStartOf="@id/tvOsdInfo"
+                app:layout_constraintEnd_toStartOf="@id/btnCast"
                 app:layout_constraintHorizontal_bias="0"
                 tools:text="1/6" />
+
+            <ImageView
+                android:id="@+id/btnCast"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_cast"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:padding="4dp"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:clickable="true"
+                app:tint="#AAAAAA"
+                app:layout_constraintBottom_toBottomOf="@id/tvOsdLineInfo"
+                app:layout_constraintStart_toEndOf="@id/tvOsdLineInfo"
+                app:layout_constraintEnd_toStartOf="@id/tvOsdInfo"
+                app:layout_constraintHorizontal_bias="0"
+                app:layout_constraintTop_toTopOf="@id/tvOsdLineInfo"
+                android:contentDescription="投屏到电视" />
 
             <!-- 右侧网速、时间、编码等 -->
             <TextView

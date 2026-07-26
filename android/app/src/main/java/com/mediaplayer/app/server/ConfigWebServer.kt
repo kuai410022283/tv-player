@@ -28,6 +28,7 @@ class ConfigWebServer(
      */
     @Volatile var authStatus: String = "idle"
 
+
     /** 更新授权状态并通知等待中的手机页面 */
     fun updateAuthStatus(status: String) {
         authStatus = status
@@ -87,6 +88,7 @@ class ConfigWebServer(
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Error parsing body")
             }
         }
+
 
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found")
     }

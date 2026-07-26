@@ -123,6 +123,51 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     // QR Code Config
     private var configWebServer: com.mediaplayer.app.server.ConfigWebServer? = null
+    private var controlWebServer: com.mediaplayer.app.server.ControlWebServer? = null
+    private var isPlayingSnapshotTransition = false
+    private var isProxyRestarting = false
+    private var pendingSeekPosition: Long = 0L
+    private var currentPlaySeekPosition: Long = 0L
+
+    private val controlReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == com.mediaplayer.app.server.ControlWebServer.ACTION_CONTROL_PLAY) {
+                val targetChannelId = intent.getLongExtra(com.mediaplayer.app.server.ControlWebServer.EXTRA_CHANNEL_ID, -1L)
+                val targetPosition = intent.getLongExtra(com.mediaplayer.app.server.ControlWebServer.EXTRA_POSITION, 0L)
+                if (targetChannelId != -1L) {
+                    // 1. 首先尝试匹配底层的唯一 ID（用于投屏功能）
+                    var index = allChannels.indexOfFirst { it.id == targetChannelId }
+                    
+                    // 2. 如果没找到，则认为发送的是视觉上的“频道号”（例如 1, 3, 12345），尝试匹配 globalIndex
+                    if (index == -1) {
+                        index = allChannels.indexOfFirst { it.globalIndex + 1 == targetChannelId.toInt() }
+                    }
+                    
+                    if (index != -1) {
+                        val targetChannel = allChannels[index]
+                        // 【UX 优化】根据您的灵感，如果投屏的频道不在当前分组，我们自动帮用户切换左侧菜单的分组！
+                        if (currentGroupId != targetChannel.groupId) {
+                            currentGroupId = targetChannel.groupId
+                            // 刷新分组列表选中状态
+                            groupAdapter.setSelected(currentGroupId)
+                            // 刷新频道列表
+                            filterChannels(scrollToTop = false)
+                        }
+                        
+                        if (targetPosition > 0) {
+                            pendingSeekPosition = targetPosition
+                        }
+                        
+                        android.widget.Toast.makeText(this@MainActivity, "📱 收到控制指令：切换至 ${targetChannel.name}", android.widget.Toast.LENGTH_SHORT).show()
+                        playTvChannel(index)
+                    } else {
+                        android.widget.Toast.makeText(this@MainActivity, "❌ 未找到对应频道号: $targetChannelId", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     private var layoutQrConfig: View? = null
     private var ivQrCode: android.widget.ImageView? = null
     private var tvQrConfigHint: TextView? = null
@@ -674,6 +719,18 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     // ═══════════════════════════════════════════════════
 
     private fun setupTvViews() {
+        // 启动后台控制服务器并广播服务
+        controlWebServer = com.mediaplayer.app.server.ControlWebServer(this)
+        try {
+            controlWebServer?.start()
+            val port = controlWebServer?.listeningPort ?: 0
+            if (port > 0) {
+                com.mediaplayer.app.util.NsdHelper.registerService(this, port)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         globalProgressBar = findViewById(R.id.globalProgressBar)
         tvGroupsRv = findViewById(R.id.rvGroups)
         tvChannelsRv = findViewById(R.id.rvChannels)
@@ -685,6 +742,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
         osdOverlayView?.setTrackButtonListener { type ->
             showTrackPanel(type)
+        }
+        osdOverlayView?.setCastButtonListener {
+            val currentChannel = if (currentChannelIndex in allChannels.indices) allChannels[currentChannelIndex].id else -1L
+            val currentPosition = playerHelper?.getTime() ?: 0L
+            com.mediaplayer.app.ui.widget.CastDialog(this, currentChannel, currentPosition).show()
         }
         progressBuffering = findViewById(R.id.progressBuffering)
         videoLayout = findViewById(R.id.videoLayout)
@@ -1721,6 +1783,23 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             positionProvider = { playerHelper?.getTime() ?: 0L },
                             durationProvider = { playerHelper?.getDuration() ?: 0L }
                         )
+                        
+                        // 【鲁棒性优化】针对部分网络流（如代理TS/HLS）在解析阶段忽略 initial seek 的情况
+                        // 在起播出画面后，延迟检查当前进度，如果不符，则强制跳转。
+                        if (currentPlaySeekPosition > 0L) {
+                            val seekPos = currentPlaySeekPosition
+                            currentPlaySeekPosition = 0L
+                            uiHandler.postDelayed({
+                                val currentTime = playerHelper?.getTime() ?: 0L
+                                // 如果误差超过 5 秒，说明底层的初始 seek 被忽略了，需要补发 seek
+                                if (Math.abs(currentTime - seekPos) > 5000) {
+                                    com.mediaplayer.app.util.RemoteLogger.i("Player", "Delayed seek to $seekPos applied (currentTime: $currentTime)")
+                                    playerHelper?.setTime(seekPos)
+                                    // 给一点提示
+                                    android.widget.Toast.makeText(this@MainActivity, "已为您恢复历史播放进度", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }, 1000) // 延迟1秒，确保底层 duration 和 timeline 已完全就绪
+                        }
                     }
 
                     if (resolution.isNotEmpty()) {
@@ -2220,6 +2299,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         val isCoreChanged = playerHelper == null || !isCoreMatch
         
+        // 在进入异步协程前，同步捕获进度值，防止协程挂起期间被覆盖或清零
+        val capturedSeekMs = pendingSeekPosition
+        currentPlaySeekPosition = pendingSeekPosition
+        pendingSeekPosition = 0L
+        
         resolveJob = lifecycleScope.launch {
             val gen = ++playGeneration
 
@@ -2285,7 +2369,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentPlaybackState = PlaybackState.BUFFERING
             stateStartTime = System.currentTimeMillis()
             
-            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, contentType = line.contentType, streamType = line.streamType, channel = channel)
+            playerHelper?.play(finalUrl, line.userAgent, line.customHeaders, startTimeMs = capturedSeekMs, contentType = line.contentType, streamType = line.streamType, channel = channel)
         }
         
         // 启动/重置看门狗
@@ -4337,6 +4421,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     override fun onResume() {
         super.onResume()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(controlReceiver, android.content.IntentFilter(com.mediaplayer.app.server.ControlWebServer.ACTION_CONTROL_PLAY), android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(controlReceiver, android.content.IntentFilter(com.mediaplayer.app.server.ControlWebServer.ACTION_CONTROL_PLAY))
+        }
         hideSystemUI()
         
         // 交由专门的控制器去动态注入画中画参数
@@ -4430,6 +4519,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterReceiver(controlReceiver)
+        com.mediaplayer.app.util.NsdHelper.unregisterService(this)
+        controlWebServer?.stop()
+        controlWebServer = null
         multicastLock?.let {
             if (it.isHeld) {
                 it.release()
