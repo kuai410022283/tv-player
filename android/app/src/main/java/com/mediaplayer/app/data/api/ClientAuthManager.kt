@@ -125,11 +125,20 @@ class ClientAuthManager(private val context: Context) {
         }
     }
 
-    /** 验证当前 token 是否有效 */
-    suspend fun verify(): Result<com.mediaplayer.app.data.model.VerifyResponse?> = withContext(Dispatchers.IO) {
+    /** 验证当前 token 是否有效，顺带上报心跳状态 */
+    suspend fun verify(sessionId: String? = null, speedBytes: Long? = null): Result<com.mediaplayer.app.data.model.VerifyResponse?> = withContext(Dispatchers.IO) {
         try {
             val token = getToken() ?: return@withContext Result.failure(Exception("无令牌"))
-            val response = ApiClient.getService().clientVerify("Bearer $token")
+            val response = ApiClient.getService().clientVerify("Bearer $token", sessionId, speedBytes)
+            
+            if (response.code() == 403) {
+                // 读取 error body 判断是否 KICKED_TEMP
+                val errorBody = response.errorBody()?.string()
+                if (errorBody?.contains("KICKED_TEMP") == true) {
+                    return@withContext Result.failure(Exception("KICKED_TEMP"))
+                }
+            }
+            
             if (response.isSuccessful && response.body()?.code == 0) {
                 val data = response.body()?.data
                 if (data != null) {

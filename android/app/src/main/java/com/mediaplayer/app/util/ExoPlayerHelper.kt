@@ -29,6 +29,7 @@ class ExoPlayerHelper(
 
     private var exoPlayer: ExoPlayer? = null
     private var playerView: PlayerView? = null
+    private var bandwidthMeter: androidx.media3.exoplayer.upstream.DefaultBandwidthMeter? = null
     
     private var isPlayerPlaying = false
     private var lastResolution = ""
@@ -415,10 +416,13 @@ class ExoPlayerHelper(
             )
             .build()
 
+        bandwidthMeter = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context).build()
+
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
+            .setBandwidthMeter(bandwidthMeter!!)
             .build()
             
         playerView?.player = exoPlayer
@@ -707,6 +711,11 @@ class ExoPlayerHelper(
     override fun getDuration(): Long {
         val d = exoPlayer?.duration ?: 0L
         return if (d == androidx.media3.common.C.TIME_UNSET) 0L else d
+    }
+
+    override fun getBandwidth(): Long {
+        val bitsPerSec = bandwidthMeter?.bitrateEstimate ?: 0L
+        return if (bitsPerSec > 0) bitsPerSec / 8 else 0L
     }
 
     override fun setTime(timeMs: Long) {

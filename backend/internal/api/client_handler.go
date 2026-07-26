@@ -17,13 +17,14 @@ import (
 )
 
 type ClientHandler struct {
-	clientSvc  *services.ClientService
-	channelSvc *services.ChannelService
-	logSvc     *services.LogService
+	clientSvc   *services.ClientService
+	channelSvc  *services.ChannelService
+	logSvc      *services.LogService
+	streamProxy *services.StreamProxy
 }
 
-func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService, logSvc *services.LogService) *ClientHandler {
-	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc, logSvc: logSvc}
+func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService, logSvc *services.LogService, streamProxy *services.StreamProxy) *ClientHandler {
+	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc, logSvc: logSvc, streamProxy: streamProxy}
 }
 
 // ── 客户端：注册 ───────────────────────────────────────
@@ -142,6 +143,18 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	if err != nil {
 		fail(c, 401, "令牌无效或已过期")
 		return
+	}
+
+	// 记录/更新心跳
+	sessionID := c.Query("session_id")
+	if sessionID != "" {
+		speedBytes, _ := strconv.ParseInt(c.Query("speed_bytes"), 10, 64)
+		if err := h.streamProxy.UpdateHeartbeat(sessionID, speedBytes); err != nil {
+			if err.Error() == "KICKED_TEMP" {
+				c.JSON(403, models.APIResponse{Code: 403, Message: "KICKED_TEMP"})
+				return
+			}
+		}
 	}
 
 	serverName, _ := h.channelSvc.GetSetting("server_name")

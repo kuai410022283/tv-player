@@ -56,6 +56,7 @@ type StreamProxy struct {
 	healthCheckTotal     int
 	healthCheckCurrent   int
 	healthCheckDelayMs   int
+	tempBanned           map[string]time.Time // 临时踢出黑名单 (session_id -> expire_time)
 }
 
 // removed streamState
@@ -71,6 +72,7 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		cancels:        make(map[string]context.CancelFunc),
 		redirectedURLs: make(map[int64]string),
 		broadcasters:   make(map[int64]*ChannelBroadcaster),
+		tempBanned:     make(map[string]time.Time),
 		channelSvc:     channelSvc,
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
@@ -97,7 +99,7 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 	}
 	_ = os.MkdirAll(cfg.CacheDir, 0755)
 
-	// 后台定期清理陈旧流（超过 60 秒无活动的会话）
+	// 后台定期清理陈旧流（超过 360 秒无活动的会话）和过期的小黑屋记录
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -105,13 +107,23 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 			sp.mu.Lock()
 			now := time.Now()
 			for sid, s := range sp.streams {
-				if now.Sub(s.LastActive) > 60*time.Second {
-					slog.Warn("cleaning stale stream", "session", sid, "channel", s.ChannelName, "last_active", s.LastActive)
+				// 获取 s 的 LastActive 时需要加实例锁
+				s.Mu.RLock()
+				lastActive := s.LastActive
+				s.Mu.RUnlock()
+				if now.Sub(lastActive) > 360*time.Second {
+					slog.Warn("cleaning stale stream", "session", sid, "channel", s.ChannelName, "last_active", lastActive)
 					if cancel, ok := sp.cancels[sid]; ok {
 						cancel()
 					}
 					delete(sp.streams, sid)
 					delete(sp.cancels, sid)
+				}
+			}
+			// 清理过期的小黑屋
+			for sid, expireTime := range sp.tempBanned {
+				if now.After(expireTime) {
+					delete(sp.tempBanned, sid)
 				}
 			}
 			sp.mu.Unlock()
@@ -1078,12 +1090,22 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	}
 }
 
-// KillStream forces a specific proxy stream to disconnect
+// KillStream forces a specific proxy stream to disconnect or kicks a direct stream
 func (sp *StreamProxy) KillStream(sessionID string) bool {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
+	
+	// Set temp ban (5 mins) for both proxy and direct to prevent immediate reconnect
+	sp.tempBanned[sessionID] = time.Now().Add(5 * time.Minute)
+	
+	_, exists := sp.streams[sessionID]
 	if cancel, ok := sp.cancels[sessionID]; ok {
 		cancel()
+		delete(sp.cancels, sessionID)
+	}
+	
+	if exists {
+		delete(sp.streams, sessionID)
 		return true
 	}
 	return false
@@ -2018,4 +2040,85 @@ func (sp *StreamProxy) serveRtspProxy(channelID int64, clientID int64, clientIP 
 	}
 
 	return c.Wait()
+}
+
+// UpdatePlayingStatus handles playing_status reports from clients
+func (sp *StreamProxy) UpdatePlayingStatus(req *models.PlayingStatusReq, clientID int64, clientIP, clientName, channelName string) {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+
+	if req.Status == "stopped" {
+		if cancel, ok := sp.cancels[req.SessionID]; ok {
+			cancel()
+		}
+		delete(sp.streams, req.SessionID)
+		delete(sp.cancels, req.SessionID)
+		return
+	}
+
+	// For playing status
+	now := time.Now()
+	if s, exists := sp.streams[req.SessionID]; exists {
+		s.Mu.Lock()
+		s.LastActive = now
+		s.ChannelID = req.ChannelID
+		s.ChannelName = channelName
+		if req.SpeedBytes > 0 {
+			s.SpeedBytes = req.SpeedBytes
+		}
+		s.Mu.Unlock()
+	} else {
+		urlStr := "direct_play"
+		if req.URL != "" {
+			urlStr = req.URL
+		}
+		sp.streams[req.SessionID] = &models.ActiveStream{
+			Mu:          &sync.RWMutex{},
+			SessionID:   req.SessionID,
+			ClientID:    clientID,
+			ClientIP:    clientIP,
+			ClientName:  clientName,
+			ChannelID:   req.ChannelID,
+			ChannelName: channelName,
+			URL:         urlStr,
+			Status:      "playing",
+			SpeedBytes:  req.SpeedBytes,
+			IsDirect:    true,
+			StartedAt:   now,
+			LastActive:  now,
+		}
+	}
+}
+
+// UpdateHeartbeat handles the 3-minute verify heartbeat
+func (sp *StreamProxy) UpdateHeartbeat(sessionID string, speedBytes int64) error {
+	sp.mu.RLock()
+	// Check if this session was temporarily kicked
+	if expireTime, ok := sp.tempBanned[sessionID]; ok {
+		if time.Now().Before(expireTime) {
+			sp.mu.RUnlock()
+			return fmt.Errorf("KICKED_TEMP")
+		}
+	}
+
+	s, exists := sp.streams[sessionID]
+	sp.mu.RUnlock()
+
+	if exists {
+		s.Mu.Lock()
+		s.LastActive = time.Now()
+		if speedBytes > 0 {
+			s.SpeedBytes = speedBytes
+		}
+		s.Mu.Unlock()
+	}
+	return nil
+}
+
+// TempBanSession adds a session to the temporary ban list (for Direct streams)
+func (sp *StreamProxy) TempBanSession(sessionID string) {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	// 5 minutes TTL for temporary kick
+	sp.tempBanned[sessionID] = time.Now().Add(5 * time.Minute)
 }

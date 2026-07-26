@@ -1700,6 +1700,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     dismissSnapshot() // 新流首帧到来，移除截帧占位图
                     continuousSkipCount = 0
                     pipController.updatePipParams(true)
+                    
+                    lifecycleScope.launch {
+                        val currentChannel = allChannels.getOrNull(currentChannelIndex)
+                        if (currentChannel != null) {
+                            val streamUrl = currentChannel.lines.firstOrNull()?.streamUrl ?: currentChannel.legacyStreamUrl
+                            val isProxy = streamUrl.contains("/stream/proxy/")
+                            com.mediaplayer.app.util.PlaybackStateReporter.reportPlaying(currentChannel.id, isProxy, playerHelper?.getBandwidth() ?: 0L, streamUrl)
+                        }
+                    }
 
                     // VOD 模式设置：根据 content_type 判断是否为点播
                     val isVod = isCurrentChannelVod()
@@ -3178,7 +3187,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             override fun run() {
                 lifecycleScope.launch {
                     try {
-                        authManager.verify()
+                        val sessionId = com.mediaplayer.app.util.PlaybackStateReporter.currentSessionId
+                        val speedBytes = playerHelper?.getBandwidth() ?: 0L
+                        
+                        authManager.verify(sessionId, speedBytes)
                             .onSuccess { resp ->
                                 heartbeatFailCount = 0 // 连接成功，重置失败计数
                                 if (resp != null && resp.globalMaintenance && !resp.isTester) {
@@ -3192,6 +3204,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                                 }
                             }
                             .onFailure {
+                                if (it.message == "KICKED_TEMP") {
+                                    heartbeatFailCount = 0
+                                    withContext(Dispatchers.Main) {
+                                        playerHelper?.stop()
+                                        android.widget.Toast.makeText(this@MainActivity, "连接已断开", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                    return@onFailure
+                                }
+                                
                                 // 服务器网络故障/崩溃/超时（非维护模式，而是直接断联）
                                 heartbeatFailCount++
                                 if (heartbeatFailCount >= 2) {
@@ -3209,11 +3230,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             }
                     } catch (_: Exception) {}
                 }
-                heartbeatHandler.postDelayed(this, 3 * 60 * 1000) // 每3分钟心跳
+                
+                // 3分钟 + 0~15秒随机抖动
+                val jitter = (0..15000).random().toLong()
+                heartbeatHandler.postDelayed(this, 3 * 60 * 1000L + jitter)
             }
         }
         heartbeatRunnable = runnable
-        heartbeatHandler.postDelayed(runnable, 3 * 60 * 1000)
+        heartbeatHandler.postDelayed(runnable, 3 * 60 * 1000L)
     }
 
 
@@ -4346,6 +4370,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 直播流切后台直接彻底停止，释放硬件解码器和网络连接
             playerHelper?.release()
             playerHelper = null
+            lifecycleScope.launch {
+                com.mediaplayer.app.util.PlaybackStateReporter.reportStopped()
+            }
         }
     }
     
@@ -4409,6 +4436,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 com.mediaplayer.app.util.RemoteLogger.i("Network", "MulticastLock released")
             }
         }
+        
+        // Report stopped to backend
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            com.mediaplayer.app.util.PlaybackStateReporter.reportStopped()
+        }
+        
         configWebServer?.stop()
         authFlowManager.cancelRetry()
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }

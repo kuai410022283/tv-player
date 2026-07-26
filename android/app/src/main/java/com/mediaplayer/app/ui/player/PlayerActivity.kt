@@ -133,6 +133,8 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
     private var stateStartTime = 0L
     private var lastPlaybackTime = 0L
     private var frozenTimeCounter = 0
+    private var heartbeatRunnable: Runnable? = null
+
     private val watchdogRunnable = object : Runnable {
         override fun run() {
             if (playerHelper != null) {
@@ -240,6 +242,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         playStream(streamUrl, streamType, userAgent, customHeaders)
         loadChannels()
         showChannelInfo()
+        startHeartbeat()
     }
 
     override fun onResume() {
@@ -423,6 +426,12 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     continuousSkipCount = 0
                     retryCount = 0
                     pipController.updatePipParams(true)
+                    
+                    lifecycleScope.launch {
+                        val isProxy = streamUrl.contains("/stream/proxy/") == true
+                        com.mediaplayer.app.util.PlaybackStateReporter.reportPlaying(channelId, isProxy, playerHelper?.getBandwidth() ?: 0L, streamUrl)
+                    }
+
                     if (resolution.isNotEmpty()) {
                         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                         val decoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
@@ -605,6 +614,39 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         frozenTimeCounter = 0
         handler.removeCallbacks(watchdogRunnable)
         handler.postDelayed(watchdogRunnable, 2000)
+    }
+
+    private fun startHeartbeat() {
+        heartbeatRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                lifecycleScope.launch {
+                    try {
+                        val sessionId = com.mediaplayer.app.util.PlaybackStateReporter.currentSessionId
+                        val speedBytes = playerHelper?.getBandwidth() ?: 0L
+                        authManager.verify(sessionId, speedBytes).onSuccess { resp ->
+                            if (resp != null && resp.globalMaintenance && !resp.isTester) {
+                                playerHelper?.release()
+                                playerHelper = null
+                                finish()
+                            }
+                        }.onFailure { e ->
+                            if (e.message == "KICKED_TEMP") {
+                                playerHelper?.release()
+                                playerHelper = null
+                                runOnUiThread {
+                                    android.widget.Toast.makeText(this@PlayerActivity, "已被踢下线", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                finish()
+                            }
+                        }
+                    } catch (e: Exception) {}
+                }
+                heartbeatRunnable?.let { handler.postDelayed(it, 10000) }
+            }
+        }
+        heartbeatRunnable = runnable
+        handler.postDelayed(runnable, 10000)
     }
 
     private fun handlePlaybackCompleted() {
@@ -954,6 +996,9 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             playerHelper?.release()
             pipController.release()
             stopService(Intent(this, PlaybackService::class.java))
+            lifecycleScope.launch {
+                com.mediaplayer.app.util.PlaybackStateReporter.reportStopped()
+            }
             finishAffinity()
         }
     }
@@ -967,6 +1012,9 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         pipController.release()
         playerHelper?.release()
         playerHelper = null
+        lifecycleScope.launch {
+            com.mediaplayer.app.util.PlaybackStateReporter.reportStopped()
+        }
     }
 
     override fun onPipPlay() {

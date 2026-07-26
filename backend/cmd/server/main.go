@@ -162,7 +162,7 @@ func main() {
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
 	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, syncSvc, Version)
-	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc)
+	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc, streamProxy)
 	ph := api.NewPlanHandler(planSvc)
 	lh := handlers.NewLogHandler(logSvc)
 	hs := api.NewHandlers(h, ch, ph, lh)

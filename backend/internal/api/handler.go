@@ -1033,6 +1033,53 @@ func (h *Handler) KillStream(c *gin.Context) {
 	}
 }
 
+// ── Playing Status ─────────────────────────────────────
+
+func (h *Handler) UpdatePlayingStatus(c *gin.Context) {
+	var req models.PlayingStatusReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+
+	clientID := int64(0)
+	clientIP := c.ClientIP()
+	clientName := "Unknown"
+
+	// 尝试从 token 提取 ClientID (如果经过 auth middleware)
+	if cid, exists := c.Get("client_id"); exists {
+		clientID = cid.(int64)
+		if client, err := h.clientSvc.GetByID(clientID); err == nil {
+			clientName = client.Name
+		}
+	} else {
+		// 客户端请求可能没有带 auth，尝试解析 token
+		token := extractToken(c)
+		if token != "" {
+			if client, err := h.clientSvc.GetByToken(token); err == nil {
+				clientID = client.ID
+				clientName = client.Name
+			}
+		}
+	}
+	
+	if clientID == 0 {
+		fail(c, 401, "未授权")
+		return
+	}
+
+	// 获取频道名
+	channelName := "Unknown Channel"
+	if req.ChannelID > 0 {
+		if ch, err := h.channelSvc.GetChannel(req.ChannelID, 0); err == nil {
+			channelName = ch.Name
+		}
+	}
+
+	h.streamProxy.UpdatePlayingStatus(&req, clientID, clientIP, clientName, channelName)
+	ok(c, gin.H{"status": "ok"})
+}
+
 // ── M3U Sources ────────────────────────────────────────
 
 func (h *Handler) ListM3USources(c *gin.Context) {

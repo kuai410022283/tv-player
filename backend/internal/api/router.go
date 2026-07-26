@@ -25,6 +25,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		// 客户端自服务
 		api.GET("/client/me", hs.Me)
 		api.POST("/client/logs", hs.UploadLog)
+		api.POST("/client/playing_status", hs.UpdatePlayingStatus)
 
 		// 频道组
 		groups := api.Group("/groups")

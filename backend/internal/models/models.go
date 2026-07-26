@@ -328,7 +328,7 @@ type ServerStats struct {
 	MemoryMB       int64 `json:"memory_mb"`
 }
 
-// ActiveStream 代表当前正在通过服务端代理转发的活跃流状态
+// ActiveStream 代表当前正在播放的活跃流状态
 type ActiveStream struct {
 	Mu          *sync.RWMutex `json:"-"`
 	SessionID   string        `json:"session_id"`
@@ -340,7 +340,17 @@ type ActiveStream struct {
 	URL         string        `json:"url"`
 	Status      string        `json:"status"`
 	SpeedBytes  int64         `json:"speed_bytes"` // 实时速度 (Bytes/s)
+	IsDirect    bool          `json:"is_direct"`   // true=直连, false=代理
 	ErrorMsg    string        `json:"error_msg,omitempty"`
 	StartedAt   time.Time     `json:"started_at"`
 	LastActive  time.Time     `json:"last_active"`
+}
+
+// PlayingStatusReq 代表客户端主动上报的播放状态
+type PlayingStatusReq struct {
+	ChannelID  int64  `json:"channel_id"`
+	SessionID  string `json:"session_id"` // 相同设备的多并发会话
+	Status     string `json:"status"`     // playing, stopped
+	SpeedBytes int64  `json:"speed_bytes,omitempty"` // 实时网速
+	URL        string `json:"url,omitempty"` // 客户端实际播放的URL
 }

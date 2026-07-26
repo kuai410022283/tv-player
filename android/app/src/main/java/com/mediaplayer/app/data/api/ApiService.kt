@@ -22,7 +22,14 @@ interface ApiService {
     suspend fun clientRegister(@Body body: Map<String, String>): Response<APIResponse<ClientRegisterResp>>
 
     @GET("client/verify")
-    suspend fun clientVerify(@Header("Authorization") token: String): Response<APIResponse<VerifyResponse>>
+    suspend fun clientVerify(
+        @Header("Authorization") token: String,
+        @Query("session_id") sessionId: String? = null,
+        @Query("speed_bytes") speedBytes: Long? = null
+    ): Response<APIResponse<VerifyResponse>>
+
+    @POST("client/playing_status")
+    suspend fun clientPlayingStatus(@Body body: @JvmSuppressWildcards Map<String, Any>): Response<APIResponse<JsonElement>>
 
     @GET("client/me")
     suspend fun clientMe(): Response<APIResponse<JsonElement>>

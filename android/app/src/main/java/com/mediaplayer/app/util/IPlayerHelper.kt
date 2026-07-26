@@ -46,6 +46,9 @@ interface IPlayerHelper {
     fun setTime(timeMs: Long)
     fun setRate(rate: Float)
     
+    /** Get estimated bandwidth in bytes/s, returns 0 if unknown */
+    fun getBandwidth(): Long = 0L
+    
     /**
      * Settings passthrough
      * @param scaleMode 0=Auto, 1=Stretch, 2=Crop, 3=4:3
