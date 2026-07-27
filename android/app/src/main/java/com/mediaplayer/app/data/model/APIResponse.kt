@@ -32,5 +32,6 @@ data class ClientRegisterResp(
     @SerializedName("startup_skip_after") val startupSkipAfter: Int = 0,
     @SerializedName("global_maintenance") val globalMaintenance: Boolean = false,
     @SerializedName("backup_servers") val backupServers: List<String>? = null,
-    @SerializedName("is_tester") val isTester: Boolean = false
+    @SerializedName("is_tester") val isTester: Boolean = false,
+    @SerializedName("app_display_name") val appDisplayName: String? = null
 )

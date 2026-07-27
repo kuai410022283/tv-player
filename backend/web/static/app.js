@@ -2197,6 +2197,9 @@ async function loadClientSettings() {
     if (document.getElementById('set-server-name')) {
       document.getElementById('set-server-name').value = setRes.data.server_name || '';
     }
+    if (document.getElementById('set-app-display-name')) {
+      document.getElementById('set-app-display-name').value = setRes.data.app_display_name || 'MediaPlayer';
+    }
     if (document.getElementById('set-enable-external-sub')) {
       const isExternalSub = setRes.data.enable_external_sub || 'false';
       enableExternalSubSetting = isExternalSub;
@@ -2250,12 +2253,22 @@ async function saveAllClientSettings() {
   let serverName = '';
   if (document.getElementById('set-server-name')) {
     serverName = document.getElementById('set-server-name').value.trim();
-    serverName = serverName.replace(/[^a-zA-Z0-9\u4e00-\u9fa5\s]/g, '').substring(0, 20);
+    serverName = serverName.replace(/[^a-zA-Z0-9\u4e00-\u9fff\s]/g, '').substring(0, 20);
     document.getElementById('set-server-name').value = serverName;
+  }
+
+  // 应用显示名称验证
+  let appDisplayName = 'MediaPlayer';
+  if (document.getElementById('set-app-display-name')) {
+    appDisplayName = document.getElementById('set-app-display-name').value.trim();
+    appDisplayName = appDisplayName.replace(/[^a-zA-Z0-9\u4e00-\u9fff\s]/g, '').substring(0, 20);
+    if (!appDisplayName) appDisplayName = 'MediaPlayer';
+    document.getElementById('set-app-display-name').value = appDisplayName;
   }
 
   const settings = {
     server_name: serverName,
+    app_display_name: appDisplayName,
     enable_external_sub: document.getElementById('set-enable-external-sub').value,
     server_url: document.getElementById('set-server-url').value.trim(),
     server_backup_urls: document.getElementById('set-server-backup-urls') ? document.getElementById('set-server-backup-urls').value.trim() : '',

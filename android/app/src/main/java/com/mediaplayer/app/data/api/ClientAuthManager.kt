@@ -84,6 +84,8 @@ class ClientAuthManager(private val context: Context) {
 
     fun getServerName(): String? = prefs.getString(Prefs.KEY_SERVER_NAME, null)
 
+    fun getAppDisplayName(): String? = prefs.getString(Prefs.KEY_APP_DISPLAY_NAME, null)
+
     fun getClientId(): Long {
         return prefs.getLong(Prefs.KEY_CLIENT_ID, 0)
     }
@@ -147,6 +149,7 @@ class ClientAuthManager(private val context: Context) {
                         putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
                         putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
                         putString(Prefs.KEY_SERVER_NAME, data.serverName ?: "")
+                        putString(Prefs.KEY_APP_DISPLAY_NAME, data.appDisplayName ?: "")
                         apply()
                     }
                     com.mediaplayer.app.util.RemoteLogger.updateConfig(data.enableLog)
@@ -174,6 +177,7 @@ class ClientAuthManager(private val context: Context) {
                             putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
                             putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
                             putString(Prefs.KEY_SERVER_NAME, data.serverName ?: "")
+                            putString(Prefs.KEY_APP_DISPLAY_NAME, data.appDisplayName ?: "")
                             apply()
                         }
                     } else {
@@ -226,6 +230,7 @@ class ClientAuthManager(private val context: Context) {
                 putString(Prefs.KEY_EXPIRES_AT, resp.expiresAt)
             }
             putString(Prefs.KEY_SERVER_NAME, resp.serverName ?: "")
+            putString(Prefs.KEY_APP_DISPLAY_NAME, resp.appDisplayName ?: "")
             apply()
         }
         com.mediaplayer.app.util.RemoteLogger.updateConfig(resp.enableLog)

@@ -47,6 +47,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 	h.clientSvc.AddLog(resp.ClientID, "register", 0, ip, c.GetHeader("User-Agent"), "")
 
 	serverName, _ := h.channelSvc.GetSetting("server_name")
+	appDisplayName, _ := h.channelSvc.GetSetting("app_display_name")
 
 	announcement, _ := h.channelSvc.GetSetting("system_announcement")
 	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
@@ -89,6 +90,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"access_token":          resp.AccessToken,
 			"message":               resp.Message,
 			"server_name":           serverName,
+			"app_display_name":      appDisplayName,
 			"announcement":          announcement,
 			"announcement_interval": announcementInterval,
 			"startup_media_enabled": startupMediaEnabled,
@@ -108,6 +110,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 			"access_token":          resp.AccessToken,
 			"message":               resp.Message,
 			"server_name":           serverName,
+			"app_display_name":      appDisplayName,
 			"announcement":          announcement,
 			"announcement_interval": announcementInterval,
 			"startup_media_enabled": startupMediaEnabled,
@@ -158,6 +161,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 	}
 
 	serverName, _ := h.channelSvc.GetSetting("server_name")
+	appDisplayName, _ := h.channelSvc.GetSetting("app_display_name")
 
 	announcement, _ := h.channelSvc.GetSetting("system_announcement")
 	announcementIntervalStr, _ := h.channelSvc.GetSetting("system_announcement_interval")
@@ -200,6 +204,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"expires_at":            client.ExpiresAt,
 		"plan_name":             client.PlanName,
 		"server_name":           serverName,
+		"app_display_name":      appDisplayName,
 		"announcement":          announcement,
 		"announcement_interval": announcementInterval,
 		"enable_log":            client.EnableLog,

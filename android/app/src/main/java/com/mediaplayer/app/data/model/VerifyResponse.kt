@@ -18,5 +18,6 @@ data class VerifyResponse(
     @SerializedName("expires_at") val expiresAt: String? = null,
     @SerializedName("global_maintenance") val globalMaintenance: Boolean = false,
     @SerializedName("backup_servers") val backupServers: List<String>? = null,
-    @SerializedName("is_tester") val isTester: Boolean = false
+    @SerializedName("is_tester") val isTester: Boolean = false,
+    @SerializedName("app_display_name") val appDisplayName: String? = null
 )

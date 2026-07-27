@@ -313,6 +313,7 @@ func createTables(db *sql.DB) error {
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_port_end', '45000');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_default_server', '');
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('fcc_type', 'telecom');
+	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('app_display_name', 'MediaPlayer');
 
 	CREATE TABLE IF NOT EXISTS subscription_plans (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

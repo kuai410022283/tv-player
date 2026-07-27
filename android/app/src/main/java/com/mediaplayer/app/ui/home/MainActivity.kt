@@ -1,9 +1,11 @@
 package com.mediaplayer.app.ui.home
 
+import android.app.ActivityManager
 import android.content.Intent
 import kotlin.coroutines.resume
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.content.Context
 
@@ -469,7 +471,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     resp.startupMediaEnabled, resp.startupMedia,
                     resp.startupMediaType, resp.startupDuration,
                     resp.startupSkipAfter, resp.globalMaintenance,
-                    resp.backupServers, resp.isTester
+                    resp.backupServers, resp.isTester,
+                    resp.appDisplayName
                 )
             }
 
@@ -2946,7 +2949,19 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         return input.trim()
     }
 
-    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, backupServers: List<String>?, isTester: Boolean) {
+    private fun handleAuthSuccess(sysAnnouncement: String?, sysAnnouncementInterval: Int, startupMediaEnabled: Boolean, startupMediaUrl: String?, startupMediaType: String, startupDuration: Int, startupSkipAfter: Int, globalMaintenance: Boolean, backupServers: List<String>?, isTester: Boolean, appDisplayName: String?) {
+        // 更新桌面图标显示名称
+        if (!appDisplayName.isNullOrBlank()) {
+            try {
+                title = appDisplayName
+                // 同步更新最近任务列表中的显示名称
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    setTaskDescription(ActivityManager.TaskDescription(appDisplayName))
+                }
+            } catch (_: Exception) {
+                // 静默忽略，部分设备可能不支持
+            }
+        }
         if (!backupServers.isNullOrEmpty()) {
             val localList = getServerList().toMutableList()
             val currentServer = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -3007,7 +3022,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         if (status == "approved") { 
                             authManager.verify().onSuccess { resp ->
                                 if (resp != null) {
-                                    handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester)
+                                    handleAuthSuccess(resp.announcement, resp.announcementInterval, resp.startupMediaEnabled, resp.startupMedia, resp.startupMediaType, resp.startupDuration, resp.startupSkipAfter, resp.globalMaintenance, resp.backupServers, resp.isTester, resp.appDisplayName)
                                 } else {
                                     // 即使获取配置失败，既然通过了 checkStatus 也要保存当前成功的备用节点
                                     getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
