@@ -86,6 +86,14 @@ object Prefs {
     const val KEY_EXPIRES_AT = "expires_at"
     const val KEY_SERVER_NAME = "server_name"
     const val KEY_APP_DISPLAY_NAME = "app_display_name"
+    
+    // 公共服务器列表开关
+    const val KEY_FETCH_PUBLIC_SERVERS = "fetch_public_servers"  // 是否启用公共服务器列表
+    const val KEY_PUBLIC_SERVER_URLS = "public_server_urls"      // 公共服务器列表缓存（JSON 数组，ServerEntry 格式）
+    // 远程公共服务器列表地址（支持多个，使用 GitHub raw 地址）
+    val PUBLIC_SERVER_LIST_URLS: List<String> get() = listOf(
+        "https://raw.githubusercontent.com/kuai410022283/mediaplayer/main/PublicServerList.txt"
+    )
     // 时间显示模式：0=隐藏, 1=常显, 2=整点, 3=半点
     const val KEY_TIME_SHOW_MODE = "time_show_mode"
     const val TIME_SHOW_MODE_HIDDEN = 0

@@ -232,10 +232,17 @@ class ServerAuthFlowManager(
         val serverListJson = prefs.getString(Prefs.KEY_SERVER_URLS, null)
         val serverList = if (serverListJson != null) {
             try {
-                val arr = com.google.gson.Gson().fromJson(serverListJson, Array<String>::class.java)
-                arr.toList().filter { it.isNotEmpty() }
+                // 尝试新格式（ServerEntry 数组）
+                val arr = com.google.gson.Gson().fromJson(serverListJson, Array<com.mediaplayer.app.data.model.ServerEntry>::class.java)
+                arr.toList().filter { it.url.isNotEmpty() }.map { it.url }
             } catch (e: Exception) {
-                emptyList()
+                try {
+                    // 兼容旧格式（纯字符串数组）
+                    val arr = com.google.gson.Gson().fromJson(serverListJson, Array<String>::class.java)
+                    arr.toList().filter { it.isNotEmpty() }
+                } catch (e2: Exception) {
+                    emptyList()
+                }
             }
         } else {
             emptyList()
