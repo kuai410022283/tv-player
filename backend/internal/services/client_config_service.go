@@ -225,8 +225,8 @@ func isValidConfigKey(key string) bool {
 		"time_show_mode": true, "control_scheme": true, "auto_start": true,
 		"enable_pip": true, "local_proxy_enabled": true,
 		"gesture_brightness": true, "gesture_volume": true,
-		"reverse_channel_keys": true, "fetch_public_servers": true,
-		"hide_settings_panel": true, "hide_channel_list": true,
+		"reverse_channel_keys": true,
+		"hide_settings_panel":  true, "hide_channel_list": true,
 		"hide_epg_panel": true, "hide_osd_panel": true,
 	}
 	return validKeys[key]
@@ -274,7 +274,6 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setBool("gesture_brightness", &cfg.GestureBrightness)
 	setBool("gesture_volume", &cfg.GestureVolume)
 	setBool("reverse_channel_keys", &cfg.ReverseChannelKeys)
-	setBool("fetch_public_servers", &cfg.FetchPublicServers)
 	setBool("hide_settings_panel", &cfg.HideSettingsPanel)
 	setBool("hide_channel_list", &cfg.HideChannelList)
 	setBool("hide_epg_panel", &cfg.HideEpgPanel)

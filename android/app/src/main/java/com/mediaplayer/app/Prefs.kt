@@ -86,34 +86,7 @@ object Prefs {
     const val KEY_EXPIRES_AT = "expires_at"
     const val KEY_SERVER_NAME = "server_name"
     const val KEY_APP_DISPLAY_NAME = "app_display_name"
-    
-    // 公共服务器列表开关
-    const val KEY_FETCH_PUBLIC_SERVERS = "fetch_public_servers"  // 是否启用公共服务器列表
-    const val KEY_PUBLIC_SERVER_URLS = "public_server_urls"      // 公共服务器列表缓存（JSON 数组，ServerEntry 格式）
 
-    // 远程公共服务器列表地址（支持多个，使用 XOR+Base64 编码防明文暴露）
-    // 编码方法：encodePublicServerUrl(url) 输入明文 URL，输出编码字符串
-    // 编译时自动从 PublicServerList.txt 读取并编码，首次运行 gradle 任务后生成
-    val PUBLIC_SERVER_LIST_URLS: List<String> get() = PublicServerListUrls.encoded.map { decodePublicServerUrl(it) }
-
-    private val XOR_KEY = byteArrayOf(0x3A.toByte(), 0x5F.toByte(), 0x8C.toByte(), 0x1B.toByte(), 0x6D.toByte(), 0xE4.toByte(), 0x2F.toByte(), 0x9A.toByte())
-
-    internal fun decodePublicServerUrl(encoded: String): String {
-        val bytes = java.util.Base64.getDecoder().decode(encoded)
-        for (i in bytes.indices) {
-            bytes[i] = (bytes[i].toInt() xor XOR_KEY[i % XOR_KEY.size].toInt()).toByte()
-        }
-        return String(bytes, Charsets.UTF_8)
-    }
-
-    /** 开发者工具：将明文 URL 编码为混淆字符串，用于更新 PUBLIC_SERVER_LIST_URLS */
-    fun encodePublicServerUrl(url: String): String {
-        val bytes = url.toByteArray(Charsets.UTF_8)
-        for (i in bytes.indices) {
-            bytes[i] = (bytes[i].toInt() xor XOR_KEY[i % XOR_KEY.size].toInt()).toByte()
-        }
-        return java.util.Base64.getEncoder().encodeToString(bytes)
-    }
     // 时间显示模式：0=隐藏, 1=常显, 2=整点, 3=半点
     const val KEY_TIME_SHOW_MODE = "time_show_mode"
     const val TIME_SHOW_MODE_HIDDEN = 0

@@ -509,9 +509,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         // 启动认证流程
         authFlowManager.startAuthFlow()
 
-        // 异步获取公共服务器列表（不阻塞认证流程）
-        fetchAndCheckPublicServers()
-
         // 检查版本更新
         com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
 
@@ -535,9 +532,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     Prefs.SCALE_MODE_FILL -> "铺满全屏"
                     else -> "原始比例"
                 }
-                // 刷新公共服务器列表状态
-                val fetchPublic = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
-                findViewById<TextView>(R.id.tvSettingsPublicServerValue)?.text = if (fetchPublic) "开" else "关"
             }
         }
     }
@@ -1078,7 +1072,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         Prefs.KEY_SHOW_GROUP_SOURCE to R.id.btnSettingsGroupSource,
         Prefs.KEY_DNS_POLICY to R.id.btnSettingsDnsPolicy,
         Prefs.KEY_PREFERRED_SERVER_INDEX to R.id.btnSettingsPreferredServer,
-        Prefs.KEY_FETCH_PUBLIC_SERVERS to R.id.btnSettingsPublicServer,
         Prefs.KEY_AUTO_START to R.id.btnSettingsAutoStart,
         Prefs.KEY_REVERSE_CHANNEL_KEYS to R.id.btnSettingsReverseChannels,
         Prefs.KEY_LOCAL_PROXY_ENABLED to R.id.btnSettingsLocalProxy
@@ -1105,7 +1098,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         R.id.btnSettingsGroupSource,
         R.id.btnSettingsDnsPolicy,
         R.id.btnSettingsPreferredServer,
-        R.id.btnSettingsPublicServer,
         R.id.btnSettingsAutoStart,
         R.id.btnSettingsReverseChannels,
         R.id.btnSettingsLocalProxy,
@@ -1260,43 +1252,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
             btnSettingsPreferredServer.postDelayed(serverSwitchRunnable, 1200L)
         }
-        
-        val btnSettingsPublicServer = findViewById<View>(R.id.btnSettingsPublicServer)
-        val tvSettingsPublicServerValue = findViewById<TextView>(R.id.tvSettingsPublicServerValue)
-        var fetchPublicServers = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
-        tvSettingsPublicServerValue?.text = if (fetchPublicServers) "开" else "关"
-        
-        btnSettingsPublicServer?.setOnClickListener {
-            if (isManagedSetting(Prefs.KEY_FETCH_PUBLIC_SERVERS)) return@setOnClickListener
-            fetchPublicServers = !fetchPublicServers
-            prefs.edit().putBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, fetchPublicServers).apply()
-            
-            if (fetchPublicServers) {
-                // 开关开启：异步获取并检测公共服务器列表
-                tvSettingsPublicServerValue?.text = "检测中"
-                Toast.makeText(this@MainActivity, "正在获取并检测公共服务器列表...", Toast.LENGTH_SHORT).show()
-                fetchAndCheckPublicServers()
-            } else {
-                // 开关关闭：从列表中移除公共服务器
-                tvSettingsPublicServerValue?.text = "关"
-                val localList = getServerList().toMutableList()
-                val publicList = getPublicServerList()
-                val publicUrls = publicList.map { it.url }.toSet()
-                val filteredList = localList.filter { it.url !in publicUrls }
-                val currentServer = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-                // 确保 currentServer 仍然在列表中
-                val mergedList = mutableListOf(com.mediaplayer.app.data.model.ServerEntry("", currentServer))
-                mergedList.addAll(filteredList.filter { it.url != currentServer })
-                val finalList = mergedList.distinctBy { it.url }
-                saveServerList(finalList)
-                // 清空缓存的公共列表
-                savePublicServerList(emptyList())
-                updatePreferredServerText()
-                Toast.makeText(this@MainActivity, "已关闭公共服务器列表", Toast.LENGTH_SHORT).show()
-                com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "公共服务器列表已移除")
-            }
-        }
-        
+
         val btnSettingsGroupSource = findViewById<View>(R.id.btnSettingsGroupSource)
         val tvSettingsGroupSourceValue = findViewById<TextView>(R.id.tvSettingsGroupSourceValue)
         
@@ -2160,169 +2116,6 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 arr.toList().filter { it.isNotEmpty() }.map { com.mediaplayer.app.data.model.ServerEntry("", it) }
             } catch (e2: Exception) {
                 emptyList()
-            }
-        }
-    }
-
-    private fun savePublicServerList(entries: List<com.mediaplayer.app.data.model.ServerEntry>) {
-        val json = com.google.gson.Gson().toJson(entries)
-        getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-            .edit()
-            .putString(Prefs.KEY_PUBLIC_SERVER_URLS, json)
-            .apply()
-    }
-
-    private fun getPublicServerList(): List<com.mediaplayer.app.data.model.ServerEntry> {
-        val json = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-            .getString(Prefs.KEY_PUBLIC_SERVER_URLS, null) ?: return emptyList()
-        return try {
-            val arr = com.google.gson.Gson().fromJson(json, Array<com.mediaplayer.app.data.model.ServerEntry>::class.java)
-            arr.toList().filter { it.url.isNotEmpty() }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    /**
-     * 远程公共服务器列表地址（支持多个）。
-     */
-    private val publicServerListUrls: List<String> get() = Prefs.PUBLIC_SERVER_LIST_URLS
-
-    /**
-     * 从远程地址获取公共服务器列表 → 连通性检测 → 缓存 → 合并到主列表。
-     * 在协程中异步执行，不阻塞主线程。
-     */
-    private fun fetchAndCheckPublicServers() {
-        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        if (!prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)) return
-
-        lifecycleScope.launch {
-            try {
-                com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "开始获取公共服务器列表...")
-                
-                // 1. 遍历所有远程 URL，逐个拉取并解析
-                val allParsedEntries = mutableListOf<com.mediaplayer.app.data.model.ServerEntry>()
-                val urls = publicServerListUrls
-                if (urls.isEmpty()) {
-                    com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "远程列表地址为空，跳过")
-                    return@launch
-                }
-                
-                for (url in urls) {
-                    try {
-                        val content = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            val client = okhttp3.OkHttpClient.Builder()
-                                .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
-                                .readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
-                                .build()
-                            val request = okhttp3.Request.Builder().url(url).build()
-                            val response = client.newCall(request).execute()
-                            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-                            response.body?.string() ?: throw Exception("空响应")
-                        }
-                        
-                        // 解析行格式：名称, URL
-                        val entries = content.lines()
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() && !it.startsWith("#") }
-                            .mapNotNull { line ->
-                                val commaIndex = line.indexOf(',')
-                                if (commaIndex > 0) {
-                                    val name = line.substring(0, commaIndex).trim()
-                                    val url2 = line.substring(commaIndex + 1).trim()
-                                    if (url2.isNotEmpty()) com.mediaplayer.app.data.model.ServerEntry(name, url2) else null
-                                } else {
-                                    val url2 = line.trim()
-                                    if (url2.startsWith("http://") || url2.startsWith("https://")) {
-                                        com.mediaplayer.app.data.model.ServerEntry("", url2)
-                                    } else null
-                                }
-                            }
-                        allParsedEntries.addAll(entries)
-                        com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "从 $url 解析到 ${entries.size} 台服务器")
-                    } catch (e: Exception) {
-                        com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "获取 $url 失败: ${e.message}")
-                        // 单个地址失败不影响其他地址
-                    }
-                }
-                
-                // 按 URL 去重
-                val rawEntries = allParsedEntries.distinctBy { it.url }
-                
-                if (rawEntries.isEmpty()) {
-                    com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "所有远程列表均为空，跳过")
-                    return@launch
-                }
-                
-                com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "解析到 ${rawEntries.size} 台服务器，开始连通性检测...")
-                
-                // 3. 连通性检测（串行 TCP Socket 连接，单台超时 3 秒）
-                // 使用串行方式避免协程扩展函数导入问题，确保稳定性
-                val reachableEntries = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    val result = mutableListOf<com.mediaplayer.app.data.model.ServerEntry>()
-                    for (entry in rawEntries) {
-                        try {
-                            val uri = java.net.URI(entry.url)
-                            val host = uri.host
-                            val port = if (uri.port > 0) uri.port else 9527
-                            val socket = java.net.Socket()
-                            socket.connect(java.net.InetSocketAddress(host, port), 3000)
-                            socket.close()
-                            result.add(entry)
-                        } catch (_: Exception) {
-                            // 不可达，跳过
-                        }
-                    }
-                    result
-                }
-                
-                com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "连通性检测完成：${reachableEntries.size}/${rawEntries.size} 台可达")
-                
-                // 4. 先记录旧的公共服务器列表，再缓存新的
-                val oldPublicList = getPublicServerList()
-                val oldPublicUrls = oldPublicList.map { it.url }.toSet()
-                savePublicServerList(reachableEntries)
-                
-                // 5. 合并到主列表（公共服务器始终放在最底部）
-                val existingList = getServerList().toMutableList()
-                // 移除旧的公共服务器
-                existingList.removeAll { it.url in oldPublicUrls }
-                // 追加新的可达公共服务器（最底部）
-                existingList.addAll(reachableEntries)
-                // 确保 currentServer 在列表首位
-                val currentServer = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-                val mergedList = mutableListOf(com.mediaplayer.app.data.model.ServerEntry("", currentServer))
-                mergedList.addAll(existingList.filter { it.url != currentServer })
-                val finalList = mergedList.filter { it.url.isNotBlank() }.distinctBy { it.url }
-                saveServerList(finalList)
-                
-                // 6. 更新 UI
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    // 刷新首选服务器显示
-                    val tvServerValue = findViewById<android.widget.TextView>(R.id.tvSettingsPreferredServerValue)
-                    if (tvServerValue != null) {
-                        val count = getServerList().size
-                        val prefsIdx = getSharedPreferences(Prefs.FILE, MODE_PRIVATE).getInt(Prefs.KEY_PREFERRED_SERVER_INDEX, -1)
-                        if (count <= 1) {
-                            tvServerValue.text = "线路 1"
-                        } else if (prefsIdx == -1 || prefsIdx >= count) {
-                            tvServerValue.text = "自动"
-                        } else {
-                            val serverList = getServerList()
-                            val name = if (prefsIdx < serverList.size && serverList[prefsIdx].name.isNotEmpty()) {
-                                val n = serverList[prefsIdx].name
-                                if (n.length > 12) n.take(11) + "…" else n
-                            } else ""
-                            tvServerValue.text = if (name.isNotEmpty()) "线路 [$name]" else "线路 ${prefsIdx + 1}"
-                        }
-                    }
-                    val tvPublicValue = findViewById<android.widget.TextView>(R.id.tvSettingsPublicServerValue)
-                    tvPublicValue?.text = "开"
-                    com.mediaplayer.app.util.RemoteLogger.i("PublicServer", "公共服务器列表已合并，共 ${reachableEntries.size} 台")
-                }
-            } catch (e: Exception) {
-                com.mediaplayer.app.util.RemoteLogger.e("PublicServer", "获取公共服务器列表失败: ${e.message}")
-                // 静默失败，不影响现有功能
             }
         }
     }
@@ -3347,17 +3140,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 对服务器下发的每一个节点进行智能解码转换 (支持 Base64 或明文)
             val resolvedBackupServers = backupServers.map { resolveUrl(it) }
             mergedList.addAll(resolvedBackupServers.map { com.mediaplayer.app.data.model.ServerEntry("", it) })
-            
-            // 如果公共服务器列表开关开启，加入缓存的公共服务器（放在最底部）
-            val fetchPublic = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                .getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
-            if (fetchPublic) {
-                val publicList = getPublicServerList()
-                mergedList.addAll(publicList)
-            }
-            
+
             // 去重操作 (distinctBy 会保留第一次出现的元素，抛弃后面的重复项)
-            // 这完美保证了“用户原来的优先，服务器追加在后”的规则
+            // 这完美保证了"用户原来的优先，服务器追加在后"的规则
             val finalList = mergedList.filter { it.url.isNotBlank() }.distinctBy { it.url }
             saveServerList(finalList)
         }

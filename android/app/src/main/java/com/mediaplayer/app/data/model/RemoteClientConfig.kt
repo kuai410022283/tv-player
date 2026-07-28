@@ -50,10 +50,6 @@ data class RemoteClientConfig(
     /** 反转频道切换键方向 */
     @SerializedName("reverse_channel_keys") val reverseChannelKeys: Boolean? = null,
 
-    // ── 应用管理 ──────────────────────────────────
-    /** 公共服务器列表开关 */
-    @SerializedName("fetch_public_servers")  val fetchPublicServers: Boolean? = null,
-
     // ── 隐藏配置项（不在客户端UI中显示，但值仍生效） ──
     /** 需要隐藏的配置项键名列表 */
     @SerializedName("hidden_keys")           val hiddenKeys: List<String>? = null,

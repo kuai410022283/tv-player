@@ -58,7 +58,6 @@ object RemoteConfigManager {
             applyBool(this, prefs, Prefs.KEY_GESTURE_BRIGHTNESS, config.gestureBrightness)
             applyBool(this, prefs, Prefs.KEY_GESTURE_VOLUME, config.gestureVolume)
             applyBool(this, prefs, Prefs.KEY_REVERSE_CHANNEL_KEYS, config.reverseChannelKeys)
-            applyBool(this, prefs, Prefs.KEY_FETCH_PUBLIC_SERVERS, config.fetchPublicServers)
 
             apply()
         }

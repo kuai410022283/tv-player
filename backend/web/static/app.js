@@ -3172,7 +3172,6 @@ const CLIENT_CONFIG_ITEMS = [
   { group: '周边扩展', key: 'show_group_source', label: '显示分组来源名称', type: 'toggle' },
   { group: '周边扩展', key: 'dns_policy', label: '网络 DNS 策略', type: 'select', options: { '0': 'IPv4优先', '1': 'IPv6优先', '2': '系统默认' } },
   // ── 应用管理 ──
-  { group: '应用管理', key: 'fetch_public_servers', label: '公共服务器列表', type: 'toggle' },
   { group: '应用管理', key: 'auto_start', label: '开机自动启动', type: 'toggle' },
   { group: '应用管理', key: 'reverse_channel_keys', label: '换台按键反转', type: 'toggle' },
   { group: '应用管理', key: 'local_proxy_enabled', label: '本地代理', type: 'toggle' }
