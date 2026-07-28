@@ -136,7 +136,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			clientConfig.GET("", hs.GetClientConfig)
 			clientConfig.POST("", hs.SaveClientConfig)
 			clientConfig.DELETE("/:key", hs.DeleteClientConfig)
-			clientConfig.POST("/reset", hs.ClientHandler.ResetClientConfig)
+			clientConfig.POST("/reset", hs.ResetClientConfig)
 		}
 
 		// 管理端：授权管理（无需 VIP 授权，用于激活授权码和查看状态）
@@ -153,8 +153,8 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		globalConfig.Use(middleware.RequireAdmin())
 		globalConfig.Use(middleware.RequireVIP())
 		{
-			globalConfig.GET("", hs.ClientHandler.GetGlobalConfig)
-			globalConfig.POST("", hs.ClientHandler.SaveGlobalConfig)
+			globalConfig.GET("", hs.GetGlobalConfig)
+			globalConfig.POST("", hs.SaveGlobalConfig)
 		}
 
 		// 管理端：套餐管理
