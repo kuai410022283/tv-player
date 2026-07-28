@@ -1091,7 +1091,7 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsDnsPolicy"
-                    android:nextFocusDown="@+id/btnSettingsAutoStart">
+                    android:nextFocusDown="@+id/btnSettingsPublicServer">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

@@ -247,7 +247,7 @@ func createTables(db *sql.DB) error {
 		app_version TEXT DEFAULT '',
 		ip TEXT DEFAULT '',
 		access_token TEXT UNIQUE,
-		status TEXT NOT NULL DEFAULT 'pending',  -- pending / approved / rejected / banned / expired
+		status TEXT NOT NULL DEFAULT 'pending',
 		plan_id INTEGER DEFAULT 0,
 		max_streams INTEGER DEFAULT 2,
 		expires_at DATETIME,
@@ -373,6 +373,9 @@ func createTables(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE subscription_plans ADD COLUMN enable_aggregation INTEGER DEFAULT 0;")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_status TEXT DEFAULT 'idle';")
 	_, _ = db.Exec("ALTER TABLE m3u_sources ADD COLUMN sync_error TEXT DEFAULT '';")
+
+	// 客户端远程配置表（新功能，自动幂等建表）
+	MigrateClientConfig(db)
 
 	return nil
 }

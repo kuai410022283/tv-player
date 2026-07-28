@@ -88,6 +88,17 @@
         <span>访问日志</span>
       </div>
       <div class="nav-section">系统管理</div>
+      <div class="nav-item" onclick="showSection('client-config',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+          <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+          <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        <span>远程配置</span>
+      </div>
       <div class="nav-item" onclick="showSection('client-settings',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3" />
@@ -515,6 +526,22 @@
         </div>
       </div>
 
+      <!-- Client Config -->
+      <div id="sec-client-config" style="display:none">
+        <div class="header">
+          <h1>远程配置</h1>
+          <button class="btn btn-primary" onclick="saveGlobalClientConfig()">保存全局配置</button>
+        </div>
+        <div class="card" style="padding:24px">
+          <p style="color:var(--text2);font-size:13px;margin-bottom:20px">
+            设置全局客户端默认配置。修改以下项目后，客户端下次启动或心跳时将自动应用。选择"不管控"代表保持客户端本地原有设置不变。
+          </p>
+          <div id="global-config-form" class="config-grid">
+            <!-- 动态渲染 -->
+          </div>
+        </div>
+      </div>
+
       <!-- Client Settings -->
       <div id="sec-client-settings" style="display:none">
         <div class="header">
@@ -540,8 +567,7 @@
             <div class="form-group" style="margin-bottom: 16px;">
               <label style="color: var(--text); font-weight: 500; font-size: 13px;">服务器名称</label>
               <input type="text" id="set-server-name" placeholder="例如：我的电视服务器 (留空则客户端不显示)" maxlength="20"
-                style="height: 38px; margin-top: 6px;"
-                oninput="this.value=this.value.replace(/[^a-zA-Z0-9\u4e00-\u9fff\s]/g,'')">
+                style="height: 38px; margin-top: 6px;">
               <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
                 最多 20 个字符，仅支持中文、英文、数字、空格。留空时客户端不显示服务器名称。</div>
             </div>
@@ -550,8 +576,7 @@
             <div class="form-group" style="margin-bottom: 16px;">
               <label style="color: var(--text); font-weight: 500; font-size: 13px;">应用显示名称</label>
               <input type="text" id="set-app-display-name" placeholder="例如：我的电视、IPTV电视 (默认 MediaPlayer)" maxlength="20"
-                style="height: 38px; margin-top: 6px;"
-                oninput="this.value=this.value.replace(/[^a-zA-Z0-9\u4e00-\u9fff\s]/g,'')">
+                style="height: 38px; margin-top: 6px;">
               <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
                 客户端安装后桌面图标显示的名称。最多 20 个字符，仅支持中文、英文、数字、空格。<br>注意：此功能仅在 Android TV 桌面（小米电视、当贝等）生效，标准 Android 模拟器/手机桌面不适用。</div>
             </div>
@@ -1316,10 +1341,20 @@
     </div>
 
     <div class="modal-overlay" id="client-detail-modal">
-      <div class="modal" style="width:620px">
+      <div class="modal" style="width:680px">
         <h3>设备详情</h3>
-        <div id="client-detail-content"></div>
-        <div class="form-actions">
+        <div class="tabs" style="margin-bottom:16px;display:flex;gap:0;border-bottom:2px solid var(--border);">
+          <button class="tab-btn active" data-tab="basic" onclick="switchClientDetailTab('basic',this)">基本信息</button>
+          <button class="tab-btn" data-tab="config" onclick="switchClientDetailTab('config',this)">远程配置</button>
+        </div>
+        <div id="client-detail-content" style="flex:1;min-height:0;overflow-y:auto;"></div>
+        <div id="client-config-tab-content" style="display:none;max-height:400px;overflow-y:auto;"></div>
+        <div class="form-actions" id="client-detail-actions">
+          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
+        </div>
+        <div class="form-actions" id="client-config-actions" style="display:none;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveClientConfig(currentDetailClientId)">保存设备配置</button>
+          <button class="btn btn-warn" onclick="resetClientConfig(currentDetailClientId)">重置为全局</button>
           <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
         </div>
       </div>

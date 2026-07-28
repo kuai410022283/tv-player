@@ -161,6 +161,8 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; c
 .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: #5fb878; }
 input:checked + .slider:before { transform: translateX(16px); }
+.switch input:disabled + .slider { background-color: #ccc; }
+.switch input:disabled + .slider:before { transform: translateX(0); }
 
 /* ── Drag & Drop Sort ── */
 .drag-handle{cursor:grab;color:var(--text2);font-size:16px;user-select:none;padding:4px;display:inline-block;line-height:1}
@@ -177,3 +179,13 @@ tr.no-drag .drag-handle{cursor:default;opacity:.3;pointer-events:none}
 .plan-group-tag .plan-group-remove:hover{opacity:1}
 .plan-group-tag-unselected{transition:all .2s ease}
 .plan-group-tag-unselected:hover{background:var(--accent)!important;color:#fff!important}
+
+/* ── Config Grid ── */
+.config-grid{max-width:720px}
+.config-grid .config-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bg3)}
+.config-grid .config-item > label:first-of-type{font-size:14px;color:var(--text);font-weight:500;min-width:100px}
+
+/* ── Tab Buttons ── */
+.tab-btn{padding:8px 20px;border:none;background:transparent;color:var(--text2);font-size:14px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}

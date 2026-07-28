@@ -17,14 +17,15 @@ import (
 )
 
 type ClientHandler struct {
-	clientSvc   *services.ClientService
-	channelSvc  *services.ChannelService
-	logSvc      *services.LogService
-	streamProxy *services.StreamProxy
+	clientSvc       *services.ClientService
+	channelSvc      *services.ChannelService
+	logSvc          *services.LogService
+	streamProxy     *services.StreamProxy
+	clientConfigSvc *services.ClientConfigService
 }
 
-func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService, logSvc *services.LogService, streamProxy *services.StreamProxy) *ClientHandler {
-	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc, logSvc: logSvc, streamProxy: streamProxy}
+func NewClientHandler(clientSvc *services.ClientService, channelSvc *services.ChannelService, logSvc *services.LogService, streamProxy *services.StreamProxy, clientConfigSvc *services.ClientConfigService) *ClientHandler {
+	return &ClientHandler{clientSvc: clientSvc, channelSvc: channelSvc, logSvc: logSvc, streamProxy: streamProxy, clientConfigSvc: clientConfigSvc}
 }
 
 // ── 客户端：注册 ───────────────────────────────────────
@@ -130,7 +131,11 @@ func (h *ClientHandler) Register(c *gin.Context) {
 func (h *ClientHandler) Verify(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
-		token = c.Query("token")
+		// 统一 URL token 策略：与 AuthMiddleware 一致，受 enable_url_token 设置控制
+		enableUrlToken, _ := h.channelSvc.GetSetting("enable_url_token")
+		if enableUrlToken == "true" {
+			token = c.Query("token")
+		}
 	}
 	if token == "" {
 		fail(c, 401, "缺少令牌")
@@ -197,6 +202,16 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		}
 	}
 
+	// 获取客户端远程配置（合并全局+单设备）
+	var remoteConfig *models.ClientRemoteConfig
+	if h.clientConfigSvc != nil {
+		if cfg, err := h.clientConfigSvc.GetEffectiveConfig(client.ID); err == nil {
+			remoteConfig = cfg
+		} else {
+			slog.Warn("client verify: failed to get effective config", "client_id", client.ID, "error", err)
+		}
+	}
+
 	ok(c, gin.H{
 		"client_id":             client.ID,
 		"name":                  client.Name,
@@ -216,6 +231,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		"global_maintenance":    globalMaintenance,
 		"backup_servers":        backupServers,
 		"is_tester":             client.IsTester,
+		"client_config":         remoteConfig,
 	})
 }
 
@@ -582,4 +598,103 @@ func (h *ClientHandler) DownloadLog(c *gin.Context) {
 	}
 
 	c.FileAttachment(logPath, fmt.Sprintf("%s.log", client.DeviceID))
+}
+
+// ── 管理端：全局远程配置 ────────────────────────────────
+
+// GetGlobalConfig 获取全局客户端配置列表
+func (h *ClientHandler) GetGlobalConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		ok(c, []interface{}{})
+		return
+	}
+	entries, err := h.clientConfigSvc.GetGlobalConfigs()
+	if err != nil {
+		failInternal(c, err, "获取全局配置失败")
+		return
+	}
+	ok(c, entries)
+}
+
+// SaveGlobalConfig 批量保存全局客户端配置
+func (h *ClientHandler) SaveGlobalConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		fail(c, 503, "配置服务未初始化")
+		return
+	}
+	var req models.ClientConfigSaveReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.clientConfigSvc.SaveGlobalConfigs(req.Configs, req.Hidden); err != nil {
+		failInternal(c, err, "保存全局配置失败")
+		return
+	}
+	ok(c, gin.H{"message": "全局配置已保存"})
+}
+
+// ── 管理端：单客户端远程配置 ───────────────────────────
+
+// GetClientConfig 获取单客户端配置列表
+func (h *ClientHandler) GetClientConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		ok(c, []interface{}{})
+		return
+	}
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	entries, err := h.clientConfigSvc.GetClientConfigs(id)
+	if err != nil {
+		failInternal(c, err, "获取设备配置失败")
+		return
+	}
+	ok(c, entries)
+}
+
+// SaveClientConfig 批量保存单客户端配置
+func (h *ClientHandler) SaveClientConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		fail(c, 503, "配置服务未初始化")
+		return
+	}
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var req models.ClientConfigSaveReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, 400, "参数错误")
+		return
+	}
+	if err := h.clientConfigSvc.SaveClientConfigs(id, req.Configs, req.Hidden); err != nil {
+		failInternal(c, err, "保存设备配置失败")
+		return
+	}
+	ok(c, gin.H{"message": "设备配置已保存"})
+}
+
+// DeleteClientConfig 删除单客户端某配置项（恢复继承全局）
+func (h *ClientHandler) DeleteClientConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		fail(c, 503, "配置服务未初始化")
+		return
+	}
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	key := c.Param("key")
+	if err := h.clientConfigSvc.DeleteClientConfig(id, key); err != nil {
+		failInternal(c, err, "删除配置项失败")
+		return
+	}
+	ok(c, gin.H{"message": "配置项已删除，将继承全局配置"})
+}
+
+// ResetClientConfig 清除单客户端所有配置（完全恢复全局）
+func (h *ClientHandler) ResetClientConfig(c *gin.Context) {
+	if h.clientConfigSvc == nil {
+		fail(c, 503, "配置服务未初始化")
+		return
+	}
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err := h.clientConfigSvc.DeleteAllClientConfigs(id); err != nil {
+		failInternal(c, err, "重置设备配置失败")
+		return
+	}
+	ok(c, gin.H{"message": "设备配置已重置，将全部继承全局配置"})
 }

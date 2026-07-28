@@ -153,6 +153,12 @@ class ClientAuthManager(private val context: Context) {
                         apply()
                     }
                     com.mediaplayer.app.util.RemoteLogger.updateConfig(data.enableLog)
+                    // 修复Bug4: 通过心跳更新备用服务器列表（持久化到本地）
+                    com.mediaplayer.app.data.api.RemoteConfigManager.saveBackupServers(context, data.backupServers)
+                    // 应用远程配置（null 字段跳过，不覆盖本地）
+                    data.clientConfig?.let {
+                        com.mediaplayer.app.data.api.RemoteConfigManager.applyConfig(context, it)
+                    }
                 }
                 Result.success(data)
             } else {
@@ -234,6 +240,8 @@ class ClientAuthManager(private val context: Context) {
             apply()
         }
         com.mediaplayer.app.util.RemoteLogger.updateConfig(resp.enableLog)
+        // 修复Bug4: 持久化 backup_servers
+        com.mediaplayer.app.data.api.RemoteConfigManager.saveBackupServers(context, resp.backupServers)
         // 同步到 ApiClient
         resp.accessToken.takeIf { it.isNotEmpty() }?.let {
             ApiClient.accessToken = it

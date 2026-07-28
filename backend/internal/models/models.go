@@ -350,8 +350,64 @@ type ActiveStream struct {
 // PlayingStatusReq 代表客户端主动上报的播放状态
 type PlayingStatusReq struct {
 	ChannelID  int64  `json:"channel_id"`
-	SessionID  string `json:"session_id"` // 相同设备的多并发会话
-	Status     string `json:"status"`     // playing, stopped
+	SessionID  string `json:"session_id"`            // 相同设备的多并发会话
+	Status     string `json:"status"`                // playing, stopped
 	SpeedBytes int64  `json:"speed_bytes,omitempty"` // 实时网速
-	URL        string `json:"url,omitempty"` // 客户端实际播放的URL
+	URL        string `json:"url,omitempty"`         // 客户端实际播放的URL
+}
+
+// ── Client Remote Config (客户端远程配置) ──────────────────
+
+// ClientRemoteConfig 下发给客户端的远程配置，omitempty + 指针类型确保 null 值不序列化。
+// 客户端收到某字段为 null/缺失时，保持本地设置不变（不管控语义）。
+type ClientRemoteConfig struct {
+	// 播放器行为
+	PlayerCore        *int  `json:"player_core,omitempty"`         // 0=自动 1=ExoPlayer 3=MPV
+	DecoderMode       *int  `json:"decoder_mode,omitempty"`        // 0=自动 1=硬解 2=软解
+	NetworkCacheMs    *int  `json:"network_cache_ms,omitempty"`    // 网络缓冲毫秒
+	AudioPassthrough  *bool `json:"audio_passthrough,omitempty"`   // 音频直通
+	ScaleMode         *int  `json:"scale_mode,omitempty"`          // 画面比例 0-5
+	DnsPolicy         *int  `json:"dns_policy,omitempty"`          // DNS策略 0-2
+	StopPreviousMedia *bool `json:"stop_previous_media,omitempty"` // 切台停止上一路
+
+	// 界面显示
+	ShowChannelLogo   *bool `json:"show_channel_logo,omitempty"`   // 显示台标
+	ShowGroupSource   *bool `json:"show_group_source,omitempty"`   // 显示频道来源
+	GlobalProgressBar *int  `json:"global_progress_bar,omitempty"` // 进度条 0=关 1=顶 2=底
+	TimeShowMode      *int  `json:"time_show_mode,omitempty"`      // 时间显示 0=隐藏 1=常显 2=整点 3=半点
+	ControlScheme     *int  `json:"control_scheme,omitempty"`      // 操控方案 0=现代 1=传统
+
+	// 功能开关
+	AutoStart          *bool `json:"auto_start,omitempty"`           // 开机自启
+	EnablePip          *bool `json:"enable_pip,omitempty"`           // 画中画
+	LocalProxyEnabled  *bool `json:"local_proxy_enabled,omitempty"`  // 本地代理
+	GestureBrightness  *bool `json:"gesture_brightness,omitempty"`   // 手势亮度
+	GestureVolume      *bool `json:"gesture_volume,omitempty"`       // 手势音量
+	ReverseChannelKeys *bool `json:"reverse_channel_keys,omitempty"` // 反转频道键
+	FetchPublicServers *bool `json:"fetch_public_servers,omitempty"` // 公共服务器列表开关
+
+	// 隐藏配置项（不在客户端UI中显示，但值仍生效）
+	HiddenKeys []string `json:"hidden_keys,omitempty"`
+
+	// 面板隐藏（禁用整个客户端面板）
+	HideSettingsPanel *bool `json:"hide_settings_panel,omitempty"` // 隐藏设置栏
+	HideChannelList   *bool `json:"hide_channel_list,omitempty"`   // 隐藏频道列表
+	HideEpgPanel      *bool `json:"hide_epg_panel,omitempty"`      // 隐藏节目单(EPG)
+	HideOsdPanel      *bool `json:"hide_osd_panel,omitempty"`      // 隐藏OSD信息面板
+}
+
+// ClientConfigEntry 对应数据库 client_remote_configs 表的单条记录
+type ClientConfigEntry struct {
+	ID        int64  `json:"id" db:"id"`
+	Scope     string `json:"scope" db:"scope"` // 'global' 或 'client:{id}'
+	ConfigKey string `json:"config_key" db:"config_key"`
+	ConfigVal string `json:"config_val" db:"config_val"` // 空字符串表示不管控（由前端传入 null 时转为空）
+	Hidden    int    `json:"hidden" db:"hidden"`         // 是否在客户端UI中隐藏（0=显示 1=隐藏）
+	UpdatedAt string `json:"updated_at" db:"updated_at"`
+}
+
+// ClientConfigSaveReq 批量保存配置请求（key→值，值为 null 时删除该管控项）
+type ClientConfigSaveReq struct {
+	Configs map[string]interface{} `json:"configs" binding:"required"`
+	Hidden  map[string]bool        `json:"hidden,omitempty"` // key→是否在客户端UI中隐藏
 }

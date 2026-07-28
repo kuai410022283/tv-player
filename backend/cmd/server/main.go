@@ -93,6 +93,7 @@ func main() {
 	logoSvc := services.NewLogoService(db)
 	syncSvc := services.NewSyncService(db)
 	logSvc := services.NewLogService()
+	clientConfigSvc := services.NewClientConfigService(db)
 
 	// ── 读取设置并初始化本地文件开关 ────────────────
 	if settings, err := channelSvc.GetAllSettings(); err == nil {
@@ -162,7 +163,7 @@ func main() {
 
 	// ── 初始化 Handler（所有路由共享同一实例）────────
 	h := api.NewHandler(channelSvc, streamProxy, importer, clientSvc, epgSvc, logoSvc, syncSvc, Version)
-	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc, streamProxy)
+	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc, streamProxy, clientConfigSvc)
 	ph := api.NewPlanHandler(planSvc)
 	lh := handlers.NewLogHandler(logSvc)
 	hs := api.NewHandlers(h, ch, ph, lh)
@@ -181,9 +182,9 @@ func main() {
 	{
 		public.POST("/admin/login", middleware.LoginRateLimit(), h.AdminLogin)
 		public.GET("/admin/config", h.GetAdminConfig)
-		public.POST("/client/register", ch.Register)
-		public.GET("/client/verify", ch.Verify)
-		public.POST("/client/verify", ch.Verify)
+		public.POST("/client/register", middleware.ClientAuthRateLimit(), ch.Register)
+		public.GET("/client/verify", middleware.ClientAuthRateLimit(), ch.Verify)
+		public.POST("/client/verify", middleware.ClientAuthRateLimit(), ch.Verify)
 		public.GET("/update", h.GetAppUpdate)
 		public.GET("/subscription", ph.GetSubscription)
 	}

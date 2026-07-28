@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mediaplayer/backend/internal/models"
@@ -324,15 +323,18 @@ func (s *ClientService) SetTester(clientID int64, isTester bool) error {
 
 func (s *ClientService) List(status string, search string, p *models.PageRequest) (*models.PageResponse, error) {
 	p.Normalize()
-	where := "WHERE 1=1"
+	where := "WHERE 1=1"     // 用于 COUNT 查询（无表别名）
+	mainWhere := "WHERE 1=1" // 用于主查询（使用 c. 前缀避免 JOIN 歧义）
 	args := []interface{}{}
 
 	if status != "" {
 		where += " AND status=?"
+		mainWhere += " AND c.status=?"
 		args = append(args, status)
 	}
 	if search != "" {
 		where += " AND (name LIKE ? OR device_id LIKE ? OR device_model LIKE ? OR ip LIKE ?)"
+		mainWhere += " AND (c.name LIKE ? OR c.device_id LIKE ? OR c.device_model LIKE ? OR c.ip LIKE ?)"
 		s := "%" + search + "%"
 		args = append(args, s, s, s, s)
 	}
@@ -344,7 +346,7 @@ func (s *ClientService) List(status string, search string, p *models.PageRequest
 
 	offset := (p.Page - 1) * p.PageSize
 	queryArgs := append(args, p.PageSize, offset)
-	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, strings.ReplaceAll(where, "status", "c.status")), queryArgs...)
+	rows, err := s.db.Query(fmt.Sprintf(`SELECT c.id, c.name, c.device_id, c.device_model, c.device_os, c.app_version, c.ip, c.status, c.plan_id, c.max_streams, c.expires_at, c.approved_by, c.reject_reason, c.last_seen, c.total_play_minutes, c.request_note, c.enable_log, c.is_tester, c.created_at, c.updated_at, COALESCE(p.name, '') as plan_name FROM clients c LEFT JOIN subscription_plans p ON c.plan_id = p.id %s ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, mainWhere), queryArgs...)
 	if err != nil {
 		return nil, err
 	}

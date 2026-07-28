@@ -37,6 +37,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.mediaplayer.app.MediaPlayerApp
 import com.mediaplayer.app.Prefs
+import com.mediaplayer.app.data.api.RemoteConfigManager
 import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
 import com.mediaplayer.app.data.api.ClientAuthManager
@@ -513,6 +514,32 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         // 检查版本更新
         com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+
+        // 注册远程配置应用回调：心跳收到远程配置后，刷新本地缓存设置值和 UI
+        RemoteConfigManager.onConfigApplied = {
+            runOnUiThread {
+                syncSettingsMemoryState()
+                applyHiddenConfigKeys()
+                // 刷新设置面板中其他可能被远程覆盖的缓存值
+                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                findViewById<TextView>(R.id.tvSettingsGlobalProgressValue)?.text = when (prefs.getInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, Prefs.GLOBAL_PROGRESS_OFF)) {
+                    Prefs.GLOBAL_PROGRESS_TOP -> "顶部"
+                    Prefs.GLOBAL_PROGRESS_BOTTOM -> "底部"
+                    else -> "关闭"
+                }
+                findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)) {
+                    Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
+                    Prefs.SCALE_MODE_4_3 -> "强制 4:3"
+                    Prefs.SCALE_MODE_16_10 -> "强制 16:10"
+                    Prefs.SCALE_MODE_CROP -> "放大裁剪"
+                    Prefs.SCALE_MODE_FILL -> "铺满全屏"
+                    else -> "原始比例"
+                }
+                // 刷新公共服务器列表状态
+                val fetchPublic = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, true)
+                findViewById<TextView>(R.id.tvSettingsPublicServerValue)?.text = if (fetchPublic) "开" else "关"
+            }
+        }
     }
 
 
@@ -1034,6 +1061,88 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
     }
 
+    /** Prefs key 到设置项 View ID 的映射，用于隐藏/显示 */
+    private val prefKeyToViewId = mapOf(
+        Prefs.KEY_SCALE_MODE to R.id.btnSettingsScale,
+        Prefs.KEY_DECODER_MODE to R.id.btnSettingsDecoder,
+        Prefs.KEY_PLAYER_CORE to R.id.btnSettingsCore,
+        Prefs.KEY_AUDIO_PASSTHROUGH to R.id.btnSettingsAudioPassthrough,
+        Prefs.KEY_STOP_PREVIOUS_MEDIA to R.id.btnSettingsStopPrevious,
+        Prefs.KEY_ENABLE_PIP to R.id.btnSettingsPip,
+        Prefs.KEY_SHOW_CHANNEL_LOGO to R.id.btnSettingsShowLogo,
+        Prefs.KEY_TIME_SHOW_MODE to R.id.btnSettingsTimeMode,
+        Prefs.KEY_GESTURE_BRIGHTNESS to R.id.btnSettingsGestureBrightness,
+        Prefs.KEY_GESTURE_VOLUME to R.id.btnSettingsGestureVolume,
+        Prefs.KEY_CONTROL_SCHEME to R.id.btnSettingsControlScheme,
+        Prefs.KEY_GLOBAL_PROGRESS_BAR to R.id.btnSettingsGlobalProgress,
+        Prefs.KEY_SHOW_GROUP_SOURCE to R.id.btnSettingsGroupSource,
+        Prefs.KEY_DNS_POLICY to R.id.btnSettingsDnsPolicy,
+        Prefs.KEY_PREFERRED_SERVER_INDEX to R.id.btnSettingsPreferredServer,
+        Prefs.KEY_FETCH_PUBLIC_SERVERS to R.id.btnSettingsPublicServer,
+        Prefs.KEY_AUTO_START to R.id.btnSettingsAutoStart,
+        Prefs.KEY_REVERSE_CHANNEL_KEYS to R.id.btnSettingsReverseChannels,
+        Prefs.KEY_LOCAL_PROXY_ENABLED to R.id.btnSettingsLocalProxy
+    )
+
+    /** 设置栏所有可焦点的 View ID（按 XML 布局顺序），用于动态修正焦点链 */
+    private val settingsFocusOrder = listOf(
+        R.id.btnSettingsScale,
+        R.id.btnSettingsMemory,
+        R.id.btnSettingsDecoder,
+        R.id.btnSettingsCore,
+        R.id.btnSettingsAudioPassthrough,
+        R.id.btnSettingsStopPrevious,
+        R.id.btnSettingsPip,
+        R.id.btnSettingsShowLogo,
+        R.id.btnSettingsTimeMode,
+        R.id.sbSettingsCache,
+        R.id.sbSettingsVolume,
+        R.id.sbSettingsBrightness,
+        R.id.btnSettingsGestureBrightness,
+        R.id.btnSettingsGestureVolume,
+        R.id.btnSettingsControlScheme,
+        R.id.btnSettingsGlobalProgress,
+        R.id.btnSettingsGroupSource,
+        R.id.btnSettingsDnsPolicy,
+        R.id.btnSettingsPreferredServer,
+        R.id.btnSettingsPublicServer,
+        R.id.btnSettingsAutoStart,
+        R.id.btnSettingsReverseChannels,
+        R.id.btnSettingsLocalProxy,
+        R.id.btnSettingsCheckUpdate,
+        R.id.btnSettingsAbout
+    )
+
+    /** 动态修正设置栏焦点链，跳过被隐藏的项 */
+    private fun fixSettingsFocusChain() {
+        val visibleIds = settingsFocusOrder.filter { viewId ->
+            findViewById<View>(viewId)?.visibility == View.VISIBLE
+        }
+        for (i in visibleIds.indices) {
+            val view = findViewById<View>(visibleIds[i]) ?: continue
+            val prevId = if (i > 0) visibleIds[i - 1] else View.NO_ID
+            val nextId = if (i < visibleIds.size - 1) visibleIds[i + 1] else View.NO_ID
+            view.nextFocusUpId = prevId
+            view.nextFocusDownId = nextId
+        }
+    }
+
+    /** 根据远程配置的 hidden_keys 隐藏/显示对应的设置项 UI */
+    private fun applyHiddenConfigKeys() {
+        // 先全部显示
+        for (viewId in prefKeyToViewId.values) {
+            findViewById<View>(viewId)?.visibility = View.VISIBLE
+        }
+        // 再隐藏远程配置标记为隐藏的项
+        for ((key, viewId) in prefKeyToViewId) {
+            if (com.mediaplayer.app.data.api.RemoteConfigManager.isHidden(key)) {
+                findViewById<View>(viewId)?.visibility = View.GONE
+            }
+        }
+        // 动态修正焦点链，跳过 GONE 的项
+        fixSettingsFocusChain()
+    }
+
     private fun setupSettingsViews() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
         val url = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL)
@@ -1074,6 +1183,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateGlobalProgressText(currentGlobalProgress)
         
         btnSettingsGlobalProgress?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_GLOBAL_PROGRESS_BAR)) return@setOnClickListener
             currentGlobalProgress = (currentGlobalProgress + 1) % 3
             updateGlobalProgressText(currentGlobalProgress)
             prefs.edit().putInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, currentGlobalProgress).apply()
@@ -1157,6 +1267,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         tvSettingsPublicServerValue?.text = if (fetchPublicServers) "开" else "关"
         
         btnSettingsPublicServer?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_FETCH_PUBLIC_SERVERS)) return@setOnClickListener
             fetchPublicServers = !fetchPublicServers
             prefs.edit().putBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, fetchPublicServers).apply()
             
@@ -1193,6 +1304,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
         
         btnSettingsGroupSource?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_SHOW_GROUP_SOURCE)) return@setOnClickListener
             showGroupSource = !showGroupSource
             tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
             prefs.edit().putBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, showGroupSource).apply()
@@ -1295,6 +1407,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateControlSchemeText(controlScheme)
         
         findViewById<View>(R.id.btnSettingsDnsPolicy)?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_DNS_POLICY)) return@setOnClickListener
             currentDnsPolicy = (currentDnsPolicy + 1) % 3
             updateDnsPolicyText(currentDnsPolicy)
             prefs.edit().putInt(Prefs.KEY_DNS_POLICY, currentDnsPolicy).apply()
@@ -1309,24 +1422,28 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
 
         btnSettingsGestureBrightness?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_GESTURE_BRIGHTNESS)) return@setOnClickListener
             currentGestureBrightness = !currentGestureBrightness
             updateGestureBrightnessText(currentGestureBrightness)
             prefs.edit().putBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, currentGestureBrightness).apply()
         }
         
         btnSettingsGestureVolume?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_GESTURE_VOLUME)) return@setOnClickListener
             currentGestureVolume = !currentGestureVolume
             updateGestureVolumeText(currentGestureVolume)
             prefs.edit().putBoolean(Prefs.KEY_GESTURE_VOLUME, currentGestureVolume).apply()
         }
         
         btnSettingsControlScheme?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_CONTROL_SCHEME)) return@setOnClickListener
             controlScheme = if (controlScheme == Prefs.CONTROL_SCHEME_MODERN) Prefs.CONTROL_SCHEME_TRADITIONAL else Prefs.CONTROL_SCHEME_MODERN
             updateControlSchemeText(controlScheme)
             prefs.edit().putInt(Prefs.KEY_CONTROL_SCHEME, controlScheme).commit()
         }
         
         btnSettingsAudioPassthrough?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_AUDIO_PASSTHROUGH)) return@setOnClickListener
             currentAudioPassthrough = !currentAudioPassthrough
             updateAudioPassthroughText(currentAudioPassthrough)
             prefs.edit().putBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, currentAudioPassthrough).apply()
@@ -1334,6 +1451,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
 
         findViewById<View>(R.id.btnSettingsStopPrevious)?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_STOP_PREVIOUS_MEDIA)) return@setOnClickListener
             currentStopPrevious = !currentStopPrevious
             updateStopPreviousText(currentStopPrevious)
             prefs.edit().putBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, currentStopPrevious).apply()
@@ -1342,6 +1460,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         val btnSettingsPip = findViewById<View>(R.id.btnSettingsPip)
         btnSettingsPip?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_ENABLE_PIP)) return@setOnClickListener
             if (!currentEnablePip) {
                 // 准备开启时，检查是否具有画中画权限
                 var hasPermission = false
@@ -1414,6 +1533,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
         
         btnSettingsDecoder?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_DECODER_MODE)) return@setOnClickListener
             val channel = allChannels.getOrNull(currentChannelIndex)
             currentDecoderMode = when (currentDecoderMode) {
                 Prefs.DECODER_MODE_AUTO -> Prefs.DECODER_MODE_HARDWARE
@@ -1432,6 +1552,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
         
         btnSettingsCore?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_PLAYER_CORE)) return@setOnClickListener
             val channel = allChannels.getOrNull(currentChannelIndex)
             currentCore = when (currentCore) {
                 Prefs.PLAYER_CORE_AUTO -> Prefs.PLAYER_CORE_EXO
@@ -1452,6 +1573,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         val btnSettingsShowLogo = findViewById<View>(R.id.btnSettingsShowLogo)
         btnSettingsShowLogo?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_SHOW_CHANNEL_LOGO)) return@setOnClickListener
             currentShowLogo = !currentShowLogo
             updateShowLogoText(currentShowLogo)
             prefs.edit().putBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, currentShowLogo).apply()
@@ -1480,6 +1602,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateTimeModeText()
 
         btnSettingsTimeMode?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_TIME_SHOW_MODE)) return@setOnClickListener
             currentTimeMode = (currentTimeMode + 1) % 4
             updateTimeModeText()
             prefs.edit().putInt(Prefs.KEY_TIME_SHOW_MODE, currentTimeMode).apply()
@@ -1487,6 +1610,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
         
         btnSettingsScale?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_SCALE_MODE)) return@setOnClickListener
             currentScaleMode = when (currentScaleMode) {
                 Prefs.SCALE_MODE_DEFAULT -> Prefs.SCALE_MODE_FILL
                 Prefs.SCALE_MODE_FILL -> Prefs.SCALE_MODE_STRETCH
@@ -1503,12 +1627,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
 
         btnSettingsAutoStart?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_AUTO_START)) return@setOnClickListener
             currentAutoStart = !currentAutoStart
             updateAutoStartText(currentAutoStart)
             prefs.edit().putBoolean(Prefs.KEY_AUTO_START, currentAutoStart).apply()
         }
 
         btnSettingsReverseChannels?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_REVERSE_CHANNEL_KEYS)) return@setOnClickListener
             currentReverseChannels = !currentReverseChannels
             updateReverseChannelsText(currentReverseChannels)
             prefs.edit().putBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, currentReverseChannels).apply()
@@ -1525,6 +1651,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateLocalProxyText()
 
         btnSettingsLocalProxy?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_LOCAL_PROXY_ENABLED)) return@setOnClickListener
             localProxyEnabled = !localProxyEnabled
             prefs.edit().putBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, localProxyEnabled).apply()
 
@@ -1556,14 +1683,21 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val progress = if (cacheMs == 0) 0 else (cacheMs / 50).coerceIn(1, 100)
         sbSettingsCache?.progress = progress
         tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${"%.2f".format(cacheMs / 1000f)} 秒"
+        val isCacheManaged = RemoteConfigManager.isManaged(Prefs.KEY_NETWORK_CACHE)
+        sbSettingsCache?.isEnabled = !isCacheManaged
 
         sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (isCacheManaged && fromUser) {
+                    Toast.makeText(this@MainActivity, "管理员已禁止修改", Toast.LENGTH_SHORT).show()
+                    return
+                }
                 val newCacheMs = if (progress == 0) 0 else progress * 50
                 tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${"%.2f".format(newCacheMs / 1000f)} 秒"
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
+                if (isCacheManaged) return
                 val p = seekBar?.progress ?: 0
                 val newCacheMs = if (p == 0) 0 else p * 50
                 prefs.edit().putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs).apply()
@@ -1653,6 +1787,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         btnSettingsAbout?.setOnClickListener {
             showAboutDevice()
         }
+        
+        applyHiddenConfigKeys()
     }
 
     private fun joinQQGroup(qqGroup: String) {
@@ -1711,6 +1847,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     }
 
     private fun showSettingsMenu() {
+        if (RemoteConfigManager.isSettingsPanelHidden()) {
+            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (layoutSettingsMenu?.visibility == View.VISIBLE) return
         
         // 隐藏左侧菜单
@@ -1718,6 +1858,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         layoutSettingsMenu?.visibility = View.VISIBLE
         
+        applyHiddenConfigKeys()
         syncSettingsMemoryState()
         
         // 填充关于信息
@@ -2189,6 +2330,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private fun hideSettingsMenu() {
         layoutSettingsMenu?.visibility = View.GONE
         activeListArea = "channels"
+    }
+
+    private fun isManagedSetting(prefKey: String): Boolean {
+        if (RemoteConfigManager.isManaged(prefKey)) {
+            Toast.makeText(this, "管理员已禁止修改", Toast.LENGTH_SHORT).show()
+            return true
+        }
+        return false
     }
 
     private fun updateCoreText(core: Int) {
@@ -2905,6 +3054,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     }
 
     private fun showOsd() {
+        if (RemoteConfigManager.isOsdPanelHidden()) return
         checkAndRefreshEpgBg()
         // 刷新频道号码和名称（来自当前频道，不依赖播放器回调）
         val channel = allChannels.getOrNull(currentChannelIndex)
@@ -3733,6 +3883,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
 
     private fun showEpgMenu() {
+        if (RemoteConfigManager.isEpgPanelHidden()) {
+            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (currentChannelIndex < 0 || currentChannelIndex >= allChannels.size) return
         val channel = allChannels[currentChannelIndex]
         
@@ -3885,6 +4039,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     }
 
     private fun showZappingMenu(focusOnGroups: Boolean, resetToPlaying: Boolean = false) {
+        if (RemoteConfigManager.isChannelListHidden()) {
+            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            return
+        }
         checkAndRefreshEpgBg()
         if (layoutZappingMenu?.visibility == View.VISIBLE) return
 

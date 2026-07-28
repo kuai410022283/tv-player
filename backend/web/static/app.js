@@ -12,6 +12,7 @@ let localLogoEnabled = false;
 let serverUrlSetting = '';
 let serverBackupUrlsSetting = '';
 let enableExternalSubSetting = 'false';
+let currentDetailClientId = 0;
 
 // ═══ API helpers ══════════════════════════════════════
 let loadingCount = 0;
@@ -233,6 +234,7 @@ function showSection(name, el) {
     streams: loadStreams,
     clients: loadClients,
     'client-logs': loadClientLogs,
+    'client-config': loadGlobalClientConfig,
     'client-settings': loadClientSettings,
     'update': loadUpdates,
     'sync': loadSyncSettings,
@@ -1515,6 +1517,7 @@ function updateSelectedClients() {
 }
 
 async function showClientDetail(id) {
+  currentDetailClientId = id;
   const r = await api(`/admin/clients/${id}`);
   if (!r.data) { toast('加载失败', 'error'); return; }
   const c = r.data;
@@ -1564,7 +1567,22 @@ async function showClientDetail(id) {
       <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">删除设备</button>
     </div>
   `;
+  // 重置到基本信息 tab
+  switchClientDetailTab('basic', document.querySelector('.tab-btn[data-tab="basic"]'));
   showModal('client-detail-modal');
+}
+
+/** 切换设备详情弹窗的 Tab */
+function switchClientDetailTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('client-detail-content').style.display = tab === 'basic' ? 'block' : 'none';
+  document.getElementById('client-config-tab-content').style.display = tab === 'config' ? 'block' : 'none';
+  document.getElementById('client-detail-actions').style.display = tab === 'basic' ? 'flex' : 'none';
+  document.getElementById('client-config-actions').style.display = tab === 'config' ? 'flex' : 'none';
+  if (tab === 'config' && currentDetailClientId > 0) {
+    loadClientConfigTab(currentDetailClientId);
+  }
 }
 
 async function editClientRemark(id, oldNote) {
@@ -3123,4 +3141,402 @@ document.getElementById('grp-proxy-type').addEventListener('change', function() 
 document.getElementById('ch-proxy-type').addEventListener('change', function() {
   document.getElementById('ch-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
 });
+
+// ═══════════════════════════════════════════════════════
+// 远程配置 - 全局配置
+// ═══════════════════════════════════════════════════════
+
+const CLIENT_CONFIG_ITEMS = [
+  // ── 播放与画面 ──
+  { group: '播放与画面', key: 'scale_mode', label: '画面比例', type: 'select', options: { '0': '原始比例', '1': '强制16:9', '2': '放大裁剪', '3': '强制4:3', '4': '强制16:10', '5': '铺满全屏' } },
+  { group: '播放与画面', key: 'decoder_mode', label: '解码模式', type: 'select', options: { '0': '自动', '1': '强制硬解', '2': '强制软解' } },
+  { group: '播放与画面', key: 'player_core', label: '播放内核', type: 'select', options: { '0': '自动', '1': 'ExoPlayer', '3': 'MPV' } },
+  { group: '播放与画面', key: 'audio_passthrough', label: '杜比音频', type: 'toggle' },
+  { group: '播放与画面', key: 'stop_previous_media', label: '切台模式', type: 'toggle' },
+  { group: '播放与画面', key: 'enable_pip', label: '画中画模式', type: 'toggle' },
+  { group: '播放与画面', key: 'show_channel_logo', label: '显示频道台标', type: 'toggle' },
+  { group: '播放与画面', key: 'time_show_mode', label: '时间显示', type: 'select', options: { '0': '隐藏', '1': '常显', '2': '整点', '3': '半点' } },
+  { group: '播放与画面', key: 'network_cache_ms', label: '网络缓存时长', type: 'number', placeholder: '0 = 智能' },
+  // ── 界面管控 ──
+  { group: '界面管控', key: 'hide_channel_list', label: '隐藏频道列表', type: 'toggle' },
+  { group: '界面管控', key: 'hide_epg_panel', label: '隐藏节目单(EPG)', type: 'toggle' },
+  { group: '界面管控', key: 'hide_osd_panel', label: '隐藏OSD信息面板', type: 'toggle' },
+  { group: '界面管控', key: 'hide_settings_panel', label: '隐藏设置栏', type: 'toggle' },
+  // ── 设备与系统 ──
+  // (客户端中该分类下为系统音量/画面亮度，均为本地设置，不可远程管控)
+  // ── 周边扩展 ──
+  { group: '周边扩展', key: 'gesture_brightness', label: '左侧滑动调节亮度', type: 'toggle' },
+  { group: '周边扩展', key: 'gesture_volume', label: '右侧滑动调节音量', type: 'toggle' },
+  { group: '周边扩展', key: 'control_scheme', label: '操控方式', type: 'select', options: { '0': '现代', '1': '传统' } },
+  { group: '周边扩展', key: 'global_progress_bar', label: '全局进度条显示', type: 'select', options: { '0': '关闭', '1': '顶部', '2': '底部' } },
+  { group: '周边扩展', key: 'show_group_source', label: '显示分组来源名称', type: 'toggle' },
+  { group: '周边扩展', key: 'dns_policy', label: '网络 DNS 策略', type: 'select', options: { '0': 'IPv4优先', '1': 'IPv6优先', '2': '系统默认' } },
+  // ── 应用管理 ──
+  { group: '应用管理', key: 'fetch_public_servers', label: '公共服务器列表', type: 'toggle' },
+  { group: '应用管理', key: 'auto_start', label: '开机自动启动', type: 'toggle' },
+  { group: '应用管理', key: 'reverse_channel_keys', label: '换台按键反转', type: 'toggle' },
+  { group: '应用管理', key: 'local_proxy_enabled', label: '本地代理', type: 'toggle' }
+];
+
+/** 加载全局配置并渲染表单 */
+async function loadGlobalClientConfig() {
+  const container = document.getElementById('global-config-form');
+  const r = await api('/admin/client-config');
+  if (!r.data) { container.innerHTML = ''; return; }
+  const entries = r.data || [];
+  container.innerHTML = '';
+  const configMap = {};
+  const hiddenMap = {};
+  entries.forEach(e => { configMap[e.config_key] = e.config_val; if (e.hidden) hiddenMap[e.config_key] = true; });
+
+  let currentGroup = '';
+  CLIENT_CONFIG_ITEMS.forEach(item => {
+    if (item.group !== currentGroup) {
+      currentGroup = item.group;
+      const header = document.createElement('h3');
+      header.textContent = currentGroup;
+      header.style.cssText = 'margin:0 0 16px 0;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;';
+      if (container.lastChild) {
+        const spacer = document.createElement('div');
+        spacer.style.height = '24px';
+        container.appendChild(spacer);
+      }
+      container.appendChild(header);
+    }
+    const div = document.createElement('div');
+    div.className = 'config-item';
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bg3);';
+
+    const value = configMap[item.key] !== undefined ? configMap[item.key] : '';
+    const isManaged = value !== '';
+
+    // 不管控 checkbox
+    const unchecked = document.createElement('input');
+    unchecked.type = 'checkbox';
+    unchecked.checked = !isManaged;
+    unchecked.id = 'gcc-' + item.key + '-unchecked';
+    unchecked.style.cssText = 'width:18px;height:18px;cursor:pointer;';
+    unchecked.dataset.key = item.key;
+    unchecked.onchange = function() { toggleConfigInput(this, item.key); };
+
+    const uncheckedLabel = document.createElement('label');
+    uncheckedLabel.htmlFor = unchecked.id;
+    uncheckedLabel.textContent = '不管控';
+    uncheckedLabel.style.cssText = 'font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:48px;';
+
+    // 标签
+    const label = document.createElement('label');
+    label.textContent = item.label;
+    label.style.cssText = 'font-size:14px;color:var(--text);font-weight:500;min-width:100px;';
+
+    // 值控件
+    const input = document.createElement('div');
+    input.style.cssText = 'flex:1;display:flex;align-items:center;gap:8px;';
+    input.id = 'gcc-input-' + item.key;
+
+    if (item.type === 'toggle') {
+      const toggle = document.createElement('label');
+      toggle.className = 'switch';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = value === 'true' || value === '1';
+      cb.disabled = !isManaged;
+      cb.id = 'gcc-val-' + item.key;
+      cb.dataset.key = item.key;
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      toggle.appendChild(cb);
+      toggle.appendChild(slider);
+      input.appendChild(toggle);
+      const valLabel = document.createElement('span');
+      valLabel.id = 'gcc-txt-' + item.key;
+      valLabel.textContent = cb.checked ? '开' : '关';
+      valLabel.style.cssText = 'font-size:13px;color:var(--text2);';
+      cb.onchange = function() { 
+        document.getElementById('gcc-txt-' + item.key).textContent = this.checked ? '开' : '关';
+      };
+      input.appendChild(valLabel);
+    } else if (item.type === 'select') {
+      const sel = document.createElement('select');
+      sel.id = 'gcc-val-' + item.key;
+      sel.disabled = !isManaged;
+      sel.style.cssText = 'flex:1;max-width:200px;height:34px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg1);color:var(--text);font-size:13px;';
+      sel.dataset.key = item.key;
+      for (const [k, v] of Object.entries(item.options)) {
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = v;
+        if (value === k) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      input.appendChild(sel);
+    } else if (item.type === 'number') {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.id = 'gcc-val-' + item.key;
+      inp.value = value;
+      inp.disabled = !isManaged;
+      inp.placeholder = item.placeholder || '';
+      inp.style.cssText = 'flex:1;max-width:200px;height:34px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg1);color:var(--text);font-size:13px;';
+      inp.dataset.key = item.key;
+      input.appendChild(inp);
+    }
+
+    div.appendChild(unchecked);
+    div.appendChild(uncheckedLabel);
+    div.appendChild(label);
+    div.appendChild(input);
+
+    // 隐藏 checkbox
+    const hiddenCb = document.createElement('input');
+    hiddenCb.type = 'checkbox';
+    hiddenCb.checked = !!hiddenMap[item.key];
+    hiddenCb.id = 'gcc-' + item.key + '-hidden';
+    hiddenCb.style.cssText = 'width:16px;height:16px;cursor:pointer;margin-left:auto;';
+    const hiddenLabel = document.createElement('label');
+    hiddenLabel.htmlFor = hiddenCb.id;
+    hiddenLabel.textContent = '隐藏';
+    hiddenLabel.style.cssText = 'font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:32px;';
+    div.appendChild(hiddenCb);
+    div.appendChild(hiddenLabel);
+
+    container.appendChild(div);
+  });
+}
+
+function toggleConfigInput(checkbox, key) {
+  const isUnchecked = checkbox.checked;
+  const input = document.getElementById('gcc-val-' + key);
+  if (input) input.disabled = isUnchecked;
+}
+
+/** 保存全局配置 */
+async function saveGlobalClientConfig() {
+  const configs = {};
+  const hidden = {};
+  CLIENT_CONFIG_ITEMS.forEach(item => {
+    const unchecked = document.getElementById('gcc-' + item.key + '-unchecked');
+    if (unchecked && unchecked.checked) {
+      // 不管控 → 传 null 表示删除
+      configs[item.key] = null;
+    } else {
+      const input = document.getElementById('gcc-val-' + item.key);
+      if (!input) return;
+      if (item.type === 'toggle') {
+        configs[item.key] = input.checked ? 'true' : 'false';
+      } else if (item.type === 'number') {
+        configs[item.key] = input.value || '0';
+      } else {
+        configs[item.key] = input.value;
+      }
+    }
+    // 无论是否管控，都收集隐藏状态（支持"仅隐藏不强制值"的场景）
+    const hiddenCb = document.getElementById('gcc-' + item.key + '-hidden');
+    if (hiddenCb) hidden[item.key] = hiddenCb.checked;
+  });
+  const r = await api('/admin/client-config', {
+    method: 'POST',
+    body: JSON.stringify({ configs, hidden })
+  });
+  if (!r.error) {
+    toast('全局配置已保存', 'success');
+    loadGlobalClientConfig();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// 远程配置 - 单设备配置
+// ═══════════════════════════════════════════════════════
+
+/** 加载单设备配置并渲染到设备详情弹窗 */
+async function loadClientConfigTab(clientId) {
+  const [globalR, clientR] = await Promise.all([
+    api('/admin/client-config'),
+    api(`/admin/clients/${clientId}/config`)
+  ]);
+  const globalEntries = globalR.data || [];
+  const clientEntries = clientR.data || [];
+
+  const globalMap = {};
+  const globalHiddenMap = {};
+  globalEntries.forEach(e => { globalMap[e.config_key] = e.config_val; if (e.hidden) globalHiddenMap[e.config_key] = true; });
+  const clientMap = {};
+  const clientHiddenMap = {};
+  clientEntries.forEach(e => { clientMap[e.config_key] = e.config_val; if (e.hidden) clientHiddenMap[e.config_key] = true; });
+
+  const container = document.getElementById('client-config-tab-content');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let currentGroup = '';
+  CLIENT_CONFIG_ITEMS.forEach(item => {
+    if (item.group !== currentGroup) {
+      currentGroup = item.group;
+      const header = document.createElement('h3');
+      header.textContent = currentGroup;
+      header.style.cssText = 'margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;';
+      if (container.lastChild) {
+        const spacer = document.createElement('div');
+        spacer.style.height = '16px';
+        container.appendChild(spacer);
+      }
+      container.appendChild(header);
+    }
+
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bg3);';
+
+    const globalVal = globalMap[item.key] || '';
+    const clientVal = clientMap[item.key];
+    const hasClientOverride = clientVal !== undefined;
+    const effectiveVal = hasClientOverride ? clientVal : globalVal;
+
+    // 继承全局 checkbox
+    const inheritCb = document.createElement('input');
+    inheritCb.type = 'checkbox';
+    inheritCb.checked = !hasClientOverride;
+    inheritCb.id = 'dcc-' + item.key + '-inherit';
+    inheritCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+    inheritCb.dataset.key = item.key;
+
+    const inheritLabel = document.createElement('label');
+    inheritLabel.htmlFor = inheritCb.id;
+    inheritLabel.textContent = '继承全局';
+    inheritLabel.style.cssText = 'font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:52px;';
+
+    // 标签 + 全局值提示
+    const label = document.createElement('span');
+    label.textContent = item.label;
+    label.style.cssText = 'font-size:13px;color:var(--text);font-weight:500;min-width:90px;';
+    const globalHint = document.createElement('span');
+    globalHint.style.cssText = 'font-size:11px;color:var(--text3);';
+    globalHint.textContent = globalVal ? `(全局: ${globalVal})` : '(全局: 不管控)';
+
+    // 值控件
+    const input = document.createElement('div');
+    input.style.cssText = 'flex:1;display:flex;align-items:center;gap:6px;';
+    input.id = 'dcc-input-' + item.key;
+
+    if (item.type === 'toggle') {
+      const toggle = document.createElement('label');
+      toggle.className = 'switch';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = effectiveVal === 'true' || effectiveVal === '1';
+      cb.disabled = inheritCb.checked;
+      cb.id = 'dcc-val-' + item.key;
+      cb.dataset.key = item.key;
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      toggle.appendChild(cb);
+      toggle.appendChild(slider);
+      input.appendChild(toggle);
+      const valLabel = document.createElement('span');
+      valLabel.id = 'dcc-txt-' + item.key;
+      valLabel.textContent = cb.checked ? '开' : '关';
+      valLabel.style.cssText = 'font-size:12px;color:var(--text2);';
+      cb.onchange = function() { 
+        document.getElementById('dcc-txt-' + item.key).textContent = this.checked ? '开' : '关';
+      };
+      input.appendChild(valLabel);
+    } else if (item.type === 'select') {
+      const sel = document.createElement('select');
+      sel.id = 'dcc-val-' + item.key;
+      sel.disabled = inheritCb.checked;
+      sel.style.cssText = 'flex:1;max-width:160px;height:30px;padding:0 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg1);color:var(--text);font-size:12px;';
+      sel.dataset.key = item.key;
+      for (const [k, v] of Object.entries(item.options)) {
+        const opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = v;
+        if (effectiveVal === k) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      input.appendChild(sel);
+    } else if (item.type === 'number') {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.id = 'dcc-val-' + item.key;
+      inp.value = effectiveVal;
+      inp.disabled = inheritCb.checked;
+      inp.placeholder = item.placeholder || '';
+      inp.style.cssText = 'flex:1;max-width:160px;height:30px;padding:0 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg1);color:var(--text);font-size:12px;';
+      inp.dataset.key = item.key;
+      input.appendChild(inp);
+    }
+
+    // 继承切换时联动
+    inheritCb.onchange = function() {
+      const disabled = this.checked;
+      const valInput = document.getElementById('dcc-val-' + item.key);
+      if (valInput) valInput.disabled = disabled;
+    };
+
+    div.appendChild(inheritCb);
+    div.appendChild(inheritLabel);
+    div.appendChild(label);
+    div.appendChild(globalHint);
+    div.appendChild(input);
+
+    // 隐藏 checkbox（设备可覆盖全局隐藏状态）
+    const effectiveHidden = hasClientOverride ? !!clientHiddenMap[item.key] : !!globalHiddenMap[item.key];
+    const hiddenCb = document.createElement('input');
+    hiddenCb.type = 'checkbox';
+    hiddenCb.checked = effectiveHidden;
+    hiddenCb.id = 'dcc-' + item.key + '-hidden';
+    hiddenCb.style.cssText = 'width:14px;height:14px;cursor:pointer;margin-left:4px;';
+    const hiddenLabel = document.createElement('label');
+    hiddenLabel.htmlFor = hiddenCb.id;
+    hiddenLabel.textContent = '隐藏';
+    hiddenLabel.style.cssText = 'font-size:11px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:28px;';
+    div.appendChild(hiddenCb);
+    div.appendChild(hiddenLabel);
+
+    container.appendChild(div);
+  });
+}
+
+/** 保存单设备配置 */
+async function saveClientConfig(clientId) {
+  const configs = {};
+  const hidden = {};
+  CLIENT_CONFIG_ITEMS.forEach(item => {
+    const inheritCb = document.getElementById('dcc-' + item.key + '-inherit');
+    if (inheritCb && inheritCb.checked) {
+      // 继承全局 => 传空字符串表示删除该设备覆盖项
+      configs[item.key] = '';
+    } else {
+      const input = document.getElementById('dcc-val-' + item.key);
+      if (!input) return;
+      if (item.type === 'toggle') {
+        configs[item.key] = input.checked ? 'true' : 'false';
+      } else if (item.type === 'number') {
+        configs[item.key] = input.value || '0';
+      } else {
+        configs[item.key] = input.value;
+      }
+    }
+    // 无论是否继承全局，都收集隐藏状态
+    const hiddenCb = document.getElementById('dcc-' + item.key + '-hidden');
+    if (hiddenCb) hidden[item.key] = hiddenCb.checked;
+  });
+  const r = await api(`/admin/clients/${clientId}/config`, {
+    method: 'POST',
+    body: JSON.stringify({ configs, hidden })
+  });
+  if (!r.error) {
+    toast('设备配置已保存', 'success');
+    loadClientConfigTab(clientId);
+  }
+}
+
+/** 重置设备配置为全部继承全局 */
+async function resetClientConfig(clientId) {
+  if (!confirm('确定要重置该设备的所有远程配置吗？重置后将全部继承全局配置。')) return;
+  const r = await api(`/admin/clients/${clientId}/config/reset`, { method: 'POST' });
+  if (!r.error) {
+    toast('设备配置已重置', 'success');
+    loadClientConfigTab(clientId);
+  }
+}
 

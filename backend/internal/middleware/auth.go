@@ -40,22 +40,29 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		}
 
 		// 尝试 Admin JWT 认证
+		jwtFailed := false
 		if auth != "" {
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-				return []byte(secret), nil
-			})
-			if err == nil && token.Valid {
-				c.Set("auth_type", "admin")
-				c.Set("operator", "admin")
-				c.Next()
-				return
+			// 格式预检：JWT 由 3 段 base64 编码组成，以点分隔（header.payload.signature）
+			// 非 JWT 格式的 token 直接跳过解析，避免不必要的开销
+			if strings.Count(tokenStr, ".") == 2 {
+				token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+					return []byte(secret), nil
+				})
+				if err == nil && token.Valid {
+					c.Set("auth_type", "admin")
+					c.Set("operator", "admin")
+					c.Next()
+					return
+				}
+				// 格式符合 JWT 但解析失败，不降级为 client token 查询
+				jwtFailed = true
 			}
 		}
 
 		// 尝试 Client Token 认证
 		token := clientToken
-		if token == "" {
+		if token == "" && !jwtFailed {
 			token = strings.TrimPrefix(auth, "Bearer ")
 		}
 		// 流代理场景：开发调试开关 (允许通过 URL query 传递 token)
@@ -224,6 +231,15 @@ var loginLimiter = &rateLimiter{
 	maxSize:  10000,
 }
 
+var clientAuthLimiter = &rateLimiter{
+	visitors: make(map[string]*visitor),
+	rate:     60,              // 客户端注册/验证接口限流：每分钟 60 次
+	window:   1 * time.Minute,
+	maxSize:  50000,
+}
+
+
+
 var apiLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
 	rate:     300,             // 放宽至 300 次/分钟，防止管理后台正常刷新被误伤
@@ -332,6 +348,23 @@ func APIRateLimit() gin.HandlerFunc {
 		ip := c.ClientIP()
 		if !apiLimiter.allow(ip) {
 			slog.Warn("API rate limit exceeded", "ip", ip)
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":    429,
+				"message": "请求过于频繁，请稍后再试",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// ClientAuthRateLimit 客户端注册与验证接口限流（每 IP 每分钟 60 次）
+func ClientAuthRateLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if !clientAuthLimiter.allow(ip) {
+			slog.Warn("client auth rate limit exceeded", "ip", ip, "path", c.Request.URL.Path)
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"code":    429,
 				"message": "请求过于频繁，请稍后再试",

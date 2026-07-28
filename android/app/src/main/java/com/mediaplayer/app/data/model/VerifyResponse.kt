@@ -17,7 +17,11 @@ data class VerifyResponse(
     @SerializedName("plan_name") val planName: String? = null,
     @SerializedName("expires_at") val expiresAt: String? = null,
     @SerializedName("global_maintenance") val globalMaintenance: Boolean = false,
-    @SerializedName("backup_servers") val backupServers: List<String>? = null,
     @SerializedName("is_tester") val isTester: Boolean = false,
-    @SerializedName("app_display_name") val appDisplayName: String? = null
+    @SerializedName("app_display_name") val appDisplayName: String? = null,
+    // 修复Bug3: verify 接口也返回备用服务器列表，确保可以通过心跳更新
+    @SerializedName("backup_servers") val backupServers: List<String>? = null,
+    // 远程配置下发，null 表示本次无需更新配置
+    @SerializedName("client_config") val clientConfig: RemoteClientConfig? = null
 )
+
