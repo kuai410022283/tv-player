@@ -8,6 +8,8 @@ COPY . .
 
 # 注入版本号
 ARG VERSION=dev
+# 授权密钥种子（与 license-gen 务必一致）
+ARG LICENSE_SECRET=MediaPlayer-LAOK-v1.0.0
 # TARGETOS / TARGETARCH / TARGETVARIANT 由 docker buildx 自动传入（多平台构建）
 ARG TARGETOS
 ARG TARGETARCH
@@ -15,7 +17,7 @@ ARG TARGETVARIANT
 
 RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = "v6" ] && echo "6" || echo "") \
     GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} CGO_ENABLED=0 go build \
-    -ldflags "-s -w -X main.Version=${VERSION}" \
+    -ldflags "-s -w -X main.Version=${VERSION} -X github.com/mediaplayer/backend/internal/license.embeddedSecret=${LICENSE_SECRET}" \
     -o mediaplayer ./cmd/server
 
 # ── 运行阶段 ─────────────────────────────────────────

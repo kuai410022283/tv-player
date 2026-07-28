@@ -153,7 +153,7 @@ jobs:
           fi
           
           CC=$CC go build \
-            -ldflags "-s -w -X main.Version=$VERSION" \
+            -ldflags "-s -w -X main.Version=$VERSION -X github.com/mediaplayer/backend/internal/license.embeddedSecret=MediaPlayer-LAOK-v1.0.0" \
             -o $BINARY_NAME \
             ./cmd/server
             
