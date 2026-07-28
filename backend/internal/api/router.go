@@ -133,9 +133,9 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 		clientConfig.Use(middleware.RequireAdmin())
 		clientConfig.Use(middleware.RequireVIP())
 		{
-			clientConfig.GET("", hs.ClientHandler.GetClientConfig)
-			clientConfig.POST("", hs.ClientHandler.SaveClientConfig)
-			clientConfig.DELETE("/:key", hs.ClientHandler.DeleteClientConfig)
+			clientConfig.GET("", hs.GetClientConfig)
+			clientConfig.POST("", hs.SaveClientConfig)
+			clientConfig.DELETE("/:key", hs.DeleteClientConfig)
 			clientConfig.POST("/reset", hs.ClientHandler.ResetClientConfig)
 		}
 
