@@ -8,6 +8,7 @@ import com.mediaplayer.app.data.model.ClientRegisterResp
 import com.mediaplayer.app.data.model.VerifyResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -72,6 +73,7 @@ class ServerAuthFlowManager(
 
     /**
      * 验证所有服务器（优化后的逻辑）
+     * 增加了每台服务器的重试机制，以应对反向代理/内网穿透场景的瞬时网络波动。
      */
     private suspend fun verifyServers() {
         val candidates = getCandidateServers()
@@ -79,41 +81,56 @@ class ServerAuthFlowManager(
 
         for ((index, serverUrl) in candidates.withIndex()) {
             val label = if (index == 0) "主服务器" else "备用服务器 $index"
-            callback?.onStatusUpdate("正在验证$label ...")
-
-            ApiClient.init(serverUrl)
-
-            val attempt = try {
-                withTimeout(15_000L) { authManager.verify() }
-            } catch (_: Exception) {
-                Result.failure(Exception("连接超时"))
-            }
-
-            if (attempt.isSuccess) {
-                val resp = attempt.getOrNull()
-                if (resp != null) {
-                    if (resp.globalMaintenance && !resp.isTester) {
-                        // 该服务器处于维护模式，记录下来并尝试下一个备用服务器
-                        maintenanceResp = resp
-                        continue
-                    } else {
-                        // 验证成功，尝试注册到其他服务器获取 Token
-                        if (index != 0) {
-                            registerToOtherServers(candidates, index)
-                        }
-                        callback?.onSuccess(resp)
-                        return
-                    }
+            
+            // 每台服务器最多重试 2 次，应对反向代理/内网穿透瞬时连接失败
+            var retryCount = 0
+            val maxRetries = 2
+            while (retryCount < maxRetries) {
+                if (retryCount > 0) {
+                    callback?.onStatusUpdate("正在重试$label (${retryCount+1}/$maxRetries)...")
+                    delay(1000) // 重试前等待 1 秒
                 } else {
-                    // Token 无效（非网络错误），尝试重新注册到当前服务器
-                    val registerResult = registerToServer(serverUrl, index)
-                    if (registerResult != null) {
-                        callback?.onSuccess(registerResult)
-                        return
+                    callback?.onStatusUpdate("正在验证$label ...")
+                }
+
+                ApiClient.init(serverUrl)
+
+                // 动态超时：首次 15s，重试时增加到 20s（慢速反向代理场景）
+                val timeoutMs = if (retryCount == 0) 15_000L else 20_000L
+                val attempt = try {
+                    withTimeout(timeoutMs) { authManager.verify() }
+                } catch (_: Exception) {
+                    Result.failure(Exception("连接超时"))
+                }
+
+                if (attempt.isSuccess) {
+                    val resp = attempt.getOrNull()
+                    if (resp != null) {
+                        if (resp.globalMaintenance && !resp.isTester) {
+                            // 该服务器处于维护模式，记录下来并尝试下一个备用服务器
+                            maintenanceResp = resp
+                            break
+                        } else {
+                            // 验证成功，尝试注册到其他服务器获取 Token
+                            if (index != 0) {
+                                registerToOtherServers(candidates, index)
+                            }
+                            callback?.onSuccess(resp)
+                            return
+                        }
+                    } else {
+                        // Token 无效（非网络错误），尝试重新注册到当前服务器
+                        val registerResult = registerToServer(serverUrl, index)
+                        if (registerResult != null) {
+                            callback?.onSuccess(registerResult)
+                            return
+                        }
                     }
                 }
+                // attempt.isFailure → 增加重试计数，继续重试当前服务器
+                retryCount++
             }
-            // attempt.isFailure → 网络错误，继续尝试下一个服务器（不清空 Token）
+            // 当前服务器重试耗尽，继续尝试下一个服务器（不清空 Token）
         }
 
         // 所有服务器验证失败
@@ -126,6 +143,7 @@ class ServerAuthFlowManager(
 
     /**
      * 注册到所有服务器（优化后的逻辑，不清空 Token）
+     * 增加了每台服务器的重试机制，以应对反向代理/内网穿透场景的瞬时网络波动。
      */
     private suspend fun registerToServers() {
         val candidates = getCandidateServers()
@@ -135,42 +153,54 @@ class ServerAuthFlowManager(
 
         for ((index, serverUrl) in candidates.withIndex()) {
             val label = if (index == 0) "主服务器" else "备用服务器 $index"
-            callback?.onStatusUpdate("正在连接$label ...")
 
-            ApiClient.init(serverUrl)
-            // 注意：这里不再调用 authManager.clearAuth()
+            // 每台服务器最多重试 2 次
+            var retryCount = 0
+            val maxRetries = 2
+            while (retryCount < maxRetries) {
+                if (retryCount > 0) {
+                    callback?.onStatusUpdate("正在重试连接$label (${retryCount+1}/$maxRetries)...")
+                    delay(1000)
+                } else {
+                    callback?.onStatusUpdate("正在连接$label ...")
+                }
 
-            val attempt = try {
-                withTimeout(15_000L) { authManager.register() }
-            } catch (_: Exception) {
-                Result.failure(Exception("连接超时"))
-            }
+                ApiClient.init(serverUrl)
 
-            if (attempt.isSuccess) {
-                val result = attempt.getOrThrow()
-                when (result.status) {
-                    "approved" -> {
-                        if (result.globalMaintenance && !result.isTester) {
-                            maintenanceResult = result
-                            continue
-                        } else {
-                            callback?.onSuccess(convertToVerifyResponse(result))
+                val timeoutMs = if (retryCount == 0) 15_000L else 20_000L
+                val attempt = try {
+                    withTimeout(timeoutMs) { authManager.register() }
+                } catch (_: Exception) {
+                    Result.failure(Exception("连接超时"))
+                }
+
+                if (attempt.isSuccess) {
+                    val result = attempt.getOrThrow()
+                    when (result.status) {
+                        "approved" -> {
+                            if (result.globalMaintenance && !result.isTester) {
+                                maintenanceResult = result
+                                break
+                            } else {
+                                callback?.onSuccess(convertToVerifyResponse(result))
+                                return
+                            }
+                        }
+                        "pending" -> {
+                            callback?.onPending(authManager.getDeviceId())
+                            return
+                        }
+                        "rejected" -> {
+                            callback?.onRejected("设备注册被拒绝\n请联系管理员")
+                            return
+                        }
+                        "banned" -> {
+                            callback?.onBanned("设备已被封禁\n请联系管理员")
                             return
                         }
                     }
-                    "pending" -> {
-                        callback?.onPending(authManager.getDeviceId())
-                        return
-                    }
-                    "rejected" -> {
-                        callback?.onRejected("设备注册被拒绝\n请联系管理员")
-                        return
-                    }
-                    "banned" -> {
-                        callback?.onBanned("设备已被封禁\n请联系管理员")
-                        return
-                    }
                 }
+                retryCount++
             }
             // attempt.isFailure → 继续尝试下一台服务器
         }

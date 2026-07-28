@@ -109,10 +109,11 @@ func (s *ClientConfigService) GetEffectiveConfig(clientID int64) (*models.Client
 	for _, r := range clientRows {
 		if r.ConfigVal != "" {
 			merged[r.ConfigKey] = r.ConfigVal
-		} else {
-			// 单设备明确设为空 = 取消对该项的管控（删除全局管控）
+		} else if r.Hidden == 0 {
+			// 空值且不隐藏 = 取消对该项的管控（删除全局管控）
 			delete(merged, r.ConfigKey)
 		}
+		// else: 空值但隐藏 = 保留全局值，仅控制隐藏
 		if r.Hidden != 0 {
 			clientHidden[r.ConfigKey] = true
 		} else {
@@ -136,7 +137,7 @@ func (s *ClientConfigService) GetEffectiveConfig(clientID int64) (*models.Client
 	}
 	// 单设备明确不隐藏的要从集合中移除
 	for _, r := range clientRows {
-		if r.Hidden == 0 && r.ConfigVal != "" {
+		if r.Hidden == 0 {
 			delete(hiddenSet, r.ConfigKey)
 		}
 	}
@@ -190,6 +191,17 @@ func (s *ClientConfigService) saveConfigs(scope string, configs map[string]inter
 		}
 		if val == nil && hiddenVal == 0 {
 			// 不管控且不隐藏 → 删除整行
+			_, err = tx.Exec(`DELETE FROM client_remote_configs WHERE scope=? AND config_key=?`, scope, key)
+		} else if val == nil && hiddenVal == 1 {
+			// 仅隐藏，不管控值 → 只更新 hidden 标志，保留 config_val 为空（不覆盖全局值）
+			_, err = tx.Exec(
+				`INSERT INTO client_remote_configs (scope, config_key, config_val, hidden, updated_at)
+				 VALUES (?, ?, '', ?, ?)
+				 ON CONFLICT(scope, config_key) DO UPDATE SET hidden=excluded.hidden, updated_at=excluded.updated_at`,
+				scope, key, hiddenVal, now,
+			)
+		} else if valStr, ok := val.(string); ok && valStr == "" && hiddenVal == 0 {
+			// 空字符串等价于"不管控"（兼容前端可能传空字符串的安全兜底）
 			_, err = tx.Exec(`DELETE FROM client_remote_configs WHERE scope=? AND config_key=?`, scope, key)
 		} else {
 			// 有管控值 或 仅隐藏 → INSERT/UPDATE

@@ -3387,7 +3387,8 @@ async function loadClientConfigTab(clientId) {
 
     const globalVal = globalMap[item.key] || '';
     const clientVal = clientMap[item.key];
-    const hasClientOverride = clientVal !== undefined;
+    // 空字符串视为无覆盖（兼容后端可能残留空值覆盖行的安全兜底）
+    const hasClientOverride = clientVal !== undefined && clientVal !== '';
     const effectiveVal = hasClientOverride ? clientVal : globalVal;
 
     // 继承全局 checkbox
@@ -3502,8 +3503,8 @@ async function saveClientConfig(clientId) {
   CLIENT_CONFIG_ITEMS.forEach(item => {
     const inheritCb = document.getElementById('dcc-' + item.key + '-inherit');
     if (inheritCb && inheritCb.checked) {
-      // 继承全局 => 传空字符串表示删除该设备覆盖项
-      configs[item.key] = '';
+      // 继承全局 => 传 null 表示删除该设备覆盖项（与全局配置 saveGlobalClientConfig 一致）
+      configs[item.key] = null;
     } else {
       const input = document.getElementById('dcc-val-' + item.key);
       if (!input) return;
@@ -3515,9 +3516,11 @@ async function saveClientConfig(clientId) {
         configs[item.key] = input.value;
       }
     }
-    // 无论是否继承全局，都收集隐藏状态
-    const hiddenCb = document.getElementById('dcc-' + item.key + '-hidden');
-    if (hiddenCb) hidden[item.key] = hiddenCb.checked;
+    // 仅当不继承全局时收集隐藏状态；继承全局时隐藏状态也继承全局，不创建设备覆盖
+    if (inheritCb && !inheritCb.checked) {
+      const hiddenCb = document.getElementById('dcc-' + item.key + '-hidden');
+      if (hiddenCb) hidden[item.key] = hiddenCb.checked;
+    }
   });
   const r = await api(`/admin/clients/${clientId}/config`, {
     method: 'POST',

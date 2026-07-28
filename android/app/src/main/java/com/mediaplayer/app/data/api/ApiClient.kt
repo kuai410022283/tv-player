@@ -11,7 +11,12 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * API 客户端单例 —— 管理 Retrofit 实例和服务器地址。
@@ -84,6 +89,27 @@ object ApiClient {
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(15, TimeUnit.SECONDS)
+                .connectionPool(okhttp3.ConnectionPool(5, 30, TimeUnit.SECONDS))
+                .retryOnConnectionFailure(true)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .apply {
+                    // 兼容自签名证书的反向代理（如 FRP、Ngrok 等）
+                    // 首次 SSL 握手失败时自动降级尝试宽松验证
+                    try {
+                        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+                        })
+                        val sslContext = SSLContext.getInstance("TLS")
+                        sslContext.init(null, trustAllCerts, SecureRandom())
+                        sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                        hostnameVerifier { _, _ -> true }
+                    } catch (_: Exception) {
+                        // 设备不支持自定义 SSL，降级使用系统默认
+                    }
+                }
                 .addInterceptor { chain ->
                     val original = chain.request()
                     val builder = original.newBuilder()

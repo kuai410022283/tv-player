@@ -145,6 +145,7 @@ class ClientAuthManager(private val context: Context) {
                 val data = response.body()?.data
                 if (data != null) {
                     prefs.edit().apply {
+                        putLong(Prefs.KEY_CLIENT_ID, data.clientId)
                         putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog)
                         putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
                         putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
@@ -179,12 +180,17 @@ class ClientAuthManager(private val context: Context) {
                     val data = response.body()?.data
                     if (data != null) {
                         prefs.edit().apply {
+                            putLong(Prefs.KEY_CLIENT_ID, data.clientId)
                             putString(Prefs.KEY_CLIENT_STATUS, "approved")
                             putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
                             putString(Prefs.KEY_EXPIRES_AT, data.expiresAt ?: "")
                             putString(Prefs.KEY_SERVER_NAME, data.serverName ?: "")
                             putString(Prefs.KEY_APP_DISPLAY_NAME, data.appDisplayName ?: "")
                             apply()
+                        }
+                        // 应用远程配置，防止后续 verify() 失败时配置丢失
+                        data.clientConfig?.let {
+                            com.mediaplayer.app.data.api.RemoteConfigManager.applyConfig(context, it)
                         }
                     } else {
                         prefs.edit().putString(Prefs.KEY_CLIENT_STATUS, "approved").apply()

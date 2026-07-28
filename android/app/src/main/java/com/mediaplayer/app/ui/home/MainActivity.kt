@@ -503,16 +503,28 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
         })
 
-        // 预连接：提前建立到服务器的TCP连接，减少首次请求延迟
-        com.mediaplayer.app.util.ConnectionWarmer.warmUp(serverUrl)
-
-        // 启动认证流程
-        authFlowManager.startAuthFlow()
-
-        // 检查版本更新
-        com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+        // 预连接：提前建立到所有候选服务器的 TCP 连接，减少首次请求延迟
+        // 使用 OkHttp 连接池，预热建立的连接可被后续请求复用，对反向代理/内网穿透场景尤其重要
+        val serverListJson = prefs.getString(Prefs.KEY_SERVER_URLS, null)
+        val serverUrls = if (serverListJson != null) {
+            try {
+                val arr = com.google.gson.Gson().fromJson(serverListJson, Array<com.mediaplayer.app.data.model.ServerEntry>::class.java)
+                arr.toList().filter { it.url.isNotEmpty() }.map { it.url }
+            } catch (_: Exception) {
+                try {
+                    val arr = com.google.gson.Gson().fromJson(serverListJson, Array<String>::class.java)
+                    arr.toList().filter { it.isNotEmpty() }
+                } catch (_: Exception) {
+                    listOf(serverUrl)
+                }
+            }
+        } else {
+            listOf(serverUrl)
+        }
+        com.mediaplayer.app.util.ConnectionWarmer.warmUp(serverUrls)
 
         // 注册远程配置应用回调：心跳收到远程配置后，刷新本地缓存设置值和 UI
+        // 必须在 startAuthFlow 之前设置，防止竞态导致回调丢失
         RemoteConfigManager.onConfigApplied = {
             runOnUiThread {
                 syncSettingsMemoryState()
@@ -534,8 +546,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
             }
         }
-    }
 
+        // 启动认证流程（必须在 onConfigApplied 设置之后）
+        authFlowManager.startAuthFlow()
+
+        // 检查版本更新
+        com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+    }
 
 
     private fun hideSystemUI() {
@@ -3132,7 +3149,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 优先级 1. 当前正在使用的主服务器 (currentServer)
             // 优先级 2. 用户原来手动输入的本地列表 (localList)
             // 优先级 3. 服务器最新下发的备用列表 (backupServers)
-            // 优先级 4. 公共服务器列表（开关开启时加入，放在最底部）
+            // 优先级 4. 服务器下发备用节点（放在最底部）
             val mergedList = mutableListOf<com.mediaplayer.app.data.model.ServerEntry>()
             mergedList.add(com.mediaplayer.app.data.model.ServerEntry("", currentServer))
             mergedList.addAll(localList)
