@@ -288,19 +288,6 @@ type ClientBatchReq struct {
 	Action string  `json:"action" binding:"required"` // approve, reject, ban, delete
 }
 
-// ── License (可选：许可证模式) ─────────────────────────
-
-type License struct {
-	ID         int64     `json:"id" db:"id"`
-	Key        string    `json:"key" db:"license_key"`
-	ClientID   int64     `json:"client_id" db:"client_id"`
-	MaxDevices int       `json:"max_devices" db:"max_devices"`
-	MaxStreams int       `json:"max_streams" db:"max_streams"`
-	Features   string    `json:"features" db:"features"` // JSON: ["hd","4k","dvr"]
-	ExpiresAt  time.Time `json:"expires_at" db:"expires_at"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
-}
-
 // ── Access Log ─────────────────────────────────────────
 
 type AccessLog struct {

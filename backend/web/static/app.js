@@ -249,7 +249,7 @@ function showSection(name, el) {
       if (iframe && (iframe.src === 'about:blank' || iframe.src.endsWith('blank'))) {
         iframe.src = '/admin/manual.html';
       }
-    }
+    },
   };
   if (loaders[name]) loaders[name]();
 }
@@ -2141,6 +2141,161 @@ function clientLogGoToPage(p) {
   if (p >= 1 && p <= totalPages) { clientLogPage = p; renderClientLogsTable(); }
 }
 
+// ═══ License Management ═══════════════════════════════
+
+/**
+ * 将文本复制到剪贴板。
+ * 兑齐处理：HTTP 环境下 navigator.clipboard 不可用，降级为旧式 execCommand。
+ * @param {string} text  要复制的文本
+ * @param {HTMLElement} btn 点击的按钮（用于反馈）
+ */
+function copyToClipboard(text, btn) {
+  const done = () => {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = '已复制';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); cb && cb(); } catch(e) { alert('复制失败，请手动选择复制') }
+  document.body.removeChild(ta);
+}
+
+/** 加载授权管理页面 */
+async function loadLicenseStatus() {
+  const container = document.getElementById('vip-license-status');
+  try {
+    const r = await api('/admin/license/status');
+    const d = r.data;
+    if (!d) {
+      container.innerHTML = '<p style="color:var(--text2);">无法获取授权信息</p>';
+      return;
+    }
+
+    if (d.status === 'unsupported') {
+      // 环境不支持，隐藏整个 VIP 授权模块
+      const section = document.getElementById('vip-license-section');
+      if (section) section.style.display = 'none';
+      return;
+    }
+
+    if (d.status === 'activated') {
+      const expiresDisplay = d.expires_at ? d.expires_at : '永久';
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:#22c55e;font-size:20px;">✅</span>
+            <span style="font-size:16px;font-weight:600;">已激活</span>
+          </div>
+          <div class="form-row">
+            <label>机器码</label>
+            <div style="display:flex;align-items:center;gap:8px;flex:1;">
+              <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
+              <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">复制</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label>过期时间</label>
+            <span style="flex:1;">${expiresDisplay}</span>
+          </div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-danger" onclick="revokeLicense()">吊销授权</button>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // unlicensed 或 expired
+    const warningMsg = d.status === 'expired'
+      ? `<p style="color:#ef4444;font-size:14px;">授权已过期，请联系管理员重新授权</p>`
+      : `<p style="color:var(--text2);font-size:14px;">将机器码提供给管理员，获取授权码后激活</p>`;
+
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        ${d.status === 'expired' ? '<div style="display:flex;align-items:center;gap:8px;"><span style="color:#ef4444;font-size:20px;">❌</span><span style="font-size:16px;font-weight:600;">已过期</span></div>' : ''}
+        <div class="form-row">
+          <label>机器码</label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;">
+            <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
+            <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">复制</button>
+          </div>
+        </div>
+        ${warningMsg}
+        <div class="form-row">
+          <label>授权码</label>
+          <input id="license-key-input" type="text" placeholder="输入授权码" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;font-family:monospace;" />
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="activateLicense()">激活授权</button>
+        </div>
+      </div>`;
+  } catch (e) {
+    container.innerHTML = '<p style="color:var(--text2);">加载授权信息失败</p>';
+  }
+}
+
+/** 激活授权码 */
+async function activateLicense() {
+  const key = document.getElementById('license-key-input').value.trim();
+  if (!key) { alert('请输入授权码'); return; }
+  const r = await api('/admin/license/activate', { method: 'POST', body: JSON.stringify({ license_key: key }) });
+  if (r.code === 200) {
+    alert('授权激活成功');
+    loadLicenseStatus();
+    updateLicenseUI();
+  } else {
+    alert(r.message || '激活失败');
+  }
+}
+
+/** 吊销授权 */
+async function revokeLicense() {
+  if (!confirm('确定要吊销当前授权吗？')) return;
+  const r = await api('/admin/license/revoke', { method: 'POST' });
+  if (r.code === 200) {
+    alert('授权已吊销');
+    loadLicenseStatus();
+    updateLicenseUI();
+  }
+}
+
+/** 更新授权相关 UI 显隐 */
+async function updateLicenseUI() {
+  try {
+    const r = await api('/admin/license/status');
+    const activated = r.data && r.data.status === 'activated';
+
+    // 控制侧边栏远程配置导航项显隐
+    const navRemoteConfig = document.getElementById('nav-client-config');
+    if (navRemoteConfig) navRemoteConfig.style.display = activated ? '' : 'none';
+
+    // 控制设备详情弹窗中的"远程配置"Tab按钮
+    const tabConfig = document.getElementById('tab-btn-config');
+    if (tabConfig) tabConfig.style.display = activated ? '' : 'none';
+  } catch (e) {
+    // 授权接口不可用时，隐藏所有授权相关 UI
+    const navRemoteConfig = document.getElementById('nav-client-config');
+    if (navRemoteConfig) navRemoteConfig.style.display = 'none';
+    const tabConfig = document.getElementById('tab-btn-config');
+    if (tabConfig) tabConfig.style.display = 'none';
+  }
+}
+
 // ═══ Client Settings & EPG ══════════════════════════════
 async function loadClientSettings() {
   const [setRes, plansRes, updateRes] = await Promise.all([
@@ -2264,6 +2419,9 @@ async function loadClientSettings() {
   const base64TextEl = document.getElementById('server-base64-text');
   if (rawUrlEl) rawUrlEl.textContent = serverRawUrl;
   if (base64TextEl) base64TextEl.textContent = serverBase64;
+
+  // 加载 VIP 授权订阅状态
+  loadLicenseStatus();
 }
 
 async function saveAllClientSettings() {
@@ -2607,6 +2765,7 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
     } catch (e) { }
     const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
     showSection(lastSection);
+    updateLicenseUI(); // 控制授权相关 UI 显隐
   })();
 }
 function copyText(text) {

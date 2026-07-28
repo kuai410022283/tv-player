@@ -280,17 +280,7 @@ func createTables(db *sql.DB) error {
 
 	CREATE INDEX IF NOT EXISTS idx_access_logs_client ON access_logs(client_id, created_at);
 
-	CREATE TABLE IF NOT EXISTS licenses (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		license_key TEXT NOT NULL UNIQUE,
-		client_id INTEGER,
-		max_devices INTEGER DEFAULT 1,
-		max_streams INTEGER DEFAULT 2,
-		features TEXT DEFAULT '[]',
-		expires_at DATETIME,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
-	);
+	-- 授权表迁移由 internal/license/storage.go 的 Migrate() 负责
 
 	-- ── Auto-reject policy setting ──────────────────────
 	INSERT OR IGNORE INTO user_settings (key, value) VALUES ('auto_approve', 'false');

@@ -18,6 +18,7 @@ import (
 	"github.com/mediaplayer/backend/internal/api"
 	"github.com/mediaplayer/backend/internal/api/handlers"
 	"github.com/mediaplayer/backend/internal/config"
+	"github.com/mediaplayer/backend/internal/license"
 	"github.com/mediaplayer/backend/internal/middleware"
 	"github.com/mediaplayer/backend/internal/services"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -95,6 +96,13 @@ func main() {
 	logSvc := services.NewLogService()
 	clientConfigSvc := services.NewClientConfigService(db)
 
+	// ── 初始化授权模块 ───────────────────────────────
+	licenseStorage := license.NewSQLiteStorage(db)
+	licenseStorage.Migrate()
+	license.Init(licenseStorage)
+	// 打印唯一标识码
+	fmt.Println("服务器机器码:", license.GetMachineID())
+
 	// ── 读取设置并初始化本地文件开关 ────────────────
 	if settings, err := channelSvc.GetAllSettings(); err == nil {
 		if v, ok := settings["allow_local_file"]; ok {
@@ -107,6 +115,7 @@ func main() {
 	go startClientExpiry(clientSvc, stop)
 	go middleware.StartRateLimitCleanup(stop)
 	epgSvc.StartEPGScheduler()
+	go licenseStorage.StartCleanupTask(stop)
 
 	// ── 初始化 Gin ──────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)
@@ -166,7 +175,8 @@ func main() {
 	ch := api.NewClientHandler(clientSvc, channelSvc, logSvc, streamProxy, clientConfigSvc)
 	ph := api.NewPlanHandler(planSvc)
 	lh := handlers.NewLogHandler(logSvc)
-	hs := api.NewHandlers(h, ch, ph, lh)
+	lih := handlers.NewLicenseHandler()
+	hs := api.NewHandlers(h, ch, ph, lh, lih)
 
 	// 禁用 API 缓存的中间件
 	noCache := func(c *gin.Context) {

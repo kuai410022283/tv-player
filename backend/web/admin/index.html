@@ -88,7 +88,7 @@
         <span>访问日志</span>
       </div>
       <div class="nav-section">系统管理</div>
-      <div class="nav-item" onclick="showSection('client-config',this)">
+      <div class="nav-item" id="nav-client-config" onclick="showSection('client-config',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
           <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
@@ -625,6 +625,22 @@
               当前自动识别的本地访问地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
             </div>
           </div>
+          <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+
+          <!-- VIP 授权订阅模块 -->
+          <div class="form-group" id="vip-license-section" style="background: rgba(168, 85, 247, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
+            <h3 style="margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              VIP 授权订阅
+            </h3>
+            <div id="vip-license-status">
+              <p style="color:var(--text2);">加载中...</p>
+            </div>
+          </div>
+
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
@@ -1345,7 +1361,7 @@
         <h3>设备详情</h3>
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:0;border-bottom:2px solid var(--border);">
           <button class="tab-btn active" data-tab="basic" onclick="switchClientDetailTab('basic',this)">基本信息</button>
-          <button class="tab-btn" data-tab="config" onclick="switchClientDetailTab('config',this)">远程配置</button>
+          <button class="tab-btn" id="tab-btn-config" data-tab="config" onclick="switchClientDetailTab('config',this)">远程配置</button>
         </div>
         <div id="client-detail-content" style="flex:1;min-height:0;overflow-y:auto;"></div>
         <div id="client-config-tab-content" style="display:none;max-height:400px;overflow-y:auto;"></div>

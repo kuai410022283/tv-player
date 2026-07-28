@@ -9,12 +9,13 @@ import (
 type Handlers struct {
 	*Handler
 	*ClientHandler
-	PlanHandler *PlanHandler
-	LogHandler  *handlers.LogHandler
+	PlanHandler    *PlanHandler
+	LogHandler     *handlers.LogHandler
+	LicenseHandler *handlers.LicenseHandler
 }
 
-func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler, lh *handlers.LogHandler) *Handlers {
-	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph, LogHandler: lh}
+func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler, lh *handlers.LogHandler, lih *handlers.LicenseHandler) *Handlers {
+	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph, LogHandler: lh, LicenseHandler: lih}
 }
 
 func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
@@ -125,21 +126,36 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			clients.POST("/:id/remark", hs.UpdateRemark)
 			clients.DELETE("/:id", hs.Delete)
 			clients.POST("/batch", hs.Batch)
-			// 单客户端远程配置
-			clients.GET("/:id/config", hs.ClientHandler.GetClientConfig)
-			clients.POST("/:id/config", hs.ClientHandler.SaveClientConfig)
-			clients.DELETE("/:id/config/:key", hs.ClientHandler.DeleteClientConfig)
-			clients.POST("/:id/config/reset", hs.ClientHandler.ResetClientConfig)
 		}
 
-		// 管理端：全局客户端远程配置
+		// 单客户端远程配置（需要 VIP 授权，独立子分组）
+		clientConfig := api.Group("/admin/clients/:id/config")
+		clientConfig.Use(middleware.RequireAdmin())
+		clientConfig.Use(middleware.RequireVIP())
+		{
+			clientConfig.GET("", hs.ClientHandler.GetClientConfig)
+			clientConfig.POST("", hs.ClientHandler.SaveClientConfig)
+			clientConfig.DELETE("/:key", hs.ClientHandler.DeleteClientConfig)
+			clientConfig.POST("/reset", hs.ClientHandler.ResetClientConfig)
+		}
+
+		// 管理端：授权管理（无需 VIP 授权，用于激活授权码和查看状态）
+		adminLicense := api.Group("/admin/license")
+		adminLicense.Use(middleware.RequireAdmin())
+		{
+			adminLicense.GET("/status", hs.LicenseHandler.GetStatus)
+			adminLicense.POST("/activate", hs.LicenseHandler.Activate)
+			adminLicense.POST("/revoke", hs.LicenseHandler.Revoke)
+		}
+
+		// 管理端：全局客户端远程配置（需要 VIP 授权）
 		globalConfig := api.Group("/admin/client-config")
 		globalConfig.Use(middleware.RequireAdmin())
+		globalConfig.Use(middleware.RequireVIP())
 		{
 			globalConfig.GET("", hs.ClientHandler.GetGlobalConfig)
 			globalConfig.POST("", hs.ClientHandler.SaveGlobalConfig)
 		}
-
 
 		// 管理端：套餐管理
 		plans := api.Group("/admin/plans")
