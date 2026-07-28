@@ -20,12 +20,12 @@ func NewClientService(db *sql.DB) *ClientService {
 
 // ── Token 生成 ─────────────────────────────────────────
 
-func generateToken() string {
+func generateToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
+		return "", fmt.Errorf("crypto/rand failed: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 // ── 客户端注册 ─────────────────────────────────────────
@@ -33,39 +33,10 @@ func generateToken() string {
 func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*models.ClientRegisterResp, error) {
 	now := time.Now()
 
-	// 检查是否已注册
-	var existing models.Client
-	var nullExpiresAt sql.NullTime
-	err := s.db.QueryRow(`SELECT id, status, access_token, expires_at, enable_log, is_tester FROM clients WHERE device_id=?`, req.DeviceID).
-		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt, &existing.EnableLog, &existing.IsTester)
-	if nullExpiresAt.Valid {
-		existing.ExpiresAt = nullExpiresAt.Time
+	token, err := generateToken()
+	if err != nil {
+		return nil, fmt.Errorf("生成令牌失败: %w", err)
 	}
-
-	if err == nil {
-		// 已注册，更新信息
-		_, _ = s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, request_note=?, updated_at=? WHERE id=?`,
-			req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, req.Note, now, existing.ID)
-
-		resp := &models.ClientRegisterResp{
-			ClientID:  existing.ID,
-			Status:    existing.Status,
-			Message:   statusMessage(existing.Status),
-			EnableLog: existing.EnableLog,
-			IsTester:  existing.IsTester,
-		}
-
-		if existing.Status == "approved" && existing.AccessToken != "" {
-			resp.AccessToken = existing.AccessToken
-			if !existing.ExpiresAt.IsZero() {
-				resp.ExpiresAt = existing.ExpiresAt.Format(time.RFC3339)
-			}
-		}
-		return resp, nil
-	}
-
-	// 新注册
-	token := generateToken()
 
 	// 检查自动审批设置
 	autoApprove := false
@@ -115,31 +86,59 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 		}
 	}
 
+	// 先尝试 INSERT：利用 device_id UNIQUE 约束防止竞态条件
 	res, err := s.db.Exec(`INSERT INTO clients (name, device_id, device_model, device_os, app_version, ip, access_token, status, max_streams, expires_at, last_seen, request_note, created_at, updated_at, plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		req.Name, req.DeviceID, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, token, status, maxStreams, expiresAt, now, req.Note, now, now, planID)
-	if err != nil {
-		return nil, fmt.Errorf("注册失败: %w", err)
+	if err == nil {
+		// INSERT 成功，设备不存在
+		clientID, _ := res.LastInsertId()
+		s.AddLog(clientID, "register", 0, ip, "", "新设备注册")
+
+		resp := &models.ClientRegisterResp{
+			ClientID:  clientID,
+			Status:    status,
+			Message:   statusMessage(status),
+			EnableLog: false,
+		}
+		if status == "approved" {
+			resp.AccessToken = token
+			if expiresAt != nil {
+				resp.ExpiresAt = expiresAt.Format(time.RFC3339)
+			}
+		}
+		return resp, nil
 	}
 
-	clientID, _ := res.LastInsertId()
+	// INSERT 失败（UNIQUE 约束冲突），说明设备已存在，降级为 UPDATE
+	var existing models.Client
+	var nullExpiresAt sql.NullTime
+	err = s.db.QueryRow(`SELECT id, status, access_token, expires_at, enable_log, is_tester FROM clients WHERE device_id=?`, req.DeviceID).
+		Scan(&existing.ID, &existing.Status, &existing.AccessToken, &nullExpiresAt, &existing.EnableLog, &existing.IsTester)
+	if err != nil {
+		return nil, fmt.Errorf("查询设备失败: %w", err)
+	}
+	if nullExpiresAt.Valid {
+		existing.ExpiresAt = nullExpiresAt.Time
+	}
 
-	// 记录日志
-	s.AddLog(clientID, "register", 0, ip, "", "新设备注册")
+	// 更新设备信息
+	_, _ = s.db.Exec(`UPDATE clients SET name=?, device_model=?, device_os=?, app_version=?, ip=?, last_seen=?, request_note=?, updated_at=? WHERE id=?`,
+		req.Name, req.DeviceModel, req.DeviceOS, req.AppVersion, ip, now, req.Note, now, existing.ID)
 
 	resp := &models.ClientRegisterResp{
-		ClientID:  clientID,
-		Status:    status,
-		Message:   statusMessage(status),
-		EnableLog: false, // 新设备默认关闭日志
+		ClientID:  existing.ID,
+		Status:    existing.Status,
+		Message:   statusMessage(existing.Status),
+		EnableLog: existing.EnableLog,
+		IsTester:  existing.IsTester,
 	}
 
-	if status == "approved" {
-		resp.AccessToken = token
-		if expiresAt != nil {
-			resp.ExpiresAt = expiresAt.Format(time.RFC3339)
+	if existing.Status == "approved" && existing.AccessToken != "" {
+		resp.AccessToken = existing.AccessToken
+		if !existing.ExpiresAt.IsZero() {
+			resp.ExpiresAt = existing.ExpiresAt.Format(time.RFC3339)
 		}
 	}
-
 	return resp, nil
 }
 
@@ -185,7 +184,11 @@ func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, ap
 
 	token := currentToken
 	if currentStatus != "approved" || token == "" {
-		token = generateToken()
+		t, err := generateToken()
+		if err != nil {
+			return fmt.Errorf("生成令牌失败: %w", err)
+		}
+		token = t
 	}
 
 	maxStreams := req.MaxStreams
@@ -258,8 +261,11 @@ func (s *ClientService) Ban(clientID int64, reason string) error {
 
 func (s *ClientService) Unban(clientID int64) error {
 	now := time.Now()
-	token := generateToken()
-	_, err := s.db.Exec(`UPDATE clients SET status='pending', access_token=?, reject_reason='', updated_at=? WHERE id=?`,
+	token, err := generateToken()
+	if err != nil {
+		return fmt.Errorf("生成令牌失败: %w", err)
+	}
+	_, err = s.db.Exec(`UPDATE clients SET status='pending', access_token=?, reject_reason='', updated_at=? WHERE id=?`,
 		token, now, clientID)
 	return err
 }
@@ -280,9 +286,12 @@ func (s *ClientService) RevokeToken(clientID int64) error {
 // ── 重新生成令牌 ───────────────────────────────────────
 
 func (s *ClientService) RegenerateToken(clientID int64) (string, error) {
-	token := generateToken()
+	token, err := generateToken()
+	if err != nil {
+		return "", fmt.Errorf("生成令牌失败: %w", err)
+	}
 	now := time.Now()
-	_, err := s.db.Exec(`UPDATE clients SET access_token=?, updated_at=? WHERE id=?`, token, now, clientID)
+	_, err = s.db.Exec(`UPDATE clients SET access_token=?, updated_at=? WHERE id=?`, token, now, clientID)
 	if err != nil {
 		return "", err
 	}
@@ -454,7 +463,10 @@ func (s *ClientService) Batch(req *models.ClientBatchReq, approver string) (int,
 		var err error
 		switch req.Action {
 		case "approve":
-			token := generateToken()
+			token, tokenErr := generateToken()
+			if tokenErr != nil {
+				return 0, fmt.Errorf("生成令牌失败: %w", tokenErr)
+			}
 			_, err = tx.Exec(`UPDATE clients SET status='approved', access_token=?, max_streams=?, expires_at=?, approved_by=?, reject_reason='', updated_at=? WHERE id=?`,
 				token, 2, now.AddDate(0, 0, 365), approver, now, id)
 		case "reject":

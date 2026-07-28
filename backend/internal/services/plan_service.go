@@ -85,7 +85,11 @@ func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error
 func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 	now := time.Now()
 	if m.SubscriptionToken == "" {
-		m.SubscriptionToken = generateToken()
+		token, err := generateToken()
+		if err != nil {
+			return fmt.Errorf("生成令牌失败: %w", err)
+		}
+		m.SubscriptionToken = token
 	}
 	res, err := s.db.Exec(`INSERT INTO subscription_plans (name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
 		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, m.EnableAggregation, now, now)
@@ -107,7 +111,11 @@ func (s *PlanService) AddPlan(m *models.SubscriptionPlan) error {
 func (s *PlanService) UpdatePlan(m *models.SubscriptionPlan) error {
 	now := time.Now()
 	if m.SubscriptionToken == "" {
-		m.SubscriptionToken = generateToken()
+		token, err := generateToken()
+		if err != nil {
+			return fmt.Errorf("生成令牌失败: %w", err)
+		}
+		m.SubscriptionToken = token
 	}
 	_, err := s.db.Exec(`UPDATE subscription_plans SET name=?, days=?, max_streams=?, price=?, description=?, subscription_token=?, enable_aggregation=?, updated_at=? WHERE id=?`,
 		m.Name, m.Days, m.MaxStreams, m.Price, m.Description, m.SubscriptionToken, m.EnableAggregation, now, m.ID)

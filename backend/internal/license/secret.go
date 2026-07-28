@@ -6,7 +6,13 @@
 
 package license
 
-// embeddedSecret 是 AES-256 密钥的种子，编译时注入。
+// embeddedSecret 是 AES-256 密钥的种子。
 // 使用 PBKDF2 派生为最终的 AES-256 密钥。
 // 修改此密钥会导致所有已生成的授权码失效。
-const embeddedSecret = "MPv2.0-a3f8c2e1-4b7d-9e5f-1a2c3d4e5f6a-2026"
+//
+// 生产部署时通过 ldflags 注入自定义密钥：
+//
+//	go build -ldflags "-X 'github.com/mediaplayer/backend/internal/license.embeddedSecret=你的密钥'" ./cmd/server/
+//
+// 默认值仅用于开发环境，生产环境必须替换。
+var embeddedSecret = "MPv2.0-dev-default-change-me-in-production"

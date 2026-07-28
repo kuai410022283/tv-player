@@ -68,7 +68,10 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 		// 流代理场景：开发调试开关 (允许通过 URL query 传递 token)
 		if token == "" && db != nil {
 			var enableUrlToken string
-			_ = db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_url_token'`).Scan(&enableUrlToken)
+			err := db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_url_token'`).Scan(&enableUrlToken)
+			if err != nil && err != sql.ErrNoRows {
+				slog.Warn("查询 enable_url_token 失败", "error", err)
+			}
 			if enableUrlToken == "true" {
 				token = c.Query("token")
 				if token != "" {
@@ -80,7 +83,10 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 			} else if c.Query("plan") == "1" {
 				// 如果开启了外部订阅，允许外部订阅流地址带有 plan=1 时，从 URL 提取 token 进行播放。
 				var enableExternalSub string
-				_ = db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_external_sub'`).Scan(&enableExternalSub)
+				err := db.QueryRow(`SELECT value FROM user_settings WHERE key='enable_external_sub'`).Scan(&enableExternalSub)
+				if err != nil && err != sql.ErrNoRows {
+					slog.Warn("查询 enable_external_sub 失败", "error", err)
+				}
 				if enableExternalSub == "true" {
 					token = c.Query("token")
 					if token != "" {
@@ -233,12 +239,10 @@ var loginLimiter = &rateLimiter{
 
 var clientAuthLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),
-	rate:     60,              // 客户端注册/验证接口限流：每分钟 60 次
+	rate:     60, // 客户端注册/验证接口限流：每分钟 60 次
 	window:   1 * time.Minute,
 	maxSize:  50000,
 }
-
-
 
 var apiLimiter = &rateLimiter{
 	visitors: make(map[string]*visitor),

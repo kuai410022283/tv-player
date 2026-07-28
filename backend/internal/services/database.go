@@ -80,7 +80,12 @@ func InitDB(dbPath string) (*sql.DB, error) {
 		for rows.Next() {
 			var id int64
 			if rows.Scan(&id) == nil {
-				updates = append(updates, planIDAndToken{id: id, token: generateToken()})
+				token, err := generateToken()
+				if err != nil {
+					slog.Error("generate token failed", "error", err)
+					continue
+				}
+				updates = append(updates, planIDAndToken{id: id, token: token})
 			}
 		}
 		rows.Close()

@@ -47,7 +47,7 @@ async function api(path, opts = {}) {
     let data = {};
     const text = await res.text();
     if (text) {
-      try { data = JSON.parse(text); } catch (e) { }
+      try { data = JSON.parse(text); } catch (e) { console.warn('JSON parse failed:', e, text.substring(0, 200)); }
     }
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
@@ -1452,7 +1452,7 @@ async function loadClients() {
   if (status) q += '&status=' + status;
   if (search) q += '&search=' + encodeURIComponent(search);
 
-  const [listRes, statsRes] = await Promise.all([api('/admin/clients' + q), api('/admin/clients/stats')]).catch(() => []);
+  const [listRes, statsRes] = await Promise.all([api('/admin/clients' + q), api('/admin/clients/stats')]).catch(() => [{ data: { items: [], total: 0 } }, { data: {} }]);
   if (isStale('clients', gen)) return;
 
   const st = statsRes.data || {};
