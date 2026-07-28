@@ -536,7 +536,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     else -> "原始比例"
                 }
                 // 刷新公共服务器列表状态
-                val fetchPublic = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, true)
+                val fetchPublic = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
                 findViewById<TextView>(R.id.tvSettingsPublicServerValue)?.text = if (fetchPublic) "开" else "关"
             }
         }
@@ -1263,7 +1263,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         val btnSettingsPublicServer = findViewById<View>(R.id.btnSettingsPublicServer)
         val tvSettingsPublicServerValue = findViewById<TextView>(R.id.tvSettingsPublicServerValue)
-        var fetchPublicServers = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, true)
+        var fetchPublicServers = prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
         tvSettingsPublicServerValue?.text = if (fetchPublicServers) "开" else "关"
         
         btnSettingsPublicServer?.setOnClickListener {
@@ -2194,7 +2194,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
      */
     private fun fetchAndCheckPublicServers() {
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        if (!prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, true)) return
+        if (!prefs.getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)) return
 
         lifecycleScope.launch {
             try {
@@ -3350,7 +3350,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             // 如果公共服务器列表开关开启，加入缓存的公共服务器（放在最底部）
             val fetchPublic = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-                .getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, true)
+                .getBoolean(Prefs.KEY_FETCH_PUBLIC_SERVERS, false)
             if (fetchPublic) {
                 val publicList = getPublicServerList()
                 mergedList.addAll(publicList)
