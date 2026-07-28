@@ -102,9 +102,10 @@ func loadAndVerify() {
 		return // 没激活过，正常
 	}
 
-	// 重新验证授权码（去除连字符和空格）
-	licenseKey = strings.ReplaceAll(licenseKey, "-", "")
+	// 重新验证授权码（去除格式化分隔符，还原 base64url 字符）
 	licenseKey = strings.ReplaceAll(licenseKey, " ", "")
+	licenseKey = strings.ReplaceAll(licenseKey, "-", "")  // 去掉可视化分隔符
+	licenseKey = strings.ReplaceAll(licenseKey, ".", "-") // 还原 base64url 中的 "-"
 	decrypted, err := decryptLicenseKey(licenseKey)
 	if err != nil {
 		slog.Warn("license: 存储的授权码解密失败，需要重新激活", "error", err)
@@ -222,7 +223,7 @@ func Activate(licenseKey string) (*Info, error) {
 	// 去除格式化分隔符：先去空格，再去连字符（分隔符），最后将 "." 还原为 base64url 的 "-"
 	// 注意：授权码格式化时 base64url 的 "-" 已被替换为 "."
 	cleanKey := strings.ReplaceAll(licenseKey, " ", "")
-	cleanKey = strings.ReplaceAll(cleanKey, "-", "") // 去掉分隔符
+	cleanKey = strings.ReplaceAll(cleanKey, "-", "")  // 去掉分隔符
 	cleanKey = strings.ReplaceAll(cleanKey, ".", "-") // 还原 base64url 中的 "-"
 
 	// 解密
