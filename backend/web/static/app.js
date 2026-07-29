@@ -2175,18 +2175,35 @@ function fallbackCopy(text, cb) {
   document.body.removeChild(ta);
 }
 
+/** 折叠/展开 VIP 授权订阅模块 */
+function toggleVipSection() {
+  const statusEl = document.getElementById('vip-license-status');
+  const arrowEl = document.getElementById('vip-license-toggle-arrow');
+  if (!statusEl) return;
+  if (statusEl.style.display === 'none') {
+    statusEl.style.display = 'block';
+    if (arrowEl) arrowEl.style.transform = 'rotate(90deg)';
+  } else {
+    statusEl.style.display = 'none';
+    if (arrowEl) arrowEl.style.transform = 'rotate(0deg)';
+  }
+}
+
 /** 加载授权管理页面 */
 async function loadLicenseStatus() {
   const container = document.getElementById('vip-license-status');
+  const headerStatus = document.getElementById('vip-license-header-status');
   try {
     const r = await api('/admin/license/status');
     const d = r.data;
     if (!d) {
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">无法获取授权</span>';
       container.innerHTML = '<p style="color:var(--text2);">无法获取授权信息</p>';
       return;
     }
 
     if (d.status === 'unsupported') {
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">环境不支持</span>';
       // 环境不支持，隐藏整个 VIP 授权模块
       const section = document.getElementById('vip-license-section');
       if (section) section.style.display = 'none';
@@ -2194,13 +2211,10 @@ async function loadLicenseStatus() {
     }
 
     if (d.status === 'activated') {
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:#22c55e;font-weight:600;">✅ 已激活</span>';
       const expiresDisplay = d.expires_at ? d.expires_at : '永久';
       container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:16px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="color:#22c55e;font-size:20px;">✅</span>
-            <span style="font-size:16px;font-weight:600;">已激活</span>
-          </div>
           <div class="form-row">
             <label>机器码</label>
             <div style="display:flex;align-items:center;gap:8px;flex:1;">
@@ -2221,13 +2235,18 @@ async function loadLicenseStatus() {
     }
 
     // unlicensed 或 expired
+    if (d.status === 'expired') {
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:#ef4444;font-weight:600;">❌ 已过期</span>';
+    } else {
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text2);font-weight:600;">未激活</span>';
+    }
+
     const warningMsg = d.status === 'expired'
       ? `<p style="color:#ef4444;font-size:14px;">授权已过期，请联系管理员重新授权</p>`
       : `<p style="color:var(--text2);font-size:14px;">将机器码提供给管理员，获取授权码后激活</p>`;
 
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:16px;">
-        ${d.status === 'expired' ? '<div style="display:flex;align-items:center;gap:8px;"><span style="color:#ef4444;font-size:20px;">❌</span><span style="font-size:16px;font-weight:600;">已过期</span></div>' : ''}
         <div class="form-row">
           <label>机器码</label>
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
@@ -2245,6 +2264,7 @@ async function loadLicenseStatus() {
         </div>
       </div>`;
   } catch (e) {
+    if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">加载失败</span>';
     container.innerHTML = '<p style="color:var(--text2);">加载授权信息失败</p>';
   }
 }

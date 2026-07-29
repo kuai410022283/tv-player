@@ -629,14 +629,22 @@
 
           <!-- VIP 授权订阅模块 -->
           <div class="form-group" id="vip-license-section" style="background: rgba(168, 85, 247, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
-            <h3 style="margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              VIP 授权订阅
-            </h3>
-            <div id="vip-license-status">
+            <div onclick="toggleVipSection()" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+              <h3 style="margin: 0; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                VIP 授权订阅
+                <svg id="vip-license-toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; transition: transform 0.2s; transform: rotate(0deg);">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </h3>
+              <div id="vip-license-header-status" style="font-size: 13px;">
+                <span style="color: var(--text3);">加载中...</span>
+              </div>
+            </div>
+            <div id="vip-license-status" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(168, 85, 247, 0.2);">
               <p style="color:var(--text2);">加载中...</p>
             </div>
           </div>
