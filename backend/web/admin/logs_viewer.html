@@ -27,33 +27,34 @@
 <body>
   <div class="header">
     <div class="tabs">
-      <div class="tab active" data-type="backend">后台终端日志</div>
-      <div class="tab" data-type="client">客户端日志</div>
+      <div class="tab active" data-type="backend" data-i18n="logs.backend_tab">后台终端日志</div>
+      <div class="tab" data-type="client" data-i18n="logs.client_tab">客户端日志</div>
     </div>
     <div class="actions">
       <select id="refresh-interval" style="padding: 6px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; outline: none; background: #f9f9f9;">
-        <option value="0" selected>不自动刷新</option>
-        <option value="3000">自动 (3s)</option>
-        <option value="5000">5秒</option>
-        <option value="10000">10秒</option>
-        <option value="30000">30秒</option>
-        <option value="60000">1分钟</option>
-        <option value="300000">5分钟</option>
+        <option value="0" selected data-i18n="logs.no_refresh">不自动刷新</option>
+        <option value="3000" data-i18n="logs.refresh_3s">自动 (3s)</option>
+        <option value="5000" data-i18n="logs.refresh_5s">5秒</option>
+        <option value="10000" data-i18n="logs.refresh_10s">10秒</option>
+        <option value="30000" data-i18n="logs.refresh_30s">30秒</option>
+        <option value="60000" data-i18n="logs.refresh_1m">1分钟</option>
+        <option value="300000" data-i18n="logs.refresh_5m">5分钟</option>
       </select>
-      <button id="btn-refresh">刷新</button>
-      <button id="btn-export">导出当前</button>
+      <button id="btn-refresh" data-i18n="logs.btn_refresh">刷新</button>
+      <button id="btn-export" data-i18n="logs.btn_export">导出当前</button>
     </div>
   </div>
   
   <div class="client-selector" id="client-selector">
     <select id="client-list">
-      <option value="">-- 选择设备日志 --</option>
+      <option value="" data-i18n="logs.select_client">-- 选择设备日志 --</option>
     </select>
-    <button id="btn-delete-client" style="color: #d32f2f;">删除日志</button>
+    <button id="btn-delete-client" style="color: #d32f2f;" data-i18n="logs.btn_delete">删除日志</button>
   </div>
 
   <div class="log-container" id="log-view"></div>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/logs.js"></script>
 </body>
 </html>

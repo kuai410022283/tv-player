@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaPlayer Admin - User Manual</title>
+<script>
+  if (window.top === window.self) {
+    window.location.replace('/admin/');
+  }
+</script>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --text: #333333;
+    --text2: #8c8c8c;
+    --accent: #16baaa;
+    --border: #e8e8e8;
+    --radius: 6px;
+    --warn: #ffb800;
+    --danger: #ff5722;
+    --info: #1e9fff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px;
+  }
+  .content {
+    background: #fff;
+    padding: 40px;
+    border-radius: var(--radius);
+    max-width: 1000px;
+    margin: 0 auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  }
+  .content h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .content .subtitle {
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc-box {
+    background: #f8f9fa;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 32px;
+  }
+  .toc-box .toc-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text2);
+  }
+  .toc-box .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 24px;
+  }
+  .toc-box a {
+    font-size: 13px;
+    color: var(--accent);
+    text-decoration: none;
+    padding: 3px 0;
+    display: inline-block;
+  }
+  .toc-box a:hover { text-decoration: underline; }
+  .content h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 36px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+  }
+  .content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0 10px;
+    color: var(--text);
+  }
+  .content p {
+    font-size: 14px;
+    line-height: 1.8;
+    margin-bottom: 12px;
+    color: #444;
+  }
+  .content ul, .content ol {
+    margin: 8px 0 16px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #444;
+  }
+  .content li { margin-bottom: 4px; }
+  .note, .tip, .warning {
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    margin: 16px 0 20px;
+    font-size: 14px;
+    line-height: 1.6;
+    border-left: 4px solid;
+  }
+  .note { background: #f0f9ff; border-color: var(--info); color: #1a5a8c; }
+  .tip { background: #f0faf5; border-color: var(--accent); color: #1a7a6a; }
+  .warning { background: #fff8e6; border-color: var(--warn); color: #8a6a00; }
+  .back-to-top {
+    display: block;
+    text-align: right;
+    font-size: 13px;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 16px;
+  }
+  .back-to-top:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="content">
+  <h1>User Manual</h1>
+  <p class="subtitle">MediaPlayer Administration Panel — Comprehensive Operation Guide</p>
+
+  <div class="toc-box">
+    <div class="toc-title">Table of Contents</div>
+    <div class="toc-grid">
+      <a href="#intro">1. Getting Started</a>
+      <a href="#dashboard">2. Dashboard</a>
+      <a href="#channels">3. Channels Management</a>
+      <a href="#groups">4. Groupings</a>
+      <a href="#sources">5. M3U Source Management</a>
+      <a href="#streams">6. Active Streams</a>
+      <a href="#clients">7. Devices Authorization</a>
+      <a href="#plans">8. Subscription Plans</a>
+      <a href="#logs">9. Access Logs</a>
+    </div>
+  </div>
+
+  <h2 id="intro">1. Getting Started</h2>
+  <p>MediaPlayer is a smart media server designed for managing IPTV streaming resources. It consolidates massive raw live stream URLs (M3U) and EPG XML files into a highly responsive, customized subscription channel list for TV clients.</p>
+  <div class="tip">
+    <strong>Tip:</strong> Always configure at least one channel group before importing live sources.
+  </div>
+
+  <h2 id="dashboard">2. Dashboard</h2>
+  <p>The dashboard provides real-time statistics regarding your IPTV server health:
+    <ul>
+      <li><strong>Total Channels:</strong> Aggregate count of imported playback links.</li>
+      <li><strong>Online Channels:</strong> Active channels currently validated by the system.</li>
+      <li><strong>Active Streams:</strong> Number of client devices currently fetching live streams.</li>
+      <li><strong>Authorized Devices:</strong> Total device profiles registered on this console.</li>
+    </ul>
+  </p>
+
+  <h2 id="channels">3. Channels Management</h2>
+  <p>Add, edit, or remove channels individually. Each channel can be assigned custom stream link lines, EPG mappings, logo images, and specific decoder modes (hardware/software/ExoPlayer/VLC).</p>
+
+  <h2 id="groups">4. Groupings</h2>
+  <p>Groupings organize channels into categories (e.g., Sports, Movies, News). Group names will display directly as channel list categories on the TV client UI.</p>
+
+  <h2 id="sources">5. M3U Source Management</h2>
+  <p>Import bulk playlist sources via M3U files or remote HTTP links. The system automatically parses these files and allows you to bind channel sources to specific groups in bulk.</p>
+
+  <h2 id="streams">6. Active Streams</h2>
+  <p>Lists all live streaming sessions currently active on the server. You can monitor device IPs, cache durations, and choose to forcibly terminate unauthorized streams.</p>
+
+  <h2 id="clients">7. Devices Authorization</h2>
+  <p>Devices must be registered and approved before accessing subscriptions. You can grant access by copying base64 config lines, binding devices to specific subscription plans, or setting absolute expiration dates.</p>
+
+  <h2 id="plans">8. Subscription Plans</h2>
+  <p>Manage subscription packages. A plan determines which channel groups are accessible to the associated devices, pricing info, and stream limits.</p>
+
+  <h2 id="logs">9. Access Logs</h2>
+  <p>Tracks system events, backend terminal outputs, and client device connection status records. Great for troubleshooting buffering or authentication errors.</p>
+  
+  <a href="#" class="back-to-top">Back to Top ↑</a>
+</div>
+
+</body>
+</html>

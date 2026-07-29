@@ -21,18 +21,28 @@ body { display: flex; align-items: center; justify-content: center; height: 100v
     <svg viewBox="0 0 1024 1024" style="width: 48px; height: 48px; display: inline-block;">
       <path fill="#1296db" d="M867.530667 172.330667A71.157333 71.157333 0 0 1 938.666667 243.477333v423.018667a71.146667 71.146667 0 0 1-71.136 71.168H167.146667A71.125333 71.125333 0 0 1 96 666.496V243.509333a71.157333 71.157333 0 0 1 71.146667-71.178666z m-360.853334 163.2c-34.016-19.648-76.533333 4.917333-76.533333 44.192v150.506666c0 39.296 42.517333 63.861333 76.533333 44.213334l130.272-75.264c34.016-19.626667 34.016-68.757333 0-88.405334zM360.202667 790.997333H685.12c19.690667 0 29.536 10.666667 29.536 32s-9.845333 32-29.536 32H360.213333c-19.690667 0-29.536-10.666667-29.536-32s9.845333-32 29.536-32z"/>
     </svg>
-    <h3 style="margin: 12px 0 0 0;">管理后台登录</h3>
+    <h3 style="margin: 12px 0 0 0;" data-i18n="login.title">管理后台登录</h3>
   </div>
   <div class="form-group">
-    <label>管理密码</label>
-    <input type="password" id="login-password" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
-    <div id="default-pwd-hint" style="font-size:11px;color:var(--text2);margin-top:8px">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
+    <label data-i18n="login.password_label">管理密码</label>
+    <input type="password" id="login-password" data-i18n-placeholder="login.password_placeholder" placeholder="输入管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="default-pwd-hint" style="font-size:11px;color:var(--text2);margin-top:8px" data-i18n="login.default_pwd_hint">默认密码: admin123 (可通过环境变量 ADMIN_PASSWORD 修改)</div>
   </div>
   <div class="form-actions">
-    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">登录</button>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()" data-i18n="login.btn_login">登录</button>
+  </div>
+  <div style="margin-top: 16px; text-align: center;">
+    <select id="lang-selector" onchange="window.i18n.switchLanguage(this.value)" style="background: var(--bg2); color: var(--text2); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 12px; width: 100%; cursor: pointer;">
+      <option value="zh-CN">简体中文</option>
+      <option value="en-US">English</option>
+      <option value="zh-TW">繁體中文 (台灣)</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+    </select>
   </div>
 </div>
 <div class="toast" id="toast" style="display:none"></div>
+<script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 <script>
   fetch('/api/v1/admin/config')

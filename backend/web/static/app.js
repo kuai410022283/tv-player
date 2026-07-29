@@ -60,7 +60,7 @@ async function api(path, opts = {}) {
   } catch (e) {
     // AbortError 是主动取消，不属于错误，静默处理
     if (e.name === 'AbortError') { if (!opts.silent) hideLoading(); throw e; }
-    if (!opts.silent) toast('请求失败: ' + e.message, 'error');
+    if (!opts.silent) toast(t('common.request_failed', '请求失败') + ': ' + e.message, 'error');
     throw e;
   } finally {
     if (!opts.silent) hideLoading();
@@ -105,18 +105,18 @@ function hideModal(id) { document.getElementById(id).classList.remove('show'); }
 function timeAgo(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr), now = new Date(), diff = (now - d) / 1000;
-  if (diff < 60) return '刚刚';
-  if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
-  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
-  return Math.floor(diff / 86400) + '天前';
+  if (diff < 60) return t('common.just_now', '刚刚');
+  if (diff < 3600) return Math.floor(diff / 60) + t('common.minutes_ago', '分钟前');
+  if (diff < 86400) return Math.floor(diff / 3600) + t('common.hours_ago', '小时前');
+  return Math.floor(diff / 86400) + t('common.days_ago', '天前');
 }
 
 function fmtDate(d) {
-  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">从未同步</span>';
+  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">' + t('common.never_synced', '从未同步') + '</span>';
   return new Date(d).toLocaleString('zh-CN');
 }
 function fmtExpiresAt(d) {
-  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">永久</span>';
+  if (!d || d.startsWith('0001-01-01')) return '<span style="color:var(--text3)">' + t('common.forever', '永久') + '</span>';
   return new Date(d).toLocaleString('zh-CN');
 }
 function badge(status) { return `<span class="badge badge-${status}">${status}</span>`; }
@@ -127,9 +127,9 @@ function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}天${h}时${m}分`;
-  if (h > 0) return `${h}时${m}分`;
-  return `${m}分`;
+  if (d > 0) return `${d}${t('common.day', '天')}${h}${t('common.hour', '时')}${m}${t('common.minute', '分')}`;
+  if (h > 0) return `${h}${t('common.hour', '时')}${m}${t('common.minute', '分')}`;
+  return `${m}${t('common.minute', '分')}`;
 }
 
 // ═══ Login ════════════════════════════════════════════
@@ -143,7 +143,7 @@ function hideLogin() { /* do nothing */ }
 
 async function doLogin() {
   const password = document.getElementById('login-password').value;
-  if (!password) { toast('请输入密码', 'error'); return; }
+  if (!password) { toast(t('login.error_enter_password', '请输入密码'), 'error'); return; }
   try {
     const res = await fetch(API + '/admin/login', {
       method: 'POST',
@@ -154,13 +154,13 @@ async function doLogin() {
     if (data.code === 0 && data.data && data.data.token) {
       adminToken = data.data.token;
       localStorage.setItem('admin_token', adminToken);
-      toast('登录成功');
+      toast(t('login.success', '登录成功'), 'success');
       setTimeout(() => { window.location.href = '/admin/'; }, 500);
     } else {
-      toast(data.message || '密码错误', 'error');
+      toast(data.message || t('login.error_wrong_password', '密码错误'), 'error');
     }
   } catch (e) {
-    toast('登录失败: ' + e.message, 'error');
+    toast(t('login.failed', '登录失败') + ': ' + e.message, 'error');
   }
 }
 
@@ -168,7 +168,7 @@ function logout() {
   adminToken = '';
   localStorage.removeItem('admin_token');
   showLogin();
-  toast('已退出登录');
+  toast(t('login.logged_out', '已退出登录'));
 }
 
 async function updateAdminPassword() {
@@ -176,8 +176,8 @@ async function updateAdminPassword() {
   const newPwd = document.getElementById('pwd-new').value;
   const confirmPwd = document.getElementById('pwd-confirm').value;
 
-  if (!oldPwd || !newPwd || !confirmPwd) { toast('请填写所有密码字段', 'error'); return; }
-  if (newPwd !== confirmPwd) { toast('两次输入的新密码不一致', 'error'); return; }
+  if (!oldPwd || !newPwd || !confirmPwd) { toast(t('password_modal.error_fill_all', '请填写所有密码字段'), 'error'); return; }
+  if (newPwd !== confirmPwd) { toast(t('password_modal.error_not_match', '两次输入的新密码不一致'), 'error'); return; }
 
   await api('/admin/settings/password', {
     method: 'PUT',
@@ -188,7 +188,7 @@ async function updateAdminPassword() {
   document.getElementById('pwd-old').value = '';
   document.getElementById('pwd-new').value = '';
   document.getElementById('pwd-confirm').value = '';
-  toast('密码修改成功，请重新登录');
+  toast(t('password_modal.success', '密码修改成功，请重新登录'));
   setTimeout(() => logout(), 1500);
 }
 
@@ -246,8 +246,12 @@ function showSection(name, el) {
     },
     'manual': () => {
       const iframe = document.getElementById('manual-iframe');
-      if (iframe && (iframe.src === 'about:blank' || iframe.src.endsWith('blank'))) {
-        iframe.src = '/admin/manual.html';
+      if (iframe) {
+        const lang = localStorage.getItem('admin_lang') || 'zh-CN';
+        const targetSrc = (lang === 'zh-CN' || lang === 'zh-TW') ? '/admin/manual.html' : '/admin/manual_en.html';
+        if (iframe.src === 'about:blank' || iframe.src.endsWith('blank') || !iframe.src.endsWith(targetSrc)) {
+          iframe.src = targetSrc;
+        }
       }
     },
   };
@@ -296,10 +300,10 @@ async function loadDashboard() {
   if (logs.data && logs.data.length) {
     body.innerHTML = logs.data.map(l => {
       let actionBadge = '';
-      if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
-      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
-      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">心跳</span>';
-      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">错误</span>';
+      if (l.action === 'play') actionBadge = '<span class="badge badge-success">' + t('action.play', '播放') + '</span>';
+      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">' + t('action.login', '登录') + '</span>';
+      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">' + t('action.heartbeat', '心跳') + '</span>';
+      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">' + t('action.error', '错误') + '</span>';
       else actionBadge = badge(l.action);
 
       return `<tr>
@@ -310,7 +314,7 @@ async function loadDashboard() {
       </tr>`;
     }).join('');
   } else {
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:30px">暂无记录</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:30px">' + t('common.no_records', '暂无记录') + '</td></tr>';
   }
 }
 
@@ -357,16 +361,16 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
           logoHtml = `<img src="${c.logo}" loading="lazy" style="max-width:40px;max-height:24px;border-radius:2px;vertical-align:middle;" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span style="display:none;color:#999">-</span>`;
         }
       }
-      return `<tr data-id="${c.id}" data-source="${esc(c.source || '手动')}" data-group-id="${c.group_id}">
+      return `<tr data-id="${c.id}" data-source="${esc(c.source || t('common.manual', '手动'))}" data-group-id="${c.group_id}">
       <td><input type="checkbox" class="ch-check" value="${c.id}" onchange="updateSelectedChannels()"></td>
-      <td><span class="drag-handle" title="拖拽排序">⠿</span></td>
+      <td><span class="drag-handle" title="${t('common.drag_sort', '拖拽排序')}">⠿</span></td>
       <td style="color:var(--text3)">${(channelPage - 1) * channelPageSize + i + 1}</td>
       <td>${logoHtml}</td>
       <td><strong class="text-ellipsis" title="${esc(c.name)}">${esc(c.name)}</strong></td>
       <td style="color:var(--text3)">${c.sort_order}</td>
       <td>${c.epg_channel_id ? esc(c.epg_channel_id) : '<span style="color:#999">-</span>'}</td>
       <td>${gm[c.group_id] || '-'}</td>
-      <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || '手动')}</span></td>
+      <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(c.source || t('common.manual', '手动'))}</span></td>
       <td><label class="switch" style="transform: scale(0.8); margin: 0">
         <input type="checkbox" onchange="toggleChannelEnabled(${c.id}, this.checked)" ${c.is_enabled !== false ? 'checked' : ''}>
         <span class="slider"></span>
@@ -379,11 +383,11 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
       <td>${c.can_multiplex ? `<label class="switch" style="transform: scale(0.8); margin: 0">
         <input type="checkbox" onchange="toggleChannelMultiplex(${c.id}, this.checked)" ${c.enable_multiplex === 1 ? 'checked' : ''}>
         <span class="slider"></span>
-      </label>` : '<span class="badge" style="color:var(--text3);background:var(--bg3);border:1px solid var(--border)">不支持</span>'}</td>
+      </label>` : '<span class="badge" style="color:var(--text3);background:var(--bg3);border:1px solid var(--border)">' + t('common.not_supported', '不支持') + '</span>'}</td>
       <td style="color:var(--text3);font-size:12px">${(!c.updated_at || c.updated_at.startsWith('0001-01-01')) ? '-' : new Date(c.updated_at).toLocaleString('zh-CN')}</td>
       <td><div class="btn-group">
-        <button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">编辑</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">删除</button>
+        <button class="btn btn-ghost btn-sm" onclick="editChannel(${c.id})">${t('action.edit', '编辑')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">${t('action.delete', '删除')}</button>
       </div></td>
     </tr>`;
     }).join('');
@@ -414,7 +418,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   });
 
   document.getElementById('check-all-channels').checked = false;
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / channelPageSize));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage', channelPageSize);
   document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
@@ -433,29 +437,29 @@ function handleChannelBatchAction(action) {
   document.getElementById('channel-batch-action').value = ""; // reset
   const checked = document.querySelectorAll('.ch-check:checked');
   if (checked.length === 0) {
-    toast('请先勾选要操作的频道', 'error');
+    toast(t('channels.error_select_first', '请先勾选要操作的频道'), 'error');
     return;
   }
   
   window.pendingBatchAction = action;
   const actionNames = {
-    'delete': '删除',
-    'enable_on': '批量启用',
-    'enable_off': '批量禁用',
-    'direct_on': '开启直连模式',
-    'direct_off': '关闭直连模式',
-    'mux_on': '开启复用状态',
-    'mux_off': '关闭复用状态',
-    'content_type_auto': '设置内容类型(自动推断)',
-    'content_type_live': '设置内容类型(直播Live)',
-    'content_type_vod': '设置内容类型(点播VOD)'
+    'delete': t('channels.batch_delete', '删除'),
+    'enable_on': t('channels.batch_enable', '批量启用'),
+    'enable_off': t('channels.batch_disable', '批量禁用'),
+    'direct_on': t('channels.batch_direct_on', '开启直连模式'),
+    'direct_off': t('channels.batch_direct_off', '关闭直连模式'),
+    'mux_on': t('channels.batch_mux_on', '开启复用状态'),
+    'mux_off': t('channels.batch_mux_off', '关闭复用状态'),
+    'content_type_auto': t('channels.batch_content_type_auto', '设置内容类型(自动推断)'),
+    'content_type_live': t('channels.batch_content_type_live', '设置内容类型(直播Live)'),
+    'content_type_vod': t('channels.batch_content_type_vod', '设置内容类型(点播VOD)')
   };
   
   const modalText = document.getElementById('channel-batch-modal-text');
   if (action === 'delete') {
-    modalText.innerText = `将永久删除勾选的 ${checked.length} 个频道，此操作不可恢复。`;
+    modalText.innerText = t('modal.channel_batch_delete_text', '将永久删除勾选的 {n} 个频道，此操作不可恢复。').replace('{n}', checked.length);
   } else {
-    modalText.innerText = `将为勾选的 ${checked.length} 个频道批量${actionNames[action]}。`;
+    modalText.innerText = t('modal.channel_batch_action_text', '将为勾选的 {n} 个频道批量{action}。').replace('{n}', checked.length).replace('{action}', actionNames[action]);
   }
   showModal('channel-batch-modal');
 }
@@ -468,10 +472,10 @@ async function doChannelBatchAction() {
   try {
     if (action === 'delete') {
       await api('/channels/batch', { method: 'DELETE', body: JSON.stringify({ ids }) });
-      toast(`已批量删除 ${ids.length} 个频道`);
+      toast(t('channels.batch_delete_count', '已批量删除 {n} 个频道').replace('{n}', ids.length));
     } else {
       await api('/channels/batch', { method: 'PUT', body: JSON.stringify({ ids, action }) });
-      toast(`批量操作成功`);
+      toast(t('common.batch_success', '批量操作成功'));
     }
     hideModal('channel-batch-modal');
     loadChannels(document.getElementById('channel-search').value);
@@ -484,9 +488,9 @@ function openHealthCheckModal() {
   const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
   const descEl = document.getElementById('hc-modal-desc');
   if (ids.length > 0) {
-    descEl.innerText = `系统将对您勾选的 ${ids.length} 个频道进行健康检查探测，请设置预期完成时间。`;
+    descEl.innerText = t('channels.health_check_selected', '系统将对您勾选的 {n} 个频道进行健康检查探测，请设置预期完成时间。').replace('{n}', ids.length);
   } else {
-    descEl.innerText = `系统将采用平滑滚动机制逐一探测全库频道，绝不会产生高并发被源站封禁。请设置预期完成时间。`;
+    descEl.innerText = t('channels.health_check_all', '系统将采用平滑滚动机制逐一探测全库频道，绝不会产生高并发被源站封禁。请设置预期完成时间。');
   }
   showModal('health-check-modal');
 }
@@ -495,13 +499,13 @@ async function startHealthCheck() {
   const min = parseInt(document.getElementById('hc-expected-minutes').value) || 120;
   const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
   hideModal('health-check-modal');
-  toast('正在请求启动健康检查...');
+  toast(t('channels.health_check_starting', '正在请求启动健康检查...'));
   try {
     const r = await api('/channels/health-check/start', { 
       method: 'POST', 
       body: JSON.stringify({ expected_minutes: min, ids: ids.length > 0 ? ids : undefined }) 
     });
-    toast(r.message || '健康检查已平滑启动', 'success');
+    toast(r.message || t('channels.health_check_started', '健康检查已平滑启动'), 'success');
     pollHealthCheckStatus(); // 启动后立即轮询一次状态
   } catch (e) {
     // Error is handled by api() automatically
@@ -523,7 +527,7 @@ async function pollHealthCheckStatus() {
 
     if (data && data.is_running) {
       const pct = data.total > 0 ? Math.floor((data.current / data.total) * 100) : 0;
-      btn.textContent = `检查中 ${pct}%`;
+      btn.textContent = t('channels.health_check_progress', '检查中 {pct}%').replace('{pct}', pct);
       btn.disabled = true;
       btn.style.opacity = '0.7';
       btn.style.cursor = 'not-allowed';
@@ -540,7 +544,7 @@ async function pollHealthCheckStatus() {
       if (healthCheckPollTimer) clearTimeout(healthCheckPollTimer);
       healthCheckPollTimer = setTimeout(pollHealthCheckStatus, pollMs);
     } else {
-      btn.textContent = '健康检查';
+      btn.textContent = t('channels.health_check', '健康检查');
       btn.disabled = false;
       btn.style.opacity = '1';
       btn.style.cursor = 'pointer';
@@ -575,7 +579,7 @@ function filterChannelsByGroup(groupId, groupName, sourceName) {
   document.getElementById('channel-search').value = '';
   document.getElementById('channel-source-filter').value = '';
   showSection('channels');
-  document.getElementById('channel-search').placeholder = `已过滤: [${sourceName}] ${groupName} ...`;
+  document.getElementById('channel-search').placeholder = t('channels.filtered_placeholder', '已过滤: [{source}] {group} ...').replace('{source}', sourceName).replace('{group}', groupName);
   loadChannels();
 }
 
@@ -588,8 +592,8 @@ function filterChannelsByGroupMux(groupId, groupName, sourceName, muxSupport) {
   document.getElementById('channel-search').value = '';
   document.getElementById('channel-source-filter').value = '';
   showSection('channels');
-  let muxDesc = muxSupport === 1 ? '支持复用' : '不支持复用';
-  document.getElementById('channel-search').placeholder = `已过滤: [${sourceName}] ${groupName} (${muxDesc}) ...`;
+  let muxDesc = muxSupport === 1 ? t('channels.mux_support', '支持复用') : t('channels.mux_not_support', '不支持复用');
+  document.getElementById('channel-search').placeholder = t('channels.filtered_mux_placeholder', '已过滤: [{source}] {group} ({mux}) ...').replace('{source}', sourceName).replace('{group}', groupName).replace('{mux}', muxDesc);
   loadChannels();
 }
 
@@ -608,14 +612,14 @@ async function loadChannelSources() {
       const select = document.getElementById('channel-source-filter');
       if (select) {
         const currentVal = select.value;
-        select.innerHTML = '<option value="">全部来源</option>' +
+        select.innerHTML = '<option value="">' + t('common.all_sources', '全部来源') + '</option>' +
           res.data.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
         select.value = currentVal;
       }
       const mirrorSource = document.getElementById('ch-mirror-source');
       if (mirrorSource) {
         const mirrorVal = mirrorSource.value;
-        mirrorSource.innerHTML = '<option value="">(请先选择来源)</option>' +
+        mirrorSource.innerHTML = '<option value="">' + t('common.select_source_first', '请先选择来源') + '</option>' +
           res.data.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
         if (mirrorVal) mirrorSource.value = mirrorVal;
       }
@@ -671,20 +675,20 @@ async function saveChannelOrder() {
         source: currentChannelSource || ''
       })
     });
-    toast('排序已保存');
+    toast(t('common.sort_saved', '排序已保存'));
     document.getElementById('btn-save-channel-sort').style.display = 'none';
     loadChannels();
   } catch (e) {
-    toast('保存排序失败: ' + (e.message || e), 'error');
+    toast(t('common.sort_save_failed', '保存排序失败') + ': ' + (e.message || e), 'error');
     loadChannels();
   }
 }
 
 function showAddChannelModal() {
-  document.getElementById('channel-modal-title').textContent = '添加频道';
+  document.getElementById('channel-modal-title').textContent = t('modal.channel_add_title', '添加频道');
   document.getElementById('ch-edit-id').value = '';
   document.getElementById('ch-name').value = '';
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   if (groups.length > 0) {
     document.getElementById('ch-group').value = groups[0].id;
   }
@@ -731,21 +735,21 @@ async function saveChannel() {
     proxy_url: document.getElementById('ch-proxy-url').value,
     sort_order: parseInt(document.getElementById('ch-sort').value) || 0
   };
-  if (!d.name || !d.stream_url) { toast('请填写名称和流地址', 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast('请填写代理地址', 'error'); return; }
+  if (!d.name || !d.stream_url) { toast(t('modal.error_fill_name_url', '请填写名称和流地址'), 'error'); return; }
+  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
   if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
     } catch (e) {
-      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      toast(t('modal.error_invalid_json', '自定义 Headers 必须是合法的 JSON 格式'), 'error');
       return;
     }
   }
   await api(id ? `/channels/${id}` : '/channels', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('channel-modal');
   loadChannels();
-  toast(id ? '已更新' : '已添加');
+  toast(id ? t('common.updated', '已更新') : t('common.added', '已添加'));
 }
 
 async function editChannel(id) {
@@ -754,7 +758,7 @@ async function editChannel(id) {
   const c = r.data;
   document.getElementById('ch-edit-id').value = c.id;
   document.getElementById('ch-name').value = c.name;
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   document.getElementById('ch-group').value = c.group_id;
   document.getElementById('ch-url').value = c.stream_url;
   document.getElementById('ch-type').value = c.stream_type;
@@ -773,13 +777,13 @@ async function editChannel(id) {
   document.getElementById('ch-proxy-url').value = c.proxy_url || '';
   document.getElementById('ch-proxy-url-group').style.display = (c.proxy_type === 'socks5') ? 'block' : 'none';
   document.getElementById('ch-sort').value = c.sort_order || 0;
-  document.getElementById('channel-modal-title').textContent = '编辑频道';
+  document.getElementById('channel-modal-title').textContent = t('modal.channel_edit_title', '编辑频道');
   
   const mirrorAction = document.getElementById('ch-mirror-action');
   if (mirrorAction) {
     mirrorAction.style.display = 'block';
     document.getElementById('ch-mirror-source').value = '';
-    document.getElementById('ch-mirror-group').innerHTML = '<option value="">(请先选择分组)</option>';
+    document.getElementById('ch-mirror-group').innerHTML = '<option value="">' + t('common.select_group_first', '请先选择分组') + '</option>';
   }
 
   showModal('channel-modal');
@@ -797,10 +801,10 @@ async function toggleChannelDirect(id, enable) {
       method: 'PUT',
       body: JSON.stringify(ch)
     });
-    toast(enable ? '直连模式已开启' : '直连模式已关闭');
+    toast(enable ? t('channels.direct_on', '直连模式已开启') : t('channels.direct_off', '直连模式已关闭'));
   } catch (err) {
     console.error(err);
-    toast('操作失败', 'error');
+    toast(t('common.operation_failed', '操作失败'), 'error');
     loadChannels(); // revert UI switch
   }
 }
@@ -811,10 +815,10 @@ async function toggleChannelEnabled(id, enable) {
       method: 'PUT',
       body: JSON.stringify({ ids: [id], action: enable ? 'enable_on' : 'enable_off' })
     });
-    toast(enable ? '频道已启用' : '频道已禁用');
+    toast(enable ? t('channels.enabled', '频道已启用') : t('channels.disabled', '频道已禁用'));
   } catch (err) {
     console.error(err);
-    toast('操作失败', 'error');
+    toast(t('common.operation_failed', '操作失败'), 'error');
     loadChannels();
   }
 }
@@ -831,16 +835,16 @@ async function toggleChannelMultiplex(id, enable) {
       method: 'PUT',
       body: JSON.stringify(ch)
     });
-    toast(enable ? '复用流已开启' : '复用流已关闭');
+    toast(enable ? t('channels.mux_on', '复用流已开启') : t('channels.mux_off', '复用流已关闭'));
   } catch (err) {
     console.error(err);
-    toast('操作失败', 'error');
+    toast(t('common.operation_failed', '操作失败'), 'error');
     loadChannels(); // revert UI switch
   }
 }
 
 async function deleteChannel(id) {
-  if (!confirm('确认删除？')) return;
+  if (!confirm(t('common.confirm_delete', '确认删除？'))) return;
   await api(`/channels/${id}`, { method: 'DELETE' });
   loadChannels();
 }
@@ -852,7 +856,7 @@ async function mirrorChannel() {
   const targetSource = document.getElementById('ch-mirror-source').value;
   const targetGroupStr = document.getElementById('ch-mirror-group').value;
   if (!targetSource || !targetGroupStr) {
-    toast('请完整选择目标来源和目标分组', 'error');
+    toast(t('modal.error_select_target', '请完整选择目标来源和目标分组'), 'error');
     return;
   }
   
@@ -865,11 +869,11 @@ async function mirrorChannel() {
         target_source: targetSource
       })
     });
-    toast('频道镜像克隆成功！');
+    toast(t('channels.mirror_success', '频道镜像克隆成功！'));
     hideModal('channel-modal');
     loadChannels();
   } catch (e) {
-    toast('镜像失败: ' + (e.message || e), 'error');
+    toast(t('channels.mirror_failed', '镜像失败') + ': ' + (e.message || e), 'error');
   }
 }
 
@@ -877,12 +881,12 @@ function updateMirrorGroups() {
   const source = document.getElementById('ch-mirror-source').value;
   const groupSelect = document.getElementById('ch-mirror-group');
   if (!source) {
-    groupSelect.innerHTML = '<option value="">(请先选择分组)</option>';
+    groupSelect.innerHTML = '<option value="">' + t('common.select_group_first', '请先选择分组') + '</option>';
     return;
   }
-  const filteredGroups = groups.filter(g => (g.source || '手动') === source);
+  const filteredGroups = groups.filter(g => (g.source || t('common.manual', '手动')) === source);
   if (filteredGroups.length === 0) {
-    groupSelect.innerHTML = '<option value="">(该来源下无分组)</option>';
+    groupSelect.innerHTML = '<option value="">' + t('common.no_groups_in_source', '该来源下无分组') + '</option>';
   } else {
     groupSelect.innerHTML = filteredGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
   }
@@ -925,12 +929,12 @@ async function loadGroups() {
   document.getElementById('groups-body').innerHTML = items.map((g, i) => {
     const isDefault = g.name === '未分类' && (!g.source || g.source === '手动');
     const rowClass = isDefault ? 'no-drag' : '';
-    const dragHandle = isDefault ? '<span style="color:var(--text2);font-size:11px">锁定</span>' : '<span class="drag-handle" title="拖拽排序">⠿</span>';
+    const dragHandle = isDefault ? '<span style="color:var(--text2);font-size:11px">' + t('common.locked', '锁定') + '</span>' : '<span class="drag-handle" title="' + t('common.drag_sort', '拖拽排序') + '">⠿</span>';
     return `<tr data-id="${g.id}" class="${rowClass}">
     <td>${isDefault ? '' : `<input type="checkbox" class="group-check" value="${g.id}" onchange="updateSelectedGroups()">`}</td>
     <td>${dragHandle}</td>
     <td style="color:var(--text3)">${(groupPage - 1) * groupPageSize + i + 1}</td><td>${esc(g.name)}</td><td>${g.sort_order}</td>
-    <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || '手动')}</span></td>
+    <td><span style="font-size:12px;color:var(--text2);background:var(--surface);padding:2px 6px;border-radius:4px">${esc(g.source || t('common.manual', '手动'))}</span></td>
     <td><label class="switch" style="transform: scale(0.8); margin: 0">
       <input type="checkbox" onchange="toggleGroupDirect(${g.id}, this.checked)" ${g.is_direct !== false ? 'checked' : ''}>
       <span class="slider"></span>
@@ -938,22 +942,22 @@ async function loadGroups() {
     <td>${g.can_multiplex ? `<label class="switch" style="transform: scale(0.8); margin: 0">
       <input type="checkbox" onchange="toggleGroupMultiplex(${g.id}, this.checked)" ${g.enable_multiplex === 1 ? 'checked' : ''}>
       <span class="slider"></span>
-    </label>` : '<span class="badge" style="color:var(--text3);background:var(--bg3);border:1px solid var(--border)">不支持</span>'}</td>
-    <td><a href="javascript:void(0)" onclick="filterChannelsByGroupMux(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}', 1)" style="font-weight:bold;color:var(--success);text-decoration:underline;">${(g.channel_count || 0) - (g.non_mux_count || 0)}</a></td>
-    <td><a href="javascript:void(0)" onclick="filterChannelsByGroupMux(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}', 0)" style="font-weight:bold;color:var(--danger);text-decoration:underline;">${g.non_mux_count || 0}</a></td>
-    <td><a href="javascript:void(0)" onclick="filterChannelsByGroup(${g.id}, '${esc(g.name)}', '${esc(g.source || '手动')}')" style="font-weight:bold;color:var(--primary);text-decoration:underline;">${g.channel_count || 0}</a></td>
+    </label>` : '<span class="badge" style="color:var(--text3);background:var(--bg3);border:1px solid var(--border)">' + t('common.not_supported', '不支持') + '</span>'}</td>
+    <td><a href="javascript:void(0)" onclick="filterChannelsByGroupMux(${g.id}, '${esc(g.name)}', '${esc(g.source || t('common.manual', '手动'))}', 1)" style="font-weight:bold;color:var(--success);text-decoration:underline;">${(g.channel_count || 0) - (g.non_mux_count || 0)}</a></td>
+    <td><a href="javascript:void(0)" onclick="filterChannelsByGroupMux(${g.id}, '${esc(g.name)}', '${esc(g.source || t('common.manual', '手动'))}', 0)" style="font-weight:bold;color:var(--danger);text-decoration:underline;">${g.non_mux_count || 0}</a></td>
+    <td><a href="javascript:void(0)" onclick="filterChannelsByGroup(${g.id}, '${esc(g.name)}', '${esc(g.source || t('common.manual', '手动'))}')" style="font-weight:bold;color:var(--primary);text-decoration:underline;">${g.channel_count || 0}</a></td>
     <td style="color:var(--text3);font-size:12px">${(!g.updated_at || g.updated_at.startsWith('0001-01-01')) ? '-' : new Date(g.updated_at).toLocaleString('zh-CN')}</td>
     <td>
-      ${isDefault ? '<span style="color:var(--text3);font-size:12px;user-select:none">系统内置</span>' : `<div class="btn-group">
-        <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id})">编辑</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id}, '${esc(g.source || '手动')}', '${esc(g.name)}', ${g.channel_count})">删除</button>
+      ${isDefault ? '<span style="color:var(--text3);font-size:12px;user-select:none">' + t('common.system_builtin', '系统内置') + '</span>' : `<div class="btn-group">
+        <button class="btn btn-ghost btn-sm" onclick="editGroup(${g.id})">${t('action.edit', '编辑')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id}, '${esc(g.source || t('common.manual', '手动'))}', '${esc(g.name)}', ${g.channel_count})">${t('action.delete', '删除')}</button>
       </div>`}
     </td>
   </tr>`}).join('');
 
   const grpTotalPages = Math.max(1, Math.ceil(groupTotal / groupPageSize));
   renderPagination('groups-pagination', groupPage, grpTotalPages, 'groupGoToPage', groupPageSize);
-  document.getElementById('groups-info').textContent = `共 ${groupTotal} 个分组`;
+  document.getElementById('groups-info').textContent = t('common.total_groups', '共 {n} 个分组').replace('{n}', groupTotal);
   initGroupSort();
 }
 
@@ -1012,11 +1016,11 @@ async function saveGroupOrder() {
   if (items.length === 0) return;
   try {
     await api('/admin/groups/sort', { method: 'PUT', body: JSON.stringify({ items }) });
-    toast('排序已保存');
+    toast(t('common.sort_saved', '排序已保存'));
     document.getElementById('btn-save-sort').style.display = 'none';
     loadGroups();
   } catch (e) {
-    toast('保存排序失败: ' + (e.message || e), 'error');
+    toast(t('common.sort_save_failed', '保存排序失败') + ': ' + (e.message || e), 'error');
     loadGroups();
   }
 }
@@ -1036,27 +1040,27 @@ function handleGroupBatchAction(action) {
   document.getElementById('group-batch-action').value = ""; // reset
   const checked = document.querySelectorAll('.group-check:checked');
   if (checked.length === 0) {
-    toast('请先勾选要操作的分组', 'error');
+    toast(t('groups.error_select_first', '请先勾选要操作的分组'), 'error');
     return;
   }
   
   window.pendingGroupBatchAction = action;
   const actionNames = {
-    'delete': '删除',
-    'direct_on': '开启直连模式',
-    'direct_off': '关闭直连模式',
-    'mux_on': '开启复用状态',
-    'mux_off': '关闭复用状态',
-    'content_type_auto': '设置内容类型(自动)',
-    'content_type_live': '设置内容类型(直播)',
-    'content_type_vod': '设置内容类型(点播)'
+    'delete': t('groups.batch_delete', '删除'),
+    'direct_on': t('groups.batch_direct_on', '开启直连模式'),
+    'direct_off': t('groups.batch_direct_off', '关闭直连模式'),
+    'mux_on': t('groups.batch_mux_on', '开启复用状态'),
+    'mux_off': t('groups.batch_mux_off', '关闭复用状态'),
+    'content_type_auto': t('groups.batch_content_type_auto', '设置内容类型(自动)'),
+    'content_type_live': t('groups.batch_content_type_live', '设置内容类型(直播)'),
+    'content_type_vod': t('groups.batch_content_type_vod', '设置内容类型(点播)')
   };
   
   const modalText = document.getElementById('group-batch-modal-text');
   if (action === 'delete') {
-    modalText.innerText = `将永久删除勾选的 ${checked.length} 个分组及其下的所有频道，此操作不可恢复。`;
+    modalText.innerText = t('modal.group_batch_delete_text', '将永久删除勾选的 {n} 个分组及其下的所有频道，此操作不可恢复。').replace('{n}', checked.length);
   } else {
-    modalText.innerText = `将为勾选的 ${checked.length} 个分组批量${actionNames[action]}，这也会同步修改其下所有的频道设置。`;
+    modalText.innerText = t('modal.group_batch_action_text', '将为勾选的 {n} 个分组批量{action}，这也会同步修改其下所有的频道设置。').replace('{n}', checked.length).replace('{action}', actionNames[action]);
   }
   showModal('group-batch-modal');
 }
@@ -1069,9 +1073,9 @@ async function doGroupBatchAction() {
   try {
     await api('/groups/batch', { method: 'POST', body: JSON.stringify({ ids, action }) });
     if (action === 'delete') {
-      toast(`已批量删除 ${ids.length} 个分组`);
+      toast(t('groups.batch_delete_count', '已批量删除 {n} 个分组').replace('{n}', ids.length));
     } else {
-      toast(`批量操作成功`);
+      toast(t('common.batch_success', '批量操作成功'));
     }
     hideModal('group-batch-modal');
     loadGroups(document.getElementById('group-search').value);
@@ -1089,7 +1093,7 @@ function showAddGroupModal() {
   document.getElementById('grp-multiplex-group').style.display = 'none';
   document.getElementById('grp-user-agent').value = '';
   document.getElementById('grp-headers').value = '';
-  document.getElementById('group-modal-title').textContent = '添加分组';
+  document.getElementById('group-modal-title').textContent = t('modal.group_add_title', '添加分组');
   document.getElementById('grp-proxy-type').value = '';
   document.getElementById('grp-proxy-url').value = '';
   document.getElementById('grp-proxy-url-group').style.display = 'none';
@@ -1108,21 +1112,21 @@ async function saveGroup() {
     proxy_type: document.getElementById('grp-proxy-type').value,
     proxy_url: document.getElementById('grp-proxy-url').value
   };
-  if (!d.name) { toast('请填写名称', 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast('请填写代理地址', 'error'); return; }
+  if (!d.name) { toast(t('modal.error_fill_name', '请填写名称'), 'error'); return; }
+  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
   if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
     } catch (e) {
-      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      toast(t('modal.error_invalid_json', '自定义 Headers 必须是合法的 JSON 格式'), 'error');
       return;
     }
   }
   await api(id ? `/groups/${id}` : '/groups', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('group-modal');
   loadGroups();
-  toast(id ? '已更新' : '已添加');
+  toast(id ? t('common.updated', '已更新') : t('common.added', '已添加'));
 }
 
 function editGroup(id) {
@@ -1155,10 +1159,10 @@ async function toggleGroupDirect(id, enable) {
       body: JSON.stringify(updateData)
     });
     g.is_direct = enable;
-    toast(enable ? '分组直连已开启' : '分组直连已关闭');
+    toast(enable ? t('groups.direct_on', '分组直连已开启') : t('groups.direct_off', '分组直连已关闭'));
   } catch (err) {
     console.error(err);
-    toast('操作失败', 'error');
+    toast(t('common.operation_failed', '操作失败'), 'error');
     loadGroups();
   }
 }
@@ -1175,10 +1179,10 @@ async function toggleGroupMultiplex(id, enable) {
       body: JSON.stringify(updateData)
     });
     g.enable_multiplex = enable ? 1 : 0;
-    toast(enable ? '分组复用已开启' : '分组复用已关闭');
+    toast(enable ? t('groups.mux_on', '分组复用已开启') : t('groups.mux_off', '分组复用已关闭'));
   } catch (err) {
     console.error(err);
-    toast('操作失败', 'error');
+    toast(t('common.operation_failed', '操作失败'), 'error');
     loadGroups();
   }
 }
@@ -1230,7 +1234,7 @@ function renderSourcesTable() {
       </div></td>
     </tr>`).join('');
   } else {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">暂无源</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_sources', '暂无源') + '</td></tr>';
   }
   renderPagination('sources-pagination', sourcePage, totalPages, 'sourceGoToPage', sourcePageSize);
   document.getElementById('sources-info').textContent = `共 ${total} 个源`;
@@ -1242,7 +1246,7 @@ function sourceGoToPage(p) {
 }
 
 function showAddSourceModal() {
-  document.getElementById('src-modal-title').innerText = '添加M3U/TXT源';
+  document.getElementById('src-modal-title').innerText = t('modal.source_add_title', '添加M3U/TXT源');
   document.getElementById('src-edit-id').value = '';
   document.getElementById('src-name').value = '';
   document.getElementById('src-url').value = '';
@@ -1259,7 +1263,7 @@ function showAddSourceModal() {
 function editSource(id) {
   const s = sourcesList.find(x => x.id === id);
   if (!s) return;
-  document.getElementById('src-modal-title').innerText = '编辑M3U/TXT源';
+  document.getElementById('src-modal-title').innerText = t('modal.source_edit_title', '编辑M3U/TXT源');
   document.getElementById('src-edit-id').value = s.id;
   document.getElementById('src-name').value = s.name;
   document.getElementById('src-url').value = s.url;
@@ -1285,32 +1289,32 @@ async function saveSource() {
     proxy_type: document.getElementById('src-proxy-type').value,
     proxy_url: document.getElementById('src-proxy-url').value
   };
-  if (!d.name || !d.url) { toast('请填写完整', 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast('请填写代理地址', 'error'); return; }
+  if (!d.name || !d.url) { toast(t('sources.error_fill_complete', '请填写完整'), 'error'); return; }
+  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
   if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
     } catch (e) {
-      toast('自定义 Headers 必须是合法的 JSON 格式', 'error');
+      toast(t('modal.error_invalid_json', '自定义 Headers 必须是合法的 JSON 格式'), 'error');
       return;
     }
   }
   await api(id ? `/m3u/${id}` : '/m3u', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('source-modal');
   loadSources();
-  toast(id ? '已更新' : '已添加');
+  toast(id ? t('common.updated', '已更新') : t('common.added', '已添加'));
 }
 
 async function importSource(id) {
-  toast('已发起后台同步指令...');
+  toast(t('sources.sync_started', '已发起后台同步指令...'));
   try {
     const r = await api(`/m3u/${id}/import`, { method: 'POST' });
     if (r.data && r.data.message) {
       toast(r.data.message, 'success');
     }
   } catch (e) {
-    toast('指令下发失败: ' + e.message, 'error');
+    toast(t('sources.sync_failed', '指令下发失败') + ': ' + e.message, 'error');
   }
   loadSources(true);
 }
@@ -1324,17 +1328,17 @@ async function deleteSource(id) {
 async function importM3UContent() {
   const n = document.getElementById('import-name').value;
   const c = document.getElementById('import-content').value;
-  if (!n) { toast('请填写来源名称', 'error'); return; }
-  if (!c) { toast('请粘贴内容', 'error'); return; }
-  toast('正在解析与导入数据，大文件可能需要几十秒，请耐心等待...');
+  if (!n) { toast(t('sources.error_fill_name', '请填写来源名称'), 'error'); return; }
+  if (!c) { toast(t('sources.error_paste_content', '请粘贴内容'), 'error'); return; }
+  toast(t('sources.parsing_data', '正在解析与导入数据，大文件可能需要几十秒，请耐心等待...'));
   try {
     const r = await api('/m3u/import-string', { method: 'POST', body: JSON.stringify({ name: n, content: c }) });
     if (r.data && r.data.imported > 0) {
-      toast(`导入成功：共导入 ${r.data.imported} 个频道`, 'success');
+      toast(t('sources.import_success', '导入成功：共导入 {n} 个频道').replace('{n}', r.data.imported), 'success');
       hideModal('import-modal');
       loadSources();
     } else {
-      toast('未识别到有效的频道数据，请检查格式', 'error');
+      toast(t('sources.error_no_valid_data', '未识别到有效的频道数据，请检查格式'), 'error');
     }
   } catch (e) {
     // 错误信息已由 api() 拦截提示
@@ -1345,11 +1349,11 @@ async function formatContent(targetFormat) {
   const contentInput = document.getElementById('import-content');
   const c = contentInput.value;
   if (!c) {
-    toast('请粘贴需要格式化的内容', 'error');
+    toast(t('sources.error_paste_format_content', '请粘贴需要格式化的内容'), 'error');
     return;
   }
   
-  toast('正在请求后端进行格式化...');
+  toast(t('sources.requesting_format', '正在请求后端进行格式化...'));
   try {
     const r = await api('/m3u/format', {
       method: 'POST',
@@ -1358,9 +1362,9 @@ async function formatContent(targetFormat) {
     
     if (r.data && r.data.formatted) {
       contentInput.value = r.data.formatted;
-      toast(`格式化成功（${targetFormat.toUpperCase()}格式）`, 'success');
+      toast(t('sources.format_success', '格式化成功（{fmt}格式）').replace('{fmt}', targetFormat.toUpperCase()), 'success');
     } else {
-      toast('未识别到有效的频道数据，无法格式化', 'error');
+      toast(t('sources.error_no_valid_format_data', '未识别到有效的频道数据，无法格式化'), 'error');
     }
   } catch (e) {
     // 错误信息已由 api() 拦截提示
@@ -1376,13 +1380,13 @@ function handleImportFile(event) {
     const text = e.target.result;
     if (text.includes('#EXTM3U') || text.includes('#EXTINF') || text.includes(',')) {
       document.getElementById('import-content').value = text;
-      toast(`文件 "${file.name}" 已读取完毕，请点击下方「导入」按钮进行解析`, 'success');
+      toast(t('sources.file_loaded', '文件 "{name}" 已读取完毕，请点击下方「导入」按钮进行解析').replace('{name}', file.name), 'success');
       const nameInput = document.getElementById('import-name');
       if (!nameInput.value) {
         nameInput.value = file.name.replace(/\.[^/.]+$/, "");
       }
     } else {
-      toast('文件格式不正确，需要是标准的 M3U 或 TXT(名称,URL) 格式', 'error');
+      toast(t('sources.error_invalid_format', '文件格式不正确，需要是标准的 M3U 或 TXT(名称,URL) 格式'), 'error');
     }
     event.target.value = '';
   };
@@ -1423,7 +1427,7 @@ function renderStreamsTable() {
       <td><button class="btn btn-danger btn-sm" onclick="killStream('${s.session_id}')">踢下线</button></td>
     </tr>`).join('');
   } else {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">暂无活跃流</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_active_streams', '暂无活跃流') + '</td></tr>';
   }
   renderPagination('streams-pagination', streamPage, totalPages, 'streamGoToPage', streamPageSize);
   document.getElementById('streams-info').textContent = `共 ${total} 个活跃流`;
@@ -1437,7 +1441,7 @@ function streamGoToPage(p) {
 async function killStream(sessionId) {
   if (!confirm('确定要强制断开该代理流吗？')) return;
   await api(`/stream/active/${sessionId}`, { method: 'DELETE' });
-  toast('指令已发送');
+  toast(t('streams.command_sent', '指令已发送'));
   setTimeout(loadStreams, 500);
 }
 
@@ -1466,7 +1470,7 @@ async function loadClients() {
   selectedClientIds.clear();
 
   if (items.length === 0) {
-    body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:40px">暂无设备</td></tr>';
+    body.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_clients', '暂无设备') + '</td></tr>';
   } else {
     body.innerHTML = items.map((c, i) => `<tr>
       <td><input type="checkbox" class="client-check" value="${c.id}" onchange="updateSelectedClients()"></td>
@@ -1519,7 +1523,7 @@ function updateSelectedClients() {
 async function showClientDetail(id) {
   currentDetailClientId = id;
   const r = await api(`/admin/clients/${id}`);
-  if (!r.data) { toast('加载失败', 'error'); return; }
+  if (!r.data) { toast(t('common.load_failed', '加载失败'), 'error'); return; }
   const c = r.data;
   const tokenPreview = c.token_preview ? c.token_preview + '********' : '(无令牌)';
 
@@ -1592,7 +1596,7 @@ async function editClientRemark(id, oldNote) {
   if (r.error) {
     toast(r.error, 'error');
   } else {
-    toast('备注已更新');
+    toast(t('clients.remark_updated', '备注已更新'));
     showClientDetail(id);
     loadClients();
   }
@@ -1604,11 +1608,11 @@ async function toggleClientLog(id, enable) {
     body: JSON.stringify({ enable_log: enable })
   });
   if (r.code === 0) {
-    toast(enable ? '已开启终端日志采集' : '已关闭终端日志采集');
+    toast(t('common.log_toggle', enable ? '已开启终端日志采集' : '已关闭终端日志采集'));
     // Refresh modal
     showClientDetail(id);
   } else {
-    toast(r.message || '操作失败', 'error');
+    toast(r.message || t('common.operation_failed', '操作失败'), 'error');
   }
 }
 
@@ -1637,7 +1641,7 @@ async function downloadClientLog(id, deviceId) {
     a.remove();
     URL.revokeObjectURL(a.href);
   } catch (e) {
-    toast('网络错误', 'error');
+    toast(t('common.network_error', '网络错误'), 'error');
   }
 }
 
@@ -1737,11 +1741,11 @@ async function savePlan() {
     enable_aggregation: document.getElementById('plan-enable-aggregation').checked ? 1 : 0,
     group_ids: groupIds
   };
-  if (!d.name) { toast('请填写名称', 'error'); return; }
+  if (!d.name) { toast(t('modal.error_fill_name', '请填写名称'), 'error'); return; }
   await api(id ? `/admin/plans/${id}` : '/admin/plans', { method: id ? 'PUT' : 'POST', body: JSON.stringify(d) });
   hideModal('plan-modal');
   loadPlans();
-  toast(id ? '已更新' : '已添加');
+  toast(id ? t('common.updated', '已更新') : t('common.added', '已添加'));
 }
 
 async function editPlan(id) {
@@ -1773,7 +1777,7 @@ async function editPlan(id) {
   // 渲染已选分组（可拖拽）
   const selectedContainer = document.getElementById('plan-groups-selected');
   selectedContainer.innerHTML = selectedGroups.map(g => {
-    const source = g.source && g.source !== '手动' ? g.source : '';
+    const source = g.source && g.source !== t('common.manual', '手动') ? g.source : '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
     return `<div class="plan-group-tag" data-id="${g.id}" data-name="${esc(g.name)}"${source ? ` data-source="${esc(source)}"` : ''} style="display:flex;align-items:center;cursor:grab;background:var(--accent);color:#fff;padding:4px 10px;border-radius:4px;user-select:none;font-size:12px;transition:opacity 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onmousedown="this.style.cursor='grabbing'" onmouseup="this.style.cursor='grab'">
       ${esc(g.name)}${sourceTag}
@@ -1787,7 +1791,7 @@ async function editPlan(id) {
   unselectedContainer.innerHTML = '';
   if (unselectedHeader) unselectedContainer.appendChild(unselectedHeader);
   unselectedGroups.forEach(g => {
-    const source = g.source && g.source !== '手动' ? g.source : '';
+    const source = g.source && g.source !== t('common.manual', '手动') ? g.source : '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
     const tag = document.createElement('div');
     tag.className = 'plan-group-tag-unselected';
@@ -1987,7 +1991,7 @@ async function doApprove() {
   };
   const r = await api(`/admin/clients/${id}/approve`, { method: 'POST', body: JSON.stringify(d) });
   hideModal('approve-modal');
-  if (r.code === 0) { toast('已审批通过'); loadClients(); } else { toast(r.message, 'error'); }
+  if (r.code === 0) { toast(t('clients.approved', '已审批通过')); loadClients(); } else { toast(r.message, 'error'); }
 }
 
 function showRejectModal(id) {
@@ -2002,20 +2006,20 @@ async function doReject() {
   const reason = document.getElementById('reject-reason').value || '管理员拒绝';
   const r = await api(`/admin/clients/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
   hideModal('reject-modal');
-  if (r.code === 0) { toast('已拒绝'); loadClients(); } else { toast(r.message, 'error'); }
+  if (r.code === 0) { toast(t('clients.rejected', '已拒绝')); loadClients(); } else { toast(r.message, 'error'); }
 }
 
 async function banClient(id, reason) {
   if (!confirm('确定封禁此设备？')) return;
   await api(`/admin/clients/${id}/ban`, { method: 'POST', body: JSON.stringify({ reason }) });
   hideModal('client-detail-modal');
-  toast('已封禁');
+  toast(t('clients.banned', '已封禁'));
   loadClients();
 }
 
 async function unbanClient(id) {
   await api(`/admin/clients/${id}/unban`, { method: 'POST' });
-  toast('已解封');
+  toast(t('clients.unbanned', '已解封'));
   loadClients();
 }
 
@@ -2025,7 +2029,7 @@ async function toggleTester(id, isTester) {
       method: 'POST',
       body: JSON.stringify({ is_tester: isTester })
     });
-    toast(isTester ? '已设为测试机' : '已取消测试机');
+    toast(isTester ? t('clients.tester_set', '已设为测试机') : t('clients.tester_unset', '已取消测试机'));
   } catch (err) {
     console.error(err);
     loadClients(); // revert checkbox visually
@@ -2036,7 +2040,7 @@ async function deleteClient(id) {
   if (!confirm('确定删除此设备？删除后无法恢复。')) return;
   await api(`/admin/clients/${id}`, { method: 'DELETE' });
   hideModal('client-detail-modal');
-  toast('已删除');
+  toast(t('clients.deleted', '已删除'));
   loadClients();
 }
 
@@ -2066,21 +2070,21 @@ async function regenerateToken(id) {
   if (r.data) {
     document.getElementById('token-display').innerHTML =
       `<strong style="color:var(--accent)">${r.data.token}</strong><br><span style="font-size:11px;color:var(--warn)">⚠️ 请立即复制保存，关闭后无法再次查看</span>`;
-    toast('新令牌已生成');
-  } else { toast('操作失败', 'error'); }
+    toast(t('clients.token_generated', '新令牌已生成'));
+  } else { toast(t('common.operation_failed', '操作失败'), 'error'); }
 }
 
 async function revokeToken(id) {
   if (!confirm('吊销令牌？客户端将无法连接。')) return;
   await api(`/admin/clients/${id}/revoke`, { method: 'POST' });
-  toast('令牌已吊销');
+  toast(t('clients.token_revoked', '令牌已吊销'));
   hideModal('token-modal');
   loadClients();
 }
 
 // ── Batch operations ──
 async function doBatch() {
-  if (selectedClientIds.size === 0) { toast('请先勾选设备', 'error'); return; }
+  if (selectedClientIds.size === 0) { toast(t('clients.error_select_first', '请先勾选设备'), 'error'); return; }
   const action = document.getElementById('batch-action').value;
   if (!confirm(`确定对 ${selectedClientIds.size} 个设备执行 [${action}] 操作？`)) return;
 
@@ -2090,8 +2094,8 @@ async function doBatch() {
   });
   hideModal('batch-modal');
 
-  if (r.data) { toast(`已处理 ${r.data.affected} 个设备`); loadClients(); }
-  else toast('操作失败', 'error');
+  if (r.data) { toast(t('clients.batch_affected', '已处理 {n} 个设备').replace('{n}', r.data.affected)); loadClients(); }
+  else toast(t('common.operation_failed', '操作失败'), 'error');
 }
 
 // ═══ Client Logs ══════════════════════════════════════
@@ -2113,10 +2117,10 @@ function renderClientLogsTable() {
   if (pageData.length) {
     body.innerHTML = pageData.map((l, i) => {
       let actionBadge = '';
-      if (l.action === 'play') actionBadge = '<span class="badge badge-success">播放</span>';
-      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">登录</span>';
-      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">心跳</span>';
-      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">错误</span>';
+      if (l.action === 'play') actionBadge = '<span class="badge badge-success">' + t('action.play', '播放') + '</span>';
+      else if (l.action === 'login') actionBadge = '<span class="badge badge-info">' + t('action.login', '登录') + '</span>';
+      else if (l.action === 'heartbeat') actionBadge = '<span class="badge badge-warning" style="background:#eab308;color:#fff;">' + t('action.heartbeat', '心跳') + '</span>';
+      else if (l.action === 'error') actionBadge = '<span class="badge badge-danger">' + t('action.error', '错误') + '</span>';
       else actionBadge = badge(l.action);
 
       return `<tr>
@@ -2130,7 +2134,7 @@ function renderClientLogsTable() {
       </tr>`;
     }).join('');
   } else {
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:40px">暂无日志</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_logs', '暂无日志') + '</td></tr>';
   }
   renderPagination('client-logs-pagination', clientLogPage, totalPages, 'clientLogGoToPage', clientLogPageSize);
   document.getElementById('client-logs-info').textContent = `共 ${total} 条访问日志`;
@@ -2545,7 +2549,7 @@ async function saveAllClientSettings() {
   // 同时保存升级配置
   await saveAppUpdateSettings(true); // 传参 true 以便不重复弹 toast，或者就让它弹
 
-  toast('所有全局设置和 EPG 配置已保存');
+  toast(t('settings.all_saved', '所有全局设置和 EPG 配置已保存'));
 }
 
 async function saveAppUpdateSettings(silent = false) {
@@ -2562,9 +2566,9 @@ async function saveAppUpdateSettings(silent = false) {
       method: 'POST',
       body: JSON.stringify(updateConf)
     });
-    if (!silent) toast('升级配置已独立保存', 'success');
+    if (!silent) toast(t('settings.update_saved', '升级配置已独立保存'), 'success');
   } catch (e) {
-    if (!silent) toast('保存升级配置失败: ' + e.message, 'error');
+    if (!silent) toast(t('settings.update_save_failed', '保存升级配置失败') + ': ' + e.message, 'error');
   }
 }
 
@@ -2572,10 +2576,10 @@ async function refreshEPGCache() {
   try {
     const res = await api('/admin/epg/refresh', { method: 'POST' });
     if (res.code === 0) {
-      toast(res.data.message || '强制刷新已触发');
+      toast(t('settings.epg_refresh_triggered', '强制刷新已触发'));
     }
   } catch (e) {
-    toast('触发失败: ' + e.message, true);
+    toast(t('common.trigger_failed', '触发失败') + ': ' + e.message, true);
   }
 }
 
@@ -2586,7 +2590,7 @@ async function triggerCacheExistingLogos() {
       toast(res.data.message || '缓存外链台标任务已触发，请查看后台日志。');
     }
   } catch (e) {
-    toast('触发失败: ' + e.message, 'error');
+    toast(t('common.trigger_failed', '触发失败') + ': ' + e.message, 'error');
   }
 }
 
@@ -2603,7 +2607,7 @@ async function triggerBatchFetchLogos(overwrite) {
       toast(res.data.message || '批量拉取缺失台标任务已触发，请查看后台日志。');
     }
   } catch (e) {
-    toast('触发失败: ' + e.message, 'error');
+    toast(t('common.trigger_failed', '触发失败') + ': ' + e.message, 'error');
   }
 }
 // saveClientSetting 已在文件顶部以 debounce 方式重新定义
@@ -2619,13 +2623,13 @@ function toggleAutoApproveFields(value) {
 // onAutoApproveChange: 用户主动切换时调用，负责保存并给出反馈
 function onAutoApproveChange(value) {
   toggleAutoApproveFields(value);
-  saveClientSetting('auto_approve', value).then(() => toast('自动审批已' + (value === 'true' ? '开启' : '关闭')));
+  saveClientSetting('auto_approve', value).then(() => toast(t('settings.auto_approve_toggle', '自动审批已') + (value === 'true' ? t('common.enabled', '开启') : t('common.disabled', '关闭'))));
 }
 
 async function onEnableExternalSubChange(value) {
   await saveClientSetting('enable_external_sub', value);
   enableExternalSubSetting = value;
-  toast('外部订阅已' + (value === 'true' ? '开启，套餐页面将显示订阅地址' : '关闭'));
+  toast(t('settings.external_sub_toggle', '外部订阅已') + (value === 'true' ? t('settings.external_sub_on', '开启，套餐页面将显示订阅地址') : t('settings.external_sub_off', '关闭')));
   if (typeof renderPlansTable === 'function') renderPlansTable();
 }
 
@@ -2636,7 +2640,7 @@ async function onLogoStrategyChange(value) {
     'source': '源优先',
     'interface': '接口优先'
   };
-  toast('台标获取策略已切换为: ' + (strategies[value] || value));
+  toast(t('settings.logo_strategy_changed', '台标获取策略已切换为') + ': ' + (strategies[value] || value));
 }
 
 // ════ Pagination Helper ═════════════════════════════════════════════
@@ -2724,7 +2728,7 @@ function changePageSize(newSize, changePageFuncName) {
 function copyServerBase64() {
   const base64Text = document.getElementById('server-base64-text').textContent.trim();
   if (!base64Text || base64Text === '-') {
-    toast('无有效的 Base64 地址', 'error');
+    toast(t('common.no_valid_base64', '无有效的 Base64 地址'), 'error');
     return;
   }
 
@@ -2737,16 +2741,16 @@ function copyServerBase64() {
     textarea.select();
     try {
       document.execCommand('copy');
-      toast('复制成功');
+      toast(t('common.copy_success', '复制成功'));
     } catch (e) {
-      toast('复制失败，请手动选择复制', 'error');
+      toast(t('common.copy_failed', '复制失败，请手动选择复制'), 'error');
     }
     document.body.removeChild(textarea);
   };
 
   if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
     navigator.clipboard.writeText(base64Text).then(() => {
-      toast('复制成功');
+      toast(t('common.copy_success', '复制成功'));
     }).catch(err => {
       handleFallback();
     });
@@ -2790,7 +2794,7 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
 }
 function copyText(text) {
   if (!text) {
-    toast('无有效内容', 'error');
+    toast(t('common.no_valid_content', '无有效内容'), 'error');
     return;
   }
   const handleFallback = () => {
@@ -2802,16 +2806,16 @@ function copyText(text) {
     textarea.select();
     try {
       document.execCommand('copy');
-      toast('复制成功');
+      toast(t('common.copy_success', '复制成功'));
     } catch (e) {
-      toast('复制失败，请手动复制', 'error');
+      toast(t('common.copy_failed_manual', '复制失败，请手动复制'), 'error');
     }
     document.body.removeChild(textarea);
   };
 
   if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
     navigator.clipboard.writeText(text).then(() => {
-      toast('复制成功');
+      toast(t('common.copy_success', '复制成功'));
     }).catch(err => {
       handleFallback();
     });
@@ -2961,7 +2965,7 @@ async function downloadAllClients() {
   const apkAssets = release.assets.filter(a => a.name.includes('.apk'));
   
   if (apkAssets.length === 0) {
-    toast('当前版本没有可用的客户端安装包', 'warn');
+    toast(t('updates.no_apk_available', '当前版本没有可用的客户端安装包'), 'warn');
     return;
   }
   if (!confirm(`确定要将版本 ${release.tag_name} 的 ${apkAssets.length} 个客户端安装包全部拉取至服务端吗？`)) {
@@ -3249,7 +3253,7 @@ async function saveSyncSettings() {
 
     if (settings.sync_enable === 'true') {
       if (!settings.sync_master_url) {
-        toast('保存失败：必须填写主节点通信地址', 'error');
+        toast(t('sync.error_fill_address', '保存失败：必须填写主节点通信地址'), 'error');
         return;
       }
       // 提前校验主节点是否联通
@@ -3259,7 +3263,7 @@ async function saveSyncSettings() {
           body: JSON.stringify({ master_url: settings.sync_master_url }) 
         });
       } catch (e) {
-        toast('主节点连接失败，请检查地址是否正确或网络是否畅通', 'error');
+        toast(t('sync.error_connect_failed', '主节点连接失败，请检查地址是否正确或网络是否畅通'), 'error');
         return;
       }
     }
@@ -3269,7 +3273,7 @@ async function saveSyncSettings() {
     }
 
     if (settings.sync_enable === 'true') {
-      toast('配置已保存，正在执行初次同步...', 'success');
+      toast(t('sync.sync_saved_with_init', '配置已保存，正在执行初次同步...'), 'success');
       try {
         const res = await api('/admin/system/sync_from_master', {
           method: 'POST',
@@ -3281,10 +3285,10 @@ async function saveSyncSettings() {
         // API 函数会处理错误提示
       }
     } else {
-      toast('同步配置已保存', 'success');
+      toast(t('sync.sync_saved', '同步配置已保存'), 'success');
     }
   } catch (e) {
-    toast('保存失败: ' + e.message, 'error');
+    toast(t('sync.save_failed', '保存失败') + ': ' + e.message, 'error');
     console.error(e);
   }
 }
@@ -3293,11 +3297,11 @@ async function forceSyncFromMaster() {
   const url = document.getElementById('set-sync-master-url').value;
   const token = document.getElementById('set-sync-master-token').value;
   
-  if (!url) { toast('请填写主节点通信地址', 'error'); return; }
+  if (!url) { toast(t('sync.error_fill_master_url', '请填写主节点通信地址'), 'error'); return; }
   
   if (!confirm('确定要强制从主节点拉取数据覆盖当前节点的频道/分组数据吗？')) return;
   
-  toast('正在同步，请勿刷新页面...');
+  toast(t('sync.syncing', '正在同步，请勿刷新页面...'));
   try {
     const res = await api('/admin/system/sync_from_master', {
       method: 'POST',
@@ -3521,7 +3525,7 @@ async function saveGlobalClientConfig() {
     body: JSON.stringify({ configs, hidden })
   });
   if (!r.error) {
-    toast('全局配置已保存', 'success');
+    toast(t('settings.global_config_saved', '全局配置已保存'), 'success');
     loadGlobalClientConfig();
   }
 }
@@ -3710,7 +3714,7 @@ async function saveClientConfig(clientId) {
     body: JSON.stringify({ configs, hidden })
   });
   if (!r.error) {
-    toast('设备配置已保存', 'success');
+    toast(t('settings.device_config_saved', '设备配置已保存'), 'success');
     loadClientConfigTab(clientId);
   }
 }
@@ -3720,7 +3724,7 @@ async function resetClientConfig(clientId) {
   if (!confirm('确定要重置该设备的所有远程配置吗？重置后将全部继承全局配置。')) return;
   const r = await api(`/admin/clients/${clientId}/config/reset`, { method: 'POST' });
   if (!r.error) {
-    toast('设备配置已重置', 'success');
+    toast(t('settings.device_config_reset', '设备配置已重置'), 'success');
     loadClientConfigTab(clientId);
   }
 }

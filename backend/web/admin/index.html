@@ -20,7 +20,7 @@
           <path fill="#1296db"
             d="M867.530667 172.330667A71.157333 71.157333 0 0 1 938.666667 243.477333v423.018667a71.146667 71.146667 0 0 1-71.136 71.168H167.146667A71.125333 71.125333 0 0 1 96 666.496V243.509333a71.157333 71.157333 0 0 1 71.146667-71.178666z m-360.853334 163.2c-34.016-19.648-76.533333 4.917333-76.533333 44.192v150.506666c0 39.296 42.517333 63.861333 76.533333 44.213334l130.272-75.264c34.016-19.626667 34.016-68.757333 0-88.405334zM360.202667 790.997333H685.12c19.690667 0 29.536 10.666667 29.536 32s-9.845333 32-29.536 32H360.213333c-19.690667 0-29.536-10.666667-29.536-32s9.845333-32 29.536-32z" />
         </svg>
-        <span>MediaPlayer</span>
+        <span data-i18n="sidebar.logo">MediaPlayer</span>
       </div>
       <div class="nav-item active" onclick="showSection('dashboard',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,20 +29,20 @@
           <rect x="14" y="14" width="7" height="7" />
           <rect x="3" y="14" width="7" height="7" />
         </svg>
-        <span>仪表盘</span>
+        <span data-i18n="sidebar.dashboard">仪表盘</span>
       </div>
-      <div class="nav-section">内容管理</div>
+      <div class="nav-section" data-i18n="sidebar.content_manage">内容管理</div>
       <div class="nav-item" onclick="showSection('channels',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        <span>频道管理</span>
+        <span data-i18n="sidebar.channels">频道管理</span>
       </div>
       <div class="nav-item" onclick="showSection('groups',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
         </svg>
-        <span>分组管理</span>
+        <span data-i18n="sidebar.groups">分组管理</span>
       </div>
       <div class="nav-item" onclick="showSection('sources',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -50,15 +50,15 @@
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        <span>源管理</span>
+        <span data-i18n="sidebar.sources">源管理</span>
       </div>
       <div class="nav-item" onclick="showSection('streams',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
         </svg>
-        <span>活跃流</span>
+        <span data-i18n="sidebar.streams">活跃流</span>
       </div>
-      <div class="nav-section">客户端授权</div>
+      <div class="nav-section" data-i18n="sidebar.auth_manage">客户端授权</div>
       <div class="nav-item" onclick="showSection('clients',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -66,7 +66,7 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
-        <span>设备管理</span>
+        <span data-i18n="sidebar.devices">设备管理</span>
       </div>
       <div class="nav-item" onclick="showSection('plans',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -76,7 +76,7 @@
           <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
           <line x1="12" y1="22.08" x2="12" y2="12"></line>
         </svg>
-        <span>套餐管理</span>
+        <span data-i18n="sidebar.plans">套餐管理</span>
       </div>
       <div class="nav-item" onclick="showSection('client-logs',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -85,9 +85,9 @@
           <line x1="16" y1="13" x2="8" y2="13" />
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
-        <span>访问日志</span>
+        <span data-i18n="sidebar.logs">访问日志</span>
       </div>
-      <div class="nav-section">系统管理</div>
+      <div class="nav-section" data-i18n="sidebar.system_manage">系统管理</div>
       <div class="nav-item" id="nav-client-config" onclick="showSection('client-config',this)" style="display: none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -97,7 +97,7 @@
           <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
           <line x1="12" y1="22.08" x2="12" y2="12"></line>
         </svg>
-        <span>远程配置</span>
+        <span data-i18n="sidebar.remote_config">远程配置</span>
       </div>
       <div class="nav-item" onclick="showSection('client-settings',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -105,7 +105,7 @@
           <path
             d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
-        <span>全局设置</span>
+        <span data-i18n="sidebar.global_settings">全局设置</span>
       </div>
       <div class="nav-item" onclick="showSection('update',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -113,13 +113,13 @@
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        <span>检查更新</span>
+        <span data-i18n="sidebar.check_update">检查更新</span>
       </div>
       <div class="nav-item" onclick="showSection('sync',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2v20M17 5l-5-3-5 3M7 19l5 3 5-3M2 12h20" />
         </svg>
-        <span>主备同步</span>
+        <span data-i18n="sidebar.sync">主备同步</span>
       </div>
       <div class="nav-item" onclick="showSection('system-logs',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -128,24 +128,24 @@
           <path d="M2 15h10" />
           <path d="M2 18h10" />
         </svg>
-        <span>系统日志</span>
+        <span data-i18n="sidebar.system_logs">系统日志</span>
       </div>
-      <div class="nav-section">帮助</div>
+      <div class="nav-section" data-i18n="sidebar.help">帮助</div>
       <div class="nav-item" onclick="showSection('manual',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           <path d="M13 2v7l3-2 3 2V2" />
         </svg>
-        <span>使用手册</span>
+        <span data-i18n="sidebar.manual">使用手册</span>
       </div>
-      <div class="nav-section">账户</div>
+      <div class="nav-section" data-i18n="sidebar.account">账户</div>
       <div class="nav-item" onclick="showModal('password-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
-        <span>修改密码</span>
+        <span data-i18n="sidebar.change_password">修改密码</span>
       </div>
       <div class="nav-item" onclick="logout()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -153,11 +153,21 @@
           <polyline points="16 17 21 12 16 7" />
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
-        <span>退出登录</span>
+        <span data-i18n="sidebar.logout">退出登录</span>
+      </div>
+      <!-- Language Selector Selector -->
+      <div style="padding: 16px 24px 0; margin-top: auto; text-align: center;">
+        <select id="lang-selector" onchange="window.i18n.switchLanguage(this.value)" style="background: var(--side-bg-hover); color: var(--side-text); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 6px; font-size: 12px; width: 100%; cursor: pointer; outline: none;">
+          <option value="zh-CN">简体中文</option>
+          <option value="en-US">English</option>
+          <option value="zh-TW">繁體中文 (台灣)</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+        </select>
       </div>
       <div class="sidebar-footer" id="sidebar-version-container"
-        style="padding: 24px 24px 0; font-size: 12px; color: var(--side-text2); text-align: center; margin-top: auto; opacity: 0.6;">
-        版本: <span id="sidebar-version">-</span>
+        style="padding: 12px 24px 0; font-size: 12px; color: var(--side-text2); text-align: center; opacity: 0.6;">
+        <span data-i18n="sidebar.version">版本</span>: <span id="sidebar-version">-</span>
       </div>
     </div>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
@@ -178,63 +188,63 @@
       <!-- Dashboard -->
       <div id="sec-dashboard">
         <div class="header">
-          <h1>仪表盘</h1>
+          <h1 data-i18n="dashboard.title">仪表盘</h1>
         </div>
         <div class="stats">
           <div class="stat-card">
-            <div class="label">总频道数</div>
+            <div class="label" data-i18n="dashboard.total_channels">总频道数</div>
             <div class="value" id="stat-total">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">在线频道</div>
+            <div class="label" data-i18n="dashboard.online_channels">在线频道</div>
             <div class="value" id="stat-online">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">活跃流</div>
+            <div class="label" data-i18n="dashboard.active_streams">活跃流</div>
             <div class="value" id="stat-streams">-</div>
           </div>
           <div class="stat-card info">
-            <div class="label">已授权设备</div>
+            <div class="label" data-i18n="dashboard.authorized_devices">已授权设备</div>
             <div class="value" id="stat-clients">-</div>
           </div>
           <div class="stat-card warn">
-            <div class="label">待审批</div>
+            <div class="label" data-i18n="dashboard.pending">待审批</div>
             <div class="value" id="stat-pending">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">在线设备</div>
+            <div class="label" data-i18n="dashboard.online_devices">在线设备</div>
             <div class="value" id="stat-online-clients">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">M3U/TXT源</div>
+            <div class="label" data-i18n="dashboard.m3u_txt_sources">M3U/TXT源</div>
             <div class="value" id="stat-sources">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">总播放时长</div>
+            <div class="label" data-i18n="dashboard.total_play_time">总播放时长</div>
             <div class="value" id="stat-playtime">-</div>
           </div>
         </div>
         <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-bottom:28px">
           <div class="stat-card">
-            <div class="label">运行时长</div>
+            <div class="label" data-i18n="dashboard.uptime">运行时长</div>
             <div class="value" id="stat-uptime" style="font-size:24px">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">内存占用</div>
+            <div class="label" data-i18n="dashboard.memory_usage">内存占用</div>
             <div class="value" id="stat-memory" style="font-size:24px">-</div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
-            <h2>最近访问</h2><button class="btn btn-ghost btn-sm" onclick="loadDashboard()">刷新</button>
+            <h2 data-i18n="dashboard.recent_access">最近访问</h2><button class="btn btn-ghost btn-sm" onclick="loadDashboard()" data-i18n="btn.refresh">刷新</button>
           </div>
           <table>
             <thead>
               <tr>
-                <th>设备</th>
-                <th>操作</th>
-                <th>IP</th>
-                <th>时间</th>
+                <th data-i18n="th.device">设备</th>
+                <th data-i18n="th.actions">操作</th>
+                <th data-i18n="th.ip">IP</th>
+                <th data-i18n="th.time">时间</th>
               </tr>
             </thead>
             <tbody id="dash-logs-body"></tbody>
@@ -245,32 +255,32 @@
       <!-- Channels -->
       <div id="sec-channels" style="display:none">
         <div class="header">
-          <h1>频道管理</h1>
+          <h1 data-i18n="sidebar.channels">频道管理</h1>
           <div class="search">
             <button class="btn btn-primary btn-sm" id="btn-save-channel-sort"
-              style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveChannelOrder()">💾 保存排序</button>
+              style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveChannelOrder()" data-i18n="channels.save_sort">保存排序</button>
             <select id="channel-source-filter" onchange="filterChannelsBySource(this.value)"
               style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
-              <option value="">全部来源</option>
+              <option value="" data-i18n="channels.all_sources">全部来源</option>
             </select>
-            <input type="text" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
+            <input type="text" data-i18n-placeholder="channels.search_placeholder" placeholder="搜索频道..." id="channel-search" oninput="searchChannels()">
             <button class="btn btn-ghost" id="btn-health-check" onclick="openHealthCheckModal()"
-              style="background:var(--accent);color:white;border:none;">健康检查</button>
+              style="background:var(--accent);color:white;border:none;" data-i18n="channels.health_check">健康检查</button>
             <select id="channel-batch-action" onchange="handleChannelBatchAction(this.value)"
               style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
-              <option value="">批量操作...</option>
-              <option value="delete">删除选中频道</option>
-              <option value="enable_on">批量启用</option>
-              <option value="enable_off">批量禁用</option>
-              <option value="direct_on">开启直连模式</option>
-              <option value="direct_off">关闭直连模式</option>
-              <option value="mux_on">开启复用状态</option>
-              <option value="mux_off">关闭复用状态</option>
-              <option value="content_type_auto">内容类型(自动)</option>
-              <option value="content_type_live">内容类型(直播)</option>
-              <option value="content_type_vod">内容类型(点播)</option>
+              <option value="" data-i18n="channels.batch_actions">批量操作...</option>
+              <option value="delete" data-i18n="channels.batch_delete">删除选中频道</option>
+              <option value="enable_on" data-i18n="channels.batch_enable">批量启用</option>
+              <option value="enable_off" data-i18n="channels.batch_disable">批量禁用</option>
+              <option value="direct_on" data-i18n="channels.batch_direct_on">开启直连模式</option>
+              <option value="direct_off" data-i18n="channels.batch_direct_off">关闭直连模式</option>
+              <option value="mux_on" data-i18n="channels.batch_mux_on">开启复用状态</option>
+              <option value="mux_off" data-i18n="channels.batch_mux_off">关闭复用状态</option>
+              <option value="content_type_auto" data-i18n="channels.batch_content_type_auto">内容类型(自动)</option>
+              <option value="content_type_live" data-i18n="channels.batch_content_type_live">内容类型(直播)</option>
+              <option value="content_type_vod" data-i18n="channels.batch_content_type_vod">内容类型(点播)</option>
             </select>
-            <button class="btn btn-primary" onclick="showAddChannelModal()">+ 添加频道</button>
+            <button class="btn btn-primary" onclick="showAddChannelModal()" data-i18n="channels.add_channel">+ 添加频道</button>
           </div>
         </div>
         <div class="card">
@@ -278,20 +288,20 @@
             <thead>
               <tr>
                 <th width="40"><input type="checkbox" id="check-all-channels" onchange="toggleAllChannels(this)"></th>
-                <th width="40">移动</th>
-                <th width="60">序号</th>
-                <th>台标</th>
-                <th>名称</th>
-                <th>排序</th>
-                <th>EPG匹配ID</th>
-                <th>分组</th>
-                <th>来源</th>
-                <th>启用</th>
-                <th>直连模式</th>
-                <th>状态</th>
-                <th>复用状态</th>
-                <th>最后修改时间</th>
-                <th>操作</th>
+                <th width="40" data-i18n="th.move">移动</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="th.logo">台标</th>
+                <th data-i18n="th.name">名称</th>
+                <th data-i18n="th.sort">排序</th>
+                <th data-i18n="th.epg_id">EPG匹配ID</th>
+                <th data-i18n="th.group">分组</th>
+                <th data-i18n="th.source">来源</th>
+                <th data-i18n="th.enabled">启用</th>
+                <th data-i18n="th.direct_mode">直连模式</th>
+                <th data-i18n="th.channel_status">状态</th>
+                <th data-i18n="th.mux_status">复用状态</th>
+                <th data-i18n="th.update_time">最后修改时间</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="channels-body"></tbody>
@@ -306,24 +316,24 @@
       <!-- Groups -->
       <div id="sec-groups" style="display:none">
         <div class="header">
-          <h1>分组管理</h1>
+          <h1 data-i18n="sidebar.groups">分组管理</h1>
           <div class="search">
             <button class="btn btn-primary btn-sm" id="btn-save-sort"
-              style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveGroupOrder()">💾 保存排序</button>
-            <input type="text" placeholder="搜索分组..." id="group-search" oninput="searchGroups()">
+              style="display:none;background:#ff9800;border-color:#ff9800" onclick="saveGroupOrder()" data-i18n="groups.save_sort">保存排序</button>
+            <input type="text" data-i18n-placeholder="groups.search_placeholder" placeholder="搜索分组..." id="group-search" oninput="searchGroups()">
             <select id="group-batch-action" onchange="handleGroupBatchAction(this.value)"
               style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg2);color:var(--text)">
-              <option value="">批量操作...</option>
-              <option value="delete">删除选中分组</option>
-              <option value="direct_on">开启直连模式</option>
-              <option value="direct_off">关闭直连模式</option>
-              <option value="mux_on">开启复用状态</option>
-              <option value="mux_off">关闭复用状态</option>
-              <option value="content_type_auto">设置内容类型(自动)</option>
-              <option value="content_type_live">设置内容类型(直播)</option>
-              <option value="content_type_vod">设置内容类型(点播)</option>
+              <option value="" data-i18n="channels.batch_actions">批量操作...</option>
+              <option value="delete" data-i18n="groups.batch_delete">删除选中分组</option>
+              <option value="direct_on" data-i18n="groups.batch_direct_on">开启直连模式</option>
+              <option value="direct_off" data-i18n="groups.batch_direct_off">关闭直连模式</option>
+              <option value="mux_on" data-i18n="groups.batch_mux_on">开启复用状态</option>
+              <option value="mux_off" data-i18n="groups.batch_mux_off">关闭复用状态</option>
+              <option value="content_type_auto" data-i18n="groups.batch_content_type_auto">设置内容类型(自动)</option>
+              <option value="content_type_live" data-i18n="groups.batch_content_type_live">设置内容类型(直播)</option>
+              <option value="content_type_vod" data-i18n="groups.batch_content_type_vod">设置内容类型(点播)</option>
             </select>
-            <button class="btn btn-primary" onclick="showAddGroupModal()">+ 添加分组</button>
+            <button class="btn btn-primary" onclick="showAddGroupModal()" data-i18n="groups.add_group">+ 添加分组</button>
           </div>
         </div>
         <div class="card">
@@ -331,18 +341,18 @@
             <thead>
               <tr>
                 <th width="40"><input type="checkbox" id="check-all-groups" onchange="toggleAllGroups(this)"></th>
-                <th width="40">移动</th>
-                <th width="60">序号</th>
-                <th>名称</th>
-                <th>排序</th>
-                <th>来源</th>
-                <th>直连模式</th>
-                <th>批量复用</th>
-                <th>支持复用</th>
-                <th>不支持复用</th>
-                <th>频道数</th>
-                <th>最后修改时间</th>
-                <th>操作</th>
+                <th width="40" data-i18n="th.move">移动</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="th.name">名称</th>
+                <th data-i18n="th.sort">排序</th>
+                <th data-i18n="th.source">来源</th>
+                <th data-i18n="th.direct_mode">直连模式</th>
+                <th data-i18n="th.batch_mux">批量复用</th>
+                <th data-i18n="th.mux_supported">支持复用</th>
+                <th data-i18n="th.mux_unsupported">不支持复用</th>
+                <th data-i18n="th.channel_count">频道数</th>
+                <th data-i18n="th.update_time">最后修改时间</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="groups-body"></tbody>
@@ -357,22 +367,22 @@
       <!-- Sources -->
       <div id="sec-sources" style="display:none">
         <div class="header">
-          <h1>M3U 源管理</h1>
+          <h1 data-i18n="sources.manage">M3U 源管理</h1>
           <div class="btn-group">
-            <button class="btn btn-primary" onclick="showAddSourceModal()">+ 添加源</button>
-            <button class="btn btn-ghost" onclick="showModal('import-modal')">📋 粘贴导入</button>
+            <button class="btn btn-primary" onclick="showAddSourceModal()" data-i18n="sources.add_source">+ 添加源</button>
+            <button class="btn btn-ghost" onclick="showModal('import-modal')" data-i18n="sources.paste_import">粘贴导入</button>
           </div>
         </div>
         <div class="card">
           <table>
             <thead>
               <tr>
-                <th width="60">序号</th>
-                <th>名称</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="th.name">名称</th>
                 <th>URL</th>
                 <th>自动同步</th>
                 <th>同步状态 / 时间</th>
-                <th>操作</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="sources-body"></tbody>
@@ -387,18 +397,18 @@
       <!-- Active Streams -->
       <div id="sec-streams" style="display:none">
         <div class="header">
-          <h1>活跃流</h1><button class="btn btn-ghost" onclick="loadStreams()">刷新</button>
+          <h1 data-i18n="sidebar.streams">活跃流</h1><button class="btn btn-ghost" onclick="loadStreams()" data-i18n="btn.refresh">刷新</button>
         </div>
         <div class="card">
           <table>
             <thead>
               <tr>
-                <th>会话/设备</th>
-                <th>频道</th>
-                <th>原始URL</th>
-                <th>状态/网速</th>
-                <th>启动/活跃时间</th>
-                <th>操作</th>
+                <th data-i18n="th.session_device">会话/设备</th>
+                <th data-i18n="th.channel">频道</th>
+                <th data-i18n="th.original_url">原始URL</th>
+                <th data-i18n="th.status_speed">状态/网速</th>
+                <th data-i18n="th.start_active_time">启动/活跃时间</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="streams-body"></tbody>
@@ -413,15 +423,15 @@
       <!-- Clients -->
       <div id="sec-clients" style="display:none">
         <div class="header">
-          <h1>设备管理</h1>
+          <h1 data-i18n="sidebar.devices">设备管理</h1>
           <div class="filter-bar">
             <select id="client-status-filter" onchange="loadClients()">
-              <option value="">全部状态</option>
-              <option value="pending">待审批</option>
-              <option value="approved">已授权</option>
-              <option value="rejected">已拒绝</option>
-              <option value="banned">已封禁</option>
-              <option value="expired">已过期</option>
+              <option value="" data-i18n="clients.all_status">全部状态</option>
+              <option value="pending" data-i18n="clients.status_pending">待审批</option>
+              <option value="approved" data-i18n="clients.status_approved">已授权</option>
+              <option value="rejected" data-i18n="clients.status_rejected">已拒绝</option>
+              <option value="banned" data-i18n="clients.status_banned">已封禁</option>
+              <option value="expired" data-i18n="clients.status_expired">已过期</option>
             </select>
             <input type="text" placeholder="搜索设备名/IP/ID..." id="client-search" oninput="searchClients()"
               style="width:220px">
@@ -431,15 +441,15 @@
         </div>
         <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
           <div class="stat-card">
-            <div class="label">总设备数</div>
+            <div class="label" data-i18n="clients.total_devices">总设备数</div>
             <div class="value" id="cstat-total">-</div>
           </div>
           <div class="stat-card warn">
-            <div class="label">待审批</div>
+            <div class="label" data-i18n="dashboard.pending">待审批</div>
             <div class="value" id="cstat-pending">-</div>
           </div>
           <div class="stat-card">
-            <div class="label">在线(5分钟)</div>
+            <div class="label" data-i18n="clients.online_5min">在线(5分钟)</div>
             <div class="value" id="cstat-online">-</div>
           </div>
         </div>
@@ -448,17 +458,17 @@
             <thead>
               <tr>
                 <th><input type="checkbox" id="check-all-clients" onchange="toggleAllClients(this)"></th>
-                <th width="60">序号</th>
-                <th>设备名称</th>
-                <th>设备型号</th>
-                <th>IP</th>
-                <th>状态</th>
-                <th>测试机</th>
-                <th>设备过期时间</th>
-                <th>播放时长</th>
-                <th>最近在线</th>
-                <th>注册时间</th>
-                <th>操作</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="th.device_name">设备名称</th>
+                <th data-i18n="th.device_model">设备型号</th>
+                <th data-i18n="th.ip">IP</th>
+                <th data-i18n="th.status">状态</th>
+                <th data-i18n="th.test_device">测试机</th>
+                <th data-i18n="th.expire_time">设备过期时间</th>
+                <th data-i18n="th.play_duration">播放时长</th>
+                <th data-i18n="th.last_online">最近在线</th>
+                <th data-i18n="th.register_time">注册时间</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="clients-body"></tbody>
@@ -473,21 +483,21 @@
       <!-- Plans -->
       <div id="sec-plans" style="display:none">
         <div class="header">
-          <h1>套餐管理</h1>
+          <h1 data-i18n="sidebar.plans">套餐管理</h1>
           <button class="btn btn-primary" onclick="editPlan()">+ 添加套餐</button>
         </div>
         <div class="card">
           <table>
             <thead>
               <tr>
-                <th width="60">序号</th>
-                <th>套餐名称</th>
-                <th>有效期</th>
-                <th>允许同时在线设备数量</th>
-                <th>价格</th>
-                <th>描述</th>
-                <th id="th-plan-sub">订阅地址</th>
-                <th>操作</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="plans.plan_name">套餐名称</th>
+                <th data-i18n="th.validity">有效期</th>
+                <th data-i18n="th.max_devices">允许同时在线设备数量</th>
+                <th data-i18n="plans.price">价格</th>
+                <th data-i18n="plans.description">描述</th>
+                <th id="th-plan-sub" data-i18n="th.subscription_url">订阅地址</th>
+                <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
             <tbody id="plans-body"></tbody>
@@ -502,19 +512,19 @@
       <!-- Client Logs -->
       <div id="sec-client-logs" style="display:none">
         <div class="header">
-          <h1>访问日志</h1><button class="btn btn-ghost btn-sm" onclick="loadClientLogs()">刷新</button>
+          <h1 data-i18n="logs.client_access">访问日志</h1><button class="btn btn-ghost btn-sm" onclick="loadClientLogs()" data-i18n="btn.refresh">刷新</button>
         </div>
         <div class="card">
           <table>
             <thead>
               <tr>
-                <th width="60">序号</th>
-                <th>客户端ID</th>
-                <th>操作</th>
+                <th width="60" data-i18n="th.index">序号</th>
+                <th data-i18n="th.client_id">客户端ID</th>
+                <th data-i18n="th.actions">操作</th>
                 <th>频道</th>
-                <th>IP</th>
-                <th>详情</th>
-                <th>时间</th>
+                <th data-i18n="th.ip">IP</th>
+                <th data-i18n="th.details">详情</th>
+                <th data-i18n="th.time">时间</th>
               </tr>
             </thead>
             <tbody id="client-logs-body"></tbody>
@@ -529,8 +539,8 @@
       <!-- Client Config -->
       <div id="sec-client-config" style="display:none">
         <div class="header">
-          <h1>远程配置</h1>
-          <button class="btn btn-primary" onclick="saveGlobalClientConfig()">保存全局配置</button>
+          <h1 data-i18n="sidebar.remote_config">远程配置</h1>
+          <button class="btn btn-primary" onclick="saveGlobalClientConfig()" data-i18n="config.save_global">保存全局配置</button>
         </div>
         <div class="card" style="padding:24px">
           <p style="color:var(--text2);font-size:13px;margin-bottom:20px">
@@ -545,7 +555,7 @@
       <!-- Client Settings -->
       <div id="sec-client-settings" style="display:none">
         <div class="header">
-          <h1>全局设置</h1>
+          <h1 data-i18n="sidebar.global_settings">全局设置</h1>
         </div>
         <div class="card" style="padding:24px">
           <!-- 服务器地址 Base64 -->
@@ -560,35 +570,35 @@
                 <line x1="6" y1="6" x2="6.01" y2="6" />
                 <line x1="6" y1="18" x2="6.01" y2="18" />
               </svg>
-              服务器授权与网络配置
+              <span data-i18n="settings.server_auth_title">服务器授权与网络配置</span>
             </h3>
 
             <!-- 服务器名称配置 -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="color: var(--text); font-weight: 500; font-size: 13px;">服务器名称</label>
-              <input type="text" id="set-server-name" placeholder="例如：我的电视服务器 (留空则客户端不显示)" maxlength="20"
+              <label style="color: var(--text); font-weight: 500; font-size: 13px;" data-i18n="settings.server_name_label">服务器名称</label>
+              <input type="text" id="set-server-name" data-i18n-placeholder="settings.server_name_placeholder" placeholder="例如：我的电视服务器 (留空则客户端不显示)" maxlength="20"
                 style="height: 38px; margin-top: 6px;">
-              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;" data-i18n="settings.server_name_desc">
                 最多 20 个字符，仅支持中文、英文、数字、空格。留空时客户端不显示服务器名称。</div>
             </div>
 
             <!-- 应用显示名称配置 -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="color: var(--text); font-weight: 500; font-size: 13px;">应用显示名称</label>
-              <input type="text" id="set-app-display-name" placeholder="例如：我的电视、IPTV电视 (默认 MediaPlayer)" maxlength="20"
+              <label style="color: var(--text); font-weight: 500; font-size: 13px;" data-i18n="settings.app_display_name_label">应用显示名称</label>
+              <input type="text" id="set-app-display-name" data-i18n-placeholder="settings.app_display_name_placeholder" placeholder="例如：我的电视、IPTV电视 (默认 MediaPlayer)" maxlength="20"
                 style="height: 38px; margin-top: 6px;">
-              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;" data-i18n="settings.app_display_name_desc">
                 客户端安装后桌面图标显示的名称。最多 20 个字符，仅支持中文、英文、数字、空格。<br>注意：此功能仅在 Android TV 桌面（小米电视、当贝等）生效，标准 Android 模拟器/手机桌面不适用。</div>
             </div>
 
             <!-- 服务器域名/地址配置 -->
             <div class="form-group" style="margin-bottom: 16px;">
-              <label style="color: var(--text); font-weight: 500; font-size: 13px;">自定义服务器外网域名/地址 (Server URL)</label>
+              <label style="color: var(--text); font-weight: 500; font-size: 13px;" data-i18n="settings.server_url_label">自定义服务器外网域名/地址 (Server URL)</label>
               <div class="input-with-copy" style="margin-top:6px">
-                <input type="text" id="set-server-url" placeholder="例如：http://tv.example.com (留空则默认使用当前识别的地址)"
+                <input type="text" id="set-server-url" data-i18n-placeholder="settings.server_url_placeholder" placeholder="例如：http://tv.example.com (留空则默认使用当前识别的地址)"
                   style="height: 38px;">
                 <button class="btn-copy" type="button"
-                  onclick="copyText(document.getElementById('set-server-url').value)" title="复制服务器地址"
+                  onclick="copyText(document.getElementById('set-server-url').value)" title="复制服务器地址" data-i18n="tooltip.copy_url"
                   style="height:38px;width:38px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -596,17 +606,18 @@
                   </svg></button>
               </div>
               <div style="margin-top: 12px;">
-                <label style="color: var(--text); font-weight: 500; font-size: 13px;">备用服务器外网地址 (Backup URLs)</label>
+                <label style="color: var(--text); font-weight: 500; font-size: 13px;" data-i18n="settings.backup_urls_label">备用服务器外网地址 (Backup URLs)</label>
                 <textarea id="set-server-backup-urls" rows="2"
+                  data-i18n-placeholder="settings.backup_urls_placeholder"
                   placeholder="填写备用地址，支持多行，每行一个。如：&#10;http://backup1.com&#10;http://backup2.com"
                   style="margin-top:6px"></textarea>
-                <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">可选。当主地址故障时，客户端将按顺序尝试连接备用地址。</div>
+                <div style="font-size: 11px; color: var(--text2); margin-top: 4px;" data-i18n="settings.backup_urls_desc">可选。当主地址故障时，客户端将按顺序尝试连接备用地址。</div>
               </div>
-              <div style="font-size: 11px; color: var(--text2); margin-top: 12px;">
+              <div style="font-size: 11px; color: var(--text2); margin-top: 12px;" data-i18n="settings.server_url_note">
                 仅供客户端授权信息以及 m3u8 里的播放地址。末尾不要带 /。</div>
             </div>
 
-            <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;">
+            <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px; word-break: break-all;" data-i18n="settings.auth_code_label">
               客户端连接服务器所需信息（授权码）：
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -616,12 +627,12 @@
                 -
               </div>
               <button class="btn-copy" onclick="copyServerBase64()" style="height: 38px; width: 38px;"
-                title="复制授权码"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                title="复制授权码" data-i18n="tooltip.copy_url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg></button>
             </div>
-            <div style="font-size: 11px; color: var(--text2); margin-top: 8px;">
+            <div style="font-size: 11px; color: var(--text2); margin-top: 8px;" data-i18n="settings.local_address_label">
               当前自动识别的本地访问地址：<span id="server-raw-url" style="font-family: monospace; color: var(--text);">-</span>
             </div>
           </div>
@@ -635,7 +646,7 @@
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
-                VIP 授权订阅
+                <span data-i18n="settings.vip_title">VIP 授权订阅</span>
                 <svg id="vip-license-toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; transition: transform 0.2s; transform: rotate(0deg);">
                   <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
@@ -669,15 +680,15 @@
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">频道源配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.channel_source_config">频道源配置</h3>
           </div>
           <div class="form-group">
-            <label>允许本地文件路径</label>
+            <label data-i18n="settings.allow_local_file_label">允许本地文件路径</label>
             <select id="set-allow-local-file">
-              <option value="false">关闭 (仅允许网络地址)</option>
-              <option value="true">开启 (允许本地文件、FTP、WebDAV)</option>
+              <option value="false" data-i18n="settings.allow_local_file_off">关闭 (仅允许网络地址)</option>
+              <option value="true" data-i18n="settings.allow_local_file_on">开启 (允许本地文件、FTP、WebDAV)</option>
             </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.allow_local_file_desc">
               开启后，添加频道时可使用本地文件路径（如
               <code>/vol1/media/video.mp4</code>）、<code>file://</code>、<code>ftp://</code>、<code>webdav://</code> 等协议。
               <strong style="color:#ff6b6b;">注意：请确保服务器有对应文件的访问权限。</strong>
@@ -686,184 +697,188 @@
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">设备授权配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.device_auth_config">设备授权配置</h3>
           </div>
           <div class="form-group">
-            <label>自动审批设置</label>
+            <label data-i18n="settings.auto_approve_label">自动审批设置</label>
             <select id="set-auto-approve" onchange="onAutoApproveChange(this.value)">
-              <option value="false">关闭 (手动审批)</option>
-              <option value="true">开启 (自动通过)</option>
+              <option value="false" data-i18n="settings.auto_approve_off">关闭 (手动审批)</option>
+              <option value="true" data-i18n="settings.auto_approve_on">开启 (自动通过)</option>
             </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">新设备注册时是否自动审批通过</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.auto_approve_desc">新设备注册时是否自动审批通过</div>
           </div>
           <div id="auto-approve-settings" style="display:none">
             <div class="form-group">
-              <label>自动审批默认套餐</label>
+              <label data-i18n="settings.default_plan_label">自动审批默认套餐</label>
               <select id="set-default-plan-id" onchange="onDefaultPlanChange()">
-                <option value="0">-- 请选择 --</option>
+                <option value="0" data-i18n="settings.select_plan_default">-- 请选择 --</option>
               </select>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.default_plan_desc">
                 说明：选择特定套餐或自定义授权，均会自动隐藏下方的配置选项并应用对应规则（自定义授权将自动使用系统默认配置）。</div>
               <div id="default-plan-desc"
                 style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
             </div>
             <div class="form-row" id="auto-approve-fields-row" style="display:none">
               <div class="form-group" id="set-max-streams-group">
-                <label>允许同时在线设备数量</label>
+                <label data-i18n="settings.max_devices_label">允许同时在线设备数量</label>
                 <input type="number" id="set-max-streams" value="100" min="1" max="10000">
               </div>
               <div class="form-group">
-                <label>有效期 (天)</label>
+                <label data-i18n="settings.validity_days_label">有效期 (天)</label>
                 <input type="number" id="set-expire-days" value="365" min="0">
-                <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 永不过期</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.validity_never_expire">0 = 永不过期</div>
               </div>
             </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">客户端公告配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.announcement_config">客户端公告配置</h3>
           </div>
           <div class="form-group">
-            <label>系统公告 (跑马灯)</label>
-            <textarea id="set-system-announcement" rows="2" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
+            <label data-i18n="settings.announcement_label">系统公告 (跑马灯)</label>
+            <textarea id="set-system-announcement" rows="2" data-i18n-placeholder="settings.announcement_placeholder" placeholder="填写公告内容，客户端顶部将会显示跑马灯。留空则不显示。"></textarea>
           </div>
           <div class="form-group">
-            <label>跑马灯显示间隔 (分钟)</label>
+            <label data-i18n="settings.announcement_interval_label">跑马灯显示间隔 (分钟)</label>
             <input type="number" id="set-system-announcement-interval" value="0" min="0">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.announcement_interval_desc">0 = 仅换台和启动时显示。大于0 = 每隔几分钟自动在屏幕上方横向滚动播报一次。
             </div>
           </div>
 
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">EPG 节目源配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.epg_config">EPG 节目源配置</h3>
           </div>
           <div class="form-group">
-            <label>EPG 数据源 URL (XMLTV)</label>
+            <label data-i18n="settings.epg_url_label">EPG 数据源 URL (XMLTV)</label>
             <textarea id="set-epg-source-url" rows="3"
+              data-i18n-placeholder="settings.epg_url_placeholder"
               placeholder="http://epg.example.com/e.xml&#10;http://epg2.example.com/e.xml"></textarea>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.epg_url_desc">支持配置多个源（每行一个），优先匹配前面的源。格式支持 .xml 或
               .gz。服务端会自动拉取并仅加载所需频道到内存中。</div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>EPG 自动刷新间隔 (小时)</label>
+              <label data-i18n="settings.epg_refresh_label">EPG 自动刷新间隔 (小时)</label>
               <input type="number" id="set-epg-refresh-hours" value="12" min="1" max="72">
             </div>
             <div class="form-group">
-              <label>EPG 全局时差 (小时)</label>
+              <label data-i18n="settings.epg_time_shift_label">EPG 全局时差 (小时)</label>
               <input type="number" id="set-epg-time-shift" value="0" placeholder="例如: 8 或 -2">
             </div>
             <div class="form-group" style="display:flex;align-items:flex-end">
-              <button class="btn btn-ghost" onclick="refreshEPGCache()">强制拉取 EPG</button>
+              <button class="btn btn-ghost" onclick="refreshEPGCache()" data-i18n="settings.epg_force_refresh">强制拉取 EPG</button>
             </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">台标缓存配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.logo_cache_config">台标缓存配置</h3>
           </div>
           <div class="form-group">
-            <label>启用本地台标缓存</label>
+            <label data-i18n="settings.logo_strategy_label">启用本地台标缓存</label>
             <select id="set-logo-strategy" onchange="onLogoStrategyChange(this.value)">
-              <option value="local">本地优先 (本地 》 数据库 》 接口)</option>
-              <option value="source">源优先 (数据库 》 本地 》 接口)</option>
-              <option value="interface">接口优先 (接口 》 数据库 》 本地)</option>
+              <option value="local" data-i18n="settings.logo_local_first">本地优先 (本地 》 数据库 》 接口)</option>
+              <option value="source" data-i18n="settings.logo_source_first">源优先 (数据库 》 本地 》 接口)</option>
+              <option value="interface" data-i18n="settings.logo_interface_first">接口优先 (接口 》 数据库 》 本地)</option>
             </select>
           </div>
           <div class="form-group">
-            <label>台标源库地址</label>
+            <label data-i18n="settings.logo_url_label">台标源库地址</label>
             <textarea id="set-local-logo-urls" rows="3"
+              data-i18n-placeholder="settings.logo_url_placeholder"
               placeholder="http://example.com/logo/{name|uppercase}.png"></textarea>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.logo_url_desc">
               配置台标包的根目录，按行分割，拉取时会自动拼接清洗后的频道名称。例如：http://example.com/logo/cctv1.png</div>
           </div>
           <div class="form-row">
             <div class="form-group" style="display:flex;align-items:flex-end;gap:10px;">
-              <button class="btn btn-ghost" onclick="triggerCacheExistingLogos()">缓存已有外链台标</button>
-              <button class="btn btn-primary" onclick="triggerBatchFetchLogos(false)">增量拉取缺失台标</button>
-              <button class="btn btn-danger" onclick="triggerBatchFetchLogos(true)">全量覆盖拉取台标</button>
+              <button class="btn btn-ghost" onclick="triggerCacheExistingLogos()" data-i18n="settings.logo_cache_existing">缓存已有外链台标</button>
+              <button class="btn btn-primary" onclick="triggerBatchFetchLogos(false)" data-i18n="settings.logo_fetch_incremental">增量拉取缺失台标</button>
+              <button class="btn btn-danger" onclick="triggerBatchFetchLogos(true)" data-i18n="settings.logo_fetch_full">全量覆盖拉取台标</button>
             </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">开机短视频/广告/欢迎图 配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.startup_media_config">开机短视频/广告/欢迎图 配置</h3>
           </div>
           <div class="form-group">
-            <label>开机广告总开关</label>
+            <label data-i18n="settings.startup_media_enabled_label">开机广告总开关</label>
             <select id="set-startup-media-enabled">
-              <option value="false">关闭</option>
-              <option value="true">开启</option>
+              <option value="false" data-i18n="settings.off">关闭</option>
+              <option value="true" data-i18n="settings.on">开启</option>
             </select>
           </div>
           <div class="form-row">
             <div class="form-group" style="flex: 2;">
-              <label>开机广告媒体 URL</label>
+              <label data-i18n="settings.startup_media_url_label">开机广告媒体 URL</label>
               <div class="input-with-copy"><input type="text" id="set-startup-media-url"
+                  data-i18n-placeholder="settings.startup_media_url_placeholder"
                   placeholder="http://example.com/ad.mp4 或 /ad/test.jpg"><button class="btn-copy" type="button"
-                  onclick="copyText(document.getElementById('set-startup-media-url').value)" title="复制广告媒体URL"><svg
+                  onclick="copyText(document.getElementById('set-startup-media-url').value)" title="复制广告媒体URL" data-i18n="tooltip.copy_url"><svg
                     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg></button></div>
             </div>
             <div class="form-group" style="flex: 1;">
-              <label>解析类型</label>
+              <label data-i18n="settings.startup_media_type_label">解析类型</label>
               <select id="set-startup-media-type">
-                <option value="image">图片模式 (静态/GIF/API)</option>
-                <option value="video">视频模式 (MP4/MKV等)</option>
+                <option value="image" data-i18n="settings.startup_media_type_image">图片模式 (静态/GIF/API)</option>
+                <option value="video" data-i18n="settings.startup_media_type_video">视频模式 (MP4/MKV等)</option>
               </select>
             </div>
           </div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:15px;margin-top:-5px;">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:15px;margin-top:-5px;" data-i18n="settings.startup_media_note">
             请根据您填入的链接类型明确选择“图片”或“视频”。若格式在电视端无法被解析，将自动跳过广告。<br>
             <strong style="color:var(--danger)">强烈不建议填入 m3u8 等直播流，会导致开机严重卡顿。</strong>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>最大展示时长 (秒)</label>
+              <label data-i18n="settings.startup_max_duration_label">最大展示时长 (秒)</label>
               <input type="number" id="set-startup-duration" value="5" min="1">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">到达此时长将强制跳入主页，防卡死。</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.startup_max_duration_desc">到达此时长将强制跳入主页，防卡死。</div>
             </div>
             <div class="form-group">
-              <label>多少秒后允许跳过 (秒)</label>
+              <label data-i18n="settings.startup_skip_after_label">多少秒后允许跳过 (秒)</label>
               <input type="number" id="set-startup-skip-after" value="0" min="0">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">0 = 立刻可跳过。填大于时长则表示不可跳过。</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.startup_skip_after_desc">0 = 立刻可跳过。填大于时长则表示不可跳过。</div>
             </div>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">客户端在线升级 (OTA) 配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.ota_config">客户端在线升级 (OTA) 配置</h3>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>最新版本号 (Version Code)</label>
-              <input type="number" id="set-update-version-code" placeholder="如：10" min="0">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">必须为整数。客户端版本号小于此值将提示升级。</div>
+              <label data-i18n="settings.ota_version_code_label">最新版本号 (Version Code)</label>
+              <input type="number" id="set-update-version-code" data-i18n-placeholder="settings.ota_version_code_placeholder" placeholder="如：10" min="0">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.ota_version_code_desc">必须为整数。客户端版本号小于此值将提示升级。</div>
             </div>
             <div class="form-group">
-              <label>展示版本名 (Version Name)</label>
-              <input type="text" id="set-update-version-name" placeholder="如：v1.2.0">
+              <label data-i18n="settings.ota_version_name_label">展示版本名 (Version Name)</label>
+              <input type="text" id="set-update-version-name" data-i18n-placeholder="settings.ota_version_name_placeholder" placeholder="如：v1.2.0">
             </div>
           </div>
           <div class="form-group">
-            <label>APK 下载地址</label>
+            <label data-i18n="settings.ota_download_url_label">APK 下载地址</label>
             <div class="input-with-copy"><input type="text" id="set-update-download-url"
+                data-i18n-placeholder="settings.ota_download_url_placeholder"
                 placeholder="http://example.com/app.apk"><button class="btn-copy" type="button"
-                onclick="copyText(document.getElementById('set-update-download-url').value)" title="复制APK下载地址"><svg
+                onclick="copyText(document.getElementById('set-update-download-url').value)" title="复制APK下载地址" data-i18n="tooltip.copy_url"><svg
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg></button></div>
           </div>
           <div class="form-group">
-            <label>更新日志</label>
-            <textarea id="set-update-log" rows="3" placeholder="填写新版本修复或增加的内容..."></textarea>
+            <label data-i18n="settings.ota_changelog_label">更新日志</label>
+            <textarea id="set-update-log" rows="3" data-i18n-placeholder="settings.ota_changelog_placeholder" placeholder="填写新版本修复或增加的内容..."></textarea>
           </div>
           <div class="form-group">
-            <label>是否强制更新</label>
+            <label data-i18n="settings.ota_force_label">是否强制更新</label>
             <select id="set-update-force">
-              <option value="false">否 (用户可跳过)</option>
-              <option value="true">是 (必须更新才能使用)</option>
+              <option value="false" data-i18n="settings.ota_force_no">否 (用户可跳过)</option>
+              <option value="true" data-i18n="settings.ota_force_yes">是 (必须更新才能使用)</option>
             </select>
           </div>
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
@@ -873,46 +888,46 @@
                 style="width: 18px; height: 18px; color: var(--accent);">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
-              FCC (Fast Channel Change) 毫秒级换台加速
+              <span data-i18n="settings.fcc_title">FCC (Fast Channel Change) 毫秒级换台加速</span>
             </h3>
           </div>
           <div class="form-group">
-            <label>FCC 全局开关</label>
+            <label data-i18n="settings.fcc_enabled_label">FCC 全局开关</label>
             <select id="set-fcc-enabled">
-              <option value="false">关闭 (使用标准 IGMP 组播)</option>
-              <option value="true">开启 (启用毫秒级起播与换台)</option>
+              <option value="false" data-i18n="settings.fcc_off">关闭 (使用标准 IGMP 组播)</option>
+              <option value="true" data-i18n="settings.fcc_on">开启 (启用毫秒级起播与换台)</option>
             </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">开启后，客户端通过代理播放 UDP/RTP 组播流时，后端将尝试与运营商的 FCC
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.fcc_desc">开启后，客户端通过代理播放 UDP/RTP 组播流时，后端将尝试与运营商的 FCC
               服务器进行握手并拉取历史流，实现秒开。</div>
-            <div style="font-size:12px;color:var(--danger);margin-top:6px;font-weight:bold;">⚠️ 警告：要使 FCC 正常工作，Docker
+            <div style="font-size:12px;color:var(--danger);margin-top:6px;font-weight:bold;" data-i18n="settings.fcc_warning">⚠️ 警告：要使 FCC 正常工作，Docker
               必须使用 <code>network_mode: host</code> 或 <code>macvlan</code>，并且必须在主路由器中将下方的 UDP 端口范围映射到本服务器！</div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>UDP 接收端口范围 (起始)</label>
+              <label data-i18n="settings.fcc_port_start">UDP 接收端口范围 (起始)</label>
               <input type="number" id="set-fcc-port-start" value="40000" min="1024" max="65535">
             </div>
             <div class="form-group">
-              <label>UDP 接收端口范围 (结束)</label>
+              <label data-i18n="settings.fcc_port_end">UDP 接收端口范围 (结束)</label>
               <input type="number" id="set-fcc-port-end" value="42000" min="1024" max="65535">
             </div>
             <div class="form-group">
-              <label>默认 FCC 服务器</label>
-              <input type="text" id="set-fcc-default-server" placeholder="例: 182.139.234.40:8027">
+              <label data-i18n="settings.fcc_default_server">默认 FCC 服务器</label>
+              <input type="text" id="set-fcc-default-server" data-i18n-placeholder="settings.fcc_default_server_placeholder" placeholder="例: 182.139.234.40:8027">
             </div>
             <div class="form-group">
-              <label>默认 FCC 协议</label>
+              <label data-i18n="settings.fcc_type_label">默认 FCC 协议</label>
               <select id="set-fcc-type">
-                <option value="telecom">电信/中兴/烽火 (Telecom/ZTE/FiberHome)</option>
-                <option value="huawei">华为 (Huawei UDP)</option>
+                <option value="telecom" data-i18n="settings.fcc_type_telecom">电信/中兴/烽火 (Telecom/ZTE/FiberHome)</option>
+                <option value="huawei" data-i18n="settings.fcc_type_huawei">华为 (Huawei UDP)</option>
               </select>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>FCC 公网 IP (可选)</label>
-              <input type="text" id="set-fcc-public-ip" placeholder="例: 123.45.67.89 或 ddns.example.com 或 auto">
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">
+              <label data-i18n="settings.fcc_public_ip_label">FCC 公网 IP (可选)</label>
+              <input type="text" id="set-fcc-public-ip" data-i18n-placeholder="settings.fcc_public_ip_placeholder" placeholder="例: 123.45.67.89 或 ddns.example.com 或 auto">
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.fcc_public_ip_desc">
                 如果服务器在内网(NAT后)，需要填写路由器的公网IP或DDNS域名。<br>
                 填写 <code>auto</code> 可自动检测公网IP（需要服务器能访问外网）。
               </div>
@@ -923,8 +938,8 @@
             style="background: rgba(220, 38, 38, 0.05); border: 1px dashed var(--danger); padding: 16px; border-radius: var(--radius);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <h3 style="margin-bottom:4px;color:var(--danger)">系统维护模式</h3>
-                <div style="font-size:12px;color:var(--text2)">开启后，非测试设备在连接时将进入全屏维护提示，自动停止播放视频，以便您进行系统级维护。</div>
+                <h3 style="margin-bottom:4px;color:var(--danger)" data-i18n="settings.maintenance_title">系统维护模式</h3>
+                <div style="font-size:12px;color:var(--text2)" data-i18n="settings.maintenance_desc">开启后，非测试设备在连接时将进入全屏维护提示，自动停止播放视频，以便您进行系统级维护。</div>
               </div>
               <label class="switch" style="transform: scale(1.1)">
                 <input type="checkbox" id="set-maintenance-mode">
@@ -935,22 +950,22 @@
           <div style="display: none;">
             <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
             <div class="form-group">
-              <h3 style="margin-bottom: 12px;">开发与安全配置</h3>
+              <h3 style="margin-bottom: 12px;" data-i18n="settings.dev_security_config">开发与安全配置</h3>
             </div>
             <div class="form-group">
-              <label>允许 URL 传递 Token (开发调试开关)</label>
+              <label data-i18n="settings.url_token_label">允许 URL 传递 Token (开发调试开关)</label>
               <select id="set-enable-url-token">
-                <option value="false">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
-                <option value="true">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
+                <option value="false" data-i18n="settings.url_token_off">关闭 (安全模式：禁止 URL 明文拼接 Token)</option>
+                <option value="true" data-i18n="settings.url_token_on">开启 (允许 ?token=xxx，仅供开发调试时使用)</option>
               </select>
-              <div style="font-size:11px;color:var(--text2);margin-top:4px">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
+              <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.url_token_desc">强烈建议在生产环境中保持关闭！若开启，其他人只要知道 Token
                 即可脱离官方客户端，在浏览器或第三方播放器中播放。</div>
             </div>
           </div>
           <div class="form-actions" style="justify-content:flex-start">
-            <button class="btn btn-primary" onclick="saveAllClientSettings()">保存设置</button>
+            <button class="btn btn-primary" onclick="saveAllClientSettings()" data-i18n="btn.save_settings">保存设置</button>
             <button class="btn btn-ghost" onclick="saveAppUpdateSettings()"
-              style="margin-left: 10px; background: var(--primary); color: white; border: none;">独立保存升级配置</button>
+              style="margin-left: 10px; background: var(--primary); color: white; border: none;" data-i18n="settings.save_ota_config">独立保存升级配置</button>
           </div>
         </div>
       </div>
@@ -958,51 +973,51 @@
       <!-- System Update -->
       <div id="sec-update" style="display:none">
         <div class="header">
-          <h1>系统更新</h1>
+          <h1 data-i18n="sidebar.check_update">系统更新</h1>
         </div>
         <div class="card" style="padding:24px">
           <div class="form-group"
             style="background: rgba(22, 186, 170, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
             <h3
               style="margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
-              当前版本：<span id="update-current-version">-</span>
+              <span data-i18n="update.current_version">当前版本：</span><span id="update-current-version">-</span>
             </h3>
-            <div style="font-size: 13px; color: var(--text2);">
+            <div style="font-size: 13px; color: var(--text2);" data-i18n="update.description">
               如果您使用的是 Docker 部署的服务端，建议直接通过 Watchtower 等工具自动拉取 latest 镜像进行服务端更新。客户端的更新可以通过下方选择对应的版本下载覆盖安装。
             </div>
           </div>
 
-          <div id="update-loading" style="text-align:center; padding:40px; color:var(--text2)">
+          <div id="update-loading" style="text-align:center; padding:40px; color:var(--text2)" data-i18n="update.loading_text">
             正在拉取 GitHub 获取最新版本信息...
           </div>
 
           <div id="update-error"
             style="display:none; text-align:center; padding:30px; border:1px solid #ff4d4f; border-radius:var(--radius); background:rgba(255,77,79,0.05); margin-bottom:20px;">
-            <p style="color:#ff4d4f; margin-bottom:15px">无法连接至 GitHub，请检查您的服务器网络状态是否正常。</p>
+            <p style="color:#ff4d4f; margin-bottom:15px" data-i18n="update.error_text">无法连接至 GitHub，请检查您的服务器网络状态是否正常。</p>
             <button class="btn btn-primary"
-              onclick="window.open('https://github.com/kuai410022283/mediaplayer/releases', '_blank')">直接访问仓库 Releases
+              onclick="window.open('https://github.com/kuai410022283/mediaplayer/releases', '_blank')" data-i18n="update.go_to_releases">直接访问仓库 Releases
               页面下载</button>
           </div>
 
           <div id="update-content" style="display:none">
             <div class="form-group">
-              <h3 style="margin-bottom: 12px;" id="update-latest-notice">最新版本：获取中...</h3>
+              <h3 style="margin-bottom: 12px;" id="update-latest-notice" data-i18n="update.latest_version">最新版本：获取中...</h3>
             </div>
             <div class="form-row">
               <div class="form-group" style="flex:1">
-                <label>选择想要下载的版本 (Tag)</label>
+                <label data-i18n="update.select_tag">选择想要下载的版本 (Tag)</label>
                 <select id="update-tag-select" onchange="onUpdateTagChange()"></select>
               </div>
               <div class="form-group" style="flex:2">
-                <label>选择对应平台的安装包或文件</label>
+                <label data-i18n="update.select_asset">选择对应平台的安装包或文件</label>
                 <select id="update-asset-select" onchange="onUpdateAssetChange()"></select>
               </div>
             </div>
             <div class="form-row" style="margin-top: 10px;">
               <div class="form-group" style="flex:1">
-                <label>GitHub 下载加速代理 (解决国内下载慢/失败)</label>
+                <label data-i18n="update.proxy_label">GitHub 下载加速代理 (解决国内下载慢/失败)</label>
                 <select id="update-proxy-select" onchange="onUpdateAssetChange()">
-                  <option value="">直连 (无加速)</option>
+                  <option value="" data-i18n="update.proxy_direct">直连 (无加速)</option>
                   <option value="https://cf.612526.xyz/">https://cf.612526.xyz</option>
                   <option value="https://gh.felicity.ac.cn/">https://gh.felicity.ac.cn</option>
                   <option value="https://gh-proxy.org/">https://gh-proxy.org</option>
@@ -1015,15 +1030,15 @@
 
             <div class="form-actions" style="justify-content:flex-start; margin-top: 10px;">
               <button id="btn-update-download" class="btn btn-ghost" style="display:none;"
-                onclick="window.open(this.dataset.href, '_blank')">下载至客户端</button>
+                onclick="window.open(this.dataset.href, '_blank')" data-i18n="update.download_to_client">下载至客户端</button>
               <button id="btn-update-download-all" class="btn btn-primary" style="display:none; margin-left: 10px;"
-                onclick="downloadAllClients()">一键全部下载至服务端</button>
+                onclick="downloadAllClients()" data-i18n="update.download_all_to_server">一键全部下载至服务端</button>
               <button id="btn-update-pull" class="btn btn-primary" style="display:none; margin-left: 10px;"
-                onclick="pullUpdateToServer(this)">下载至服务端</button>
+                onclick="pullUpdateToServer(this)" data-i18n="update.download_to_server">下载至服务端</button>
               <button id="btn-update-cancel" class="btn btn-danger" style="display:none; margin-left: 10px;"
-                onclick="cancelPullUpdateToServer()">停止下载</button>
+                onclick="cancelPullUpdateToServer()" data-i18n="update.stop_download">停止下载</button>
               <button class="btn btn-ghost" style="margin-left: 10px;"
-                onclick="window.open('https://github.com/kuai410022283/mediaplayer/releases', '_blank')">在 GitHub
+                onclick="window.open('https://github.com/kuai410022283/mediaplayer/releases', '_blank')" data-i18n="update.view_changelog">在 GitHub
                 仓库查看更新日志</button>
             </div>
           </div>
@@ -1033,31 +1048,31 @@
       <!-- Sync -->
       <div id="sec-sync" style="display:none">
         <div class="header">
-          <h1>主备同步</h1>
+          <h1 data-i18n="sidebar.sync">主备同步</h1>
         </div>
         <div class="card" style="padding:24px">
           <div class="form-group"
             style="background: rgba(22, 186, 170, 0.05); border: 1px dashed var(--accent); padding: 16px; border-radius: var(--radius); margin-bottom: 24px;">
             <h3
               style="margin-bottom: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; border-bottom: none; padding-bottom: 0;">
-              主服务器授权设置区 (供备机连接用)
+              <span data-i18n="sync.master_config_title">主服务器授权设置区 (供备机连接用)</span>
             </h3>
-            <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px;">
+            <div style="font-size: 13px; color: var(--text2); margin-bottom: 12px;" data-i18n="sync.master_config_desc">
               如果当前节点是“主服务器”，请配置用于备用节点拉取数据的授权通讯秘钥。
             </div>
             <div class="form-group" style="margin-bottom: 16px;">
-              <label>数据拉取授权码 (Sync Serve Token)</label>
+              <label data-i18n="sync.serve_token_label">数据拉取授权码 (Sync Serve Token)</label>
               <div class="input-with-copy" style="margin-top:6px">
-                <input type="text" id="set-sync-serve-token" placeholder="输入复杂的密码，或点击右侧生成随机秘钥" style="height: 38px;">
+                <input type="text" id="set-sync-serve-token" data-i18n-placeholder="sync.serve_token_placeholder" placeholder="输入复杂的密码，或点击右侧生成随机秘钥" style="height: 38px;">
                 <button class="btn-copy" type="button"
-                  onclick="document.getElementById('set-sync-serve-token').value = generateUUID()" title="随机生成秘钥"
+                  onclick="document.getElementById('set-sync-serve-token').value = generateUUID()" title="随机生成秘钥" data-i18n="tooltip.generate_key"
                   style="height:38px;width:38px;background:var(--bg3)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.12-11.45L2 6"></path>
                   </svg>
                 </button>
                 <button class="btn-copy" type="button"
-                  onclick="copyText(document.getElementById('set-sync-serve-token').value)" title="复制通讯秘钥"
+                  onclick="copyText(document.getElementById('set-sync-serve-token').value)" title="复制通讯秘钥" data-i18n="tooltip.copy_url"
                   style="height:38px;width:38px;background:var(--bg3)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -1066,44 +1081,44 @@
                 </button>
               </div>
             </div>
-            <button class="btn btn-primary" onclick="saveSyncSettings()">保存主节点通讯秘钥</button>
+            <button class="btn btn-primary" onclick="saveSyncSettings()" data-i18n="sync.save_master_token">保存主节点通讯秘钥</button>
           </div>
 
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">备用节点运行设置区 (拉取外部数据用)</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="sync.standby_config_title">备用节点运行设置区 (拉取外部数据用)</h3>
           </div>
           <div class="form-group">
-            <label>是否作为备用边缘节点运行</label>
+            <label data-i18n="sync.standby_enabled_label">是否作为备用边缘节点运行</label>
             <select id="set-sync-enable" onchange="onSyncEnableChange(this.value)">
-              <option value="false">关闭 (独立节点或主节点)</option>
-              <option value="true">开启 (作为备机，自动拉取主节点数据)</option>
+              <option value="false" data-i18n="sync.standby_off">关闭 (独立节点或主节点)</option>
+              <option value="true" data-i18n="sync.standby_on">开启 (作为备机，自动拉取主节点数据)</option>
             </select>
           </div>
           <div id="sync-standby-settings" style="display:none">
             <div class="form-group">
               <label style="display:flex; justify-content:space-between; align-items:center;">
-                <span>主节点通信地址 (Master Node URL)</span>
+                <span data-i18n="sync.master_url_label">主节点通信地址 (Master Node URL)</span>
                 <span id="master-status-badge"
-                  style="font-size:12px; padding:2px 8px; border-radius:10px; background:var(--bg3); color:var(--text2); display:none;">检测中...</span>
+                  style="font-size:12px; padding:2px 8px; border-radius:10px; background:var(--bg3); color:var(--text2); display:none;" data-i18n="sync.master_status_checking">检测中...</span>
               </label>
-              <input type="text" id="set-sync-master-url" placeholder="例如：http://192.168.1.10:9527">
+              <input type="text" id="set-sync-master-url" data-i18n-placeholder="sync.master_url_placeholder" placeholder="例如：http://192.168.1.10:9527">
             </div>
             <div class="form-group">
-              <label>主节点通讯秘钥 (Master Node Auth Token)</label>
-              <input type="password" id="set-sync-master-token" placeholder="填入上方主节点的 Sync Serve Token">
+              <label data-i18n="sync.master_token_label">主节点通讯秘钥 (Master Node Auth Token)</label>
+              <input type="password" id="set-sync-master-token" data-i18n-placeholder="sync.master_token_placeholder" placeholder="填入上方主节点的 Sync Serve Token">
             </div>
             <div class="form-group">
-              <label>自动同步间隔 (分钟)</label>
-              <input type="number" id="set-sync-interval" min="1" placeholder="请填入分钟数，例如 60（表示1小时），1440（表示24小时）">
+              <label data-i18n="sync.sync_interval_label">自动同步间隔 (分钟)</label>
+              <input type="number" id="set-sync-interval" min="1" data-i18n-placeholder="sync.sync_interval_placeholder" placeholder="请填入分钟数，例如 60（表示1小时），1440（表示24小时）">
             </div>
             <div class="form-actions" style="justify-content:flex-start">
-              <button class="btn btn-danger" onclick="forceSyncFromMaster()">强制立即覆盖拉取 (危险操作)</button>
+              <button class="btn btn-danger" onclick="forceSyncFromMaster()" data-i18n="sync.force_sync">强制立即覆盖拉取 (危险操作)</button>
             </div>
           </div>
           <div class="form-actions" style="justify-content:flex-start; margin-top: 20px;">
-            <button class="btn btn-primary" onclick="saveSyncSettings()">保存备机配置并生效</button>
+            <button class="btn btn-primary" onclick="saveSyncSettings()" data-i18n="sync.save_standby_config">保存备机配置并生效</button>
           </div>
         </div>
       </div>
@@ -1112,21 +1127,21 @@
     <!-- Modals -->
     <div class="modal-overlay" id="channel-modal">
       <div class="modal">
-        <h3 id="channel-modal-title">添加频道</h3>
+        <h3 id="channel-modal-title" data-i18n="modal.channel_add_title">添加频道</h3>
         <div class="modal-body">
           <input type="hidden" id="ch-edit-id">
-          <div class="form-group"><label>名称</label><input type="text" id="ch-name"></div>
-          <div class="form-group"><label>分组</label><select id="ch-group"></select></div>
-          <div class="form-group"><label>流地址</label>
-            <div class="input-with-copy"><input type="text" id="ch-url" placeholder="https://..."><button
+          <div class="form-group"><label data-i18n="modal.channel_name">名称</label><input type="text" id="ch-name"></div>
+          <div class="form-group"><label data-i18n="modal.channel_group">分组</label><select id="ch-group"></select></div>
+          <div class="form-group"><label data-i18n="modal.stream_url">流地址</label>
+            <div class="input-with-copy"><input type="text" id="ch-url" data-i18n-placeholder="modal.stream_url_placeholder" placeholder="https://..."><button
                 class="btn-copy" type="button" onclick="copyText(document.getElementById('ch-url').value)"
-                title="复制流地址"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                title="复制流地址" data-i18n="tooltip.copy_url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg></button></div>
           </div>
-          <div class="form-group"><label>流类型 (留空自动探测)</label>
-            <input type="text" id="ch-type" list="stream-types" placeholder="例如: hls, ts, mp4">
+          <div class="form-group"><label data-i18n="modal.stream_type">流类型 (留空自动探测)</label>
+            <input type="text" id="ch-type" list="stream-types" data-i18n-placeholder="modal.stream_type_placeholder" placeholder="例如: hls, ts, mp4">
             <datalist id="stream-types">
               <option value="hls"></option>
               <option value="ts"></option>
@@ -1137,23 +1152,23 @@
               <option value="dash"></option>
             </datalist>
           </div>
-          <div class="form-group"><label>内容类型</label>
+          <div class="form-group"><label data-i18n="modal.content_type">内容类型</label>
             <select id="ch-content-type">
-              <option value="">自动推断（推荐）</option>
-              <option value="live">直播 (Live)</option>
-              <option value="vod">点播 (VOD)</option>
+              <option value="" data-i18n="modal.content_type_auto">自动推断（推荐）</option>
+              <option value="live" data-i18n="modal.content_type_live">直播 (Live)</option>
+              <option value="vod" data-i18n="modal.content_type_vod">点播 (VOD)</option>
             </select>
           </div>
-          <div class="form-group"><label>启用频道</label>
+          <div class="form-group"><label data-i18n="modal.enable_channel">启用频道</label>
             <div style="margin-top: 8px;">
               <label class="switch">
                 <input type="checkbox" id="ch-is-enabled" checked>
                 <span class="slider"></span>
               </label>
-              <span style="margin-left:8px;font-size:12px;color:var(--text3)">关闭后客户端和订阅中不显示此频道</span>
+              <span style="margin-left:8px;font-size:12px;color:var(--text3)" data-i18n="modal.disable_hint">关闭后客户端和订阅中不显示此频道</span>
             </div>
           </div>
-          <div class="form-group"><label>直连模式</label>
+          <div class="form-group"><label data-i18n="modal.direct_mode">直连模式</label>
             <div style="margin-top: 8px;">
               <label class="switch">
                 <input type="checkbox" id="ch-is-direct">
@@ -1162,7 +1177,7 @@
             </div>
           </div>
           <div class="form-group" id="ch-multiplex-group">
-            <label>复用流 (需直连关闭+代理分发)</label>
+            <label data-i18n="modal.multiplex">复用流 (需直连关闭+代理分发)</label>
             <div style="margin-top: 8px;">
               <label class="switch">
                 <input type="checkbox" id="ch-enable-multiplex">
@@ -1170,81 +1185,81 @@
               </label>
             </div>
           </div>
-          <div class="form-group"><label>Logo URL</label>
+          <div class="form-group"><label data-i18n="modal.logo_url">Logo URL</label>
             <div class="input-with-copy"><input type="text" id="ch-logo"><button class="btn-copy" type="button"
-                onclick="copyText(document.getElementById('ch-logo').value)" title="复制Logo URL"><svg viewBox="0 0 24 24"
+                onclick="copyText(document.getElementById('ch-logo').value)" title="复制Logo URL" data-i18n="tooltip.copy_url"><svg viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg></button></div>
           </div>
-          <div class="form-group"><label>EPG频道ID</label>
+          <div class="form-group"><label data-i18n="modal.epg_id">EPG频道ID</label>
             <div class="input-with-copy"><input type="text" id="ch-epg"><button class="btn-copy" type="button"
-                onclick="copyText(document.getElementById('ch-epg').value)" title="复制EPG频道ID"><svg viewBox="0 0 24 24"
+                onclick="copyText(document.getElementById('ch-epg').value)" title="复制EPG频道ID" data-i18n="tooltip.copy_url"><svg viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg></button></div>
           </div>
-          <div class="form-group"><label>User-Agent (重写)</label><input type="text" id="ch-user-agent"
-              placeholder="留空使用群组默认或系统默认"></div>
-          <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="ch-headers" rows="2"
-              placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
-          <div class="form-group"><label>自定义 FCC 服务器 (格式: IP:Port)</label><input type="text" id="ch-fcc"
-              placeholder="留空使用系统全局默认 FCC 设置"></div>
-          <div class="form-group"><label>自定义 FCC 厂商协议</label>
+          <div class="form-group"><label data-i18n="modal.user_agent">User-Agent (重写)</label><input type="text" id="ch-user-agent"
+              data-i18n-placeholder="modal.user_agent_placeholder" placeholder="留空使用群组默认或系统默认"></div>
+          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="ch-headers" rows="2"
+              data-i18n-placeholder="modal.custom_headers_placeholder" placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
+          <div class="form-group"><label data-i18n="modal.fcc_server">自定义 FCC 服务器 (格式: IP:Port)</label><input type="text" id="ch-fcc"
+              data-i18n-placeholder="modal.fcc_server_placeholder" placeholder="留空使用系统全局默认 FCC 设置"></div>
+          <div class="form-group"><label data-i18n="modal.fcc_type">自定义 FCC 厂商协议</label>
             <select id="ch-fcc-type">
-              <option value="">(使用系统全局默认协议)</option>
+              <option value="" data-i18n="modal.fcc_type_default">(使用系统全局默认协议)</option>
               <option value="telecom">电信/中兴/烽火 (Telecom/ZTE/FiberHome)</option>
               <option value="huawei">华为 (Huawei UDP)</option>
             </select>
           </div>
           <div class="form-group">
-            <label>代理类型</label>
+            <label data-i18n="modal.proxy_type">代理类型</label>
             <select id="ch-proxy-type">
-              <option value="">继承分组代理设置</option>
-              <option value="none">不代理（覆盖继承）</option>
-              <option value="socks5">SOCKS5</option>
+              <option value="" data-i18n="modal.proxy_inherit_group">继承分组代理设置</option>
+              <option value="none" data-i18n="modal.proxy_none">不代理（覆盖继承）</option>
+              <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
             </select>
           </div>
           <div class="form-group" id="ch-proxy-url-group" style="display:none">
-            <label>代理地址</label>
-            <input type="text" id="ch-proxy-url" placeholder="socks5://user:pass@host:port">
+            <label data-i18n="modal.proxy_url">代理地址</label>
+            <input type="text" id="ch-proxy-url" data-i18n-placeholder="modal.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
           </div>
-          <div class="form-group"><label>排序</label><input type="number" id="ch-sort" value="0" placeholder="数字越小越靠前">
+          <div class="form-group"><label data-i18n="modal.sort_order">排序</label><input type="number" id="ch-sort" value="0" data-i18n-placeholder="modal.sort_order_placeholder" placeholder="数字越小越靠前">
           </div>
 
           <div class="form-group" id="ch-mirror-action"
             style="display:none; padding-top: 15px; border-top: 1px solid var(--border); margin-top: 15px;">
-            <label style="color: var(--primary);">镜像克隆到...</label>
-            <p style="font-size:12px;color:var(--text2);margin-bottom:8px">自动克隆该频道到新来源，且后续随本体源自动更新播放地址。</p>
+            <label style="color: var(--primary);" data-i18n="modal.mirror_clone">镜像克隆到...</label>
+            <p style="font-size:12px;color:var(--text2);margin-bottom:8px" data-i18n="modal.mirror_desc">自动克隆该频道到新来源，且后续随本体源自动更新播放地址。</p>
             <div style="display:flex; gap: 8px;">
               <select id="ch-mirror-source" onchange="updateMirrorGroups()" style="flex:1">
-                <option value="">(请先选择来源)</option>
+                <option value="" data-i18n="modal.select_source_first">(请先选择来源)</option>
               </select>
               <select id="ch-mirror-group" style="flex:1">
-                <option value="">(请先选择分组)</option>
+                <option value="" data-i18n="modal.select_group_first">(请先选择分组)</option>
               </select>
               <button class="btn btn-primary" onclick="mirrorChannel()" type="button"
-                style="background:#ff9800;border-color:#ff9800">执行镜像</button>
+                style="background:#ff9800;border-color:#ff9800" data-i18n="modal.mirror_execute">执行镜像</button>
             </div>
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('channel-modal')">取消</button>
-          <button class="btn btn-primary" onclick="saveChannel()">保存</button>
+          <button class="btn btn-ghost" onclick="hideModal('channel-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="saveChannel()" data-i18n="btn.save">保存</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="group-modal">
       <div class="modal">
-        <h3 id="group-modal-title">添加分组</h3>
+        <h3 id="group-modal-title" data-i18n="modal.group_add_title">添加分组</h3>
         <div class="modal-body">
           <input type="hidden" id="grp-edit-id">
-          <div class="form-group"><label>名称</label><input type="text" id="grp-name"></div>
-          <div class="form-group"><label>排序</label><input type="number" id="grp-sort" value="0"></div>
-          <div class="form-group"><label>所有频道直连模式</label>
+          <div class="form-group"><label data-i18n="modal.group_name">名称</label><input type="text" id="grp-name"></div>
+          <div class="form-group"><label data-i18n="modal.sort_order">排序</label><input type="number" id="grp-sort" value="0"></div>
+          <div class="form-group"><label data-i18n="modal.group_direct_mode">所有频道直连模式</label>
             <div style="margin-top: 8px;">
               <label class="switch">
                 <input type="checkbox" id="grp-is-direct">
@@ -1252,7 +1267,7 @@
               </label>
             </div>
           </div>
-          <div class="form-group" id="grp-multiplex-group"><label>批量线路复用 (限全组支持复用)</label>
+          <div class="form-group" id="grp-multiplex-group"><label data-i18n="modal.group_multiplex">批量线路复用 (限全组支持复用)</label>
             <div style="margin-top: 8px;">
               <label class="switch">
                 <input type="checkbox" id="grp-enable-multiplex">
@@ -1260,16 +1275,16 @@
               </label>
             </div>
           </div>
-          <div class="form-group"><label>User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
-              placeholder="留空使用订阅源或系统默认"></div>
-          <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2"
+          <div class="form-group"><label data-i18n="modal.group_user_agent">User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
+              data-i18n-placeholder="modal.group_user_agent_placeholder" placeholder="留空使用订阅源或系统默认"></div>
+          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2"
               placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
           <div class="form-group">
-            <label>代理类型</label>
+            <label data-i18n="modal.proxy_type">代理类型</label>
             <select id="grp-proxy-type">
-              <option value="">继承源代理设置</option>
+              <option value="" data-i18n="modal.proxy_inherit_source">继承源代理设置</option>
               <option value="none">不代理（覆盖继承）</option>
-              <option value="socks5">SOCKS5</option>
+              <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
             </select>
           </div>
           <div class="form-group" id="grp-proxy-url-group" style="display:none">
@@ -1278,22 +1293,23 @@
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('group-modal')">取消</button>
-          <button class="btn btn-primary" onclick="saveGroup()">保存</button>
+          <button class="btn btn-ghost" onclick="hideModal('group-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="saveGroup()" data-i18n="btn.save">保存</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="source-modal">
       <div class="modal">
-        <h3 id="src-modal-title">添加M3U/TXT源</h3>
+        <h3 id="src-modal-title" data-i18n="modal.source_add_title">添加M3U/TXT源</h3>
         <div class="modal-body">
           <input type="hidden" id="src-edit-id">
-          <div class="form-group"><label>来源名称</label><input type="text" id="src-name"></div>
-          <div class="form-group"><label>URL</label>
+          <div class="form-group"><label data-i18n="modal.source_name">来源名称</label><input type="text" id="src-name"></div>
+          <div class="form-group"><label data-i18n="modal.source_url">URL</label>
             <div class="input-with-copy"><input type="text" id="src-url"
+                data-i18n-placeholder="modal.source_url_placeholder"
                 placeholder="https://example.com/playlist.m3u"><button class="btn-copy" type="button"
-                onclick="copyText(document.getElementById('src-url').value)" title="复制源URL"><svg viewBox="0 0 24 24"
+                onclick="copyText(document.getElementById('src-url').value)" title="复制源URL" data-i18n="tooltip.copy_url"><svg viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
@@ -1301,26 +1317,26 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>自动同步</label>
+              <label data-i18n="modal.auto_sync">自动同步</label>
               <select id="src-auto-sync">
-                <option value="false">关闭</option>
-                <option value="true">开启</option>
+                <option value="false" data-i18n="settings.off">关闭</option>
+                <option value="true" data-i18n="settings.on">开启</option>
               </select>
             </div>
             <div class="form-group">
-              <label>同步间隔 (小时)</label>
+              <label data-i18n="modal.sync_interval">同步间隔 (小时)</label>
               <input type="number" id="src-sync-interval" value="12" min="1">
             </div>
           </div>
-          <div class="form-group"><label>User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent"
-              placeholder="留空使用系统默认"></div>
-          <div class="form-group"><label>自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2"
+          <div class="form-group"><label data-i18n="modal.source_user_agent">User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent"
+              data-i18n-placeholder="modal.source_user_agent_placeholder" placeholder="留空使用系统默认"></div>
+          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2"
               placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
           <div class="form-group">
-            <label>代理类型</label>
+            <label data-i18n="modal.proxy_type">代理类型</label>
             <select id="src-proxy-type">
-              <option value="">不使用代理</option>
-              <option value="socks5">SOCKS5</option>
+              <option value="" data-i18n="modal.proxy_disabled">不使用代理</option>
+              <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
             </select>
           </div>
           <div class="form-group" id="src-proxy-url-group" style="display:none">
@@ -1329,258 +1345,260 @@
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('source-modal')">取消</button>
-          <button class="btn btn-primary" onclick="saveSource()">保存</button>
+          <button class="btn btn-ghost" onclick="hideModal('source-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="saveSource()" data-i18n="btn.save">保存</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="import-modal">
       <div class="modal">
-        <h3>粘贴M3U内容</h3>
+        <h3 data-i18n="modal.import_title">粘贴M3U内容</h3>
         <div class="modal-body">
-          <div class="form-group"><label>来源名称 <span style="color:var(--danger)">*</span></label><input type="text"
-              id="import-name" placeholder="例如：本地测试源" required></div>
+          <div class="form-group"><label data-i18n="modal.import_name">来源名称 <span style="color:var(--danger)">*</span></label><input type="text"
+              id="import-name" data-i18n-placeholder="modal.import_name_placeholder" placeholder="例如：本地测试源" required></div>
           <div class="form-group">
             <label style="display:flex;justify-content:space-between;align-items:center;">
-              <span>M3U/TXT内容</span>
+              <span data-i18n="modal.import_content">M3U/TXT内容</span>
               <div class="format-toolbar" style="display:flex;gap:8px;">
-                <button class="btn btn-ghost btn-sm" onclick="formatContent('m3u')">格式化为标准M3U</button>
-                <button class="btn btn-ghost btn-sm" onclick="formatContent('txt')">格式化为极简TXT</button>
+                <button class="btn btn-ghost btn-sm" onclick="formatContent('m3u')" data-i18n="modal.format_m3u">格式化为标准M3U</button>
+                <button class="btn btn-ghost btn-sm" onclick="formatContent('txt')" data-i18n="modal.format_txt">格式化为极简TXT</button>
                 <button class="btn btn-ghost btn-sm"
-                  onclick="document.getElementById('import-file-input').click()">导入源文件</button>
+                  onclick="document.getElementById('import-file-input').click()" data-i18n="modal.import_file">导入源文件</button>
               </div>
             </label>
             <input type="file" id="import-file-input" accept=".m3u,.m3u8,.txt" style="display:none"
               onchange="handleImportFile(event)">
             <textarea id="import-content" rows="10"
+              data-i18n-placeholder="modal.import_content_placeholder"
               placeholder="#EXTM3U&#10;#EXTINF:-1,CCTV-1&#10;http://..."></textarea>
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('import-modal')">取消</button>
-          <button class="btn btn-primary" onclick="importM3UContent()">导入</button>
+          <button class="btn btn-ghost" onclick="hideModal('import-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="importM3UContent()" data-i18n="modal.import_confirm">导入</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="client-detail-modal">
       <div class="modal" style="width:680px">
-        <h3>设备详情</h3>
+        <h3 data-i18n="modal.client_detail_title">设备详情</h3>
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:0;border-bottom:2px solid var(--border);">
-          <button class="tab-btn active" data-tab="basic" onclick="switchClientDetailTab('basic',this)">基本信息</button>
-          <button class="tab-btn" id="tab-btn-config" data-tab="config" onclick="switchClientDetailTab('config',this)" style="display: none;">远程配置</button>
+          <button class="tab-btn active" data-tab="basic" onclick="switchClientDetailTab('basic',this)" data-i18n="modal.client_detail_basic">基本信息</button>
+          <button class="tab-btn" id="tab-btn-config" data-tab="config" onclick="switchClientDetailTab('config',this)" style="display: none;" data-i18n="modal.client_detail_config">远程配置</button>
         </div>
         <div id="client-detail-content" style="flex:1;min-height:0;overflow-y:auto;"></div>
         <div id="client-config-tab-content" style="display:none;max-height:400px;overflow-y:auto;"></div>
         <div class="form-actions" id="client-detail-actions">
-          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
+          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')" data-i18n="btn.cancel">关闭</button>
         </div>
         <div class="form-actions" id="client-config-actions" style="display:none;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="saveClientConfig(currentDetailClientId)">保存设备配置</button>
-          <button class="btn btn-warn" onclick="resetClientConfig(currentDetailClientId)">重置为全局</button>
-          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')">关闭</button>
+          <button class="btn btn-primary" onclick="saveClientConfig(currentDetailClientId)" data-i18n="modal.save_client_config">保存设备配置</button>
+          <button class="btn btn-warn" onclick="resetClientConfig(currentDetailClientId)" data-i18n="modal.reset_client_config">重置为全局</button>
+          <button class="btn btn-ghost" onclick="hideModal('client-detail-modal')" data-i18n="btn.cancel">关闭</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="approve-modal">
       <div class="modal">
-        <h3>审批设备</h3>
+        <h3 data-i18n="modal.approve_title">审批设备</h3>
         <input type="hidden" id="approve-client-id">
         <div class="form-group">
-          <label>绑定套餐</label>
+          <label data-i18n="modal.approve_plan">绑定套餐</label>
           <select id="approve-plan-id" onchange="onApprovePlanChange()"></select>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">选择套餐将自动覆盖有效期和允许同时在线设备数量</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="modal.approve_plan_desc">选择套餐将自动覆盖有效期和允许同时在线设备数量</div>
           <div id="approve-plan-desc"
             style="font-size:12px;color:var(--accent);margin-top:6px;display:none;font-weight:500;"></div>
         </div>
         <input type="hidden" id="approve-days" value="365">
         <input type="hidden" id="approve-streams" value="2">
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('approve-modal')">取消</button>
-          <button class="btn btn-primary" onclick="doApprove()">确认通过</button>
+          <button class="btn btn-ghost" onclick="hideModal('approve-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="doApprove()" data-i18n="modal.approve_confirm">确认通过</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="reject-modal">
       <div class="modal">
-        <h3>拒绝设备</h3>
+        <h3 data-i18n="modal.reject_title">拒绝设备</h3>
         <input type="hidden" id="reject-client-id">
-        <div class="form-group"><label>拒绝原因</label><textarea id="reject-reason" rows="3"
-            placeholder="填写拒绝原因..."></textarea></div>
+        <div class="form-group"><label data-i18n="modal.reject_reason">拒绝原因</label><textarea id="reject-reason" rows="3"
+            data-i18n-placeholder="modal.reject_reason_placeholder" placeholder="填写拒绝原因..."></textarea></div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('reject-modal')">取消</button>
-          <button class="btn btn-danger" onclick="doReject()">确认拒绝</button>
+          <button class="btn btn-ghost" onclick="hideModal('reject-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-danger" onclick="doReject()" data-i18n="modal.reject_confirm">确认拒绝</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="token-modal">
       <div class="modal">
-        <h3>令牌管理</h3>
+        <h3 data-i18n="modal.token_title">令牌管理</h3>
         <div id="token-modal-content"></div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('token-modal')">关闭</button>
+          <button class="btn btn-ghost" onclick="hideModal('token-modal')" data-i18n="btn.cancel">关闭</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="batch-modal">
       <div class="modal">
-        <h3>批量操作</h3>
-        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">对勾选的设备执行操作</p>
+        <h3 data-i18n="modal.batch_title">批量操作</h3>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px" data-i18n="modal.batch_desc">对勾选的设备执行操作</p>
         <div class="form-group">
-          <label>操作</label>
+          <label data-i18n="modal.batch_action">操作</label>
           <select id="batch-action">
-            <option value="approve">批量通过</option>
-            <option value="reject">批量拒绝</option>
-            <option value="ban">批量封禁</option>
-            <option value="delete">批量删除</option>
+            <option value="approve" data-i18n="modal.batch_approve">批量通过</option>
+            <option value="reject" data-i18n="modal.batch_reject">批量拒绝</option>
+            <option value="ban" data-i18n="modal.batch_ban">批量封禁</option>
+            <option value="delete" data-i18n="modal.batch_delete">批量删除</option>
           </select>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('batch-modal')">取消</button>
-          <button class="btn btn-danger" onclick="doBatch()">执行</button>
+          <button class="btn btn-ghost" onclick="hideModal('batch-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-danger" onclick="doBatch()" data-i18n="modal.batch_execute">执行</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="group-batch-modal">
       <div class="modal">
-        <h3>分组批量操作</h3>
-        <p id="group-batch-modal-text" style="color:var(--text2);font-size:13px;margin-bottom:16px">
+        <h3 data-i18n="modal.group_batch_title">分组批量操作</h3>
+        <p id="group-batch-modal-text" style="color:var(--text2);font-size:13px;margin-bottom:16px" data-i18n="modal.group_batch_desc">
           将删除勾选的分组，并同步删除其下的所有频道，此操作不可恢复。</p>
         <div class="form-actions">
           <button class="btn btn-ghost"
-            onclick="hideModal('group-batch-modal'); document.getElementById('group-batch-action').value='';">取消</button>
-          <button class="btn btn-danger" onclick="doGroupBatchAction()">确认操作</button>
+            onclick="hideModal('group-batch-modal'); document.getElementById('group-batch-action').value='';" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-danger" onclick="doGroupBatchAction()" data-i18n="modal.confirm_action">确认操作</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="channel-batch-modal">
       <div class="modal">
-        <h3>频道批量操作</h3>
-        <p id="channel-batch-modal-text" style="color:var(--text2);font-size:13px;margin-bottom:16px">
+        <h3 data-i18n="modal.channel_batch_title">频道批量操作</h3>
+        <p id="channel-batch-modal-text" style="color:var(--text2);font-size:13px;margin-bottom:16px" data-i18n="modal.channel_batch_desc">
           将永久删除勾选的频道，此操作不可恢复。</p>
         <div class="form-actions">
           <button class="btn btn-ghost"
-            onclick="hideModal('channel-batch-modal'); document.getElementById('channel-batch-action').value='';">取消</button>
-          <button class="btn btn-danger" id="channel-batch-confirm-btn" onclick="doChannelBatchAction()">确认操作</button>
+            onclick="hideModal('channel-batch-modal'); document.getElementById('channel-batch-action').value='';" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-danger" id="channel-batch-confirm-btn" onclick="doChannelBatchAction()" data-i18n="modal.confirm_action">确认操作</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="health-check-modal">
       <div class="modal">
-        <h3>主动健康检查</h3>
-        <p id="hc-modal-desc" style="color:var(--text2);font-size:13px;margin-bottom:16px">
+        <h3 data-i18n="modal.health_check_title">主动健康检查</h3>
+        <p id="hc-modal-desc" style="color:var(--text2);font-size:13px;margin-bottom:16px" data-i18n="modal.health_check_desc">
           系统将采用平滑滚动机制逐一探测频道，绝不会产生高并发被源站封禁。请设置预期完成时间。</p>
         <div class="form-group">
-          <label>预期完成时间 (分钟)</label>
+          <label data-i18n="modal.health_check_minutes">预期完成时间 (分钟)</label>
           <input type="number" id="hc-expected-minutes" value="120" min="1" max="1440">
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('health-check-modal')">取消</button>
-          <button class="btn btn-primary" onclick="startHealthCheck()">启动</button>
+          <button class="btn btn-ghost" onclick="hideModal('health-check-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="startHealthCheck()" data-i18n="modal.health_check_start">启动</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="plan-modal">
       <div class="modal">
-        <h3>添加/修改套餐</h3>
+        <h3 data-i18n="modal.plan_title">添加/修改套餐</h3>
         <div class="modal-body">
           <input type="hidden" id="plan-edit-id">
-          <div class="form-group"><label>套餐名称</label><input type="text" id="plan-name" placeholder="如：家庭包年套餐"></div>
+          <div class="form-group"><label data-i18n="modal.plan_name">套餐名称</label><input type="text" id="plan-name" data-i18n-placeholder="modal.plan_name_placeholder" placeholder="如：家庭包年套餐"></div>
           <div class="form-row">
-            <div class="form-group"><label>有效期 (天)</label><input type="number" id="plan-days" value="365" min="0"></div>
-            <div class="form-group"><label>允许同时在线设备数量</label><input type="number" id="plan-streams" value="100" min="1">
+            <div class="form-group"><label data-i18n="modal.plan_days">有效期 (天)</label><input type="number" id="plan-days" value="365" min="0"></div>
+            <div class="form-group"><label data-i18n="modal.plan_streams">允许同时在线设备数量</label><input type="number" id="plan-streams" value="100" min="1">
             </div>
           </div>
-          <div class="form-group"><label>价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01">
+          <div class="form-group"><label data-i18n="modal.plan_price">价格 (可选展示)</label><input type="number" id="plan-price" value="0" step="0.01">
           </div>
-          <div class="form-group"><label>描述</label><textarea id="plan-desc" rows="2"></textarea></div>
+          <div class="form-group"><label data-i18n="modal.plan_desc">描述</label><textarea id="plan-desc" rows="2"></textarea></div>
           <div class="form-group" style="display:flex;align-items:center;gap:8px;">
             <label class="switch">
               <input type="checkbox" id="plan-enable-aggregation">
               <span class="slider"></span>
             </label>
-            <label for="plan-enable-aggregation" style="margin-bottom:0;">开启同名分组聚合</label>
-            <span style="font-size:12px;color:var(--text2);margin-left:4px;">(若开启，将自动剥离来源标识合并同名分组及频道)</span>
+            <label for="plan-enable-aggregation" style="margin-bottom:0;" data-i18n="modal.plan_aggregation">开启同名分组聚合</label>
+            <span style="font-size:12px;color:var(--text2);margin-left:4px;" data-i18n="modal.plan_aggregation_desc">(若开启，将自动剥离来源标识合并同名分组及频道)</span>
           </div>
           <div class="form-group" id="plan-token-group">
-            <label>订阅 Token (不填写会自动生成)</label>
+            <label data-i18n="modal.plan_token">订阅 Token (不填写会自动生成)</label>
             <div style="display:flex;gap:10px;">
-              <input type="text" id="plan-token" placeholder="留空自动生成" style="flex:1;">
+              <input type="text" id="plan-token" data-i18n-placeholder="modal.plan_token_placeholder" placeholder="留空自动生成" style="flex:1;">
               <button class="btn btn-ghost" type="button" onclick="regeneratePlanTokenInput()"
-                style="white-space:nowrap;">随机生成</button>
+                style="white-space:nowrap;" data-i18n="modal.plan_token_random">随机生成</button>
             </div>
           </div>
           <div class="form-group" id="plan-subscription-buttons-group" style="display:none;">
-            <label>复制订阅链接</label>
+            <label data-i18n="modal.plan_subscription">复制订阅链接</label>
             <div style="display:flex;gap:10px;">
-              <button class="btn btn-ghost" type="button" id="btn-copy-m3u" style="flex:1;">订阅 M3U</button>
-              <button class="btn btn-ghost" type="button" id="btn-copy-txt" style="flex:1;">订阅 TXT</button>
+              <button class="btn btn-ghost" type="button" id="btn-copy-m3u" style="flex:1;" data-i18n="modal.plan_sub_m3u">订阅 M3U</button>
+              <button class="btn btn-ghost" type="button" id="btn-copy-txt" style="flex:1;" data-i18n="modal.plan_sub_txt">订阅 TXT</button>
             </div>
           </div>
           <div class="form-group">
-            <label>关联频道分组 <span
-                style="font-size:12px;color:var(--text2);font-weight:normal;">(不勾选则没有任何频道的访问权限，已选分组可拖拽排序)</span></label>
+            <label data-i18n="modal.plan_groups">关联频道分组 <span
+                style="font-size:12px;color:var(--text2);font-weight:normal;" data-i18n="modal.plan_groups_desc">(不勾选则没有任何频道的访问权限，已选分组可拖拽排序)</span></label>
             <div style="margin-bottom: 6px;">
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAllPlanGroups(true)">全选</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAllPlanGroups(true)" data-i18n="modal.select_all">全选</button>
               <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAllPlanGroups(false)"
-                style="margin-left:4px;">取消全选</button>
+                style="margin-left:4px;" data-i18n="modal.deselect_all">取消全选</button>
             </div>
             <div id="plan-groups-selected-container"
               style="min-height:40px;margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);max-height:350px;overflow-y:auto;">
-              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">已选分组（可拖拽排序）</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;" data-i18n="modal.plan_selected_groups">已选分组（可拖拽排序）</div>
               <div id="plan-groups-selected" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
             </div>
             <div id="plan-groups-container"
               style="display:flex;flex-wrap:wrap;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);max-height:350px;overflow-y:auto;">
-              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;width:100%;">未选分组</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;width:100%;" data-i18n="modal.plan_unselected_groups">未选分组</div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-ghost" onclick="hideModal('plan-modal')">取消</button>
-          <button class="btn btn-primary" onclick="savePlan()">保存</button>
+          <button class="btn btn-ghost" onclick="hideModal('plan-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="savePlan()" data-i18n="btn.save">保存</button>
         </div>
       </div>
     </div>
 
     <div class="modal-overlay" id="password-modal">
       <div class="modal">
-        <h3>修改管理员密码</h3>
+        <h3 data-i18n="sidebar.change_password">修改管理员密码</h3>
         <div class="form-group">
-          <label>原密码</label>
-          <input type="password" id="pwd-old" placeholder="请输入当前密码">
+          <label data-i18n="password_modal.old_password">原密码</label>
+          <input type="password" id="pwd-old" data-i18n-placeholder="password_modal.old_password_placeholder" placeholder="请输入当前密码">
         </div>
         <div class="form-group">
-          <label>新密码</label>
-          <input type="password" id="pwd-new" placeholder="请输入新密码">
+          <label data-i18n="password_modal.new_password">新密码</label>
+          <input type="password" id="pwd-new" data-i18n-placeholder="password_modal.new_password_placeholder" placeholder="请输入新密码">
         </div>
         <div class="form-group">
-          <label>确认新密码</label>
-          <input type="password" id="pwd-confirm" placeholder="请再次输入新密码">
+          <label data-i18n="password_modal.confirm_password">确认新密码</label>
+          <input type="password" id="pwd-confirm" data-i18n-placeholder="password_modal.confirm_password_placeholder" placeholder="请再次输入新密码">
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" onclick="hideModal('password-modal')">取消</button>
-          <button class="btn btn-primary" onclick="updateAdminPassword()">确认修改</button>
+          <button class="btn btn-ghost" onclick="hideModal('password-modal')" data-i18n="btn.cancel">取消</button>
+          <button class="btn btn-primary" onclick="updateAdminPassword()" data-i18n="btn.confirm_modify">确认修改</button>
         </div>
       </div>
     </div>
 
     <div class="toast" id="toast" style="display:none"></div>
     <div class="loading-overlay" id="loading-overlay">
-      <div class="loading-spinner"></div><span>加载中...</span>
+      <div class="loading-spinner"></div><span data-i18n="common.loading">加载中...</span>
     </div>
 
     <!-- <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script> -->
     <script src="/static/Sortable.min.js"></script>
+    <script src="/static/i18n.js"></script>
     <script src="/static/app.js"></script>
 </body>
 
