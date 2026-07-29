@@ -15,6 +15,8 @@ object Prefs {
     const val KEY_GESTURE_VOLUME = "gesture_volume_enabled"
     const val KEY_SHOW_GROUP_SOURCE = "show_group_source"
     const val KEY_PREFERRED_SERVER_INDEX = "preferred_server_index"
+    const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+    const val KEY_CHECK_UPDATE_DUMMY = "check_update"
     
     // 全局细线进度条：0=关闭, 1=顶部, 2=底部
     const val KEY_GLOBAL_PROGRESS_BAR = "global_progress_bar"

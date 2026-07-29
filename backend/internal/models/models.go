@@ -371,6 +371,8 @@ type ClientRemoteConfig struct {
 	GestureBrightness  *bool `json:"gesture_brightness,omitempty"`   // 手势亮度
 	GestureVolume      *bool `json:"gesture_volume,omitempty"`       // 手势音量
 	ReverseChannelKeys *bool `json:"reverse_channel_keys,omitempty"` // 反转频道键
+	PreferredServerIndex *int `json:"preferred_server_index,omitempty"` // 服务器选择
+	AutoCheckUpdate    *bool `json:"auto_check_update,omitempty"`    // 自动检查更新
 
 	// 隐藏配置项（不在客户端UI中显示，但值仍生效）
 	HiddenKeys []string `json:"hidden_keys,omitempty"`

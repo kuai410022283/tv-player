@@ -544,6 +544,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     Prefs.SCALE_MODE_FILL -> "铺满全屏"
                     else -> "原始比例"
                 }
+                findViewById<TextView>(R.id.tvSettingsAutoCheckUpdateValue)?.text = if (prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)) "开" else "关"
             }
         }
 
@@ -551,7 +552,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         authFlowManager.startAuthFlow()
 
         // 检查版本更新
-        com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+        if (prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)) {
+            com.mediaplayer.app.util.UpdateManager.checkUpdate(this, lifecycleScope, false)
+        }
     }
 
 
@@ -1091,7 +1094,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         Prefs.KEY_PREFERRED_SERVER_INDEX to R.id.btnSettingsPreferredServer,
         Prefs.KEY_AUTO_START to R.id.btnSettingsAutoStart,
         Prefs.KEY_REVERSE_CHANNEL_KEYS to R.id.btnSettingsReverseChannels,
-        Prefs.KEY_LOCAL_PROXY_ENABLED to R.id.btnSettingsLocalProxy
+        Prefs.KEY_LOCAL_PROXY_ENABLED to R.id.btnSettingsLocalProxy,
+        Prefs.KEY_AUTO_CHECK_UPDATE to R.id.btnSettingsAutoCheckUpdate,
+        Prefs.KEY_CHECK_UPDATE_DUMMY to R.id.btnSettingsCheckUpdate
     )
 
     /** 设置栏所有可焦点的 View ID（按 XML 布局顺序），用于动态修正焦点链 */
@@ -1118,6 +1123,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         R.id.btnSettingsAutoStart,
         R.id.btnSettingsReverseChannels,
         R.id.btnSettingsLocalProxy,
+        R.id.btnSettingsAutoCheckUpdate,
         R.id.btnSettingsCheckUpdate,
         R.id.btnSettingsAbout
     )
@@ -1645,6 +1651,23 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Toast.makeText(this@MainActivity, "本地代理已关闭", Toast.LENGTH_SHORT).show()
             }
             updateLocalProxyText()
+        }
+
+        // 自动检查更新开关
+        val btnSettingsAutoCheckUpdate = findViewById<View>(R.id.btnSettingsAutoCheckUpdate)
+        val tvSettingsAutoCheckUpdateValue = findViewById<TextView>(R.id.tvSettingsAutoCheckUpdateValue)
+        var autoCheckUpdateEnabled = prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)
+        
+        fun updateAutoCheckUpdateText() {
+            tvSettingsAutoCheckUpdateValue?.text = if (autoCheckUpdateEnabled) "开" else "关"
+        }
+        updateAutoCheckUpdateText()
+
+        btnSettingsAutoCheckUpdate?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_AUTO_CHECK_UPDATE)) return@setOnClickListener
+            autoCheckUpdateEnabled = !autoCheckUpdateEnabled
+            prefs.edit().putBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, autoCheckUpdateEnabled).apply()
+            updateAutoCheckUpdateText()
         }
 
         btnSettingsCheckUpdate?.setOnClickListener {

@@ -240,6 +240,7 @@ func isValidConfigKey(key string) bool {
 		"reverse_channel_keys": true,
 		"hide_settings_panel":  true, "hide_channel_list": true,
 		"hide_epg_panel": true, "hide_osd_panel": true,
+		"preferred_server_index": true, "auto_check_update": true, "check_update": true,
 	}
 	return validKeys[key]
 }
@@ -255,6 +256,14 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setInt := func(key string, ptr **int) {
 		if v, ok := m[key]; ok {
 			if n, err := strconv.Atoi(v); err == nil {
+				*ptr = &n
+				hasAny = true
+			} else if v == "true" {
+				n := 0
+				*ptr = &n
+				hasAny = true
+			} else if v == "false" {
+				n := -1
 				*ptr = &n
 				hasAny = true
 			}
@@ -290,6 +299,8 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setBool("hide_channel_list", &cfg.HideChannelList)
 	setBool("hide_epg_panel", &cfg.HideEpgPanel)
 	setBool("hide_osd_panel", &cfg.HideOsdPanel)
+	setInt("preferred_server_index", &cfg.PreferredServerIndex)
+	setBool("auto_check_update", &cfg.AutoCheckUpdate)
 
 	if !hasAny {
 		return nil

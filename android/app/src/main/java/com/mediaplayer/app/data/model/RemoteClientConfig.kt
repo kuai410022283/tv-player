@@ -49,6 +49,10 @@ data class RemoteClientConfig(
     @SerializedName("gesture_volume")      val gestureVolume: Boolean? = null,
     /** 反转频道切换键方向 */
     @SerializedName("reverse_channel_keys") val reverseChannelKeys: Boolean? = null,
+    /** 自动检测更新 */
+    @SerializedName("auto_check_update")   val autoCheckUpdate: Boolean? = null,
+    /** 优选服务器索引 */
+    @SerializedName("preferred_server_index") val preferredServerIndex: Int? = null,
 
     // ── 隐藏配置项（不在客户端UI中显示，但值仍生效） ──
     /** 需要隐藏的配置项键名列表 */
