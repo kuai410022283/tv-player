@@ -1212,9 +1212,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val serverList = getServerList()
             if (index < 0 || index >= serverList.size) return ""
             val entry = serverList[index]
-            return if (entry.name.isNotEmpty()) {
+            val name = entry.name ?: ""
+            return if (name.isNotEmpty()) {
                 // 名称过长时截断
-                if (entry.name.length > 12) entry.name.take(11) + "…" else entry.name
+                if (name.length > 12) name.take(11) + "…" else name
             } else {
                 ""
             }
