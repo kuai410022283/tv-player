@@ -64,8 +64,12 @@ object RemoteConfigManager {
 
             apply()
         }
-        // 记录隐藏配置项
-        config.hiddenKeys?.let { hiddenKeys.addAll(it) }
+        // 记录隐藏配置项（将后端 config_key 映射为客户端 Prefs key）
+        config.hiddenKeys?.let { keys ->
+            keys.forEach { key ->
+                hiddenKeys.add(configKeyToPrefKey[key] ?: key)
+            }
+        }
         // 记录面板隐藏标志
         hideSettingsPanel = config.hideSettingsPanel ?: false
         hideChannelList = config.hideChannelList ?: false
@@ -101,6 +105,13 @@ object RemoteConfigManager {
     fun isChannelListHidden(): Boolean = hideChannelList
     fun isEpgPanelHidden(): Boolean = hideEpgPanel
     fun isOsdPanelHidden(): Boolean = hideOsdPanel
+
+    // ── 配置键名映射 ────────────────────────────────────
+    // 后端使用的 config_key 和客户端 Prefs 键名不一致时，在此映射。
+    private val configKeyToPrefKey = mapOf(
+        "gesture_brightness" to Prefs.KEY_GESTURE_BRIGHTNESS,  // "gesture_brightness_enabled"
+        "gesture_volume"     to Prefs.KEY_GESTURE_VOLUME,      // "gesture_volume_enabled"
+    )
 
     // ── 内部辅助 ────────────────────────────────────────
 
