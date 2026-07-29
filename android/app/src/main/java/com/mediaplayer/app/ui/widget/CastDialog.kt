@@ -76,7 +76,7 @@ class CastDialog(
             }
         }, onDiscoveryStopped = {
             coroutineScope.launch {
-                tvScanStatus.text = "扫描结束"
+                tvScanStatus.text = context.getString(R.string.cast_scan_finished)
                 progressScan.visibility = View.GONE
                 if (devices.isEmpty()) {
                     tvEmpty.visibility = View.VISIBLE
@@ -88,7 +88,7 @@ class CastDialog(
         coroutineScope.launch {
             delay(5000)
             if (isShowing) {
-                tvScanStatus.text = "局域网内的在线设备"
+                tvScanStatus.text = context.getString(R.string.cast_online_devices)
                 progressScan.visibility = View.GONE
                 if (devices.isEmpty()) {
                     tvEmpty.visibility = View.VISIBLE
@@ -99,7 +99,7 @@ class CastDialog(
     
     private fun sendCastCommand(device: NsdHelper.DeviceInfo) {
         if (currentChannelId == -1L) {
-            Toast.makeText(context, "当前没有可投屏的频道", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_cast_no_channel), Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -112,27 +112,27 @@ class CastDialog(
             .post(body)
             .build()
             
-        tvScanStatus.text = "正在连接 ${device.name}..."
+        tvScanStatus.text = context.getString(R.string.cast_connecting_device, device.name)
         progressScan.visibility = View.VISIBLE
             
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 coroutineScope.launch {
-                    tvScanStatus.text = "局域网内的在线设备"
+                    tvScanStatus.text = context.getString(R.string.cast_online_devices)
                     progressScan.visibility = View.GONE
-                    Toast.makeText(context, "连接失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_cast_connect_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
                 }
             }
 
             override fun onResponse(call: Call, response: Response) {
                 coroutineScope.launch {
-                    tvScanStatus.text = "局域网内的在线设备"
+                    tvScanStatus.text = context.getString(R.string.cast_online_devices)
                     progressScan.visibility = View.GONE
                     if (response.isSuccessful) {
-                        Toast.makeText(context, "投屏指令已发送", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_cast_cmd_sent), Toast.LENGTH_SHORT).show()
                         dismiss()
                     } else {
-                        Toast.makeText(context, "设备响应错误", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_cast_device_error), Toast.LENGTH_SHORT).show()
                     }
                 }
             }

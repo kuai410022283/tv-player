@@ -17,10 +17,25 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.load
+import android.content.Context
 import com.mediaplayer.app.Prefs
 import com.mediaplayer.app.R
 
 class SplashMediaActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val langInt = prefs.getInt(Prefs.KEY_APP_LANGUAGE, Prefs.LANG_AUTO)
+        val langCode = when (langInt) {
+            Prefs.LANG_ZH_CN -> "zh-CN"
+            Prefs.LANG_EN -> "en"
+            Prefs.LANG_ZH_TW -> "zh-TW"
+            Prefs.LANG_KO -> "ko"
+            Prefs.LANG_JA -> "ja"
+            else -> "auto"
+        }
+        super.attachBaseContext(com.mediaplayer.app.util.LocaleHelper.wrap(newBase, langCode))
+    }
 
     companion object {
         const val EXTRA_MEDIA_URL = "extra_media_url"
@@ -108,19 +123,19 @@ class SplashMediaActivity : ComponentActivity() {
         skipText.visibility = View.VISIBLE
         if (skipAfter <= 0) {
             canSkip = true
-            skipText.text = "按返回键跳过"
+            skipText.text = getString(R.string.splash_skip_press_back)
         } else {
             canSkip = false
-            skipText.text = "${skipAfter}秒后可跳过"
+            skipText.text = getString(R.string.splash_skip_timer, skipAfter.toString())
             object : CountDownTimer(skipAfter * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     val sec = millisUntilFinished / 1000
-                    skipText.text = "${sec}秒后可跳过"
+                    skipText.text = getString(R.string.splash_skip_timer, sec.toString())
                 }
 
                 override fun onFinish() {
                     canSkip = true
-                    skipText.text = "按返回键跳过"
+                    skipText.text = getString(R.string.splash_skip_press_back)
                 }
             }.also {
                 countDownTimer = it
@@ -130,7 +145,7 @@ class SplashMediaActivity : ComponentActivity() {
 
         skipText.setOnClickListener {
             if (canSkip) finishWithResult()
-            else Toast.makeText(this, "请看完广告", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, getString(R.string.toast_splash_watch_ad), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -140,7 +155,7 @@ class SplashMediaActivity : ComponentActivity() {
                 if (canSkip) {
                     finishWithResult()
                 } else {
-                    Toast.makeText(this@SplashMediaActivity, "请看完广告", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SplashMediaActivity, getString(R.string.toast_splash_watch_ad), Toast.LENGTH_SHORT).show()
                 }
             }
         })
@@ -193,7 +208,7 @@ class SplashMediaActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (canSkip) finishWithResult()
-            else Toast.makeText(this, "请看完广告", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, getString(R.string.toast_splash_watch_ad), Toast.LENGTH_SHORT).show()
             return true
         }
         return super.onKeyDown(keyCode, event)

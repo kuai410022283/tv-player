@@ -373,6 +373,7 @@ type ClientRemoteConfig struct {
 	ReverseChannelKeys *bool `json:"reverse_channel_keys,omitempty"` // 反转频道键
 	PreferredServerIndex *int `json:"preferred_server_index,omitempty"` // 服务器选择
 	AutoCheckUpdate    *bool `json:"auto_check_update,omitempty"`    // 自动检查更新
+	AppLanguage        *int  `json:"app_language,omitempty"`         // 多语言配置 (0=自动, 1=中文, 2=英文等)
 
 	// 隐藏配置项（不在客户端UI中显示，但值仍生效）
 	HiddenKeys []string `json:"hidden_keys,omitempty"`

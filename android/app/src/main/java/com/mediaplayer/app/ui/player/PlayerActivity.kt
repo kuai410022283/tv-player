@@ -41,6 +41,20 @@ import kotlin.math.min
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCallback {
 
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val langInt = prefs.getInt(Prefs.KEY_APP_LANGUAGE, Prefs.LANG_AUTO)
+        val langCode = when (langInt) {
+            Prefs.LANG_ZH_CN -> "zh-CN"
+            Prefs.LANG_EN -> "en"
+            Prefs.LANG_ZH_TW -> "zh-TW"
+            Prefs.LANG_KO -> "ko"
+            Prefs.LANG_JA -> "ja"
+            else -> "auto"
+        }
+        super.attachBaseContext(com.mediaplayer.app.util.LocaleHelper.wrap(newBase, langCode))
+    }
+
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
         val dm = res.displayMetrics
@@ -147,7 +161,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                         // 动态看门狗超时：默认 10秒；直播/特殊流放宽到 25秒，给足大水库蓄水时间
                         val timeoutLimit = if (!isWatchdogEnabledForCurrentStream) 25000L else 10000L
                         if (stateStartTime > 0 && now - stateStartTime > timeoutLimit) {
-                            tvStatus?.text = "网络连接超时，正在尝试切换线路..."
+                            tvStatus?.text = getString(R.string.player_status_timeout)
                             currentPlaybackState = PlaybackState.IDLE
                             handlePlaybackError(isNetworkTimeout = true)
                             return
@@ -162,7 +176,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                             if (currentTime > 0 && currentTime == lastPlaybackTime) {
                                 frozenTimeCounter++
                                 if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
-                                    tvStatus?.text = "检测到画面卡死，正在尝试恢复..."
+                                    tvStatus?.text = getString(R.string.player_status_stuck)
                                     currentPlaybackState = PlaybackState.IDLE
                                     handlePlaybackError()
                                     frozenTimeCounter = 0
@@ -418,11 +432,11 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     }
                     if (percent == 100f) {
                         progressBar?.visibility = View.GONE
-                        tvStatus?.text = "播放中"
+                        tvStatus?.text = getString(R.string.player_status_playing)
                         handler.postDelayed({ hideChannelInfo() }, 3000)
                     } else {
                         progressBar?.visibility = View.VISIBLE
-                        tvStatus?.text = "缓冲中... ${percent.toInt()}%"
+                        tvStatus?.text = getString(R.string.player_status_buffering, percent.toInt().toString())
                     }
                 }
             }
@@ -432,7 +446,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     currentPlaybackState = PlaybackState.PLAYING
                     stateStartTime = System.currentTimeMillis()
                     progressBar?.visibility = View.GONE
-                    tvStatus?.text = "播放中"
+                    tvStatus?.text = getString(R.string.player_status_playing)
                     continuousSkipCount = 0
                     retryCount = 0
                     pipController.updatePipParams(true)
@@ -645,7 +659,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                                 playerHelper?.release()
                                 playerHelper = null
                                 runOnUiThread {
-                                    android.widget.Toast.makeText(this@PlayerActivity, "已被踢下线", android.widget.Toast.LENGTH_LONG).show()
+                                    android.widget.Toast.makeText(this@PlayerActivity, getString(R.string.toast_player_kicked), android.widget.Toast.LENGTH_LONG).show()
                                 }
                                 finish()
                             }
@@ -663,7 +677,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         // 播放自然结束（仅 catchup 回看会触发，直播流不会）
         currentPlaybackState = PlaybackState.IDLE
         com.mediaplayer.app.util.RemoteLogger.i("Player", "Playback completed naturally.")
-        tvStatus?.text = "播放已结束"
+        tvStatus?.text = getString(R.string.player_status_ended)
         progressBar?.visibility = View.GONE
     }
 
@@ -679,7 +693,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             }
             currentPlaybackState = PlaybackState.IDLE
             progressBar?.visibility = View.GONE
-            tvStatus?.text = "当前播放内核($coreName)无法播放此频道，请在设置中切换为智能模式"
+            tvStatus?.text = getString(R.string.player_status_unsupported, coreName)
             com.mediaplayer.app.util.RemoteLogger.e("Player", "Manual core ($coreName) playback failed. No auto-switch in manual mode.")
             return
         }
@@ -688,7 +702,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         if (retryCount > maxRetries) {
             currentPlaybackState = PlaybackState.IDLE
             progressBar?.visibility = View.GONE
-            tvStatus?.text = "播放失败，请稍后重试"
+            tvStatus?.text = getString(R.string.player_status_failed)
             continuousSkipCount = 0
             return
         }
@@ -698,7 +712,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
         if (retryCount > 1) {
             val delayMs = (1L shl retryCount) * 1000L
-            tvStatus?.text = "播放失败，${delayMs / 1000} 秒后自动重试..."
+            tvStatus?.text = getString(R.string.player_status_retry_timer, (delayMs / 1000).toString())
             handler.postDelayed({ executeRetry(isNetworkTimeout) }, delayMs)
             return
         }
@@ -723,7 +737,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             } else if (isDirectRtpOrUdp && !proxyEnabled) {
                 // 代理未开启时：RTP/UDP 可以让 MPV 原生处理（MPV 支持 rtp:// udp://）
                 val coreName = "MPV"
-                tvStatus?.text = "尝试使用 $coreName 重试该线路..."
+                tvStatus?.text = getString(R.string.player_status_retrying, coreName)
                 playCurrentLine()
                 return
             } else {
@@ -731,7 +745,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     1 -> "MPV"
                     else -> "ExoPlayer"
                 }
-                tvStatus?.text = "尝试使用 $coreName 重试该线路..."
+                tvStatus?.text = getString(R.string.player_status_retrying, coreName)
                 playCurrentLine()
                 return
             }
@@ -743,7 +757,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
         if (lines.isNotEmpty() && lineIndex < lines.size - 1) {
             lineIndex++
-            tvStatus?.text = "当前线路失效，自动切换线路 ${lineIndex + 1}..."
+            tvStatus?.text = getString(R.string.player_status_line_failed, (lineIndex + 1).toString())
             playCurrentLine()
         } else {
             coreRetryLevel = 0
@@ -751,10 +765,10 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
             continuousSkipCount++
             if (continuousSkipCount >= maxAutoSkips) {
-                tvStatus?.text = "多个频道连续播放失败，已停止自动换台"
+                tvStatus?.text = getString(R.string.player_status_all_failed)
                 continuousSkipCount = 0
             } else {
-                tvStatus?.text = "当前频道失效，自动为您跳过"
+                tvStatus?.text = getString(R.string.player_status_channel_skipped)
                 if (allChannels.isNotEmpty()) {
                     val nextIdx = if (channelIndex < allChannels.size - 1) channelIndex + 1 else 0
                     handler.postDelayed({
@@ -800,7 +814,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     private fun nextChannel() {
         if (allChannels.isEmpty()) {
-            Toast.makeText(this, "频道列表加载中...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_player_loading_channels), Toast.LENGTH_SHORT).show()
             return
         }
         if (channelIndex < allChannels.size - 1) switchChannel(channelIndex + 1)
@@ -809,7 +823,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     private fun prevChannel() {
         if (allChannels.isEmpty()) {
-            Toast.makeText(this, "频道列表加载中...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_player_loading_channels), Toast.LENGTH_SHORT).show()
             return
         }
         if (channelIndex > 0) switchChannel(channelIndex - 1)
@@ -832,7 +846,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
         val channel = allChannels.getOrNull(channelIndex)
         if (channel != null && channel.currentEpg.isNotEmpty()) {
             layoutEpg?.visibility = View.VISIBLE
-            tvEpgNow?.text = "📺 正在播放: ${channel.currentEpg}"
+            tvEpgNow?.text = getString(R.string.player_epg_now, channel.currentEpg)
             tvEpgNow?.isSelected = true
             tvEpgNext?.text = ""
         } else {
@@ -850,7 +864,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     private fun showVolumeIndicator(vol: Int) {
         progressVolume?.progress = (vol * 100 / maxVolume)
-        tvVolume?.text = "🔊 $vol"
+        tvVolume?.text = getString(R.string.player_volume, vol.toString())
         layoutVolumeIndicator?.visibility = View.VISIBLE
         handler.removeCallbacks(hideVolumeRunnable)
         handler.postDelayed(hideVolumeRunnable, 1500)
@@ -899,7 +913,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                     if (backPressedTime + 2000 > System.currentTimeMillis()) {
                         saveProgress(); finish()
                     } else {
-                        Toast.makeText(this, "再按一次返回键退出播放", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.toast_player_press_back_again), Toast.LENGTH_SHORT).show()
                         backPressedTime = System.currentTimeMillis()
                     }
                     return true
@@ -959,7 +973,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
                 if (backPressedTime + 2000 > System.currentTimeMillis()) {
                     saveProgress(); finish()
                 } else {
-                    Toast.makeText(this, "再按一次返回键退出播放", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_player_press_back_again), Toast.LENGTH_SHORT).show()
                     backPressedTime = System.currentTimeMillis()
                 }
                 return true

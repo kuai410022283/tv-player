@@ -154,7 +154,7 @@
             android:id="@+id/tvEpgMenuTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="节目单"
+            android:text="@string/epg_title"
             android:textColor="@color/accent"
             android:textSize="@dimen/sp_24"
             android:textStyle="bold"
@@ -190,7 +190,7 @@
             android:id="@+id/tvEpgEmptyText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="暂无节目单数据"
+            android:text="@string/no_epg_data"
             android:textColor="#888888"
             android:textSize="@dimen/sp_20"
             app:layout_constraintTop_toTopOf="parent"
@@ -223,7 +223,7 @@
                 android:id="@+id/tvLineMenuTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="切换线路"
+                android:text="@string/server_switch_line"
                 android:textColor="@color/accent"
                 android:textSize="@dimen/sp_22"
                 android:textStyle="bold"
@@ -265,7 +265,7 @@
                 android:id="@+id/tvTrackPanelTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="选择音轨"
+                android:text="@string/select_audio_track"
                 android:textColor="@color/accent"
                 android:textSize="@dimen/sp_22"
                 android:textStyle="bold"
@@ -337,7 +337,7 @@
                     android:id="@+id/tvAuthStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="正在连接服务器..."
+                    android:text="@string/status_connecting"
                     android:textColor="#AAAAAA"
                     android:textSize="@dimen/sp_22"
                     android:gravity="center"
@@ -365,7 +365,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/dp_20"
-                    android:text="手机扫码设置服务器"
+                    android:text="@string/settings_qr_header"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_22"
                     android:gravity="center"
@@ -396,7 +396,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="设置"
+                android:text="@string/settings"
                 android:textColor="@color/accent"
                 android:textSize="@dimen/text_28"
                 android:textStyle="bold"
@@ -412,7 +412,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="播放与画面"
+                android:text="@string/settings_group_play_video"
                 android:textColor="#88FFFFFF"
                 android:textSize="@dimen/text_18"
                 android:layout_marginBottom="@dimen/dp_8"
@@ -441,7 +441,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="画面比例"
+                        android:text="@string/settings_scale_mode"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -477,7 +477,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="独立记忆"
+                        android:text="@string/settings_config_mode"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -512,7 +512,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="解码模式"
+                        android:text="@string/settings_decoder_mode"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -547,7 +547,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="播放内核"
+                        android:text="@string/settings_player_core"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -582,7 +582,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="杜比音频"
+                        android:text="@string/settings_audio_passthrough"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -617,7 +617,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="切台模式"
+                        android:text="@string/settings_stop_previous"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -652,7 +652,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="画中画模式"
+                        android:text="@string/settings_pip"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -687,7 +687,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="显示频道台标"
+                        android:text="@string/settings_show_logo"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -722,7 +722,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="时间显示"
+                        android:text="@string/settings_time_mode"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -751,7 +751,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="网络缓存时长"
+                        android:text="@string/settings_network_cache"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22" />
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -779,7 +779,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="设备与系统"
+                android:text="@string/settings_group_device_system"
                 android:textColor="#88FFFFFF"
                 android:textSize="@dimen/sp_18"
                 android:layout_marginBottom="@dimen/dp_8"
@@ -796,7 +796,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="系统音量"
+                    android:text="@string/settings_volume"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_22"
                     android:paddingHorizontal="@dimen/dp_8"
@@ -815,7 +815,7 @@
                     android:id="@+id/tvSettingsBrightnessLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="画面亮度"
+                    android:text="@string/settings_brightness"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_22"
                     android:paddingHorizontal="@dimen/dp_8"
@@ -834,7 +834,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="周边扩展"
+                android:text="@string/settings_group_extensions"
                 android:textColor="#88FFFFFF"
                 android:textSize="@dimen/sp_18"
                 android:layout_marginBottom="@dimen/dp_8"
@@ -864,7 +864,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="左侧滑动调节亮度"
+                        android:text="@string/settings_gesture_brightness"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -899,7 +899,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="右侧滑动调节音量"
+                        android:text="@string/settings_gesture_volume"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -934,7 +934,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="操控方式"
+                        android:text="@string/settings_control_scheme"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -969,7 +969,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="全局进度条显示"
+                        android:text="@string/settings_global_progress"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1006,7 +1006,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="显示分组来源名称"
+                        android:text="@string/settings_group_source"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1041,7 +1041,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="网络 DNS 策略"
+                        android:text="@string/settings_dns_policy"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1065,7 +1065,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="应用管理"
+                android:text="@string/settings_group_app_management"
                 android:textColor="#88FFFFFF"
                 android:textSize="@dimen/sp_18"
                 android:layout_marginBottom="@dimen/dp_8"
@@ -1095,7 +1095,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="服务器"
+                        android:text="@string/settings_preferred_server"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1130,7 +1130,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="开机自动启动"
+                        android:text="@string/settings_auto_start"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1165,7 +1165,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="换台按键反转"
+                        android:text="@string/settings_reverse_channels"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1200,7 +1200,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="本地代理"
+                        android:text="@string/settings_local_proxy"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1231,11 +1231,11 @@
                     android:focusable="true"
                     android:clickable="true"
                     android:nextFocusUp="@+id/btnSettingsLocalProxy"
-                    android:nextFocusDown="@+id/btnSettingsCheckUpdate">
+                    android:nextFocusDown="@+id/btnSettingsLanguage">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="自动更新"
+                        android:text="@string/settings_auto_check_update"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1244,6 +1244,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="开"
+                        android:textColor="#AAAAAA"
+                        android:textSize="@dimen/sp_22"
+                        android:layout_marginEnd="@dimen/dp_8"/>
+                    <ImageView
+                        android:layout_width="@dimen/dp_16"
+                        android:layout_height="@dimen/dp_16"
+                        android:src="@drawable/ic_replay"
+                        app:tint="#888888"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnSettingsLanguage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/selector_channel_item"
+                    android:paddingHorizontal="@dimen/dp_8"
+                    android:paddingVertical="@dimen/dp_12"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:nextFocusUp="@+id/btnSettingsAutoCheckUpdate"
+                    android:nextFocusDown="@+id/btnSettingsCheckUpdate">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_language"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/sp_22"/>
+                    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                    <TextView
+                        android:id="@+id/tvSettingsLanguageValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="自动"
                         android:textColor="#AAAAAA"
                         android:textSize="@dimen/sp_22"
                         android:layout_marginEnd="@dimen/dp_8"/>
@@ -1265,12 +1300,12 @@
                     android:paddingVertical="@dimen/dp_12"
                     android:focusable="true"
                     android:clickable="true"
-                    android:nextFocusUp="@+id/btnSettingsAutoCheckUpdate"
+                    android:nextFocusUp="@+id/btnSettingsLanguage"
                     android:nextFocusDown="@+id/btnSettingsAbout">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="检查更新"
+                        android:text="@string/settings_check_update"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1297,7 +1332,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="关于本机"
+                        android:text="@string/settings_about"
                         android:textColor="#FFFFFF"
                         android:textSize="@dimen/sp_22"/>
                     <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
@@ -1344,7 +1379,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/dp_12"
-                    android:text="手机扫码快速配置服务器"
+                    android:text="@string/settings_qr_quick_hint"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/sp_18"
                     android:gravity="center"
@@ -1356,7 +1391,7 @@
                 android:id="@+id/btnCommunity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="交流互动"
+                android:text="@string/settings_group_interaction"
                 android:textColor="#FFFFFF"
                 android:textSize="@dimen/sp_22"
                 android:layout_marginTop="@dimen/dp_32"

@@ -60,7 +60,23 @@ import kotlinx.coroutines.withTimeout
 
 import kotlin.math.max
 
+import com.mediaplayer.app.util.LocaleHelper
+
 class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCallback {
+
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val langInt = prefs.getInt(Prefs.KEY_APP_LANGUAGE, Prefs.LANG_AUTO)
+        val langCode = when (langInt) {
+            Prefs.LANG_ZH_CN -> "zh-CN"
+            Prefs.LANG_EN -> "en"
+            Prefs.LANG_ZH_TW -> "zh-TW"
+            Prefs.LANG_KO -> "ko"
+            Prefs.LANG_JA -> "ja"
+            else -> "auto"
+        }
+        super.attachBaseContext(LocaleHelper.wrap(newBase, langCode))
+    }
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
@@ -161,10 +177,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             pendingSeekPosition = targetPosition
                         }
                         
-                        android.widget.Toast.makeText(this@MainActivity, "📱 收到控制指令：切换至 ${targetChannel.name}", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.toast_control_received, targetChannel.name), android.widget.Toast.LENGTH_SHORT).show()
                         playTvChannel(index)
                     } else {
-                        android.widget.Toast.makeText(this@MainActivity, "❌ 未找到对应频道号: $targetChannelId", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.toast_channel_not_found, targetChannelId), android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -298,7 +314,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         // 避免在弱网或加载较慢的有效源上出现频繁的“误杀”和自动换台跳跃。
                         /*
                         if (stateStartTime > 0 && now - stateStartTime > 10000L) {
-                            Toast.makeText(this@MainActivity, "网络连接超时，正在尝试切换线路...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.player_status_timeout), Toast.LENGTH_SHORT).show()
                             currentPlaybackState = PlaybackState.IDLE
                             handlePlaybackError(isNetworkTimeout = true)
                             return
@@ -319,7 +335,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                             if (currentTime > 0 && currentTime == lastPlaybackTime) {
                                 frozenTimeCounter++
                                 if (frozenTimeCounter >= 4) { // 4 * 2s = 8s
-                                    Toast.makeText(this@MainActivity, "检测到画面卡死，正在尝试恢复...", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, getString(R.string.player_status_stuck), Toast.LENGTH_SHORT).show()
                                     currentPlaybackState = PlaybackState.IDLE
                                     handlePlaybackError()
                                     frozenTimeCounter = 0
@@ -532,19 +548,27 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 // 刷新设置面板中其他可能被远程覆盖的缓存值
                 val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                 findViewById<TextView>(R.id.tvSettingsGlobalProgressValue)?.text = when (prefs.getInt(Prefs.KEY_GLOBAL_PROGRESS_BAR, Prefs.GLOBAL_PROGRESS_OFF)) {
-                    Prefs.GLOBAL_PROGRESS_TOP -> "顶部"
-                    Prefs.GLOBAL_PROGRESS_BOTTOM -> "底部"
-                    else -> "关闭"
+                    Prefs.GLOBAL_PROGRESS_TOP -> getString(R.string.status_top)
+                    Prefs.GLOBAL_PROGRESS_BOTTOM -> getString(R.string.status_bottom)
+                    else -> getString(R.string.status_off)
                 }
                 findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)) {
-                    Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
-                    Prefs.SCALE_MODE_4_3 -> "强制 4:3"
-                    Prefs.SCALE_MODE_16_10 -> "强制 16:10"
-                    Prefs.SCALE_MODE_CROP -> "放大裁剪"
-                    Prefs.SCALE_MODE_FILL -> "铺满全屏"
-                    else -> "原始比例"
+                    Prefs.SCALE_MODE_STRETCH -> getString(R.string.scale_stretch)
+                    Prefs.SCALE_MODE_4_3 -> getString(R.string.scale_4_3)
+                    Prefs.SCALE_MODE_16_10 -> getString(R.string.scale_16_10)
+                    Prefs.SCALE_MODE_CROP -> getString(R.string.scale_crop)
+                    Prefs.SCALE_MODE_FILL -> getString(R.string.scale_fill)
+                    else -> getString(R.string.scale_original)
                 }
-                findViewById<TextView>(R.id.tvSettingsAutoCheckUpdateValue)?.text = if (prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)) "开" else "关"
+                findViewById<TextView>(R.id.tvSettingsAutoCheckUpdateValue)?.text = if (prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)) getString(R.string.status_on) else getString(R.string.status_off)
+                findViewById<TextView>(R.id.tvSettingsLanguageValue)?.text = when (prefs.getInt(Prefs.KEY_APP_LANGUAGE, Prefs.LANG_AUTO)) {
+                    Prefs.LANG_ZH_CN -> "简体中文"
+                    Prefs.LANG_EN -> "English"
+                    Prefs.LANG_ZH_TW -> "繁体中文"
+                    Prefs.LANG_KO -> "한국어"
+                    Prefs.LANG_JA -> "日本語"
+                    else -> "自动"
+                }
             }
         }
 
@@ -1059,20 +1083,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
         
         // Update UI
-        tvSettingsMemoryValue?.text = if (isIndependentMemoryOn) "专属配置" else "跟随系统"
-        tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor(if (isIndependentMemoryOn) "#00E5FF" else "#AAAAAA"))
-        
-        findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (currentDecoderMode) {
-            Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
-            Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
-            else -> "自动识别"
-        }
-        
-        findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (currentCore) {
-            Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
-            Prefs.PLAYER_CORE_MPV -> "MPV"
-            else -> "智能切换"
-        }
+        updateMemoryText(isIndependentMemoryOn)
+        updateDecoderText(currentDecoderMode)
+        updateCoreText(currentCore)
     }
 
     /** Prefs key 到设置项 View ID 的映射，用于隐藏/显示 */
@@ -1096,7 +1109,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         Prefs.KEY_REVERSE_CHANNEL_KEYS to R.id.btnSettingsReverseChannels,
         Prefs.KEY_LOCAL_PROXY_ENABLED to R.id.btnSettingsLocalProxy,
         Prefs.KEY_AUTO_CHECK_UPDATE to R.id.btnSettingsAutoCheckUpdate,
-        Prefs.KEY_CHECK_UPDATE_DUMMY to R.id.btnSettingsCheckUpdate
+        Prefs.KEY_CHECK_UPDATE_DUMMY to R.id.btnSettingsCheckUpdate,
+        Prefs.KEY_APP_LANGUAGE to R.id.btnSettingsLanguage
     )
 
     /** 设置栏所有可焦点的 View ID（按 XML 布局顺序），用于动态修正焦点链 */
@@ -1124,6 +1138,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         R.id.btnSettingsReverseChannels,
         R.id.btnSettingsLocalProxy,
         R.id.btnSettingsAutoCheckUpdate,
+        R.id.btnSettingsLanguage,
         R.id.btnSettingsCheckUpdate,
         R.id.btnSettingsAbout
     )
@@ -1188,9 +1203,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         fun updateGlobalProgressText(mode: Int) {
             tvSettingsGlobalProgressValue?.text = when (mode) {
-                Prefs.GLOBAL_PROGRESS_TOP -> "顶部"
-                Prefs.GLOBAL_PROGRESS_BOTTOM -> "底部"
-                else -> "关闭"
+                Prefs.GLOBAL_PROGRESS_TOP -> getString(R.string.status_top)
+                Prefs.GLOBAL_PROGRESS_BOTTOM -> getString(R.string.status_bottom)
+                else -> getString(R.string.status_off)
             }
         }
         
@@ -1231,7 +1246,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val count = getAvailableServerCount()
             if (count <= 1) {
                 val name = getServerDisplayName(0)
-                tvSettingsPreferredServerValue?.text = if (name.isNotEmpty()) "线路 [$name]" else "线路 1"
+                tvSettingsPreferredServerValue?.text = if (name.isNotEmpty()) "${getString(R.string.server_line)} [$name]" else "${getString(R.string.server_line)} 1"
                 if (currentPreferredIndex != 0) {
                     currentPreferredIndex = 0
                     prefs.edit().putInt(Prefs.KEY_PREFERRED_SERVER_INDEX, 0).apply()
@@ -1241,10 +1256,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             if (currentPreferredIndex == -1 || currentPreferredIndex >= count) {
                 currentPreferredIndex = -1
-                tvSettingsPreferredServerValue?.text = "自动"
+                tvSettingsPreferredServerValue?.text = getString(R.string.status_auto)
             } else {
                 val name = getServerDisplayName(currentPreferredIndex)
-                tvSettingsPreferredServerValue?.text = if (name.isNotEmpty()) "线路 [$name]" else "线路 ${currentPreferredIndex + 1}"
+                tvSettingsPreferredServerValue?.text = if (name.isNotEmpty()) "${getString(R.string.server_line)} [$name]" else "${getString(R.string.server_line)} ${currentPreferredIndex + 1}"
             }
         }
         
@@ -1255,7 +1270,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         btnSettingsPreferredServer?.setOnClickListener {
             val count = getAvailableServerCount()
             if (count <= 1) {
-                Toast.makeText(this@MainActivity, "当前仅有一条可用线路", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_only_one_line), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             
@@ -1269,7 +1284,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             // 防抖 1.2s 后直接激活切换
             serverSwitchRunnable?.let { btnSettingsPreferredServer.removeCallbacks(it) }
             serverSwitchRunnable = Runnable {
-                Toast.makeText(this@MainActivity, "正在应用线路配置，准备重新连接...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_applying_line), Toast.LENGTH_SHORT).show()
                 playerHelper?.release()
                 playerHelper = null
                 authFlowManager.startAuthFlow()
@@ -1281,63 +1296,57 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val tvSettingsGroupSourceValue = findViewById<TextView>(R.id.tvSettingsGroupSourceValue)
         
         var showGroupSource = prefs.getBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, false)
-        tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
+        tvSettingsGroupSourceValue?.text = if (showGroupSource) getString(R.string.status_on) else getString(R.string.status_off)
         
         btnSettingsGroupSource?.setOnClickListener {
             if (isManagedSetting(Prefs.KEY_SHOW_GROUP_SOURCE)) return@setOnClickListener
             showGroupSource = !showGroupSource
-            tvSettingsGroupSourceValue?.text = if (showGroupSource) "开" else "关"
+            tvSettingsGroupSourceValue?.text = if (showGroupSource) getString(R.string.status_on) else getString(R.string.status_off)
             prefs.edit().putBoolean(Prefs.KEY_SHOW_GROUP_SOURCE, showGroupSource).apply()
             
             groupAdapter.showSource = showGroupSource
             groupAdapter.notifyDataSetChanged()
         }
 
-        fun updateDecoderText(mode: Int) {
-            findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
-                Prefs.DECODER_MODE_HARDWARE -> "强制硬解"
-                Prefs.DECODER_MODE_SOFTWARE -> "强制软解"
-                else -> "自动识别"
-            }
-        }
+
 
 
         fun updateScaleText(mode: Int) {
             findViewById<TextView>(R.id.tvSettingsScaleValue)?.text = when (mode) {
-                Prefs.SCALE_MODE_STRETCH -> "强制 16:9"
-                Prefs.SCALE_MODE_4_3 -> "强制 4:3"
-                Prefs.SCALE_MODE_16_10 -> "强制 16:10"
-                Prefs.SCALE_MODE_CROP -> "放大裁剪"
-                Prefs.SCALE_MODE_FILL -> "铺满全屏"
-                else -> "原始比例"
+                Prefs.SCALE_MODE_STRETCH -> getString(R.string.scale_stretch)
+                Prefs.SCALE_MODE_4_3 -> getString(R.string.scale_4_3)
+                Prefs.SCALE_MODE_16_10 -> getString(R.string.scale_16_10)
+                Prefs.SCALE_MODE_CROP -> getString(R.string.scale_crop)
+                Prefs.SCALE_MODE_FILL -> getString(R.string.scale_fill)
+                else -> getString(R.string.scale_original)
             }
         }
 
         fun updateAutoStartText(enabled: Boolean) {
-            findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (enabled) "开" else "关"
+            findViewById<TextView>(R.id.tvSettingsAutoStartValue)?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
         
         fun updateReverseChannelsText(enabled: Boolean) {
-            findViewById<TextView>(R.id.tvSettingsReverseChannelsValue)?.text = if (enabled) "开" else "关"
+            findViewById<TextView>(R.id.tvSettingsReverseChannelsValue)?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
         
         fun updateGestureBrightnessText(enabled: Boolean) {
-            tvSettingsGestureBrightnessValue?.text = if (enabled) "开" else "关"
+            tvSettingsGestureBrightnessValue?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
 
         fun updateGestureVolumeText(enabled: Boolean) {
-            tvSettingsGestureVolumeValue?.text = if (enabled) "开" else "关"
+            tvSettingsGestureVolumeValue?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
 
         fun updateControlSchemeText(scheme: Int) {
-            tvSettingsControlSchemeValue?.text = if (scheme == Prefs.CONTROL_SCHEME_TRADITIONAL) "传统" else "现代"
+            tvSettingsControlSchemeValue?.text = if (scheme == Prefs.CONTROL_SCHEME_TRADITIONAL) getString(R.string.scheme_traditional) else getString(R.string.scheme_modern)
         }
 
         fun updateDnsPolicyText(policy: Int) {
             findViewById<TextView>(R.id.tvSettingsDnsPolicyValue)?.text = when (policy) {
-                Prefs.DNS_POLICY_IPV4_FIRST -> "优先 IPv4"
-                Prefs.DNS_POLICY_IPV6_FIRST -> "优先 IPv6"
-                else -> "自动"
+                Prefs.DNS_POLICY_IPV4_FIRST -> getString(R.string.dns_ipv4)
+                Prefs.DNS_POLICY_IPV6_FIRST -> getString(R.string.dns_ipv6)
+                else -> getString(R.string.status_auto)
             }
         }
 
@@ -1360,15 +1369,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentDnsPolicy = prefs.getInt(Prefs.KEY_DNS_POLICY, Prefs.DNS_POLICY_AUTO)
 
         fun updateAudioPassthroughText(enabled: Boolean) {
-            tvSettingsAudioPassthroughValue?.text = if (enabled) "开" else "关"
+            tvSettingsAudioPassthroughValue?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
 
         fun updateStopPreviousText(enabled: Boolean) {
-            findViewById<TextView>(R.id.tvSettingsStopPreviousValue)?.text = if (enabled) "兼容" else "流畅"
+            findViewById<TextView>(R.id.tvSettingsStopPreviousValue)?.text = if (enabled) getString(R.string.stop_compat) else getString(R.string.stop_smooth)
         }
 
         fun updatePipText(enabled: Boolean) {
-            findViewById<TextView>(R.id.tvSettingsPipValue)?.text = if (enabled) "开" else "关"
+            findViewById<TextView>(R.id.tvSettingsPipValue)?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
 
         updateDecoderText(currentDecoderMode)
@@ -1398,7 +1407,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Prefs.DNS_POLICY_IPV6_FIRST -> "优先 IPv6"
                 else -> "自动"
             }
-            Toast.makeText(this, "网络 DNS 策略更新为：$text", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_dns_updated, text), Toast.LENGTH_SHORT).show()
         }
 
         btnSettingsGestureBrightness?.setOnClickListener {
@@ -1427,7 +1436,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentAudioPassthrough = !currentAudioPassthrough
             updateAudioPassthroughText(currentAudioPassthrough)
             prefs.edit().putBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, currentAudioPassthrough).apply()
-            Toast.makeText(this, "音频直通设置已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_passthrough_saved), Toast.LENGTH_SHORT).show()
         }
 
         findViewById<View>(R.id.btnSettingsStopPrevious)?.setOnClickListener {
@@ -1435,7 +1444,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             currentStopPrevious = !currentStopPrevious
             updateStopPreviousText(currentStopPrevious)
             prefs.edit().putBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, currentStopPrevious).apply()
-            Toast.makeText(this, if (currentStopPrevious) "切台模式：兼容（下次播放生效）" else "切台模式：流畅（下次播放生效）", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, if (currentStopPrevious) getString(R.string.toast_main_zap_mode_compatible) else getString(R.string.toast_main_zap_mode_smooth), Toast.LENGTH_SHORT).show()
         }
 
         val btnSettingsPip = findViewById<View>(R.id.btnSettingsPip)
@@ -1451,7 +1460,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
 
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && !hasPermission) {
-                    Toast.makeText(this, "请在此页面允许“画中画”权限", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.toast_main_allow_pip), Toast.LENGTH_LONG).show()
                     try {
                         // 尝试打开专属的画中画权限设置页
                         val intent = Intent("android.settings.PICTURE_IN_PICTURE_SETTINGS")
@@ -1475,23 +1484,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             updatePipText(currentEnablePip)
             prefs.edit().putBoolean(Prefs.KEY_ENABLE_PIP, currentEnablePip).apply()
             pipController.updatePipParams(playerHelper?.isPlaying() == true)
-            Toast.makeText(this, "画中画模式已" + (if (currentEnablePip) "开启" else "关闭"), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_pip_status, if (currentEnablePip) getString(R.string.status_on) else getString(R.string.status_off)), Toast.LENGTH_SHORT).show()
         }
-        
-        fun updateMemoryText(enabled: Boolean) {
-            if (enabled) {
-                tvSettingsMemoryValue?.text = "专属配置"
-                tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#00E5FF"))
-            } else {
-                tvSettingsMemoryValue?.text = "跟随系统"
-                tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#AAAAAA"))
-            }
-        }
+
         
         btnSettingsMemory?.setOnClickListener {
             val channel = allChannels.getOrNull(currentChannelIndex)
             if (channel == null) {
-                Toast.makeText(this, "当前无频道，无法设置独立记忆", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_no_channel_memory), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             
@@ -1501,14 +1501,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             if (isIndependentMemoryOn) {
                 com.mediaplayer.app.data.ChannelMemoryManager.updateDecoder(channel.id, currentDecoderMode)
                 com.mediaplayer.app.data.ChannelMemoryManager.updateCore(channel.id, currentCore)
-                Toast.makeText(this, "已开启独立记忆", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_memory_enabled), Toast.LENGTH_SHORT).show()
             } else {
                 com.mediaplayer.app.data.ChannelMemoryManager.clearDecoderAndCore(channel.id)
                 currentDecoderMode = prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
                 currentCore = prefs.getInt(Prefs.KEY_PLAYER_CORE, Prefs.PLAYER_CORE_AUTO)
                 updateDecoderText(currentDecoderMode)
                 updateCoreText(currentCore)
-                Toast.makeText(this, "已恢复系统默认", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_memory_reset), Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -1524,10 +1524,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             if (isIndependentMemoryOn && channel != null) {
                 com.mediaplayer.app.data.ChannelMemoryManager.updateDecoder(channel.id, currentDecoderMode)
-                Toast.makeText(this, "专属解码模式已保存", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_exclusive_decoder_saved), Toast.LENGTH_SHORT).show()
             } else {
                 prefs.edit().putInt(Prefs.KEY_DECODER_MODE, currentDecoderMode).apply()
-                Toast.makeText(this, "全局解码模式已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_global_decoder_saved), Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -1544,10 +1544,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             
             if (isIndependentMemoryOn && channel != null) {
                 com.mediaplayer.app.data.ChannelMemoryManager.updateCore(channel.id, currentCore)
-                Toast.makeText(this, "专属播放内核已保存", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_exclusive_core_saved), Toast.LENGTH_SHORT).show()
             } else {
                 prefs.edit().putInt(Prefs.KEY_PLAYER_CORE, currentCore).apply()
-                Toast.makeText(this, "全局播放内核已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_global_core_saved), Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -1572,11 +1572,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         fun updateTimeModeText() {
             tvSettingsTimeModeValue?.text = when (currentTimeMode) {
-                Prefs.TIME_SHOW_MODE_HIDDEN -> "隐藏"
-                Prefs.TIME_SHOW_MODE_ALWAYS -> "常显"
-                Prefs.TIME_SHOW_MODE_EVERY_HOUR -> "整点"
-                Prefs.TIME_SHOW_MODE_HALF_HOUR -> "半点"
-                else -> "未知"
+                Prefs.TIME_SHOW_MODE_HIDDEN -> getString(R.string.status_hidden)
+                Prefs.TIME_SHOW_MODE_ALWAYS -> getString(R.string.status_always)
+                Prefs.TIME_SHOW_MODE_EVERY_HOUR -> getString(R.string.status_every_hour)
+                Prefs.TIME_SHOW_MODE_HALF_HOUR -> getString(R.string.status_half_hour)
+                else -> getString(R.string.error)
             }
         }
         updateTimeModeText()
@@ -1626,7 +1626,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var localProxyEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false)
 
         fun updateLocalProxyText() {
-            tvSettingsLocalProxyStatus?.text = if (localProxyEnabled) "开" else "关"
+            tvSettingsLocalProxyStatus?.text = if (localProxyEnabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
         updateLocalProxyText()
 
@@ -1640,15 +1640,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val success = MediaPlayerApp.tryStartProxy()
                 if (success) {
                     MediaPlayerApp.isProxyEnabled = true
-                    Toast.makeText(this@MainActivity, "本地代理已开启，端口 ${MediaPlayerApp.localProxyPort}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.toast_main_proxy_started, MediaPlayerApp.localProxyPort.toString()), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this@MainActivity, "本地代理启动失败，已自动关闭", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.toast_main_proxy_failed), Toast.LENGTH_LONG).show()
                     localProxyEnabled = false
                     prefs.edit().putBoolean(Prefs.KEY_LOCAL_PROXY_ENABLED, false).apply()
                 }
             } else {
                 MediaPlayerApp.isProxyEnabled = false
-                Toast.makeText(this@MainActivity, "本地代理已关闭", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_proxy_stopped), Toast.LENGTH_SHORT).show()
             }
             updateLocalProxyText()
         }
@@ -1659,7 +1659,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var autoCheckUpdateEnabled = prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)
         
         fun updateAutoCheckUpdateText() {
-            tvSettingsAutoCheckUpdateValue?.text = if (autoCheckUpdateEnabled) "开" else "关"
+            tvSettingsAutoCheckUpdateValue?.text = if (autoCheckUpdateEnabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
         updateAutoCheckUpdateText()
 
@@ -1668,6 +1668,40 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             autoCheckUpdateEnabled = !autoCheckUpdateEnabled
             prefs.edit().putBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, autoCheckUpdateEnabled).apply()
             updateAutoCheckUpdateText()
+        }
+
+        // 多语言切换开关
+        val btnSettingsLanguage = findViewById<View>(R.id.btnSettingsLanguage)
+        val tvSettingsLanguageValue = findViewById<TextView>(R.id.tvSettingsLanguageValue)
+        var currentLang = prefs.getInt(Prefs.KEY_APP_LANGUAGE, Prefs.LANG_AUTO)
+
+        fun updateLanguageText() {
+            tvSettingsLanguageValue?.text = when (currentLang) {
+                Prefs.LANG_ZH_CN -> "简体中文"
+                Prefs.LANG_EN -> "English"
+                Prefs.LANG_ZH_TW -> "繁体中文"
+                Prefs.LANG_KO -> "한국어"
+                Prefs.LANG_JA -> "日本語"
+                else -> getString(R.string.status_auto)
+            }
+        }
+        updateLanguageText()
+
+        var languageSwitchRunnable: Runnable? = null
+
+        btnSettingsLanguage?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_APP_LANGUAGE)) return@setOnClickListener
+            // 循环切换：0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
+            currentLang = (currentLang + 1) % 6
+            prefs.edit().putInt(Prefs.KEY_APP_LANGUAGE, currentLang).apply()
+            updateLanguageText()
+
+            // 延迟3秒再切换语言，防止频繁点击闪烁
+            languageSwitchRunnable?.let { btnSettingsLanguage.removeCallbacks(it) }
+            languageSwitchRunnable = Runnable {
+                recreate()
+            }
+            btnSettingsLanguage.postDelayed(languageSwitchRunnable, 3000L)
         }
 
         btnSettingsCheckUpdate?.setOnClickListener {
@@ -1679,18 +1713,18 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val cacheMs = prefs.getInt(Prefs.KEY_NETWORK_CACHE, Prefs.DEFAULT_NETWORK_CACHE)
         val progress = if (cacheMs == 0) 0 else (cacheMs / 50).coerceIn(1, 100)
         sbSettingsCache?.progress = progress
-        tvSettingsCacheValue?.text = if (cacheMs == 0) " 自动" else " ${"%.2f".format(cacheMs / 1000f)} 秒"
+        tvSettingsCacheValue?.text = if (cacheMs == 0) " " + getString(R.string.status_auto) else " " + getString(R.string.settings_cache_seconds, "%.2f".format(cacheMs / 1000f))
         val isCacheManaged = RemoteConfigManager.isManaged(Prefs.KEY_NETWORK_CACHE)
         sbSettingsCache?.isEnabled = !isCacheManaged
 
         sbSettingsCache?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 if (isCacheManaged && fromUser) {
-                    Toast.makeText(this@MainActivity, "管理员已禁止修改", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.toast_main_admin_forbidden), Toast.LENGTH_SHORT).show()
                     return
                 }
                 val newCacheMs = if (progress == 0) 0 else progress * 50
-                tvSettingsCacheValue?.text = if (newCacheMs == 0) " 自动" else " ${"%.2f".format(newCacheMs / 1000f)} 秒"
+                tvSettingsCacheValue?.text = if (newCacheMs == 0) " " + getString(R.string.status_auto) else " " + getString(R.string.settings_cache_seconds, "%.2f".format(newCacheMs / 1000f))
             }
             override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
@@ -1699,7 +1733,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val newCacheMs = if (p == 0) 0 else p * 50
                 prefs.edit().putInt(Prefs.KEY_NETWORK_CACHE, newCacheMs).apply()
                 playerHelper?.setCacheDuration(newCacheMs)
-                Toast.makeText(this@MainActivity, "网络缓存已保存，下次播放生效", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_cache_saved), Toast.LENGTH_SHORT).show()
             }
         })
 
@@ -1728,10 +1762,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val currentBrightness = window.attributes.screenBrightness
         if (currentBrightness < 0) {
             sbBrightness?.progress = 101
-            tvBrightnessLabel?.text = "画面亮度 (自动)"
+            tvBrightnessLabel?.text = getString(R.string.settings_brightness_auto)
         } else {
             sbBrightness?.progress = ((currentBrightness.coerceAtLeast(0.01f)) * 100).toInt().coerceIn(1, 100)
-            tvBrightnessLabel?.text = "画面亮度"
+            tvBrightnessLabel?.text = getString(R.string.settings_brightness)
         }
 
         sbBrightness?.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
@@ -1740,10 +1774,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     val lp = window.attributes
                     if (progress == 101) {
                         lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                        tvBrightnessLabel?.text = "画面亮度 (自动)"
+                        tvBrightnessLabel?.text = getString(R.string.settings_brightness_auto)
                     } else {
                         lp.screenBrightness = max(0.01f, progress / 100f)
-                        tvBrightnessLabel?.text = "画面亮度"
+                        tvBrightnessLabel?.text = getString(R.string.settings_brightness)
                     }
                     window.attributes = lp
                 }
@@ -1777,7 +1811,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 val clip = android.content.ClipData.newPlainText("TG群", "https://t.me/+3qS4i6yrHsc2MWNl")
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(this@MainActivity, "打开链接失败，已复制群链接", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_open_link_failed), Toast.LENGTH_SHORT).show()
             }
         }
         
@@ -1797,7 +1831,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             val clip = android.content.ClipData.newPlainText("QQ群", qqGroup)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this@MainActivity, "未检测到QQ应用，已复制群号: $qqGroup", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, getString(R.string.toast_main_qq_not_found, qqGroup), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1845,7 +1879,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private fun showSettingsMenu() {
         if (RemoteConfigManager.isSettingsPanelHidden()) {
-            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_admin_disabled), Toast.LENGTH_SHORT).show()
             return
         }
         if (layoutSettingsMenu?.visibility == View.VISIBLE) return
@@ -1875,32 +1909,34 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 // 格式化时间字符串：只截取到“日” (YYYY-MM-DD)
                 if (!expiresAt.isNullOrEmpty()) {
                     if (expiresAt.startsWith("0001-01-01")) {
-                        expiresAt = "永久"
+                        expiresAt = getString(R.string.settings_expires_forever)
                     } else if (expiresAt.length >= 10) {
                         expiresAt = expiresAt.substring(0, 10)
                     }
                 }
                 
-                val pName = if (planName.isNullOrEmpty()) "无" else planName
-                val expTime = if (expiresAt.isNullOrEmpty()) "永久" else expiresAt
+                val pName = if (planName.isNullOrEmpty()) getString(R.string.settings_plan_none) else planName
+                val expTime = if (expiresAt.isNullOrEmpty()) getString(R.string.settings_expires_forever) else expiresAt
                 val serverName = authManager.getServerName()
-                val serverLine = if (!serverName.isNullOrEmpty()) "服务器名称：$serverName\n" else ""
-                "${serverLine}套餐: $pName\n过期时间: $expTime"
+                val serverLine = if (!serverName.isNullOrEmpty()) getString(R.string.settings_server_name, serverName) + "\n" else ""
+                "${serverLine}${getString(R.string.settings_plan, pName)}\n${getString(R.string.settings_expires_at, expTime)}"
             }
-            "pending" -> "授权状态: 等待审批"
-            "rejected" -> "授权状态: 已拒绝"
-            "banned" -> "授权状态: 已封禁"
-            "expired" -> "授权状态: 已过期"
-            else -> "授权状态: 未注册"
+            "pending" -> getString(R.string.settings_auth_pending)
+            "rejected" -> getString(R.string.settings_auth_rejected)
+            "banned" -> getString(R.string.settings_auth_banned)
+            "expired" -> getString(R.string.settings_auth_expired)
+            else -> getString(R.string.settings_auth_unregistered)
         }
-        tvSettingsInfo?.text = "应用版本: $versionText\n设备 ID: ${authManager.getDeviceId()}\n$authStatus"
+        val appVersionStr = getString(R.string.settings_app_version, versionText)
+        val deviceIdStr = getString(R.string.settings_device_id, authManager.getDeviceId())
+        tvSettingsInfo?.text = "$appVersionStr\n$deviceIdStr\n$authStatus"
         
         // --- QR Code Logic ---
         val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
         if (ip != null) {
             setupQrConfigServer {
                 hideSettingsMenu()
-                Toast.makeText(this@MainActivity, "配置已保存，重新加载中...", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_main_config_reloading), Toast.LENGTH_LONG).show()
                 authFlowManager.startAuthFlow()
             }
             val qrPort = configWebServer?.actualPort ?: 9528
@@ -1908,14 +1944,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             val primaryUrl = webUrls.firstOrNull() ?: "http://$ip:$qrPort/"
             val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(primaryUrl, 400)
             ivQrCode?.setImageBitmap(bitmap)
-            tvQrConfigHint?.text = "手机扫码配置服务器\n或者访问: $primaryUrl"
+            tvQrConfigHint?.text = getString(R.string.settings_qr_hint, primaryUrl)
             tvQrConfigHint?.setOnClickListener {
                 try {
                     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(primaryUrl))
                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     startActivity(intent)
                 } catch (e: Throwable) {
-                    Toast.makeText(this@MainActivity, "当前设备未安装浏览器，请使用手机扫码访问", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.toast_main_no_browser), Toast.LENGTH_SHORT).show()
                 }
             }
             layoutQrConfig?.visibility = View.VISIBLE
@@ -1984,7 +2020,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                                     com.mediaplayer.app.util.RemoteLogger.i("Player", "Delayed seek to $seekPos applied (currentTime: $currentTime)")
                                     playerHelper?.setTime(seekPos)
                                     // 给一点提示
-                                    android.widget.Toast.makeText(this@MainActivity, "已为您恢复历史播放进度", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(this@MainActivity, getString(R.string.toast_main_history_restored), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }, 1000) // 延迟1秒，确保底层 duration 和 timeline 已完全就绪
                         }
@@ -2098,7 +2134,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(this, "播放内核初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.toast_main_core_init_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
             // 回退到默认状态或触发错误逻辑
             listener.onError()
         }
@@ -2130,7 +2166,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 configWebServer?.start()
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(this, "配置服务器启动失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_config_server_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -2168,7 +2204,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private fun isManagedSetting(prefKey: String): Boolean {
         if (RemoteConfigManager.isManaged(prefKey)) {
-            Toast.makeText(this, "管理员已禁止修改", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_admin_forbidden), Toast.LENGTH_SHORT).show()
             return true
         }
         return false
@@ -2178,12 +2214,30 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         findViewById<TextView>(R.id.tvSettingsCoreValue)?.text = when (core) {
             Prefs.PLAYER_CORE_EXO -> "ExoPlayer"
             Prefs.PLAYER_CORE_MPV -> "MPV"
-            else -> "智能切换"
+            else -> getString(R.string.status_auto)
+        }
+    }
+
+    private fun updateDecoderText(mode: Int) {
+        findViewById<TextView>(R.id.tvSettingsDecoderValue)?.text = when (mode) {
+            Prefs.DECODER_MODE_HARDWARE -> getString(R.string.decoder_hardware)
+            Prefs.DECODER_MODE_SOFTWARE -> getString(R.string.decoder_software)
+            else -> getString(R.string.status_auto)
+        }
+    }
+
+    private fun updateMemoryText(enabled: Boolean) {
+        if (enabled) {
+            tvSettingsMemoryValue?.text = getString(R.string.config_exclusive)
+            tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#00E5FF"))
+        } else {
+            tvSettingsMemoryValue?.text = getString(R.string.config_system)
+            tvSettingsMemoryValue?.setTextColor(android.graphics.Color.parseColor("#AAAAAA"))
         }
     }
 
     private fun updateShowLogoText(show: Boolean) {
-        findViewById<TextView>(R.id.tvSettingsShowLogoValue)?.text = if (show) "显示" else "隐藏"
+        findViewById<TextView>(R.id.tvSettingsShowLogoValue)?.text = if (show) getString(R.string.status_show) else getString(R.string.status_hide)
     }
 
     private fun handlePlaybackCompleted() {
@@ -2249,7 +2303,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     Prefs.PLAYER_CORE_MPV -> "MPV"
                     else -> "Auto"
                 }
-                Toast.makeText(this, "当前线路无法播放，切换线路 ${currentLineIndex + 1}...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_main_line_failed_switch, (currentLineIndex + 1).toString()), Toast.LENGTH_SHORT).show()
                 com.mediaplayer.app.util.RemoteLogger.i("Player", "Manual core ($coreName) failed. Switching to line ${currentLineIndex + 1}")
                 playCurrentLineInTv()
                 return
@@ -2439,7 +2493,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         osdOverlayView?.setLineInfo("${currentLineIndex + 1}/${lines.size}".toString())
         
-        osdOverlayView?.setInfoText(if (lines.size > 1) "连接中... (线路 ${currentLineIndex + 1}/${lines.size})" else "连接中...".toString())
+        osdOverlayView?.setInfoText(if (lines.size > 1) getString(R.string.status_connecting_lines, currentLineIndex + 1, lines.size) else getString(R.string.status_connecting))
         
         // 记忆功能：保存最后播放的频道 ID 和分组 ID
         val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
@@ -2601,7 +2655,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         layoutSettingsMenu?.visibility = View.GONE
         layoutEpgMenu?.visibility = View.GONE
         
-        tvLineMenuTitle?.text = "线路"
+        tvLineMenuTitle?.text = getString(R.string.server_line)
         containerLines?.removeAllViews()
         
         var firstFocusableView: View? = null
@@ -2736,14 +2790,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         // 音轨按钮：仅在有 ≥2 条音轨时显示固定文案"音轨"
         if (audioTracks != null && audioTracks.size >= 2) {
-            osdOverlayView?.updateAudioButton("音轨")
+            osdOverlayView?.updateAudioButton(getString(R.string.audio_track))
         } else {
             osdOverlayView?.updateAudioButton("")
         }
 
         // 字幕按钮：有 ≥1 条内嵌字幕时显示固定文案"字幕"
         if (subtitleTracks != null && subtitleTracks.any { it.index >= 0 }) {
-            osdOverlayView?.updateSubtitleButton("字幕")
+            osdOverlayView?.updateSubtitleButton(getString(R.string.subtitle))
         } else {
             osdOverlayView?.updateSubtitleButton("")
         }
@@ -2766,11 +2820,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         if (isAudio) {
             cachedAudioTracks = playerHelper?.getAudioTracks()
             tracks = cachedAudioTracks.orEmpty()
-            title = "选择音轨"
+            title = getString(R.string.select_audio_track)
         } else {
             cachedSubtitleTracks = playerHelper?.getSubtitleTracks()
             tracks = cachedSubtitleTracks.orEmpty()
-            title = "选择字幕"
+            title = getString(R.string.select_subtitle)
         }
 
         if (tracks.isEmpty()) return
@@ -2910,8 +2964,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         // 使用 playerHelper?.isPlaying() 而非 currentPlaybackState，以兼容 ExoPlayer
         // （ExoPlayerHelper 只在 onVideoSizeChanged 中调用 onPlaying，无视频尺寸时不回调）
         if (playerHelper?.isPlaying() == true) {
-            val infoText = osdOverlayView?.getInfoText() ?: "" ?: ""
-            if (infoText.contains("连接中") || infoText.isEmpty()) {
+            val infoText = osdOverlayView?.getInfoText() ?: ""
+            val connShort = getString(R.string.status_connecting).replace("...", "")
+            if (infoText.contains("连接中") || infoText.contains(connShort) || infoText.isEmpty()) {
                 val decoderStr = when (currentDecoderMode) {
                     Prefs.DECODER_MODE_HARDWARE -> "HW"
                     Prefs.DECODER_MODE_SOFTWARE -> "SW"
@@ -2950,15 +3005,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private fun loadEpgForChannel(channel: Channel) {
         if ((channel.currentEpg ?: "").isNotEmpty()) {
-            osdOverlayView?.setEpgText("正在播放: ${channel.currentEpg}".toString())
+            osdOverlayView?.setEpgText(getString(R.string.player_epg_now, channel.currentEpg))
             osdOverlayView?.setEpgProgress(channel.getDynamicEpgPercent())
         } else {
-            osdOverlayView?.setEpgText("暂无当前节目信息".toString())
+            osdOverlayView?.setEpgText(getString(R.string.osd_epg_no_info))
             osdOverlayView?.setEpgProgress(0)
         }
 
         if ((channel.nextEpg ?: "").isNotEmpty()) {
-            osdOverlayView?.setNextEpgText("接下来: ${channel.nextEpg}".toString())
+            osdOverlayView?.setNextEpgText(getString(R.string.osd_epg_next, channel.nextEpg))
             } else {
             osdOverlayView?.setNextEpgText("".toString())
             }
@@ -3294,14 +3349,14 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 val primaryUrl = webUrls.firstOrNull() ?: "http://$ip:$qrPort/"
                 val bitmap = com.mediaplayer.app.util.QRCodeHelper.generateQRCode(primaryUrl, 400)
                 ivAuthQrCode?.setImageBitmap(bitmap)
-                tvAuthQrConfigHint?.text = "手机扫码设置服务器\n或访问: $primaryUrl"
+                tvAuthQrConfigHint?.text = getString(R.string.auth_qr_hint_visit, primaryUrl)
                 tvAuthQrConfigHint?.setOnClickListener {
                     try {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(primaryUrl))
                         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                         startActivity(intent)
                     } catch (e: Throwable) {
-                        Toast.makeText(this@MainActivity, "当前设备未安装浏览器，请使用手机扫码访问", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, getString(R.string.toast_main_no_browser), Toast.LENGTH_SHORT).show()
                     }
                 }
                 layoutAuthQrConfig?.visibility = View.VISIBLE
@@ -3548,9 +3603,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         val hasFavorites = com.mediaplayer.app.data.FavoriteManager.getFavorites().isNotEmpty()
         val newGroups = mutableListOf<ChannelGroup>()
         if (hasFavorites) {
-            newGroups.add(ChannelGroup(id = -1, name = "收藏", icon = ""))
+            newGroups.add(ChannelGroup(id = -1, name = getString(R.string.favorites), icon = ""))
         }
-        newGroups.add(ChannelGroup(id = 0, name = "全部"))
+        newGroups.add(ChannelGroup(id = 0, name = getString(R.string.all_groups)))
         newGroups.addAll(baseGroups)
         
         groups = newGroups
@@ -3710,7 +3765,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private fun showEpgMenu() {
         if (RemoteConfigManager.isEpgPanelHidden()) {
-            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_admin_disabled), Toast.LENGTH_SHORT).show()
             return
         }
         if (currentChannelIndex < 0 || currentChannelIndex >= allChannels.size) return
@@ -3724,7 +3779,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         layoutEpgMenu?.visibility = View.VISIBLE
         com.mediaplayer.app.util.RemoteLogger.i("PanelTrace", "EPG VISIBLE")
         
-        tvEpgMenuTitle?.text = "节目单"
+        tvEpgMenuTitle?.text = getString(R.string.epg_title)
         
         val cached = com.mediaplayer.app.util.EpgCacheManager.get(channel.name)
         if (cached != null) {
@@ -3866,7 +3921,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     private fun showZappingMenu(focusOnGroups: Boolean, resetToPlaying: Boolean = false) {
         if (RemoteConfigManager.isChannelListHidden()) {
-            Toast.makeText(this, "管理员已禁用此功能", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_main_admin_disabled), Toast.LENGTH_SHORT).show()
             return
         }
         checkAndRefreshEpgBg()
@@ -4256,7 +4311,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     
                     showOsd()
                     osdOverlayView?.setChannelNum(channelInputBuffer.toString().toString())
-                    osdOverlayView?.setChannelName("输入频道号...".toString())
+                    osdOverlayView?.setChannelName(getString(R.string.osd_input_channel))
                     osdOverlayView?.setLineInfo("".toString())
                     
                     uiHandler.removeCallbacks(channelInputRunnable)

@@ -60,6 +60,7 @@ object RemoteConfigManager {
             applyBool(this, prefs, Prefs.KEY_REVERSE_CHANNEL_KEYS, config.reverseChannelKeys)
             applyBool(this, prefs, Prefs.KEY_AUTO_CHECK_UPDATE, config.autoCheckUpdate)
             applyInt(this, prefs, Prefs.KEY_PREFERRED_SERVER_INDEX, config.preferredServerIndex)
+            applyInt(this, prefs, Prefs.KEY_APP_LANGUAGE, config.appLanguage)
 
             apply()
         }

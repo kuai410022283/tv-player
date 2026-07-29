@@ -3356,7 +3356,8 @@ const CLIENT_CONFIG_ITEMS = [
   { group: '应用管理', key: 'local_proxy_enabled', label: '本地代理', type: 'toggle' },
   { group: '应用管理', key: 'preferred_server_index', label: '服务器选择', type: 'number', placeholder: '-1 = 自动, 0 = 主服务器' },
   { group: '应用管理', key: 'auto_check_update', label: '自动更新', type: 'toggle' },
-  { group: '应用管理', key: 'check_update', label: '检查更新按钮', type: 'toggle' }
+  { group: '应用管理', key: 'check_update', label: '检查更新按钮', type: 'toggle' },
+  { group: '应用管理', key: 'app_language', label: '多语言选择', type: 'select', options: { '0': '自动', '1': '简体中文', '2': 'English', '3': '繁体中文', '4': '한국어', '5': '日本語' } }
 ];
 
 /** 加载全局配置并渲染表单 */

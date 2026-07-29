@@ -241,6 +241,7 @@ func isValidConfigKey(key string) bool {
 		"hide_settings_panel":  true, "hide_channel_list": true,
 		"hide_epg_panel": true, "hide_osd_panel": true,
 		"preferred_server_index": true, "auto_check_update": true, "check_update": true,
+		"app_language": true,
 	}
 	return validKeys[key]
 }
@@ -301,6 +302,7 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setBool("hide_osd_panel", &cfg.HideOsdPanel)
 	setInt("preferred_server_index", &cfg.PreferredServerIndex)
 	setBool("auto_check_update", &cfg.AutoCheckUpdate)
+	setInt("app_language", &cfg.AppLanguage)
 
 	if !hasAny {
 		return nil

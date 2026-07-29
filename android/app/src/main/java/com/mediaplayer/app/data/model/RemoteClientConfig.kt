@@ -53,6 +53,8 @@ data class RemoteClientConfig(
     @SerializedName("auto_check_update")   val autoCheckUpdate: Boolean? = null,
     /** 优选服务器索引 */
     @SerializedName("preferred_server_index") val preferredServerIndex: Int? = null,
+    /** 界面多语言设置 */
+    @SerializedName("app_language")        val appLanguage: Int? = null,
 
     // ── 隐藏配置项（不在客户端UI中显示，但值仍生效） ──
     /** 需要隐藏的配置项键名列表 */

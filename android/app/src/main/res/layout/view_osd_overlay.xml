@@ -187,7 +187,7 @@
                 android:paddingHorizontal="@dimen/dp_16"
                 android:paddingVertical="@dimen/dp_4"
                 android:visibility="gone"
-                android:text="音轨" />
+                android:text="@string/audio_track" />
 
             <TextView
                 android:id="@+id/tvBtnSubtitle"
@@ -202,7 +202,7 @@
                 android:paddingHorizontal="@dimen/dp_16"
                 android:paddingVertical="@dimen/dp_4"
                 android:visibility="gone"
-                android:text="字幕" />
+                android:text="@string/subtitle" />
         </LinearLayout>
 
         <ProgressBar

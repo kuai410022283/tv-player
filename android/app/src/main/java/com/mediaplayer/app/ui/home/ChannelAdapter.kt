@@ -173,7 +173,7 @@ class ChannelAdapter(
                     progressEpgItem.visibility = View.GONE
                 }
             } else {
-                tvCurrentEpg.text = "暂无节目信息"
+                tvCurrentEpg.text = itemView.context.getString(R.string.epg_no_info)
                 tvCurrentEpg.visibility = View.VISIBLE
                 progressEpgItem.visibility = View.GONE
             }
@@ -227,7 +227,7 @@ class ChannelAdapter(
                     progressEpgItem.visibility = View.GONE
                 }
             } else {
-                tvCurrentEpg.text = "暂无节目信息"
+                tvCurrentEpg.text = itemView.context.getString(R.string.epg_no_info)
                 tvCurrentEpg.visibility = View.VISIBLE
                 progressEpgItem.visibility = View.GONE
             }

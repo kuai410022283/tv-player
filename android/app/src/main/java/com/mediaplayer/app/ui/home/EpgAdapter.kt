@@ -100,9 +100,9 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
             holder.tvTime.setTextColor(Color.parseColor("#FFC107")) // accent color
             holder.tvTitle.setTextColor(Color.parseColor("#FFC107"))
             if (activeProgramStartTime != null) {
-                holder.tvTitle.text = "${prog.title} (回看中)"
+                holder.tvTitle.text = "${prog.title} (" + holder.itemView.context.getString(R.string.epg_status_playback) + ")"
             } else {
-                holder.tvTitle.text = "${prog.title} (正在播出)"
+                holder.tvTitle.text = "${prog.title} (" + holder.itemView.context.getString(R.string.epg_status_now_playing) + ")"
             }
             holder.ivCatchup.visibility = View.GONE
         } else if (position < (if (activeProgramStartTime != null) programs.size else playingIndex) && supportCatchup && !isLiveProgram) {

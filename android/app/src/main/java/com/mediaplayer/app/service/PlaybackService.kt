@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.mediaplayer.app.ui.home.MainActivity
+import com.mediaplayer.app.R
 
 /**
  * 后台播放保活服务。
@@ -66,11 +67,11 @@ class PlaybackService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("电视播放器")
-            .setContentText("正在播放: $channelName")
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.player_epg_now, channelName))
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "停止", stopIntent)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.status_stop), stopIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .build()

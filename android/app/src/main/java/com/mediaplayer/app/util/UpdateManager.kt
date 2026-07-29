@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.content.ContextCompat
+import com.mediaplayer.app.R
 
 object UpdateManager {
 
@@ -42,7 +43,7 @@ object UpdateManager {
                         }
                     } else if (showUpToDateToast) {
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "当前已是最新版本", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_already_latest), Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -50,7 +51,7 @@ object UpdateManager {
                 e.printStackTrace()
                 if (showUpToDateToast) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "检查更新失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_update_check_failed), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -59,19 +60,19 @@ object UpdateManager {
 
     private fun showUpdateDialog(context: Context, config: AppUpdateConfig) {
         val builder = AlertDialog.Builder(context)
-            .setTitle("发现新版本: ${config.version_name ?: ""}")
-            .setMessage(config.update_log ?: "修复了一些已知问题")
+            .setTitle(context.getString(R.string.update_dialog_title, config.version_name ?: ""))
+            .setMessage(config.update_log ?: context.getString(R.string.update_dialog_message_default))
             .setCancelable(!config.force_update)
-            .setPositiveButton("立即更新") { _, _ ->
+            .setPositiveButton(context.getString(R.string.update_dialog_btn_now)) { _, _ ->
                 if (!config.download_url.isNullOrEmpty()) {
                     downloadAndInstall(context, config.download_url)
                 } else {
-                    Toast.makeText(context, "下载地址无效", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_update_url_invalid), Toast.LENGTH_SHORT).show()
                 }
             }
 
         if (!config.force_update) {
-            builder.setNegativeButton("稍后") { dialog, _ ->
+            builder.setNegativeButton(context.getString(R.string.update_dialog_btn_later)) { dialog, _ ->
                 dialog.dismiss()
             }
         }
@@ -90,13 +91,13 @@ object UpdateManager {
         val request = DownloadManager.Request(uri)
         
         val fileName = "update_${System.currentTimeMillis()}.apk"
-        request.setTitle("正在下载更新")
-        request.setDescription("请稍候...")
+        request.setTitle(context.getString(R.string.update_notification_title))
+        request.setDescription(context.getString(R.string.update_notification_desc))
         request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
         
         val downloadId = downloadManager.enqueue(request)
-        Toast.makeText(context, "开始下载更新，可在通知栏查看进度", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.toast_update_downloading), Toast.LENGTH_SHORT).show()
 
         val onComplete = object : BroadcastReceiver() {
             override fun onReceive(ctxt: Context, intent: Intent) {
@@ -134,7 +135,7 @@ object UpdateManager {
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(context, "安装失败: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.toast_update_install_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
         }
     }
 }
