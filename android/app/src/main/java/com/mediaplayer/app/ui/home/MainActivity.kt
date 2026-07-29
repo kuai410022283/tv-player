@@ -2926,7 +2926,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     
 
     private fun loadEpgForChannel(channel: Channel) {
-        if (channel.currentEpg.isNotEmpty()) {
+        if ((channel.currentEpg ?: "").isNotEmpty()) {
             osdOverlayView?.setEpgText("正在播放: ${channel.currentEpg}".toString())
             osdOverlayView?.setEpgProgress(channel.getDynamicEpgPercent())
         } else {
@@ -2934,7 +2934,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             osdOverlayView?.setEpgProgress(0)
         }
 
-        if (channel.nextEpg.isNotEmpty()) {
+        if ((channel.nextEpg ?: "").isNotEmpty()) {
             osdOverlayView?.setNextEpgText("接下来: ${channel.nextEpg}".toString())
             } else {
             osdOverlayView?.setNextEpgText("".toString())
@@ -3390,7 +3390,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     }
                 } else {
                     val channel = allChannels.getOrNull(currentChannelIndex)
-                    if (channel != null && channel.currentEpg.isNotEmpty()) {
+                    if (channel != null && (channel.currentEpg ?: "").isNotEmpty()) {
                         globalProgressBar?.progress = (channel.getDynamicEpgPercent() * 10).toInt()
                         globalProgressBar?.visibility = View.VISIBLE
                     } else {

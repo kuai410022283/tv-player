@@ -44,16 +44,16 @@ data class Channel(
 
     fun getLinesSafely(): List<ChannelLine> {
         if (lines.isNotEmpty()) return lines
-        if (legacyStreamUrl.isNotEmpty()) {
+        if ((legacyStreamUrl ?: "").isNotEmpty()) {
             return listOf(ChannelLine(id, legacyStreamUrl, legacyStreamType, "", legacyUserAgent, legacyCustomHeaders, supportCatchup, catchupDays))
         }
         return emptyList()
     }
 
     fun getDynamicEpgPercent(): Int {
-        if (currentEpg.isEmpty()) return epgPercent
+        if ((currentEpg ?: "").isEmpty()) return epgPercent
         try {
-            val parts = currentEpg.split(" ")
+            val parts = (currentEpg ?: "").split(" ")
             if (parts.isNotEmpty()) {
                 val timeRange = parts[0]
                 val times = timeRange.split("-")
