@@ -418,7 +418,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   });
 
   document.getElementById('check-all-channels').checked = false;
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / channelPageSize));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage', channelPageSize);
   document.getElementById('channels-info').textContent = t('channels.total_channels_count', '共 {count} 个频道').replace('{count}', channelTotal);
@@ -688,7 +688,7 @@ function showAddChannelModal() {
   document.getElementById('channel-modal-title').textContent = t('modal.channel_add_title', '添加频道');
   document.getElementById('ch-edit-id').value = '';
   document.getElementById('ch-name').value = '';
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   if (groups.length > 0) {
     document.getElementById('ch-group').value = groups[0].id;
   }
@@ -758,7 +758,7 @@ async function editChannel(id) {
   const c = r.data;
   document.getElementById('ch-edit-id').value = c.id;
   document.getElementById('ch-name').value = c.name;
-  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
+  document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== '手动' ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   document.getElementById('ch-group').value = c.group_id;
   document.getElementById('ch-url').value = c.stream_url;
   document.getElementById('ch-type').value = c.stream_type;
@@ -1777,7 +1777,7 @@ async function editPlan(id) {
   // 渲染已选分组（可拖拽）
   const selectedContainer = document.getElementById('plan-groups-selected');
   selectedContainer.innerHTML = selectedGroups.map(g => {
-    const source = g.source && g.source !== t('common.manual', '手动') ? g.source : '';
+    const source = g.source && g.source !== '手动' ? g.source : '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
     return `<div class="plan-group-tag" data-id="${g.id}" data-name="${esc(g.name)}"${source ? ` data-source="${esc(source)}"` : ''} style="display:flex;align-items:center;cursor:grab;background:var(--accent);color:#fff;padding:4px 10px;border-radius:4px;user-select:none;font-size:12px;transition:opacity 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onmousedown="this.style.cursor='grabbing'" onmouseup="this.style.cursor='grab'">
       ${esc(g.name)}${sourceTag}
@@ -1791,7 +1791,7 @@ async function editPlan(id) {
   unselectedContainer.innerHTML = '';
   if (unselectedHeader) unselectedContainer.appendChild(unselectedHeader);
   unselectedGroups.forEach(g => {
-    const source = g.source && g.source !== t('common.manual', '手动') ? g.source : '';
+    const source = g.source && g.source !== '手动' ? g.source : '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
     const tag = document.createElement('div');
     tag.className = 'plan-group-tag-unselected';
