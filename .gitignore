@@ -25,6 +25,8 @@ android/app/build/
 android/.gradle/
 android/local.properties
 android/app/release/
+backend/internal/license/android/app/build/
+backend/internal/license/android/.gradle/
 
 # IDE
 .vscode/

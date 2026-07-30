@@ -19,7 +19,7 @@ body{font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-s
 
 /* ── Main ── */
 .main{flex:1;padding:32px;overflow-y:auto}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:16px}
 .header h1{font-size:24px;font-weight:600}
 
 /* ── Stats ── */
@@ -94,7 +94,7 @@ tr:hover td{background:var(--bg3)}
 @keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
 
 /* ── Search ── */
-.search{display:flex;gap:12px;align-items:center}
+.search{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .search input{width:280px;padding:6px 12px;border:1px solid #e6e6e6;border-radius:2px;outline:none;font-size:14px}
 .search input:focus{border-color:var(--accent)}
 

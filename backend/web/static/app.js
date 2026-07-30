@@ -266,7 +266,7 @@ function toggleSidebar() {
 
 // ═══ Sidebar click to expand (mobile/tablet narrow mode) ═══
 // Capture phase ensures this runs BEFORE nav items' inline onclick handlers
-document.getElementById('sidebar').addEventListener('click', function(e) {
+document.getElementById('sidebar').addEventListener('click', function (e) {
   if (window.innerWidth >= 1025) return; // Desktop: no action needed
   const sidebar = document.getElementById('sidebar');
   // If sidebar is not expanded, expand it and block the nav item click
@@ -421,7 +421,7 @@ async function loadChannels(search = currentChannelSearch, groupId = currentChan
   document.getElementById('ch-group').innerHTML = groups.map(g => `<option value="${g.id}">${g.name} ${g.source && g.source !== t('common.manual', '手动') ? '(' + esc(g.source) + ')' : ''}</option>`).join('');
   const chTotalPages = Math.max(1, Math.ceil(channelTotal / channelPageSize));
   renderPagination('channels-pagination', channelPage, chTotalPages, 'channelGoToPage', channelPageSize);
-  document.getElementById('channels-info').textContent = `共 ${channelTotal} 个频道`;
+  document.getElementById('channels-info').textContent = t('channels.total_channels_count', '共 {count} 个频道').replace('{count}', channelTotal);
   initChannelSort();
 
   // 每次加载频道列表时，触发一次状态轮询
@@ -440,7 +440,7 @@ function handleChannelBatchAction(action) {
     toast(t('channels.error_select_first', '请先勾选要操作的频道'), 'error');
     return;
   }
-  
+
   window.pendingBatchAction = action;
   const actionNames = {
     'delete': t('channels.batch_delete', '删除'),
@@ -454,7 +454,7 @@ function handleChannelBatchAction(action) {
     'content_type_live': t('channels.batch_content_type_live', '设置内容类型(直播Live)'),
     'content_type_vod': t('channels.batch_content_type_vod', '设置内容类型(点播VOD)')
   };
-  
+
   const modalText = document.getElementById('channel-batch-modal-text');
   if (action === 'delete') {
     modalText.innerText = t('modal.channel_batch_delete_text', '将永久删除勾选的 {n} 个频道，此操作不可恢复。').replace('{n}', checked.length);
@@ -468,7 +468,7 @@ async function doChannelBatchAction() {
   const action = window.pendingBatchAction;
   const ids = Array.from(document.querySelectorAll('.ch-check:checked')).map(el => +el.value);
   if (!ids.length || !action) return;
-  
+
   try {
     if (action === 'delete') {
       await api('/channels/batch', { method: 'DELETE', body: JSON.stringify({ ids }) });
@@ -501,9 +501,9 @@ async function startHealthCheck() {
   hideModal('health-check-modal');
   toast(t('channels.health_check_starting', '正在请求启动健康检查...'));
   try {
-    const r = await api('/channels/health-check/start', { 
-      method: 'POST', 
-      body: JSON.stringify({ expected_minutes: min, ids: ids.length > 0 ? ids : undefined }) 
+    const r = await api('/channels/health-check/start', {
+      method: 'POST',
+      body: JSON.stringify({ expected_minutes: min, ids: ids.length > 0 ? ids : undefined })
     });
     toast(r.message || t('channels.health_check_started', '健康检查已平滑启动'), 'success');
     pollHealthCheckStatus(); // 启动后立即轮询一次状态
@@ -638,14 +638,14 @@ function initChannelSort() {
   window._channelSortable = new Sortable(tbody, {
     handle: '.drag-handle',
     animation: 150,
-    onMove: function(evt) {
+    onMove: function (evt) {
       // 只允许在同一来源+分组内拖拽
       const dragged = evt.dragged;
       const related = evt.related;
       return dragged.dataset.source === related.dataset.source
-          && dragged.dataset.groupId === related.dataset.groupId;
+        && dragged.dataset.groupId === related.dataset.groupId;
     },
-    onEnd: function(evt) {
+    onEnd: function (evt) {
       // 记录被拖拽的来源+分组
       window._draggedSource = evt.item.dataset.source;
       window._draggedGroupId = evt.item.dataset.groupId;
@@ -778,7 +778,7 @@ async function editChannel(id) {
   document.getElementById('ch-proxy-url-group').style.display = (c.proxy_type === 'socks5') ? 'block' : 'none';
   document.getElementById('ch-sort').value = c.sort_order || 0;
   document.getElementById('channel-modal-title').textContent = t('modal.channel_edit_title', '编辑频道');
-  
+
   const mirrorAction = document.getElementById('ch-mirror-action');
   if (mirrorAction) {
     mirrorAction.style.display = 'block';
@@ -794,9 +794,9 @@ async function toggleChannelDirect(id, enable) {
     const res = await api(`/channels/${id}`);
     const ch = res.data;
     if (!ch) return;
-    
+
     ch.is_direct = enable;
-    
+
     await api(`/channels/${id}`, {
       method: 'PUT',
       body: JSON.stringify(ch)
@@ -828,9 +828,9 @@ async function toggleChannelMultiplex(id, enable) {
     const res = await api(`/channels/${id}`);
     const ch = res.data;
     if (!ch) return;
-    
+
     ch.enable_multiplex = enable ? 1 : 0;
-    
+
     await api(`/channels/${id}`, {
       method: 'PUT',
       body: JSON.stringify(ch)
@@ -859,7 +859,7 @@ async function mirrorChannel() {
     toast(t('modal.error_select_target', '请完整选择目标来源和目标分组'), 'error');
     return;
   }
-  
+
   try {
     await api('/channels/mirror', {
       method: 'POST',
@@ -990,7 +990,7 @@ function initGroupSort() {
     handle: '.drag-handle',
     animation: 150,
     filter: '.no-drag',
-    onEnd: function() {
+    onEnd: function () {
       document.getElementById('btn-save-sort').style.display = 'inline-block';
     }
   });
@@ -1043,7 +1043,7 @@ function handleGroupBatchAction(action) {
     toast(t('groups.error_select_first', '请先勾选要操作的分组'), 'error');
     return;
   }
-  
+
   window.pendingGroupBatchAction = action;
   const actionNames = {
     'delete': t('groups.batch_delete', '删除'),
@@ -1055,7 +1055,7 @@ function handleGroupBatchAction(action) {
     'content_type_live': t('groups.batch_content_type_live', '设置内容类型(直播)'),
     'content_type_vod': t('groups.batch_content_type_vod', '设置内容类型(点播)')
   };
-  
+
   const modalText = document.getElementById('group-batch-modal-text');
   if (action === 'delete') {
     modalText.innerText = t('modal.group_batch_delete_text', '将永久删除勾选的 {n} 个分组及其下的所有频道，此操作不可恢复。').replace('{n}', checked.length);
@@ -1069,7 +1069,7 @@ async function doGroupBatchAction() {
   const action = window.pendingGroupBatchAction;
   const ids = Array.from(document.querySelectorAll('.group-check:checked')).map(el => +el.value);
   if (!ids.length || !action) return;
-  
+
   try {
     await api('/groups/batch', { method: 'POST', body: JSON.stringify({ ids, action }) });
     if (action === 'delete') {
@@ -1140,7 +1140,7 @@ function editGroup(id) {
   document.getElementById('grp-multiplex-group').style.display = g.can_multiplex ? 'block' : 'none';
   document.getElementById('grp-user-agent').value = g.user_agent || '';
   document.getElementById('grp-headers').value = g.custom_headers || '';
-  document.getElementById('group-modal-title').textContent = '编辑分组';
+  document.getElementById('group-modal-title').textContent = t('groups.edit_group', '编辑分组');
   document.getElementById('grp-proxy-type').value = g.proxy_type || '';
   document.getElementById('grp-proxy-url').value = g.proxy_url || '';
   document.getElementById('grp-proxy-url-group').style.display = (g.proxy_type === 'socks5') ? 'block' : 'none';
@@ -1151,9 +1151,9 @@ async function toggleGroupDirect(id, enable) {
   try {
     const g = groups.find(x => x.id === id);
     if (!g) return;
-    
+
     const updateData = { ...g, is_direct: enable };
-    
+
     await api(`/groups/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData)
@@ -1171,9 +1171,9 @@ async function toggleGroupMultiplex(id, enable) {
   try {
     const g = groups.find(x => x.id === id);
     if (!g) return;
-    
+
     const updateData = { ...g, enable_multiplex: enable ? 1 : 0 };
-    
+
     await api(`/groups/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updateData)
@@ -1188,7 +1188,7 @@ async function toggleGroupMultiplex(id, enable) {
 }
 
 async function deleteGroup(id, source, name, count) {
-  if (!confirm(`该分组 [${source} - ${name}] 下包含 ${count} 个频道。\n删除分组将同步删除这些频道，此操作不可恢复，确定要删除吗？`)) return;
+  if (!confirm(t('groups.confirm_delete_group', '该分组 [{source} - {name}] 下包含 {count} 个频道。\n删除分组将同步删除这些频道，此操作不可恢复，确定要删除吗？').replace('{source}', source).replace('{name}', name).replace('{count}', count))) return;
   await api(`/groups/${id}`, { method: 'DELETE' });
   loadGroups();
 }
@@ -1220,24 +1220,24 @@ function renderSourcesTable() {
       <td style="color:var(--text3)">${(sourcePage - 1) * sourcePageSize + i + 1}</td>
       <td><strong>${esc(s.name)}</strong></td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(s.url)}">${esc(s.url)}</td>
-      <td>${s.auto_sync ? `<span class="badge badge-online">开启 (${s.sync_interval}h)</span>` : '<span class="badge badge-offline">关闭</span>'}</td>
+      <td>${s.auto_sync ? `<span class="badge badge-online">${t('common.on', '开启')} (${s.sync_interval}h)</span>` : `<span class="badge badge-offline">${t('common.off', '关闭')}</span>`}</td>
       <td>
-        ${s.sync_status === 'syncing' ? '<span style="color:var(--primary); font-weight:500">🔄 正在同步...</span>' : 
-          s.sync_status === 'error' ? `<span style="color:#ff4d4f;cursor:help;font-weight:500" title="${esc(s.sync_error)}">❌ 同步失败</span><div style="font-size:11px;color:var(--text3);margin-top:2px" title="${esc(s.sync_error)}">${esc(s.sync_error).length > 20 ? esc(s.sync_error).substring(0, 20) + '...' : esc(s.sync_error)}</div>` : 
-          s.sync_status === 'idle' && s.last_sync ? `<span style="color:#52c41a;font-weight:500">✅ 正常</span><div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtDate(s.last_sync)}</div>` : 
-          `<span style="color:var(--text3)">未同步</span>`}
+        ${s.sync_status === 'syncing' ? `<span style="color:var(--primary); font-weight:500">🔄 ${t('sources.syncing', '正在同步...')}</span>` :
+        s.sync_status === 'error' ? `<span style="color:#ff4d4f;cursor:help;font-weight:500" title="${esc(s.sync_error)}">❌ ${t('sources.sync_failed', '同步失败')}</span><div style="font-size:11px;color:var(--text3);margin-top:2px" title="${esc(s.sync_error)}">${esc(s.sync_error).length > 20 ? esc(s.sync_error).substring(0, 20) + '...' : esc(s.sync_error)}</div>` :
+          s.sync_status === 'idle' && s.last_sync ? `<span style="color:#52c41a;font-weight:500">✅ ${t('common.normal', '正常')}</span><div style="font-size:11px;color:var(--text3);margin-top:2px">${fmtDate(s.last_sync)}</div>` :
+            `<span style="color:var(--text3)">${t('common.never_synced', '未同步')}</span>`}
       </td>
       <td><div class="btn-group">
-        <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">同步</button>
-        <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">编辑</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">删除</button>
+        <button class="btn btn-primary btn-sm" onclick="importSource(${s.id})">${t('action.sync', '同步')}</button>
+        <button class="btn btn-ghost btn-sm" onclick="editSource(${s.id})">${t('action.edit', '编辑')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">${t('action.delete', '删除')}</button>
       </div></td>
     </tr>`).join('');
   } else {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_sources', '暂无源') + '</td></tr>';
   }
   renderPagination('sources-pagination', sourcePage, totalPages, 'sourceGoToPage', sourcePageSize);
-  document.getElementById('sources-info').textContent = `共 ${total} 个源`;
+  document.getElementById('sources-info').textContent = t('sources.total_sources_count', '共 {count} 个源').replace('{count}', total);
 }
 
 function sourceGoToPage(p) {
@@ -1320,7 +1320,7 @@ async function importSource(id) {
 }
 
 async function deleteSource(id) {
-  if (!confirm('确定？')) return;
+  if (!confirm(t('common.confirm_action', '确定？'))) return;
   await api(`/m3u/${id}`, { method: 'DELETE' });
   loadSources();
 }
@@ -1352,14 +1352,14 @@ async function formatContent(targetFormat) {
     toast(t('sources.error_paste_format_content', '请粘贴需要格式化的内容'), 'error');
     return;
   }
-  
+
   toast(t('sources.requesting_format', '正在请求后端进行格式化...'));
   try {
     const r = await api('/m3u/format', {
       method: 'POST',
       body: JSON.stringify({ content: c, target_format: targetFormat })
     });
-    
+
     if (r.data && r.data.formatted) {
       contentInput.value = r.data.formatted;
       toast(t('sources.format_success', '格式化成功（{fmt}格式）').replace('{fmt}', targetFormat.toUpperCase()), 'success');
@@ -1424,13 +1424,13 @@ function renderStreamsTable() {
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.url)}">${esc(s.url)}</td>
       <td>${badge(s.status)}<br><span style="font-size:12px;color:var(--accent);font-weight:bold">${formatSpeed(s.speed_bytes)}</span></td>
       <td><span style="font-size:11px">启动: ${fmtDate(s.started_at)}</span><br><span style="font-size:11px;color:var(--text2)">活跃: ${fmtDate(s.last_active)}</span></td>
-      <td><button class="btn btn-danger btn-sm" onclick="killStream('${s.session_id}')">踢下线</button></td>
+      <td><button class="btn btn-danger btn-sm" onclick="killStream('${s.session_id}')">${t('action.kick', '踢下线')}</button></td>
     </tr>`).join('');
   } else {
     body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_active_streams', '暂无活跃流') + '</td></tr>';
   }
   renderPagination('streams-pagination', streamPage, totalPages, 'streamGoToPage', streamPageSize);
-  document.getElementById('streams-info').textContent = `共 ${total} 个活跃流`;
+  document.getElementById('streams-info').textContent = t('streams.total_streams_count', '共 {count} 个活跃流').replace('{count}', total);
 }
 
 function streamGoToPage(p) {
@@ -1439,7 +1439,7 @@ function streamGoToPage(p) {
 }
 
 async function killStream(sessionId) {
-  if (!confirm('确定要强制断开该代理流吗？')) return;
+  if (!confirm(t('streams.confirm_disconnect', '确定要强制断开该代理流吗？'))) return;
   await api(`/stream/active/${sessionId}`, { method: 'DELETE' });
   toast(t('streams.command_sent', '指令已发送'));
   setTimeout(loadStreams, 500);
@@ -1486,22 +1486,22 @@ async function loadClients() {
         </label>
       </td>
       <td>${fmtExpiresAt(c.expires_at)}</td>
-      <td>${c.total_play_minutes}分钟</td>
+      <td>${c.total_play_minutes}${t('common.minutes', '分钟')}</td>
       <td>${timeAgo(c.last_seen)}</td>
       <td>${fmtDate(c.created_at)}</td>
       <td>
         <div class="btn-group">
-          <button class="btn btn-ghost btn-sm" onclick="showClientDetail(${c.id})">详情</button>
-          ${c.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button><button class="btn btn-danger btn-sm" onclick="showRejectModal(${c.id})">拒绝</button>` : ''}
-          ${c.status === 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">改授权</button><button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">吊销</button>` : ''}
-          ${c.status === 'rejected' || c.status === 'banned' ? `<button class="btn btn-info btn-sm" onclick="unbanClient(${c.id})">解封</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="showClientDetail(${c.id})">${t('action.details', '详情')}</button>
+          ${c.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">${t('action.approve', '通过')}</button><button class="btn btn-danger btn-sm" onclick="showRejectModal(${c.id})">${t('action.reject', '拒绝')}</button>` : ''}
+          ${c.status === 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">${t('action.change_auth', '改授权')}</button><button class="btn btn-warn btn-sm" onclick="showRejectModal(${c.id})">${t('action.revoke', '吊销')}</button>` : ''}
+          ${c.status === 'rejected' || c.status === 'banned' ? `<button class="btn btn-info btn-sm" onclick="unbanClient(${c.id})">${t('action.unban', '解封')}</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
   }
   const cliTotalPages = Math.max(1, Math.ceil(clientTotal / clientPageSize));
   renderPagination('clients-pagination', clientPage, cliTotalPages, 'clientGoToPage', clientPageSize);
-  document.getElementById('clients-info').textContent = `共 ${clientTotal} 台设备`;
+  document.getElementById('clients-info').textContent = t('clients.total_clients_count', '共 {count} 台设备').replace('{count}', clientTotal);
 }
 
 function clientGoToPage(p) {
@@ -1529,31 +1529,31 @@ async function showClientDetail(id) {
 
   document.getElementById('client-detail-content').innerHTML = `
     <div class="detail-grid" style="margin-bottom:20px">
-      <div class="label">设备ID</div><div class="value" style="font-family:monospace">${esc(c.device_id)}</div>
-      <div class="label">设备名称</div><div class="value">${esc(c.name)}</div>
-      <div class="label">设备型号</div><div class="value">${esc(c.device_model)}</div>
-      <div class="label">系统版本</div><div class="value">${esc(c.device_os)}</div>
-      <div class="label">客户端版本</div><div class="value">${esc(c.app_version)}</div>
-      <div class="label">IP地址</div><div class="value" style="font-family:monospace">${esc(c.ip)}</div>
-      <div class="label">状态</div><div class="value">${badge(c.status)}</div>
-      <div class="label">当前套餐</div><div class="value">${c.plan_name ? '<span class="badge badge-info">' + esc(c.plan_name) + '</span>' : '-'}</div>
-      <div class="label">设备过期时间</div><div class="value">${fmtExpiresAt(c.expires_at)}</div>
-      <div class="label">审批人</div><div class="value">${esc(c.approved_by) || '-'}</div>
-      <div class="label">拒绝原因</div><div class="value">${esc(c.reject_reason) || '-'}</div>
-      <div class="label">累计播放</div><div class="value">${c.total_play_minutes} 分钟</div>
-      <div class="label">最近在线</div><div class="value">${fmtDate(c.last_seen)}</div>
-      <div class="label">注册时间</div><div class="value">${fmtDate(c.created_at)}</div>
-      <div class="label">申请备注</div>
+      <div class="label">${t('devices.device_id', '设备ID')}</div><div class="value" style="font-family:monospace">${esc(c.device_id)}</div>
+      <div class="label">${t('devices.device_name', '设备名称')}</div><div class="value">${esc(c.name)}</div>
+      <div class="label">${t('devices.device_model', '设备型号')}</div><div class="value">${esc(c.device_model)}</div>
+      <div class="label">${t('devices.device_os', '系统版本')}</div><div class="value">${esc(c.device_os)}</div>
+      <div class="label">${t('devices.app_version', '客户端版本')}</div><div class="value">${esc(c.app_version)}</div>
+      <div class="label">${t('th.ip', 'IP地址')}</div><div class="value" style="font-family:monospace">${esc(c.ip)}</div>
+      <div class="label">${t('th.status', '状态')}</div><div class="value">${badge(c.status)}</div>
+      <div class="label">${t('devices.current_plan', '当前套餐')}</div><div class="value">${c.plan_name ? '<span class="badge badge-info">' + esc(c.plan_name) + '</span>' : '-'}</div>
+      <div class="label">${t('devices.expire_time', '设备过期时间')}</div><div class="value">${fmtExpiresAt(c.expires_at)}</div>
+      <div class="label">${t('devices.approved_by', '审批人')}</div><div class="value">${esc(c.approved_by) || '-'}</div>
+      <div class="label">${t('devices.reject_reason', '拒绝原因')}</div><div class="value">${esc(c.reject_reason) || '-'}</div>
+      <div class="label">${t('devices.total_play', '累计播放')}</div><div class="value">${c.total_play_minutes} 分钟</div>
+      <div class="label">${t('devices.last_seen', '最近在线')}</div><div class="value">${fmtDate(c.last_seen)}</div>
+      <div class="label">${t('devices.register_time', '注册时间')}</div><div class="value">${fmtDate(c.created_at)}</div>
+      <div class="label">${t('devices.remark', '申请备注')}</div>
       <div class="value" style="display:flex;align-items:center;gap:8px;">
         ${esc(c.request_note) || '-'}
         <span style="cursor:pointer;opacity:0.5" onclick="editClientRemark(${c.id}, decodeURIComponent('${encodeURIComponent(c.request_note || '')}'))">✏️</span>
       </div>
-      <div class="label">令牌</div>
+      <div class="label">${t('devices.token', '令牌')}</div>
       <div class="value" style="display:flex;align-items:center;gap:8px;">
         <code style="font-size:12px" id="detail-token-display" data-preview="${esc(tokenPreview)}" data-full="${esc(c.access_token || '')}">${esc(tokenPreview)}</code>
         ${c.access_token ? `<svg onclick="toggleTokenVisibility(this)" style="width:16px;height:16px;cursor:pointer;color:var(--text2);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>` : ''}
       </div>
-      <div class="label">远程日志</div>
+      <div class="label">${t('devices.remote_log', '远程日志')}</div>
       <div class="value" style="display:flex;align-items:center;gap:8px;">
         <label style="position:relative;display:inline-block;width:36px;height:20px;">
           <input type="checkbox" onchange="this.nextElementSibling.style.backgroundColor = this.checked ? '#5fb878' : '#ccc'; this.nextElementSibling.firstElementChild.style.transform = this.checked ? 'translateX(16px)' : 'translateX(0)'; toggleClientLog(${c.id}, this.checked)" ${c.enable_log ? 'checked' : ''} style="opacity:0;width:0;height:0;">
@@ -1561,14 +1561,14 @@ async function showClientDetail(id) {
             <span style="position:absolute;content:'';height:16px;width:16px;left:2px;bottom:2px;background-color:white;transition:.4s;border-radius:50%;transform:${c.enable_log ? 'translateX(16px)' : 'translateX(0)'};"></span>
           </span>
         </label>
-        <span style="font-size:12px;color:var(--text2);">采集设备端报错及行为 (异步)</span>
+        <span style="font-size:12px;color:var(--text2);">${t('devices.remote_log_desc', '采集设备端报错及行为 (异步)')}</span>
       </div>
     </div>
     <div class="btn-group" style="flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="showTokenModal(${c.id})">🔑 令牌管理</button>
+      <button class="btn btn-ghost btn-sm" onclick="showTokenModal(${c.id})">🔑 ${t('devices.token_manage', '令牌管理')}</button>
       ${c.status === 'approved' ? `<button class="btn btn-warn btn-sm" onclick="banClient(${c.id},'管理员封禁')">封禁</button>` : ''}
-      ${c.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">通过</button>` : ''}
-      <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">删除设备</button>
+      ${c.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="showApproveModal(${c.id})">${t('action.approve', '通过')}</button>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})">${t('devices.delete_device', '删除设备')}</button>
     </div>
   `;
   // 重置到基本信息 tab
@@ -1590,7 +1590,7 @@ function switchClientDetailTab(tab, btn) {
 }
 
 async function editClientRemark(id, oldNote) {
-  const note = prompt('请输入新的申请备注：', oldNote);
+  const note = prompt(t('devices.prompt_new_remark', '请输入新的申请备注：'), oldNote);
   if (note === null) return;
   const r = await api(`/admin/clients/${id}/remark`, { method: 'POST', body: JSON.stringify({ note }) });
   if (r.error) {
@@ -1628,7 +1628,7 @@ async function downloadClientLog(id, deviceId) {
       try {
         const json = JSON.parse(errText);
         if (json.message) errMsg = json.message;
-      } catch (e) {}
+      } catch (e) { }
       toast(errMsg, 'error');
       return;
     }
@@ -1690,13 +1690,13 @@ function renderPlansTable() {
       <td>${esc(p.description)}</td>
       ${subCellHtml}
       <td><div class="btn-group">
-        <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">编辑</button>
-        <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">删除</button>
+        <button class="btn btn-ghost btn-sm" onclick="editPlan(${p.id})">${t('action.edit', '编辑')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">${t('action.delete', '删除')}</button>
       </div></td>
     </tr>`;
   }).join('');
   renderPagination('plans-pagination', planPage, totalPages, 'planGoToPage', planPageSize);
-  document.getElementById('plans-info').textContent = `共 ${total} 个套餐`;
+  document.getElementById('plans-info').textContent = t('plans.total_plans_count', '共 {count} 个套餐').replace('{count}', total);
 }
 
 function planGoToPage(p) {
@@ -1763,7 +1763,7 @@ async function editPlan(id) {
   const selectedGroups = [];
   const unselectedGroups = [];
   const selectedIds = new Set(p.group_ids || []);
-  
+
   // 按照 group_ids 的顺序添加已选分组
   for (const gid of (p.group_ids || [])) {
     const g = groups.find(x => x.id === gid);
@@ -1837,7 +1837,7 @@ async function editPlan(id) {
     const origin = serverUrlSetting || window.location.origin;
     const m3uUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=m3u`;
     const txtUrl = `${origin}/api/v1/subscription?subscription_plans=${encodeURIComponent(p.name)}&subscription_token=${p.subscription_token || ''}&subscription_format=txt`;
-    
+
     document.getElementById('btn-copy-m3u').onclick = () => copyText(m3uUrl);
     document.getElementById('btn-copy-txt').onclick = () => copyText(txtUrl);
   } else {
@@ -1851,14 +1851,14 @@ async function editPlan(id) {
 function addPlanGroup(groupId) {
   const selectedContainer = document.getElementById('plan-groups-selected');
   const unselectedContainer = document.getElementById('plan-groups-container');
-  
+
   // 从未选列表移除
   const unselectedTag = unselectedContainer.querySelector(`[data-id="${groupId}"]`);
   if (unselectedTag) {
     const gName = unselectedTag.getAttribute('data-name') || '';
     const source = unselectedTag.getAttribute('data-source') || '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
-    
+
     // 添加到已选列表
     const tag = document.createElement('div');
     tag.className = 'plan-group-tag';
@@ -1870,7 +1870,7 @@ function addPlanGroup(groupId) {
     tag.onmouseup = () => tag.style.cursor = 'grab';
     tag.innerHTML = `<span style="cursor:pointer;font-size:12px;opacity:0.8;padding:2px;" onclick="removePlanGroup(${groupId})" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">✕</span> ${esc(gName)}${sourceTag}`;
     selectedContainer.appendChild(tag);
-    
+
     unselectedTag.remove();
   }
 }
@@ -1879,14 +1879,14 @@ function addPlanGroup(groupId) {
 function removePlanGroup(groupId) {
   const selectedContainer = document.getElementById('plan-groups-selected');
   const unselectedContainer = document.getElementById('plan-groups-container');
-  
+
   // 从已选列表移除
   const selectedTag = selectedContainer.querySelector(`[data-id="${groupId}"]`);
   if (selectedTag) {
     const gName = selectedTag.getAttribute('data-name') || '';
     const source = selectedTag.getAttribute('data-source') || '';
     const sourceTag = source ? ` <span style="font-size:11px;opacity:0.7">(${esc(source)})</span>` : '';
-    
+
     // 添加到未选列表
     const tag = document.createElement('div');
     tag.className = 'plan-group-tag-unselected';
@@ -1899,13 +1899,13 @@ function removePlanGroup(groupId) {
     tag.innerHTML = `<span style="font-size:12px;opacity:0.8;">+</span> ${esc(gName)}${sourceTag}`;
     tag.onclick = () => addPlanGroup(groupId);
     unselectedContainer.appendChild(tag);
-    
+
     selectedTag.remove();
   }
 }
 
 async function deletePlan(id) {
-  if (!confirm('确定删除此套餐？')) return;
+  if (!confirm(t('plans.confirm_delete', '确定删除此套餐？'))) return;
   await api(`/admin/plans/${id}`, { method: 'DELETE' });
   loadPlans();
 }
@@ -2010,7 +2010,7 @@ async function doReject() {
 }
 
 async function banClient(id, reason) {
-  if (!confirm('确定封禁此设备？')) return;
+  if (!confirm(t('clients.confirm_ban', '确定封禁此设备？'))) return;
   await api(`/admin/clients/${id}/ban`, { method: 'POST', body: JSON.stringify({ reason }) });
   hideModal('client-detail-modal');
   toast(t('clients.banned', '已封禁'));
@@ -2037,7 +2037,7 @@ async function toggleTester(id, isTester) {
 }
 
 async function deleteClient(id) {
-  if (!confirm('确定删除此设备？删除后无法恢复。')) return;
+  if (!confirm(t('clients.confirm_delete_recoverable', '确定删除此设备？删除后无法恢复。'))) return;
   await api(`/admin/clients/${id}`, { method: 'DELETE' });
   hideModal('client-detail-modal');
   toast(t('clients.deleted', '已删除'));
@@ -2065,7 +2065,7 @@ async function showTokenModal(id) {
 }
 
 async function regenerateToken(id) {
-  if (!confirm('重新生成令牌？旧令牌将立即失效。')) return;
+  if (!confirm(t('devices.confirm_regenerate_token', '重新生成令牌？旧令牌将立即失效。'))) return;
   const r = await api(`/admin/clients/${id}/regenerate`, { method: 'POST' });
   if (r.data) {
     document.getElementById('token-display').innerHTML =
@@ -2075,7 +2075,7 @@ async function regenerateToken(id) {
 }
 
 async function revokeToken(id) {
-  if (!confirm('吊销令牌？客户端将无法连接。')) return;
+  if (!confirm(t('devices.confirm_revoke_token_prompt', '吊销令牌？客户端将无法连接。'))) return;
   await api(`/admin/clients/${id}/revoke`, { method: 'POST' });
   toast(t('clients.token_revoked', '令牌已吊销'));
   hideModal('token-modal');
@@ -2086,7 +2086,7 @@ async function revokeToken(id) {
 async function doBatch() {
   if (selectedClientIds.size === 0) { toast(t('clients.error_select_first', '请先勾选设备'), 'error'); return; }
   const action = document.getElementById('batch-action').value;
-  if (!confirm(`确定对 ${selectedClientIds.size} 个设备执行 [${action}] 操作？`)) return;
+  if (!confirm(t('devices.confirm_batch_action', '确定对 {count} 个设备执行 [{action}] 操作？').replace('{count}', selectedClientIds.size).replace('{action}', action))) return;
 
   const r = await api('/admin/clients/batch', {
     method: 'POST',
@@ -2137,7 +2137,7 @@ function renderClientLogsTable() {
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:40px">' + t('common.no_logs', '暂无日志') + '</td></tr>';
   }
   renderPagination('client-logs-pagination', clientLogPage, totalPages, 'clientLogGoToPage', clientLogPageSize);
-  document.getElementById('client-logs-info').textContent = `共 ${total} 条访问日志`;
+  document.getElementById('client-logs-info').textContent = t('logs.total_logs_count', '共 {count} 条访问日志').replace('{count}', total);
 }
 
 function clientLogGoToPage(p) {
@@ -2175,7 +2175,7 @@ function fallbackCopy(text, cb) {
   document.body.appendChild(ta);
   ta.focus();
   ta.select();
-  try { document.execCommand('copy'); cb && cb(); } catch(e) { alert('复制失败，请手动选择复制') }
+  try { document.execCommand('copy'); cb && cb(); } catch (e) { alert('复制失败，请手动选择复制') }
   document.body.removeChild(ta);
 }
 
@@ -2201,13 +2201,13 @@ async function loadLicenseStatus() {
     const r = await api('/admin/license/status');
     const d = r.data;
     if (!d) {
-      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">无法获取授权</span>';
-      container.innerHTML = '<p style="color:var(--text2);">无法获取授权信息</p>';
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">' + t('license.status_error', '无法获取授权') + '</span>';
+      container.innerHTML = '<p style="color:var(--text2);">' + t('license.info_error', '无法获取授权信息') + '</p>';
       return;
     }
 
     if (d.status === 'unsupported') {
-      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">环境不支持</span>';
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">' + t('license.status_unsupported', '环境不支持') + '</span>';
       // 环境不支持，隐藏整个 VIP 授权模块
       const section = document.getElementById('vip-license-section');
       if (section) section.style.display = 'none';
@@ -2215,24 +2215,24 @@ async function loadLicenseStatus() {
     }
 
     if (d.status === 'activated') {
-      if (headerStatus) headerStatus.innerHTML = '<span style="color:#22c55e;font-weight:600;">✅ 已激活</span>';
-      const expiresDisplay = d.expires_at ? d.expires_at : '永久';
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:#22c55e;font-weight:600;">✅ ' + t('license.status_activated', '已激活') + '</span>';
+      const expiresDisplay = d.expires_at ? d.expires_at : t('common.forever', '永久');
       container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:16px;">
           <div class="form-row">
-            <label>机器码</label>
+            <label>${t('license.machine_id', '机器码')}</label>
             <div style="display:flex;align-items:center;gap:8px;flex:1;">
               <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
-              <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">复制</button>
+              <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">${t('action.copy', '复制')}</button>
             </div>
           </div>
 
           <div class="form-row">
-            <label>过期时间</label>
+            <label>${t('license.expire_time', '过期时间')}</label>
             <span style="flex:1;">${expiresDisplay}</span>
           </div>
           <div style="margin-top:8px;">
-            <button class="btn btn-danger" onclick="revokeLicense()">吊销授权</button>
+            <button class="btn btn-danger" onclick="revokeLicense()">${t('license.revoke_license', '吊销授权')}</button>
           </div>
         </div>`;
       return;
@@ -2240,59 +2240,59 @@ async function loadLicenseStatus() {
 
     // unlicensed 或 expired
     if (d.status === 'expired') {
-      if (headerStatus) headerStatus.innerHTML = '<span style="color:#ef4444;font-weight:600;">❌ 已过期</span>';
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:#ef4444;font-weight:600;">❌ ' + t('license.status_expired', '已过期') + '</span>';
     } else {
-      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text2);font-weight:600;">未激活</span>';
+      if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text2);font-weight:600;">' + t('license.status_inactive', '未激活') + '</span>';
     }
 
     const warningMsg = d.status === 'expired'
-      ? `<p style="color:#ef4444;font-size:14px;">授权已过期，请联系管理员重新授权</p>`
-      : `<p style="color:var(--text2);font-size:14px;">将机器码提供给管理员，获取授权码后激活</p>`;
+      ? `<p style="color:#ef4444;font-size:14px;">${t('license.expired_tip', '授权已过期，请联系管理员重新授权')}</p>`
+      : `<p style="color:var(--text2);font-size:14px;">${t('license.inactive_tip', '将机器码提供给管理员，获取授权码后激活')}</p>`;
 
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:16px;">
         <div class="form-row">
-          <label>机器码</label>
+          <label>${t('license.machine_id', '机器码')}</label>
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
             <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
-            <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">复制</button>
+            <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">${t('action.copy', '复制')}</button>
           </div>
         </div>
         ${warningMsg}
         <div class="form-row">
-          <label>授权码</label>
-          <input id="license-key-input" type="text" placeholder="输入授权码" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;font-family:monospace;" />
+          <label>${t('license.license_key', '授权码')}</label>
+          <input id="license-key-input" type="text" placeholder="${t('license.input_placeholder', '输入授权码')}" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;font-family:monospace;" />
         </div>
         <div>
-          <button class="btn btn-primary" onclick="activateLicense()">激活授权</button>
+          <button class="btn btn-primary" onclick="activateLicense()">${t('license.activate', '激活授权')}</button>
         </div>
       </div>`;
   } catch (e) {
-    if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">加载失败</span>';
-    container.innerHTML = '<p style="color:var(--text2);">加载授权信息失败</p>';
+    if (headerStatus) headerStatus.innerHTML = '<span style="color:var(--text3);">' + t('common.load_failed', '加载失败') + '</span>';
+    container.innerHTML = '<p style="color:var(--text2);">' + t('license.load_info_failed', '加载授权信息失败') + '</p>';
   }
 }
 
 /** 激活授权码 */
 async function activateLicense() {
   const key = document.getElementById('license-key-input').value.trim();
-  if (!key) { alert('请输入授权码'); return; }
+  if (!key) { alert(t('license.prompt_key', '请输入授权码')); return; }
   const r = await api('/admin/license/activate', { method: 'POST', body: JSON.stringify({ license_key: key }) });
   if (r.code === 200) {
-    alert('授权激活成功');
+    alert(t('license.activate_success', '授权激活成功'));
     loadLicenseStatus();
     updateLicenseUI();
   } else {
-    alert(r.message || '激活失败');
+    alert(r.message || t('license.activate_failed', '激活失败'));
   }
 }
 
 /** 吊销授权 */
 async function revokeLicense() {
-  if (!confirm('确定要吊销当前授权吗？')) return;
+  if (!confirm(t('license.confirm_revoke', '确定要吊销当前授权吗？'))) return;
   const r = await api('/admin/license/revoke', { method: 'POST' });
   if (r.code === 200) {
-    alert('授权已吊销');
+    alert(t('license.revoked_success', '授权已吊销'));
     loadLicenseStatus();
     updateLicenseUI();
   }
@@ -2330,7 +2330,7 @@ async function loadClientSettings() {
 
   const select = document.getElementById('set-default-plan-id');
   const plans = plansRes.data || [];
-  select.innerHTML = '<option value="0" data-desc="">-- 自定义授权 (使用下方允许同时在线设备数量和有效期) --</option>' +
+  select.innerHTML = '<option value="0" data-desc="">' + t('plans.select_custom_full', '-- 自定义授权 (使用下方允许同时在线设备数量和有效期) --') + '</option>' +
     plans.map(p => `<option value="${p.id}" data-days="${p.days}" data-streams="${p.max_streams}" data-desc="${esc(p.description || '')}">${esc(p.name)}</option>`).join('');
 
   if (setRes.data) {
@@ -2368,7 +2368,7 @@ async function loadClientSettings() {
       document.getElementById('set-epg-refresh-hours').value = setRes.data.epg_refresh_hours || '12';
       document.getElementById('set-epg-time-shift').value = setRes.data.epg_time_shift || '0';
     }
-    
+
     if (document.getElementById('set-fcc-enabled')) {
       document.getElementById('set-fcc-enabled').value = setRes.data.fcc_enabled || 'false';
       document.getElementById('set-fcc-port-start').value = setRes.data.fcc_port_start || '40000';
@@ -2430,13 +2430,13 @@ async function loadClientSettings() {
 
   // 服务器地址 URL 转 Base64 逻辑 (支持多行备用地址)
   const serverRawUrl = serverUrlSetting || window.location.origin;
-  
+
   let allUrls = [serverRawUrl];
   if (serverBackupUrlsSetting) {
     const backupLines = serverBackupUrlsSetting.split('\n').map(s => s.trim()).filter(s => s);
     allUrls = allUrls.concat(backupLines);
   }
-  
+
   const serverBase64 = allUrls.map(url => btoa(unescape(encodeURIComponent(url)))).join('\n');
 
   const rawUrlEl = document.getElementById('server-raw-url');
@@ -2533,13 +2533,13 @@ async function saveAllClientSettings() {
   // 更新前端服务器地址与 Base64 授权码预览 (支持多行备用地址)
   serverBackupUrlsSetting = settings.server_backup_urls || '';
   const serverRawUrl = serverUrlSetting || window.location.origin;
-  
+
   let allUrls = [serverRawUrl];
   if (serverBackupUrlsSetting) {
     const backupLines = serverBackupUrlsSetting.split('\n').map(s => s.trim()).filter(s => s);
     allUrls = allUrls.concat(backupLines);
   }
-  
+
   const serverBase64 = allUrls.map(url => btoa(unescape(encodeURIComponent(url)))).join('\n');
   const rawUrlEl = document.getElementById('server-raw-url');
   const base64TextEl = document.getElementById('server-base64-text');
@@ -2636,9 +2636,9 @@ async function onEnableExternalSubChange(value) {
 async function onLogoStrategyChange(value) {
   await saveClientSetting('logo_strategy', value);
   const strategies = {
-    'local': '本地优先',
-    'source': '源优先',
-    'interface': '接口优先'
+    'local': t('settings.strategy_local', '本地优先'),
+    'source': t('settings.strategy_source', '源优先'),
+    'interface': t('settings.strategy_interface', '接口优先')
   };
   toast(t('settings.logo_strategy_changed', '台标获取策略已切换为') + ': ' + (strategies[value] || value));
 }
@@ -2647,7 +2647,7 @@ async function onLogoStrategyChange(value) {
 function renderPagination(containerId, currentPage, totalPages, changePageFuncName, currentPageSize = 20) {
   let html = '';
   const prevDisabled = currentPage <= 1 ? 'disabled' : '';
-  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage - 1})" ${prevDisabled}>上一页</button>`;
+  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage - 1})" ${prevDisabled}>${t('common.prev_page', '上一页')}</button>`;
 
   const maxPages = 5;
   let start = Math.max(1, currentPage - Math.floor(maxPages / 2));
@@ -2679,12 +2679,12 @@ function renderPagination(containerId, currentPage, totalPages, changePageFuncNa
   }
 
   const nextDisabled = currentPage >= totalPages ? 'disabled' : '';
-  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage + 1})" ${nextDisabled}>下一页</button>`;
+  html += `<button class="btn btn-ghost btn-sm" onclick="${changePageFuncName}(${currentPage + 1})" ${nextDisabled}>${t('common.next_page', '下一页')}</button>`;
 
   // 每页显示条数选择
   html += `<select class="btn btn-ghost btn-sm" style="padding:4px 8px;margin-left:8px;" onchange="changePageSize(this.value, '${changePageFuncName}')">`;
   [20, 50, 100, 200, 300, 400, 500, 1000].forEach(size => {
-    html += `<option value="${size}" ${currentPageSize === size ? 'selected' : ''}>${size} 条/页</option>`;
+    html += `<option value="${size}" ${currentPageSize === size ? 'selected' : ''}>${size} ${t('common.items_per_page', '条/页')}</option>`;
   });
   html += `</select>`;
 
@@ -2841,7 +2841,7 @@ async function loadUpdates() {
   if (currentVersionEl) {
     document.getElementById('update-current-version').textContent = currentVersionEl.textContent;
   }
-  
+
   if (githubReleasesCache) {
     renderUpdateReleases(githubReleasesCache);
     return;
@@ -2868,13 +2868,13 @@ async function loadUpdates() {
 function renderUpdateReleases(releases) {
   if (!releases || releases.length === 0) return;
   document.getElementById('update-content').style.display = 'block';
-  
+
   const latestRelease = releases[0];
-  document.getElementById('update-latest-notice').textContent = '最新版本：' + latestRelease.tag_name;
+  document.getElementById('update-latest-notice').textContent = t('update.latest_version', '最新版本：') + latestRelease.tag_name;
 
   const tagSelect = document.getElementById('update-tag-select');
-  tagSelect.innerHTML = releases.map((r, i) => `<option value="${i}">${r.tag_name}${i === 0 ? ' (最新)' : ''}</option>`).join('');
-  
+  tagSelect.innerHTML = releases.map((r, i) => `<option value="${i}">${r.tag_name}${i === 0 ? ' (' + t('update.latest_suffix', '最新') + ')' : ''}</option>`).join('');
+
   const savedProxy = localStorage.getItem('ghProxy');
   if (savedProxy) {
     const proxySelect = document.getElementById('update-proxy-select');
@@ -2918,19 +2918,19 @@ function onUpdateAssetChange() {
   const btn = document.getElementById('btn-update-download');
   const btnPull = document.getElementById('btn-update-pull');
   const btnDownloadAll = document.getElementById('btn-update-download-all');
-  
+
   const releaseIndex = parseInt(tagSelect.value);
   const assetIndex = parseInt(assetSelect.value);
-  
+
   if (isNaN(releaseIndex) || isNaN(assetIndex) || !githubReleasesCache[releaseIndex] || !githubReleasesCache[releaseIndex].assets[assetIndex]) {
     btn.style.display = 'none';
-    if(btnPull) btnPull.style.display = 'none';
-    if(btnDownloadAll) btnDownloadAll.style.display = 'none';
+    if (btnPull) btnPull.style.display = 'none';
+    if (btnDownloadAll) btnDownloadAll.style.display = 'none';
     return;
   }
-  
+
   const asset = githubReleasesCache[releaseIndex].assets[assetIndex];
-  
+
   const proxySelect = document.getElementById('update-proxy-select');
   let proxyUrl = proxySelect ? proxySelect.value : "";
   if (proxyUrl) {
@@ -2938,10 +2938,10 @@ function onUpdateAssetChange() {
   } else {
     localStorage.removeItem('ghProxy');
   }
-  
+
   btn.dataset.href = proxyUrl + asset.browser_download_url;
   btn.style.display = 'inline-flex';
-  
+
   if (btnDownloadAll) {
     const hasApks = githubReleasesCache[releaseIndex].assets.some(a => a.name.includes('.apk'));
     btnDownloadAll.style.display = hasApks ? 'inline-flex' : 'none';
@@ -2960,10 +2960,10 @@ async function downloadAllClients() {
   const tagSelect = document.getElementById('update-tag-select');
   const releaseIndex = parseInt(tagSelect.value);
   if (isNaN(releaseIndex) || !githubReleasesCache[releaseIndex]) return;
-  
+
   const release = githubReleasesCache[releaseIndex];
   const apkAssets = release.assets.filter(a => a.name.includes('.apk'));
-  
+
   if (apkAssets.length === 0) {
     toast(t('updates.no_apk_available', '当前版本没有可用的客户端安装包'), 'warn');
     return;
@@ -2987,7 +2987,7 @@ async function downloadAllClients() {
   const proxySelect = document.getElementById('update-proxy-select');
   const proxyUrl = proxySelect ? proxySelect.value : "";
   const downloadUrls = apkAssets.map(asset => proxyUrl + asset.browser_download_url);
-  
+
   try {
     const res = await fetch(API + '/admin/settings/pull-update', {
       method: 'POST',
@@ -3001,7 +3001,7 @@ async function downloadAllClients() {
         update_log: release.body || ''
       })
     });
-    
+
     const data = await res.json();
     if (!res.ok || data.code !== 0) {
       alert('操作失败: ' + (data.message || '未知错误'));
@@ -3020,19 +3020,19 @@ async function downloadAllClients() {
         if (pData && pData.code === 0 && pData.data) {
           const state = pData.data;
           if (state.status === "downloading") {
-             btn.textContent = `正在下载 (${state.progress}%)`;
+            btn.textContent = `正在下载 (${state.progress}%)`;
           } else if (state.status === "success") {
-             clearInterval(pollInterval);
-             btn.textContent = originalText;
-             btn.disabled = false;
-             if (btnCancel) btnCancel.style.display = 'none';
-             alert('全部下载并发布成功！');
+            clearInterval(pollInterval);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            if (btnCancel) btnCancel.style.display = 'none';
+            alert('全部下载并发布成功！');
           } else if (state.status === "error") {
-             clearInterval(pollInterval);
-             btn.textContent = originalText;
-             btn.disabled = false;
-             if (btnCancel) btnCancel.style.display = 'none';
-             alert('下载失败: ' + state.message);
+            clearInterval(pollInterval);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            if (btnCancel) btnCancel.style.display = 'none';
+            alert('下载失败: ' + state.message);
           }
         }
       } catch (err) {
@@ -3051,14 +3051,14 @@ async function downloadAllClients() {
 async function pullUpdateToServer(btn) {
   const tagSelect = document.getElementById('update-tag-select');
   const assetSelect = document.getElementById('update-asset-select');
-  
+
   const releaseIndex = parseInt(tagSelect.value);
   const assetIndex = parseInt(assetSelect.value);
-  
+
   if (isNaN(releaseIndex) || isNaN(assetIndex)) return;
   const release = githubReleasesCache[releaseIndex];
   const asset = release.assets[assetIndex];
-  
+
   if (!confirm(`确定要将版本 ${release.tag_name} (${asset.name}) 拉取至服务端并提供更新吗？这需要服务端具备网络访问条件，下载可能需要几十秒。`)) {
     return;
   }
@@ -3066,7 +3066,7 @@ async function pullUpdateToServer(btn) {
   const originalText = btn.textContent;
   btn.textContent = '准备下载...';
   btn.disabled = true;
-  
+
   const btnCancel = document.getElementById('btn-update-cancel');
   if (btnCancel) {
     btnCancel.style.display = 'inline-flex';
@@ -3091,7 +3091,7 @@ async function pullUpdateToServer(btn) {
         update_log: release.body || ''
       })
     });
-    
+
     const data = await res.json();
     if (!res.ok || data.code !== 0) {
       alert('操作失败: ' + (data.message || '未知错误'));
@@ -3110,22 +3110,22 @@ async function pullUpdateToServer(btn) {
         if (pData && pData.code === 0 && pData.data) {
           const state = pData.data;
           if (state.status === "downloading") {
-             btn.textContent = `正在下载 (${state.progress}%)`;
+            btn.textContent = `正在下载 (${state.progress}%)`;
           } else if (state.status === "success") {
-             clearInterval(pollInterval);
-             btn.textContent = originalText;
-             btn.disabled = false;
-             if (btnCancel) btnCancel.style.display = 'none';
-             alert('下载并发布成功！');
+            clearInterval(pollInterval);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            if (btnCancel) btnCancel.style.display = 'none';
+            alert('下载并发布成功！');
           } else if (state.status === "error") {
-             clearInterval(pollInterval);
-             btn.textContent = originalText;
-             btn.disabled = false;
-             if (btnCancel) btnCancel.style.display = 'none';
-             alert('下载失败: ' + state.message);
+            clearInterval(pollInterval);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            if (btnCancel) btnCancel.style.display = 'none';
+            alert('下载失败: ' + state.message);
           }
         }
-      } catch(e) {}
+      } catch (e) { }
     }, 1000);
 
   } catch (e) {
@@ -3171,7 +3171,7 @@ function onSyncEnableChange(val) {
 }
 
 function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
@@ -3180,7 +3180,7 @@ function generateUUID() {
 async function loadSyncSettings() {
   const res = await api('/settings').catch(() => ({ data: {} }));
   const data = res.data || {};
-  
+
   if (data.sync_serve_token !== undefined) document.getElementById('set-sync-serve-token').value = data.sync_serve_token;
   if (data.sync_enable !== undefined) {
     document.getElementById('set-sync-enable').value = data.sync_enable;
@@ -3203,41 +3203,41 @@ async function loadSyncSettings() {
 async function checkMasterConnection() {
   const badge = document.getElementById('master-status-badge');
   const url = document.getElementById('set-sync-master-url').value.trim();
-  
+
   if (!url) {
     badge.style.display = 'inline-block';
     badge.style.background = 'var(--bg3)';
     badge.style.color = 'var(--text2)';
-    badge.innerText = '未配置地址';
+    badge.innerText = t('sync.status_unconfigured', '未配置地址');
     return;
   }
 
   badge.style.display = 'inline-block';
   badge.style.background = 'var(--bg3)';
   badge.style.color = 'var(--text2)';
-  badge.innerText = '检测中...';
+  badge.innerText = t('sync.status_checking', '检测中...');
 
   try {
     const res = await fetch('/api/v1/admin/system/ping-master', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + adminToken
       },
       body: JSON.stringify({ master_url: url })
     });
-    
+
     if (res.ok) {
       badge.style.background = 'rgba(22, 186, 170, 0.15)';
       badge.style.color = '#16baaa';
-      badge.innerText = '状态正常 (Ping 200)';
+      badge.innerText = t('sync.status_normal', '状态正常 (Ping 200)');
     } else {
       throw new Error('Non-200 response');
     }
   } catch (e) {
     badge.style.background = 'rgba(230, 83, 107, 0.15)';
     badge.style.color = '#e6536b';
-    badge.innerText = '连接失败';
+    badge.innerText = t('sync.status_failed', '连接失败');
   }
 }
 
@@ -3258,9 +3258,9 @@ async function saveSyncSettings() {
       }
       // 提前校验主节点是否联通
       try {
-        await api('/admin/system/ping-master', { 
-          method: 'POST', 
-          body: JSON.stringify({ master_url: settings.sync_master_url }) 
+        await api('/admin/system/ping-master', {
+          method: 'POST',
+          body: JSON.stringify({ master_url: settings.sync_master_url })
         });
       } catch (e) {
         toast(t('sync.error_connect_failed', '主节点连接失败，请检查地址是否正确或网络是否畅通'), 'error');
@@ -3296,11 +3296,11 @@ async function saveSyncSettings() {
 async function forceSyncFromMaster() {
   const url = document.getElementById('set-sync-master-url').value;
   const token = document.getElementById('set-sync-master-token').value;
-  
+
   if (!url) { toast(t('sync.error_fill_master_url', '请填写主节点通信地址'), 'error'); return; }
-  
+
   if (!confirm('确定要强制从主节点拉取数据覆盖当前节点的频道/分组数据吗？')) return;
-  
+
   toast(t('sync.syncing', '正在同步，请勿刷新页面...'));
   try {
     const res = await api('/admin/system/sync_from_master', {
@@ -3315,13 +3315,13 @@ async function forceSyncFromMaster() {
 }
 
 // Proxy type toggle handlers
-document.getElementById('src-proxy-type').addEventListener('change', function() {
+document.getElementById('src-proxy-type').addEventListener('change', function () {
   document.getElementById('src-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
 });
-document.getElementById('grp-proxy-type').addEventListener('change', function() {
+document.getElementById('grp-proxy-type').addEventListener('change', function () {
   document.getElementById('grp-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
 });
-document.getElementById('ch-proxy-type').addEventListener('change', function() {
+document.getElementById('ch-proxy-type').addEventListener('change', function () {
   document.getElementById('ch-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
 });
 
@@ -3360,8 +3360,8 @@ const CLIENT_CONFIG_ITEMS = [
   { group: '应用管理', key: 'local_proxy_enabled', label: '本地代理', type: 'toggle' },
   { group: '应用管理', key: 'preferred_server_index', label: '服务器选择', type: 'number', placeholder: '-1 = 自动, 0 = 主服务器' },
   { group: '应用管理', key: 'auto_check_update', label: '自动更新', type: 'toggle' },
-  { group: '应用管理', key: 'check_update', label: '检查更新按钮', type: 'toggle' },
-  { group: '应用管理', key: 'app_language', label: '多语言选择', type: 'select', options: { '0': '自动', '1': '简体中文', '2': 'English', '3': '繁体中文', '4': '한국어', '5': '日本語' } }
+  { group: '应用管理', key: 'check_update', label: '检查更新', type: 'toggle' },
+  { group: '应用管理', key: 'app_language', label: '多语言选择', type: 'select', options: { '0': '自动', '1': '简体中文', '2': 'English', '3': '繁体中文', '4': '한국어', '5': '日本語', '6': 'Русский', '7': 'Deutsch', '8': 'Français' } }
 ];
 
 /** 加载全局配置并渲染表单 */
@@ -3380,7 +3380,13 @@ async function loadGlobalClientConfig() {
     if (item.group !== currentGroup) {
       currentGroup = item.group;
       const header = document.createElement('h3');
-      header.textContent = currentGroup;
+      const groupTranslationMap = {
+        '播放与画面': t('gcc.group_play', '播放与画面'),
+        '界面管控': t('gcc.group_ui', '界面管控'),
+        '周边扩展': t('gcc.group_extra', '周边扩展'),
+        '应用管理': t('gcc.group_app', '应用管理')
+      };
+      header.textContent = groupTranslationMap[currentGroup] || currentGroup;
       header.style.cssText = 'margin:0 0 16px 0;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;';
       if (container.lastChild) {
         const spacer = document.createElement('div');
@@ -3403,16 +3409,16 @@ async function loadGlobalClientConfig() {
     unchecked.id = 'gcc-' + item.key + '-unchecked';
     unchecked.style.cssText = 'width:18px;height:18px;cursor:pointer;';
     unchecked.dataset.key = item.key;
-    unchecked.onchange = function() { toggleConfigInput(this, item.key); };
+    unchecked.onchange = function () { toggleConfigInput(this, item.key); };
 
     const uncheckedLabel = document.createElement('label');
     uncheckedLabel.htmlFor = unchecked.id;
-    uncheckedLabel.textContent = '不管控';
+    uncheckedLabel.textContent = t('gcc.unmanaged', '不管控');
     uncheckedLabel.style.cssText = 'font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:48px;';
 
     // 标签
     const label = document.createElement('label');
-    label.textContent = item.label;
+    label.textContent = t('gcc.' + item.key + '_label', item.label);
     label.style.cssText = 'font-size:14px;color:var(--text);font-weight:500;min-width:100px;';
 
     // 值控件
@@ -3436,10 +3442,10 @@ async function loadGlobalClientConfig() {
       input.appendChild(toggle);
       const valLabel = document.createElement('span');
       valLabel.id = 'gcc-txt-' + item.key;
-      valLabel.textContent = cb.checked ? '开' : '关';
+      valLabel.textContent = cb.checked ? t('common.on', '开') : t('common.off', '关');
       valLabel.style.cssText = 'font-size:13px;color:var(--text2);';
-      cb.onchange = function() { 
-        document.getElementById('gcc-txt-' + item.key).textContent = this.checked ? '开' : '关';
+      cb.onchange = function () {
+        document.getElementById('gcc-txt-' + item.key).textContent = this.checked ? t('common.on', '开') : t('common.off', '关');
       };
       input.appendChild(valLabel);
     } else if (item.type === 'select') {
@@ -3451,7 +3457,7 @@ async function loadGlobalClientConfig() {
       for (const [k, v] of Object.entries(item.options)) {
         const opt = document.createElement('option');
         opt.value = k;
-        opt.textContent = v;
+        opt.textContent = t('gcc.opt_' + item.key + '_' + k, v);
         if (value === k) opt.selected = true;
         sel.appendChild(opt);
       }
@@ -3481,7 +3487,7 @@ async function loadGlobalClientConfig() {
     hiddenCb.style.cssText = 'width:16px;height:16px;cursor:pointer;margin-left:auto;';
     const hiddenLabel = document.createElement('label');
     hiddenLabel.htmlFor = hiddenCb.id;
-    hiddenLabel.textContent = '隐藏';
+    hiddenLabel.textContent = t('gcc.hidden_label', '隐藏');
     hiddenLabel.style.cssText = 'font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:32px;';
     div.appendChild(hiddenCb);
     div.appendChild(hiddenLabel);
@@ -3559,7 +3565,13 @@ async function loadClientConfigTab(clientId) {
     if (item.group !== currentGroup) {
       currentGroup = item.group;
       const header = document.createElement('h3');
-      header.textContent = currentGroup;
+      const groupTranslationMap = {
+        '播放与画面': t('gcc.group_play', '播放与画面'),
+        '界面管控': t('gcc.group_ui', '界面管控'),
+        '周边扩展': t('gcc.group_extra', '周边扩展'),
+        '应用管理': t('gcc.group_app', '应用管理')
+      };
+      header.textContent = groupTranslationMap[currentGroup] || currentGroup;
       header.style.cssText = 'margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;';
       if (container.lastChild) {
         const spacer = document.createElement('div');
@@ -3588,16 +3600,27 @@ async function loadClientConfigTab(clientId) {
 
     const inheritLabel = document.createElement('label');
     inheritLabel.htmlFor = inheritCb.id;
-    inheritLabel.textContent = '继承全局';
+    inheritLabel.textContent = t('gcc.inherit_global', '继承全局');
     inheritLabel.style.cssText = 'font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:52px;';
 
     // 标签 + 全局值提示
     const label = document.createElement('span');
-    label.textContent = item.label;
+    label.textContent = t('gcc.' + item.key + '_label', item.label);
     label.style.cssText = 'font-size:13px;color:var(--text);font-weight:500;min-width:90px;';
     const globalHint = document.createElement('span');
     globalHint.style.cssText = 'font-size:11px;color:var(--text3);';
-    globalHint.textContent = globalVal ? `(全局: ${globalVal})` : '(全局: 不管控)';
+    const globalLabel = t('gcc.global', '全局');
+    const unmanagedLabel = t('gcc.unmanaged', '不管控');
+    let displayVal = globalVal;
+    if (globalVal === 'true' || globalVal === '1') {
+      displayVal = t('common.on', '开');
+    } else if (globalVal === 'false' || globalVal === '0') {
+      if (item.type === 'toggle') displayVal = t('common.off', '关');
+    }
+    if (item.type === 'select' && item.options[globalVal]) {
+      displayVal = t('gcc.opt_' + item.key + '_' + globalVal, item.options[globalVal]);
+    }
+    globalHint.textContent = globalVal ? `(${globalLabel}: ${displayVal})` : `(${globalLabel}: ${unmanagedLabel})`;
 
     // 值控件
     const input = document.createElement('div');
@@ -3620,10 +3643,10 @@ async function loadClientConfigTab(clientId) {
       input.appendChild(toggle);
       const valLabel = document.createElement('span');
       valLabel.id = 'dcc-txt-' + item.key;
-      valLabel.textContent = cb.checked ? '开' : '关';
+      valLabel.textContent = cb.checked ? t('common.on', '开') : t('common.off', '关');
       valLabel.style.cssText = 'font-size:12px;color:var(--text2);';
-      cb.onchange = function() { 
-        document.getElementById('dcc-txt-' + item.key).textContent = this.checked ? '开' : '关';
+      cb.onchange = function () {
+        document.getElementById('dcc-txt-' + item.key).textContent = this.checked ? t('common.on', '开') : t('common.off', '关');
       };
       input.appendChild(valLabel);
     } else if (item.type === 'select') {
@@ -3635,7 +3658,7 @@ async function loadClientConfigTab(clientId) {
       for (const [k, v] of Object.entries(item.options)) {
         const opt = document.createElement('option');
         opt.value = k;
-        opt.textContent = v;
+        opt.textContent = t('gcc.opt_' + item.key + '_' + k, v);
         if (effectiveVal === k) opt.selected = true;
         sel.appendChild(opt);
       }
@@ -3653,7 +3676,7 @@ async function loadClientConfigTab(clientId) {
     }
 
     // 继承切换时联动
-    inheritCb.onchange = function() {
+    inheritCb.onchange = function () {
       const disabled = this.checked;
       const valInput = document.getElementById('dcc-val-' + item.key);
       if (valInput) valInput.disabled = disabled;
@@ -3674,7 +3697,7 @@ async function loadClientConfigTab(clientId) {
     hiddenCb.style.cssText = 'width:14px;height:14px;cursor:pointer;margin-left:4px;';
     const hiddenLabel = document.createElement('label');
     hiddenLabel.htmlFor = hiddenCb.id;
-    hiddenLabel.textContent = '隐藏';
+    hiddenLabel.textContent = t('gcc.hidden_label', '隐藏');
     hiddenLabel.style.cssText = 'font-size:11px;color:var(--text2);cursor:pointer;white-space:nowrap;min-width:28px;';
     div.appendChild(hiddenCb);
     div.appendChild(hiddenLabel);
@@ -3721,7 +3744,7 @@ async function saveClientConfig(clientId) {
 
 /** 重置设备配置为全部继承全局 */
 async function resetClientConfig(clientId) {
-  if (!confirm('确定要重置该设备的所有远程配置吗？重置后将全部继承全局配置。')) return;
+  if (!confirm(t('config.confirm_reset', '确定要重置该设备的所有远程配置吗？重置后将全部继承全局配置。'))) return;
   const r = await api(`/admin/clients/${clientId}/config/reset`, { method: 'POST' });
   if (!r.error) {
     toast(t('settings.device_config_reset', '设备配置已重置'), 'success');

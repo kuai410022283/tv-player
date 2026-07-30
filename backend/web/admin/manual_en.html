@@ -29,14 +29,7 @@
     color: var(--text);
     padding: 32px;
   }
-  .content {
-    background: #fff;
-    padding: 40px;
-    border-radius: var(--radius);
-    max-width: 1000px;
-    margin: 0 auto;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-  }
+
   .content h1 {
     font-size: 24px;
     font-weight: 600;
@@ -50,6 +43,8 @@
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border);
   }
+
+  /* ── TOC ── */
   .toc-box {
     background: #f8f9fa;
     border: 1px solid var(--border);
@@ -76,6 +71,7 @@
     display: inline-block;
   }
   .toc-box a:hover { text-decoration: underline; }
+
   .content h2 {
     font-size: 20px;
     font-weight: 600;
@@ -88,6 +84,12 @@
     font-size: 16px;
     font-weight: 600;
     margin: 24px 0 10px;
+    color: var(--text);
+  }
+  .content h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 18px 0 8px;
     color: var(--text);
   }
   .content p {
@@ -103,6 +105,32 @@
     color: #444;
   }
   .content li { margin-bottom: 4px; }
+
+  .content code {
+    font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #d63384;
+  }
+  .content pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0 20px;
+  }
+  .content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
   .note, .tip, .warning {
     padding: 14px 18px;
     border-radius: var(--radius);
@@ -114,6 +142,27 @@
   .note { background: #f0f9ff; border-color: var(--info); color: #1a5a8c; }
   .tip { background: #f0faf5; border-color: var(--accent); color: #1a7a6a; }
   .warning { background: #fff8e6; border-color: var(--warn); color: #8a6a00; }
+  .note strong, .tip strong, .warning strong { color: inherit; }
+
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 14px;
+  }
+  .content th, .content td {
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+  }
+  .content th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: var(--text2);
+  }
+  .content tr:hover td { background: #fafafa; }
+
+  .hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
   .back-to-top {
     display: block;
     text-align: right;
@@ -123,67 +172,728 @@
     margin-top: 16px;
   }
   .back-to-top:hover { text-decoration: underline; }
+
+  @media (max-width: 768px) {
+    body { padding: 16px; }
+    .content { padding: 24px 20px; }
+    .toc-box .toc-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
 <div class="content">
-  <h1>User Manual</h1>
-  <p class="subtitle">MediaPlayer Administration Panel — Comprehensive Operation Guide</p>
 
-  <div class="toc-box">
-    <div class="toc-title">Table of Contents</div>
-    <div class="toc-grid">
-      <a href="#intro">1. Getting Started</a>
-      <a href="#dashboard">2. Dashboard</a>
-      <a href="#channels">3. Channels Management</a>
-      <a href="#groups">4. Groupings</a>
-      <a href="#sources">5. M3U Source Management</a>
-      <a href="#streams">6. Active Streams</a>
-      <a href="#clients">7. Devices Authorization</a>
-      <a href="#plans">8. Subscription Plans</a>
-      <a href="#logs">9. Access Logs</a>
-    </div>
+<h1>User Manual</h1>
+<p class="subtitle">MediaPlayer Admin — Complete Function Guide & Operation Manual</p>
+
+<!-- ═══ TOC ═══ -->
+<div class="toc-box">
+  <div class="toc-title">Table of Contents</div>
+  <div class="toc-grid">
+    <a href="#intro">Quick Start</a>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#channels">Channel Management</a>
+    <a href="#groups">Group Management</a>
+    <a href="#sources">M3U Source Management</a>
+    <a href="#streams">Active Streams</a>
+    <a href="#clients">Device Management</a>
+    <a href="#plans">Plan Management</a>
+    <a href="#client-logs">Access Logs</a>
+    <a href="#settings">Global Settings</a>
+    <a href="#update">System Update</a>
+    <a href="#sync">Master-Backup Sync</a>
+    <a href="#system-logs">System Logs</a>
+    <a href="#client-usage">Client Usage Guide</a>
+    <a href="#faq">FAQ</a>
   </div>
+</div>
 
-  <h2 id="intro">1. Getting Started</h2>
-  <p>MediaPlayer is a smart media server designed for managing IPTV streaming resources. It consolidates massive raw live stream URLs (M3U) and EPG XML files into a highly responsive, customized subscription channel list for TV clients.</p>
-  <div class="tip">
-    <strong>Tip:</strong> Always configure at least one channel group before importing live sources.
-  </div>
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 1. Quick Start ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="intro">Quick Start</h2>
 
-  <h2 id="dashboard">2. Dashboard</h2>
-  <p>The dashboard provides real-time statistics regarding your IPTV server health:
-    <ul>
-      <li><strong>Total Channels:</strong> Aggregate count of imported playback links.</li>
-      <li><strong>Online Channels:</strong> Active channels currently validated by the system.</li>
-      <li><strong>Active Streams:</strong> Number of client devices currently fetching live streams.</li>
-      <li><strong>Authorized Devices:</strong> Total device profiles registered on this console.</li>
-    </ul>
-  </p>
+<h3>Login to Dashboard</h3>
+<p>Open <code>http://YOUR_SERVER_IP:PORT/admin/</code> in your browser and enter the admin password to log in.</p>
+<div class="tip">
+  <strong>Default Password:</strong> <code>admin123</code>, which can be modified via the environment variable <code>ADMIN_PASSWORD</code>. It is highly recommended to change the password immediately after your first login.
+</div>
 
-  <h2 id="channels">3. Channels Management</h2>
-  <p>Add, edit, or remove channels individually. Each channel can be assigned custom stream link lines, EPG mappings, logo images, and specific decoder modes (hardware/software/ExoPlayer/VLC).</p>
+<h3>UI Overview</h3>
+<p>The admin panel uses a sidebar navigation + right content area layout. The sidebar navigation is grouped by function modules. Click on any item to switch pages. The version number displayed at the top indicates the current server-side version.</p>
+<ul>
+  <li><strong>Dashboard</strong> — System overview displaying channel, device, and stream statistics</li>
+  <li><strong>Content Management</strong> — Core management of channels, groups, and M3U sources</li>
+  <li><strong>Client Licensing</strong> — Device management, plan management, and access logs</li>
+  <li><strong>System Settings</strong> — Global settings, system update, master-backup sync, and system logs</li>
+</ul>
 
-  <h2 id="groups">4. Groupings</h2>
-  <p>Groupings organize channels into categories (e.g., Sports, Movies, News). Group names will display directly as channel list categories on the TV client UI.</p>
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
 
-  <h2 id="sources">5. M3U Source Management</h2>
-  <p>Import bulk playlist sources via M3U files or remote HTTP links. The system automatically parses these files and allows you to bind channel sources to specific groups in bulk.</p>
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 2. Dashboard ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="dashboard">Dashboard</h2>
+<p>The Dashboard is the home page of the administration portal, showing critical system operational indicators to help administrators quickly understand system status.</p>
 
-  <h2 id="streams">6. Active Streams</h2>
-  <p>Lists all live streaming sessions currently active on the server. You can monitor device IPs, cache durations, and choose to forcibly terminate unauthorized streams.</p>
+<h3>Statistical Indicators</h3>
+<ul>
+  <li><strong>Total Channels / Online</strong> — The total size of the channel library and the number of currently playable channels</li>
+  <li><strong>Active Streams</strong> — The number of proxy stream sessions currently being pulled by clients</li>
+  <li><strong>Authorized Devices / Pending</strong> — The number of approved devices and devices waiting for approval</li>
+  <li><strong>Online Devices</strong> — The number of devices with active connections in the last 5 minutes</li>
+  <li><strong>M3U/TXT Sources</strong> — The number of configured external playlist sources</li>
+  <li><strong>Total Play Time</strong> — Cumulative play time across all devices</li>
+  <li><strong>Uptime / Memory Usage</strong> — Server running time and current memory usage</li>
+</ul>
 
-  <h2 id="clients">7. Devices Authorization</h2>
-  <p>Devices must be registered and approved before accessing subscriptions. You can grant access by copying base64 config lines, binding devices to specific subscription plans, or setting absolute expiration dates.</p>
+<h3>Recent Access Records</h3>
+<p>The "Recent Access" table at the bottom of the dashboard displays the latest operations from devices, including channels played, IP addresses, operation times, etc. Click the "Refresh" button to load the latest data.</p>
 
-  <h2 id="plans">8. Subscription Plans</h2>
-  <p>Manage subscription packages. A plan determines which channel groups are accessible to the associated devices, pricing info, and stream limits.</p>
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
 
-  <h2 id="logs">9. Access Logs</h2>
-  <p>Tracks system events, backend terminal outputs, and client device connection status records. Great for troubleshooting buffering or authentication errors.</p>
-  
-  <a href="#" class="back-to-top">Back to Top ↑</a>
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 3. Channel Management ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="channels">Channel Management</h2>
+<p>Channel Management is the core functional module of the administration panel. It supports channel creation, modification, deletion, ordering, health checks, and batch operations.</p>
+
+<h3>Channel List</h3>
+<p>The channel list displays all channels in a table format, showing channel name, group, stream URL, source, stream format, direct/multiplex status, and enabled status. It supports search by name and filtering by source.</p>
+
+<h3>Add Channel</h3>
+<ol>
+  <li>Click the <strong>「+ Add Channel」</strong> button in the top right corner.</li>
+  <li><strong>Name</strong> — Fill in the channel name.</li>
+  <li><strong>Group</strong> — Select the group this channel belongs to.</li>
+  <li><strong>Stream URL</strong> — Enter the media stream URL (supports formats like HLS, TS, FLV, RTMP, RTSP, MP4, DASH, etc., and also supports local file paths).</li>
+  <li><strong>Stream Type</strong> — Manually specify the stream format (e.g., hls, ts, mp4), leave blank for auto-detection.</li>
+  <li><strong>Content Type</strong> — Choose "Live" or "VOD", leave blank for auto-detection.</li>
+  <li><strong>Enable Channel</strong> — Toggle control. When off, the channel will not appear in clients or subscription lists.</li>
+  <li><strong>Direct Mode</strong> — When enabled, the client connects directly to the original stream URL to play without proxying through the server.</li>
+  <li><strong>Multiplex Stream</strong> — When enabled, if multiple clients watch the same channel, the server only pulls one stream from the source, saving server bandwidth (requires Direct Mode to be turned off).</li>
+  <li><strong>Logo URL</strong> — Set the channel logo image address.</li>
+  <li><strong>EPG Channel ID</strong> — Set the channel identifier in the EPG program guide to match program data.</li>
+  <li><strong>User-Agent</strong> — Custom User-Agent for requests, overriding group and source settings.</li>
+  <li><strong>Custom Request Headers</strong> — Custom request headers in JSON format, e.g., <code>{"Referer": "https://example.com"}</code>.</li>
+  <li><strong>Custom FCC Server</strong> — Set the dedicated FCC (millisecond channel switching) server address for this channel.</li>
+  <li><strong>Custom FCC Protocol</strong> — Select the FCC protocol type (Telecom, ZTE, Huawei, etc.).</li>
+  <li><strong>Proxy Type</strong> — Configure SOCKS5 proxy, supporting: Inherit Group settings, Bypass Proxy, or Custom SOCKS5.</li>
+  <li><strong>Sort</strong> — Smaller numbers appear first.</li>
+  <li>Click 「Save」.</li>
+</ol>
+<div class="tip">
+  <strong>Content Type Description:</strong> In Live mode, clients do not support pause or progress bar seeking; in VOD mode, clients support pause, seeking, audio track switching, and subtitle switching. If a wrong type is selected, client functionalities may malfunction. Leaving it blank for auto-detection is recommended when unsure.
+</div>
+<div class="tip">
+  <strong>Stream URL Description:</strong> Supports network URLs and local file paths (requires "Allow Local File Paths" to be enabled in Global Settings). Network URLs support http/https, rtmp, rtsp, udp, rtp, etc.
+</div>
+
+<h3>Edit Channel</h3>
+<p>Click on any row in the channel list to open the editing modal. The editing modal also provides the following feature:</p>
+<ul>
+  <li><strong>Mirror Clone</strong> — Clone this channel to other sources and groups. The cloned channels will automatically sync their stream URLs with the primary channel. Useful when a channel exists in multiple sources and needs to be synchronized.</li>
+</ul>
+
+<h3>Channel Enable/Disable</h3>
+<p>Each channel has an "Enable" switch:</p>
+<ul>
+  <li><strong>Enabled</strong> — Channel displays normally in client lists and subscription exports.</li>
+  <li><strong>Disabled</strong> — Channel is hidden from clients and subscription exports, but remains visible in the admin panel for easy re-enabling.</li>
+</ul>
+<div class="tip">
+  <strong>Difference from Delete:</strong> Disabling is a soft toggle that can be reverted at any time. Deleting is permanent. It is recommended to disable instead of deleting if you might need the channel again.
+</div>
+
+<h3>Direct Mode</h3>
+<p>When enabled, clients connect directly to the source stream URL to play, bypassing server proxying.</p>
+<ul>
+  <li><strong>Scenario:</strong> Clients can directly access the source URL (e.g., public streams).</li>
+  <li><strong>Pros:</strong> Saves server bandwidth.</li>
+  <li><strong>Cons:</strong> Cannot gather playback statistics, and proxy routing cannot be used.</li>
+  <li><strong>Group Default Direct Mode:</strong> Group settings can define a default direct mode for all channels under that group.</li>
+</ul>
+
+<h3>Multiplex Stream (Multiplex)</h3>
+<p>When enabled, when multiple clients play the same channel, the server only pulls a single stream from the source and distributes it to all clients, saving a significant amount of bandwidth.</p>
+<div class="note">
+  <strong>Note:</strong> Multiplexing requires Direct Mode to be disabled, and the stream format must be proxied (e.g., TS, HLS). Protocols like RTSP do not support multiplexing.
+</div>
+
+<h3>Proxy Configuration (SOCKS5)</h3>
+<p>The system supports a 3-tier proxy configuration inheritance hierarchy: <strong>Channel → Group → Source</strong>, sorted by priority.</p>
+<ul>
+  <li><strong>Inherit Group Settings</strong> — Uses the proxy configured on the group level.</li>
+  <li><strong>Direct (Override Inherited)</strong> — Forces no proxy, bypassing upper-level configurations.</li>
+  <li><strong>SOCKS5</strong> — Custom SOCKS5 proxy address, format: <code>socks5://user:pass@host:port</code>.</li>
+</ul>
+<p>In the channel editor, you can customize the proxy settings to override group and source default options.</p>
+
+<h3>Channel Sorting</h3>
+<p>Hover and drag the <strong>「Move」</strong> column in the channel list to adjust the channel order. Once adjusted, click the orange <strong>「Save Sort」</strong> button in the top right corner to apply.</p>
+
+<h3>Health Check</h3>
+<p>Click the <strong>「Health Check」</strong> button and set the expected completion time. The system will detect if all channels are playable one by one. The detection uses a smooth rolling mechanism to avoid high concurrency requests to the source.</p>
+<div class="tip">
+  <strong>Suggestion:</strong> Health checks consume network bandwidth and source server resources. It is recommended to perform them during off-peak hours to avoid affecting user playbacks.
+</div>
+
+<h3>Batch Actions</h3>
+<p>Check multiple channels and click <strong>「Batch Actions」</strong> to perform the following operations:</p>
+<ul>
+  <li><strong>Batch Enable</strong> — Enable all selected channels.</li>
+  <li><strong>Batch Disable</strong> — Disable all selected channels (hidden from clients and exports).</li>
+  <li><strong>Batch Delete</strong> — Delete all selected channels (permanent).</li>
+</ul>
+<div class="warning">
+  <strong>Warning:</strong> Deleting channels is irreversible. Please operate with caution. Disabling is recommended instead of deleting.
+</div>
+
+<h3>Search & Filter</h3>
+<ul>
+  <li><strong>Search Box</strong> — Fuzzy search by channel name.</li>
+  <li><strong>Source Filter</strong> — Select specific sources (such as "Manual" or a specific "M3U Source Name") to filter lists.</li>
+</ul>
+
+<h3>Channel Source</h3>
+<p>The channel list displays the channel source, showing whether the channel was manually added or imported via M3U sync. The source property cannot be manually modified.</p>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 4. Group Management ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="groups">Group Management</h2>
+<p>Groups are used to classify and organize channels. Clients will also display channels grouped accordingly.</p>
+
+<h3>Add Group</h3>
+<ol>
+  <li>Click the <strong>「+ Add Group」</strong> button.</li>
+  <li><strong>Name</strong> — Enter the group name.</li>
+  <li><strong>Sort</strong> — Smaller numbers appear first.</li>
+  <li><strong>Group-wide Direct Mode</strong> — When enabled, all channels in this group default to Direct Mode.</li>
+  <li><strong>Group-wide Multiplexing</strong> — When enabled, all channels in this group default to Multiplexing (requires all channels in the group to support proxying).</li>
+  <li><strong>User-Agent</strong> — Default User-Agent for all channels under this group.</li>
+  <li><strong>Custom Request Headers</strong> — Default request headers for all channels under this group.</li>
+  <li><strong>Proxy Type</strong> — Default proxy configuration for all channels under this group.</li>
+  <li>Click 「Save」.</li>
+</ol>
+<div class="note">
+  <strong>Inheritance Notice:</strong> Parameters configured on the group level (such as User-Agent, custom request headers, and proxy settings) will be overridden by channel-level custom settings. If a channel has no custom settings, it will inherit these group defaults.
+</div>
+
+<h3>Group Sorting</h3>
+<p>Similar to channel sorting, drag the 「Move」 column to adjust order and click 「Save Sort」.</p>
+
+<h3>Batch Actions</h3>
+<p>Select groups and click 「Batch Actions」 to delete the groups along with all channels inside them (permanent).</p>
+<div class="warning">
+  <strong>Warning:</strong> Deleting a group will also delete all channels under that group. This action is irreversible.
+</div>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 5. M3U Source Management ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="sources">M3U Source Management</h2>
+<p>Supports auto-pulling channel and group data from external M3U/TXT subscriptions, facilitating automated channel library management.</p>
+
+<h3>Add Source</h3>
+<ol>
+  <li>Click the <strong>「+ Add Source」</strong> button.</li>
+  <li><strong>Source Name</strong> — Name of this source for identification.</li>
+  <li><strong>URL</strong> — Remote M3U/TXT file URL.</li>
+  <li><strong>Auto Sync</strong> — When enabled, the system periodically updates data at the set interval.</li>
+  <li><strong>Sync Interval</strong> — Time interval in hours for auto-sync.</li>
+  <li><strong>User-Agent</strong> — User-Agent used when pulling the source URL, also serving as the default User-Agent for channels imported from this source.</li>
+  <li><strong>Custom Request Headers</strong> — Request headers added when pulling the source.</li>
+  <li><strong>Proxy Type</strong> — SOCKS5 proxy configuration for pulling the source.</li>
+  <li>Click 「Save」.</li>
+</ol>
+<div class="tip">
+  <strong>Suggestion:</strong> The sync interval should not be too short (recommended: at least 6 hours). Frequent requests may lead to IP bans or rate limiting from the source site.
+</div>
+
+<h3>Paste & Import</h3>
+<p>Click the <strong>「Paste & Import」</strong> button to copy M3U text or upload local .m3u/.m3u8/.txt files:</p>
+<ul>
+  <li><strong>Format as Standard M3U</strong> — Automatically format content to standard M3U (with #EXTINF tags).</li>
+  <li><strong>Format as Minimal TXT</strong> — Automatically format content to simplified TXT format (one URL per line).</li>
+  <li><strong>Import Source File</strong> — Upload a local .m3u/.m3u8/.txt file directly.</li>
+</ul>
+
+<h3>Manual Sync</h3>
+<p>Click the <strong>「Sync」</strong> button in the source list to manually trigger a sync immediately, without waiting for the next schedule.</p>
+
+<div class="note">
+  <strong>Note:</strong> After adding a source, channels and groups are created automatically. Deleting the source will not delete the created channels and groups automatically; they must be cleaned up manually.
+</div>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 6. Active Streams ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="streams">Active Streams</h2>
+<p>Real-time view of all media streams currently being proxied by the server. Each session shows:</p>
+<ul>
+  <li><strong>Session / Device</strong> — Identification of the playing device.</li>
+  <li><strong>Channel</strong> — Name of the channel being played.</li>
+  <li><strong>Original URL</strong> — Source stream URL.</li>
+  <li><strong>Status / Speed</strong> — Connection status and real-time data transfer speed.</li>
+  <li><strong>Start / Active Time</strong> — Session start time and latest active time.</li>
+</ul>
+<p>Supports manually disconnecting specific sessions. Click 「Refresh」 to update the list.</p>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 7. Device Management ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="clients">Device Management</h2>
+<p>Manage all connected client devices, supporting approval, licensing, banning, and details viewing.</p>
+
+<h3>Device Statuses</h3>
+<ul>
+  <li><strong>Pending</strong> — New device registered, requiring manual approval (unless Auto Approve is enabled).</li>
+  <li><strong>Approved</strong> — Devices authorized to play streams.</li>
+  <li><strong>Rejected</strong> — Devices rejected by the administrator.</li>
+  <li><strong>Banned</strong> — Banned devices, blocked from accessing the server.</li>
+  <li><strong>Expired</strong> — Authorized devices whose licensing validity has expired.</li>
+</ul>
+
+<h3>Approve Device</h3>
+<ol>
+  <li>Click the <strong>「Approve」</strong> button next to the device in the pending list.</li>
+  <li>Choose a plan to bind (optional), or manually enter the validity days and maximum simultaneous streams.</li>
+  <li>Confirm the approval.</li>
+</ol>
+<div class="note">
+  <strong>Note:</strong> Binding a plan makes the device inherit the validity and concurrent stream limits from the plan. If the plan content is modified later, already approved devices will not update automatically; they must be re-bound.
+</div>
+
+<h3>Device Details</h3>
+<p>Click the <strong>「Details」</strong> button to view comprehensive device metadata:</p>
+<ul>
+  <li><strong>Device Name</strong> — Model name of the device (e.g., Xiaomi MiBox).</li>
+  <li><strong>Device ID</strong> — Unique hardware identifier.</li>
+  <li><strong>IP Address</strong> — Current IP address used by the device.</li>
+  <li><strong>IP Location</strong> — Geographical location parsed from the IP.</li>
+  <li><strong>OS Version</strong> — OS version running on the device.</li>
+  <li><strong>Client Version</strong> — App version number.</li>
+  <li><strong>NIC Name</strong> — Network interface name used by the device.</li>
+  <li><strong>Remarks</strong> — Custom notes added by the administrator.</li>
+  <li><strong>Plan</strong> — Current plan name bound.</li>
+  <li><strong>Expiry Time</strong> — Expiration time of the authorization.</li>
+  <li><strong>Simultaneous Connections</strong> — Maximum concurrent connections allowed.</li>
+  <li><strong>Traffic Used</strong> — Cumulative bandwidth traffic used by the device.</li>
+  <li><strong>Last Active</strong> — Latest heartbeat or access time.</li>
+</ul>
+
+<h3>Tester Mark</h3>
+<p>Devices marked as <strong>「Tester」</strong> are not restricted by System Maintenance Mode, allowing administrators to debug and test settings during maintenance.</p>
+
+<h3>Batch Actions</h3>
+<p>Select multiple devices to batch approve, reject, ban, or delete.</p>
+<div class="warning">
+  <strong>Warning:</strong> Ban and delete operations take effect immediately. Banned devices' tokens are invalidated instantly, causing clients to disconnect. Batch operations cannot be undone.
+</div>
+
+<h3>Filter & Search</h3>
+<p>Filter devices by status, or search by device name, IP, or ID.</p>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 8. Plan Management ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="plans">Plan Management</h2>
+<p>Plans are used to manage device authorizations in batches, defining validity days, concurrent connection limits, and channel group access permissions.</p>
+
+<h3>Create Plan</h3>
+<ol>
+  <li>Click the <strong>「+ Add Plan」</strong> button.</li>
+  <li><strong>Plan Name</strong> — Name of the plan.</li>
+  <li><strong>Validity (Days)</strong> — Number of valid days for device authorization.</li>
+  <li><strong>Simultaneous Connections</strong> — Maximum concurrent streams allowed per device.</li>
+  <li><strong>Price</strong> — Optional, for display purposes only.</li>
+  <li><strong>Description</strong> — Optional, description text of the plan.</li>
+  <li><strong>Allowed Channel Groups</strong> — Select the groups this plan can access (drag to sort). Leaving all unselected blocks all channel access.</li>
+  <li>Once saved, the system automatically generates an M3U/TXT subscription token for the plan.</li>
+</ol>
+
+<h3>Subscription Links</h3>
+<p>Plans support generating M3U/TXT subscription URLs for direct import into third-party players (e.g., VLC, Tivimate).</p>
+<div class="tip">
+  <strong>Prerequisite:</strong> The "External Subscription" feature must be enabled in Global Settings. Subscription URLs use dedicated validation tokens to isolate device tokens and maintain security.
+</div>
+
+<div class="note">
+  <strong>Note:</strong> Modifying plan details (validity, concurrent limits, associated groups) does not automatically update existing devices already bound to the plan. They must be re-bound to apply the new settings.
+</div>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 9. Access Logs ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="client-logs">Access Logs</h2>
+<p>View all client operation history, including actions like play, pause, and stop. Each log entry shows:</p>
+<ul>
+  <li><strong>Client ID</strong> — Device identification.</li>
+  <li><strong>Action</strong> — E.g., play, pause, stop.</li>
+  <li><strong>Channel Name</strong> — The channel operated.</li>
+  <li><strong>IP Address</strong> — Client IP address.</li>
+  <li><strong>Details</strong> — Detailed metadata of the operation.</li>
+  <li><strong>Time</strong> — Operation timestamp.</li>
+</ul>
+<p>Supports pagination and manual refresh.</p>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 10. Global Settings ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="settings">Global Settings</h2>
+<p>The Global Settings page contains multiple configuration modules grouped by functionality.</p>
+
+<h3>Server Auth & Network Configuration</h3>
+<ul>
+  <li><strong>Server Name</strong> — Custom server name displayed on the client UI (max 20 chars, leave blank to hide).</li>
+  <li><strong>App Display Name</strong> — Desktop icon name of the client app, defaults to "MediaPlayer". Changes take effect on next client startup (Note: Only applies to Android TV launchers like Xiaomi, Dangbei, etc., not standard Android mobile/emulator launchers).</li>
+  <li><strong>Custom External Server URL</strong> — External server URL for client connections, leave blank to auto-detect.</li>
+  <li><strong>Backup Server URLs</strong> — Backup addresses client will try sequentially if the main address fails (one per line).</li>
+  <li><strong>Authorization Key</strong> — Base64-encoded string required by clients to register with the server, copyable directly.</li>
+</ul>
+
+<h3>Subscription Settings</h3>
+<p>When the external subscription feature is enabled, you can copy M3U/TXT subscription links on the 「Plan Management」 page and share them with users for direct import into third-party players (e.g., VLC, Tivimate).</p>
+
+<h3>Channel Source Settings</h3>
+<p>When "Allow Local File Paths" is enabled, channel stream URLs can use protocols like <code>file://</code>, <code>ftp://</code>, <code>webdav://</code>, etc.</p>
+
+<h3>Device Authorization Settings</h3>
+<ul>
+  <li><strong>Auto Approve</strong> — Automatically approve new device registrations. You can choose to bind a default plan or configure default parameters.</li>
+  <li><strong>Default Simultaneous Connections</strong> — Connection limit for auto-approved devices.</li>
+  <li><strong>Default Validity (Days)</strong> — Validity days for auto-approved devices (0 = never expires).</li>
+</ul>
+
+<h3>Client Announcement Settings</h3>
+<p>Set a system announcement (marquee text). The announcement text will scroll across the top of the client screen. You can set the broadcast interval in seconds (0 means show only once at startup and when switching channels).</p>
+
+<h3>EPG Source Settings</h3>
+<ul>
+  <li><strong>EPG Source URLs</strong> — Supports multiple XMLTV format sources (one per line), supporting .xml and .gz formats.</li>
+  <li><strong>Auto Refresh Interval</strong> — Interval in hours for periodically fetching EPG data.</li>
+  <li><strong>Global Time Shift</strong> — Time offset to adjust EPG program times (positive value delays, negative value advances), used to correct timezone discrepancies.</li>
+  <li>Click 「Force Pull EPG」 to trigger an immediate EPG update.</li>
+</ul>
+
+<h3>Channel Logo Cache Settings</h3>
+<ul>
+  <li><strong>Logo Policy</strong> — Select logo lookup priority: <strong>Local First</strong> (look up in local directory first), <strong>Source First</strong> (prioritize external URL logos), <strong>API First</strong> (prioritize logos provided by API interfaces).</li>
+  <li><strong>Logo Repository Directory</strong> — Path to the logo package directory. The system automatically matches channel names to pull corresponding logo files.</li>
+  <li>Supports caching existing external logos, incremental pulling (new channels only), and full overwrite pulling (pulling all logos again).</li>
+</ul>
+
+<h3>Boot Advertisement / Splash Settings</h3>
+<p>Configure advertisements shown to users when the client app launches:</p>
+<ul>
+  <li><strong>Mode</strong> — Image mode or Video mode.</li>
+  <li><strong>Media URL</strong> — Address of the image or video file.</li>
+  <li><strong>Max Show Duration</strong> — Maximum duration in seconds before the ad closes automatically.</li>
+  <li><strong>Skip Delay</strong> — Seconds before the user is allowed to press OK to skip the ad.</li>
+</ul>
+<div class="warning">
+  <strong>Warning:</strong> Do not fill in live stream URLs (like m3u8) here. It will cause severe app lag during startup.
+</div>
+
+<h3>OTA Online Upgrade Settings</h3>
+<p>Configure client online upgrade notifications:</p>
+<ul>
+  <li><strong>Latest Version Code</strong> — Clients with a version code smaller than this value will be prompted to upgrade.</li>
+  <li><strong>Display Version Name</strong> — E.g., v1.2.0.</li>
+  <li><strong>APK Download URL</strong> — Direct download link of the new APK package.</li>
+  <li><strong>Changelog</strong> — Description of fixes and new features in the new release.</li>
+  <li><strong>Force Update</strong> — When enabled, the client app cannot be used without completing the upgrade.</li>
+</ul>
+
+<h3>FCC Millisecond Channel Switching</h3>
+<p>Fast Channel Change feature. When enabled, UDP multicast streams are utilized to achieve millisecond-level channel switching experiences.</p>
+<ul>
+  <li><strong>FCC Server Port Range</strong> — Port range for UDP data transfers (start and end ports).</li>
+  <li><strong>Default FCC Server</strong> — Default FCC server address.</li>
+  <li><strong>FCC Vendor Protocol</strong> — Select FCC protocol type (Telecom, ZTE, Huawei, etc.).</li>
+</ul>
+<div class="warning">
+  <strong>Important:</strong> FCC requires the Docker container to run in <code>network_mode: host</code> or <code>macvlan</code>, and the UDP port range must be mapped/forwarded in your router settings.
+</div>
+
+<h3>System Maintenance Mode</h3>
+<p>When enabled, non-tester devices will see a full-screen maintenance notice and playback will stop. This allows administrators to perform server maintenance or upgrades. Devices marked as "Tester" are exempt from this restriction.</p>
+
+<div class="note">
+  <strong>Tips:</strong> After modifying the admin password, current sessions will remain active until you log out. If the server address is modified, already distributed authorization keys will need to be re-copied.
+</div>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 11. System Update ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="update">System Update</h2>
+<p>The System Update page shows the current server version and supports fetching the latest release metadata from GitHub.</p>
+<ul>
+  <li>If deploying via Docker, it is recommended to use tools like Watchtower to automatically pull the latest image.</li>
+  <li>Supports choosing specific versions (Tags) and corresponding architecture packages.</li>
+  <li>Features built-in GitHub download proxy configurations to accelerate download speeds.</li>
+  <li>Supports direct downloading to client packages or the server local environment.</li>
+</ul>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 12. Master-Backup Sync ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="sync">Master-Backup Sync</h2>
+<p>Master-Backup Sync is used to establish multi-node architectures, enabling data hot backup and load balancing.</p>
+
+<h3>Master Server Settings</h3>
+<ol>
+  <li>Set the <strong>Sync Serve Token</strong> for data pulling authorization, which will be used by backup nodes.</li>
+  <li>Once saved, backup nodes can use this Token to pull configurations from the master node.</li>
+</ol>
+
+<h3>Backup Node Settings</h3>
+<ol>
+  <li>Enable <strong>「Run as Backup Edge Node」</strong>.</li>
+  <li>Fill in the <strong>Master Node URL</strong>.</li>
+  <li>Fill in the <strong>Master Sync Token</strong> (i.e., the Sync Serve Token configured on the master server).</li>
+  <li>Set the <strong>Auto Sync Interval</strong> in minutes.</li>
+  <li>Save the configuration.</li>
+</ol>
+<div class="warning">
+  <strong>Warning:</strong> 「Force Overwrite Pull Immediately」 is a dangerous operation. It will immediately overwrite all data on the current backup node (including channels, groups, devices, and plans) with the master node's data.
+</div>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 13. System Logs ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="system-logs">System Logs</h2>
+<p>The System Logs page supports viewing two types of logs:</p>
+<ul>
+  <li><strong>Terminal Log</strong> — Real-time server-side execution logs, used for server troubleshooting.</li>
+  <li><strong>Client Log</strong> — Upstream execution logs uploaded from specific client devices, used for client troubleshooting.</li>
+</ul>
+<p>Features:</p>
+<ul>
+  <li>Supports auto-refresh interval selection (from 3 seconds to 5 minutes).</li>
+  <li>Supports exporting current logs to a file.</li>
+  <li>Supports deleting client log files from the server.</li>
+</ul>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 14. Client Usage Guide ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="client-usage">Client Usage Guide</h2>
+<p>The following instructions apply to the Android TV / Mobile client application.</p>
+
+<h3>Connect to Server</h3>
+<ol>
+  <li>Launch the client app for the first time to enter the server configuration interface.</li>
+  <li>Enter the <strong>Authorization Key</strong> provided by the administrator (which can be copied as a Base64 string at the top of the 「Global Settings」 page in the admin panel).</li>
+  <li>The client will automatically parse the server address and token to complete the connection.</li>
+  <li>Once connected, the channel playlist will load automatically.</li>
+</ol>
+<div class="tip">
+  <strong>Tip:</strong> If the server address changes in the future, you only need to get a new authorization key and update it in the client settings, without reinstalling the app.
+</div>
+
+<h3>Channel Navigation & Switching</h3>
+<ul>
+  <li><strong>Channel List</strong> — Categorized by groups. Press Left/Right to switch groups, and Up/Down to navigate channels.</li>
+  <li><strong>Number Pad Switching</strong> — Input channel numbers directly via the remote control number pad to switch.</li>
+  <li><strong>EPG Guide</strong> — View current and upcoming program schedules in the channel list (requires EPG sources configuration).</li>
+  <li><strong>Favorites</strong> — Add frequently watched channels to your favorites list for quick access.</li>
+  <li><strong>Playback Catch-up</strong> — For channels supporting catch-up, select past programs from the EPG list to playback.</li>
+</ul>
+
+<h3>Live Mode Controls</h3>
+<ul>
+  <li><strong>OSD Panel</strong> — Press the OK key to show. Press OK again to play/pause (play/pause is only supported in VOD mode).</li>
+  <li><strong>Volume Control</strong> — Use the remote control volume keys to adjust.</li>
+  <li><strong>Info Display</strong> — The OSD panel displays the current channel name, program details, clock, etc.</li>
+  <li><strong>OSD Auto Hide</strong> — The panel automatically hides after 10 seconds of inactivity.</li>
+</ul>
+<div class="note">
+  <strong>Notice:</strong> Pause and progress bar seeking are not supported in Live mode. If you need these features, the channel content type must be configured as VOD (Video on Demand).
+</div>
+
+<h3>VOD Mode Controls</h3>
+<ul>
+  <li><strong>Play / Pause</strong> — Press OK to toggle (triggered by the second OK press when OSD is visible).</li>
+  <li><strong>Progress Seeking</strong> — Press Left/Right direction keys to seek backward/forward on the progress bar.</li>
+  <li><strong>Audio Tracks</strong> — Click the 「Audio Track」 button on the OSD panel to select from available audio tracks.</li>
+  <li><strong>Subtitles</strong> — Click the 「Subtitles」 button on the OSD panel to select from available subtitle tracks.</li>
+  <li><strong>Progress Bar</strong> — The OSD panel displays current playback progress and total video duration.</li>
+  <li><strong>Loop Playback</strong> — Automatically restarts playback from the beginning when a video ends, preventing black screens.</li>
+</ul>
+<div class="tip">
+  <strong>Tip:</strong> Audio track and subtitle buttons only appear if the channel stream contains multiple audio tracks or at least one subtitle track. They will not show if there is only one audio track and no subtitles.
+</div>
+
+<h3>Remote Control Key Definitions</h3>
+<ul>
+  <li><strong>OK Key</strong> — First press shows OSD (without pausing). Second press when OSD is visible toggles play/pause.</li>
+  <li><strong>Left / Right Keys</strong> — Switch focus when OSD buttons are focused; adjust progress bar when no buttons are focused (VOD mode).</li>
+  <li><strong>Up / Down Keys</strong> — Navigate the channel list.</li>
+  <li><strong>Back Key</strong> — Return to the channel list or exit the application.</li>
+  <li><strong>Number Keys 0-9</strong> — Fast switch channels by entering channel numbers.</li>
+</ul>
+
+<h3>Client Settings</h3>
+<p>The client settings panel provides the following adjustments:</p>
+
+<h4>Screen Ratio</h4>
+<p>Supports multiple aspect ratio modes: Fit, 16:9 Stretch, Crop, Force 4:3, Force 16:10, and Fill Screen. Adjust this setting if the screen aspect ratio seems distorted.</p>
+
+<h4>Decoder Mode</h4>
+<ul>
+  <li><strong>Auto</strong> — The system automatically chooses the best decoder.</li>
+  <li><strong>Hardware Decoder</strong> — Force hardware decoding. Offers high performance but might not support all stream formats.</li>
+  <li><strong>Software Decoder</strong> — Force software decoding. High compatibility but increases CPU usage and power consumption.</li>
+</ul>
+<div class="tip">
+  <strong>Suggestion:</strong> Try switching decoder modes if you experience playback lags or screen tearing. Hardware decoding is efficient, while software decoding is highly compatible.
+</div>
+
+<h4>Player Engine</h4>
+<ul>
+  <li><strong>Auto</strong> — Automatically select the best player engine based on the channel format.</li>
+  <li><strong>ExoPlayer</strong> — Google's official player engine, offering stable performance.</li>
+  <li><strong>MPV</strong> — MPV-based player engine, providing broader compatibility.</li>
+</ul>
+
+<h4>Channel Switch Mode</h4>
+<ul>
+  <li><strong>Fluid Mode</strong> — Faster switching. Does not reset the player engine, ideal for switching between channels of the same format.</li>
+  <li><strong>Compatible Mode</strong> — More stable. Fully resets the player engine on each channel change, ideal for switching between vastly different stream formats.</li>
+</ul>
+
+<h4>Local Proxy</h4>
+<p>Used for local proxy forwarding of multicast streams (UDP/RTP/RTSP). When enabled, the client launches a local proxy service to forward multicast data to the player. Defaulted to disabled on some TV models (like Xiaomi TV) due to compatibility issues.</p>
+
+<h4>Picture-in-Picture (PiP)</h4>
+<p>When enabled, pressing the Home key during playback puts the video into a small picture-in-picture window, letting you navigate other screens while watching.</p>
+
+<h4>Other Settings</h4>
+<ul>
+  <li><strong>Adjust Brightness via Volume Keys</strong> — Use volume keys to adjust brightness in the playback UI.</li>
+  <li><strong>Brightness Gesture</strong> — Swipe vertically on the left side of the screen to adjust brightness.</li>
+  <li><strong>Volume Gesture</strong> — Swipe vertically on the right side of the screen to adjust volume.</li>
+  <li><strong>Global Progress Bar</strong> — Off/Top/Bottom. Display a slim playback progress line at the edge of the screen.</li>
+  <li><strong>NIC Selection</strong> — Manually select the network interface card on multi-NIC devices.</li>
+  <li><strong>Auto Start</strong> — Automatically launch the app on device boot.</li>
+  <li><strong>Reverse Switch Keys</strong> — Swap the functions of the Up and Down keys in the channel list.</li>
+  <li><strong>Control Scheme</strong> — Modern layout (info-centric) or Traditional layout (channel-centric).</li>
+</ul>
+
+<h3>Common Client Issues</h3>
+<ul>
+  <li><strong>Lag / Buffering</strong> — Try switching decoder modes (Hardware/Software) or check network quality.</li>
+  <li><strong>Cannot Connect to Server</strong> — Check if the authorization key is correct, server address is reachable, or the device is banned.</li>
+  <li><strong>Audio Only, No Video</strong> — Try switching decoder modes, or check if the video codec format is supported by the device hardware.</li>
+  <li><strong>No Audio Track / Subtitle Buttons</strong> — Indicates the current stream only has one audio track and no subtitles, which is normal.</li>
+  <li><strong>Device Pending Approval</strong> — First connection requires administrator manual approval in the backend, or enable Auto Approve in settings.</li>
+  <li><strong>Long Black Screen during switching</strong> — Try switching to "Fluid Mode" to speed up channel changes.</li>
+  <li><strong>Multicast Streams Cannot Play</strong> — Try enabling the "Local Proxy" feature in client settings.</li>
+</ul>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+<div class="hr"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- ── 15. FAQ ── -->
+<!-- ══════════════════════════════════════════════════════ -->
+<h2 id="faq">FAQ</h2>
+
+<h3>Q: How to modify the admin password?</h3>
+<p>Click "Change Password" at the bottom of the sidebar, enter the current password and the new password. Alternatively, set the environment variable <code>ADMIN_PASSWORD</code> to re-initialize the password.</p>
+
+<h3>Q: How do clients connect to the server?</h3>
+<p>At the top of the "Global Settings" page, copy the Base64-encoded server authorization key and paste it in the client application.</p>
+
+<h3>Q: What should I do if a channel cannot play?</h3>
+<p>Try the following troubleshooting steps:</p>
+<ol>
+  <li>Use the "Health Check" feature in Channel Management to verify if the stream is online.</li>
+  <li>Verify if the channel stream URL is correct.</li>
+  <li>Disable Direct Mode to proxy the stream through the server.</li>
+  <li>Check if the source restricts requests (User-Agent, Referer, etc.) and configure custom headers for the channel.</li>
+  <li>Check the system logs for error details.</li>
+</ol>
+
+<h3>Q: How to configure client auto-updates?</h3>
+<p>Set the latest version code and APK download URL in the OTA upgrade section of "Global Settings". The client app will check for updates on startup.</p>
+
+<h3>Q: What does "Pending Approval" mean for a device?</h3>
+<p>Find the device in "Device Management" and click "Approve". You can also enable "Auto Approve" in "Global Settings" to bypass manual approval.</p>
+
+<h3>Q: Why is the subscription link not working?</h3>
+<p>Please verify:</p>
+<ol>
+  <li>If the "External Subscription" option is enabled in Global Settings.</li>
+  <li>If the plan is associated with channel groups.</li>
+  <li>If the server external URL is configured correctly and reachable from the internet.</li>
+</ol>
+
+<h3>Q: How to backup and restore data?</h3>
+<p>Use the master-backup sync feature for automatic hot backup. For manual backup, copy the database file from the server directory.</p>
+
+<h3>Q: What is the "Enable Channel" switch?</h3>
+<p>Each channel has an "Enable" switch. When turned off, the channel is hidden from client lists and subscription exports, but remains visible in the admin panel. This is useful for temporarily hiding channels without deleting them.</p>
+
+<h3>Q: How to configure SOCKS5 proxy?</h3>
+<p>SOCKS5 proxy settings support 3 levels of inheritance (Channel → Group → Source) in their respective editing modals. Proxy URLs should be in the format: <code>socks5://user:pass@host:port</code>. Setting "Direct" blocks upper inheritance.</p>
+
+<h3>Q: What does source "Manual" mean?</h3>
+<p>"Manual" means the channel was added by the administrator manually, rather than imported or synchronized via M3U sources. Channels synced from sources show the source name.</p>
+
+<h3>Q: How to change the app icon label on device launcher?</h3>
+<p>Change "App Display Name" in "Global Settings" (e.g., "My TV"). It takes effect on next client startup (Note: Only applies to Android TV launchers like Xiaomi, Dangbei, etc., not standard Android mobile/emulator launchers).</p>
+
+<h3>Q: What if channel switching is slow on the client?</h3>
+<p>Change the client's Channel Switch Mode to "Fluid Mode". It does not reset the player engine, speeding up switches. If different channel formats cause screen artifacts, switch back to "Compatible Mode".</p>
+
+<h3>Q: What is a "Tester" device and how to set it?</h3>
+<p>Tester devices can bypass System Maintenance Mode for debugging. Set the tester flag in Device Management details.</p>
+
+<a href="#intro" class="back-to-top">↑ Back to Top</a>
+
+<div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); text-align: center; font-size: 13px; color: var(--text2);">
+  MediaPlayer Admin User Manual — Please contact the administrator if you have any questions.
+</div>
+
 </div>
 
 </body>

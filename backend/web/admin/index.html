@@ -163,6 +163,9 @@
           <option value="zh-TW">繁體中文 (台灣)</option>
           <option value="ja">日本語</option>
           <option value="ko">한국어</option>
+          <option value="ru">Русский</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
         </select>
       </div>
       <div class="sidebar-footer" id="sidebar-version-container"
@@ -380,8 +383,8 @@
                 <th width="60" data-i18n="th.index">序号</th>
                 <th data-i18n="th.name">名称</th>
                 <th>URL</th>
-                <th>自动同步</th>
-                <th>同步状态 / 时间</th>
+                <th data-i18n="th.auto_sync">自动同步</th>
+                <th data-i18n="th.sync_status">同步状态 / 时间</th>
                 <th data-i18n="th.actions">操作</th>
               </tr>
             </thead>
@@ -433,10 +436,10 @@
               <option value="banned" data-i18n="clients.status_banned">已封禁</option>
               <option value="expired" data-i18n="clients.status_expired">已过期</option>
             </select>
-            <input type="text" placeholder="搜索设备名/IP/ID..." id="client-search" oninput="searchClients()"
+            <input type="text" data-i18n-placeholder="placeholder.device_search" placeholder="搜索设备名/IP/ID..." id="client-search" oninput="searchClients()"
               style="width:220px">
-            <button class="btn btn-primary btn-sm" onclick="showModal('batch-modal')">批量操作</button>
-            <button class="btn btn-ghost btn-sm" onclick="loadClients()">刷新</button>
+            <button class="btn btn-primary btn-sm" onclick="showModal('batch-modal')" data-i18n="btn.batch_actions">批量操作</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadClients()" data-i18n="btn.refresh">刷新</button>
           </div>
         </div>
         <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
@@ -484,7 +487,7 @@
       <div id="sec-plans" style="display:none">
         <div class="header">
           <h1 data-i18n="sidebar.plans">套餐管理</h1>
-          <button class="btn btn-primary" onclick="editPlan()">+ 添加套餐</button>
+          <button class="btn btn-primary" onclick="editPlan()" data-i18n="plans.add_plan">+ 添加套餐</button>
         </div>
         <div class="card">
           <table>
@@ -521,7 +524,7 @@
                 <th width="60" data-i18n="th.index">序号</th>
                 <th data-i18n="th.client_id">客户端ID</th>
                 <th data-i18n="th.actions">操作</th>
-                <th>频道</th>
+                <th data-i18n="th.channel">频道</th>
                 <th data-i18n="th.ip">IP</th>
                 <th data-i18n="th.details">详情</th>
                 <th data-i18n="th.time">时间</th>
@@ -543,7 +546,7 @@
           <button class="btn btn-primary" onclick="saveGlobalClientConfig()" data-i18n="config.save_global">保存全局配置</button>
         </div>
         <div class="card" style="padding:24px">
-          <p style="color:var(--text2);font-size:13px;margin-bottom:20px">
+          <p style="color:var(--text2);font-size:13px;margin-bottom:20px" data-i18n="config.global_desc">
             设置全局客户端默认配置。修改以下项目后，客户端下次启动或心跳时将自动应用。选择"不管控"代表保持客户端本地原有设置不变。
           </p>
           <div id="global-config-form" class="config-grid">
@@ -652,26 +655,26 @@
                 </svg>
               </h3>
               <div id="vip-license-header-status" style="font-size: 13px;">
-                <span style="color: var(--text3);">加载中...</span>
+                <span style="color: var(--text3);" data-i18n="common.loading">加载中...</span>
               </div>
             </div>
             <div id="vip-license-status" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(168, 85, 247, 0.2);">
-              <p style="color:var(--text2);">加载中...</p>
+              <p style="color:var(--text2);" data-i18n="common.loading">加载中...</p>
             </div>
           </div>
 
           <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
 
           <div class="form-group">
-            <h3 style="margin-bottom: 12px;">订阅配置</h3>
+            <h3 style="margin-bottom: 12px;" data-i18n="settings.sub_config_title">订阅配置</h3>
           </div>
           <div class="form-group">
-            <label>是否开启外部订阅</label>
+            <label data-i18n="settings.enable_external_sub">是否开启外部订阅</label>
             <select id="set-enable-external-sub" onchange="onEnableExternalSubChange(this.value)">
-              <option value="false">关闭 (禁止外部订阅)</option>
-              <option value="true">开启 (允许外部订阅)</option>
+              <option value="false" data-i18n="settings.external_sub_off">关闭 (禁止外部订阅)</option>
+              <option value="true" data-i18n="settings.external_sub_on">开启 (允许外部订阅)</option>
             </select>
-            <div style="font-size:11px;color:var(--text2);margin-top:4px">
+            <div style="font-size:11px;color:var(--text2);margin-top:4px" data-i18n="settings.external_sub_desc">
               开启后，可在套餐管理页面复制 M3U/TXT 订阅地址，分享给用户导入第三方播放器（如 VLC、Tivimate 等）直接使用，<strong
                 style="color:var(--accent)">无需开启开发调试模式</strong>。
               订阅地址内的代理流链接采用专属验证参数，仅允许通过套餐订阅 Token 鉴权，不会影响普通设备 Token 的安全边界。
@@ -764,7 +767,7 @@
             </div>
             <div class="form-group">
               <label data-i18n="settings.epg_time_shift_label">EPG 全局时差 (小时)</label>
-              <input type="number" id="set-epg-time-shift" value="0" placeholder="例如: 8 或 -2">
+              <input type="number" id="set-epg-time-shift" value="0" data-i18n-placeholder="placeholder.epg_time_shift" placeholder="例如: 8 或 -2">
             </div>
             <div class="form-group" style="display:flex;align-items:flex-end">
               <button class="btn btn-ghost" onclick="refreshEPGCache()" data-i18n="settings.epg_force_refresh">强制拉取 EPG</button>
@@ -1210,8 +1213,8 @@
           <div class="form-group"><label data-i18n="modal.fcc_type">自定义 FCC 厂商协议</label>
             <select id="ch-fcc-type">
               <option value="" data-i18n="modal.fcc_type_default">(使用系统全局默认协议)</option>
-              <option value="telecom">电信/中兴/烽火 (Telecom/ZTE/FiberHome)</option>
-              <option value="huawei">华为 (Huawei UDP)</option>
+              <option value="telecom" data-i18n="settings.fcc_type_telecom">电信/中兴/烽火 (Telecom/ZTE/FiberHome)</option>
+              <option value="huawei" data-i18n="settings.fcc_type_huawei">华为 (Huawei UDP)</option>
             </select>
           </div>
           <div class="form-group">
@@ -1277,19 +1280,19 @@
           </div>
           <div class="form-group"><label data-i18n="modal.group_user_agent">User-Agent (群组默认)</label><input type="text" id="grp-user-agent"
               data-i18n-placeholder="modal.group_user_agent_placeholder" placeholder="留空使用订阅源或系统默认"></div>
-          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2"
+          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="grp-headers" rows="2" data-i18n-placeholder="placeholder.custom_headers"
               placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
           <div class="form-group">
             <label data-i18n="modal.proxy_type">代理类型</label>
             <select id="grp-proxy-type">
               <option value="" data-i18n="modal.proxy_inherit_source">继承源代理设置</option>
-              <option value="none">不代理（覆盖继承）</option>
+              <option value="none" data-i18n="modal.proxy_none">不代理（覆盖继承）</option>
               <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
             </select>
           </div>
           <div class="form-group" id="grp-proxy-url-group" style="display:none">
-            <label>代理地址</label>
-            <input type="text" id="grp-proxy-url" placeholder="socks5://user:pass@host:port">
+            <label data-i18n="modal.proxy_url">代理地址</label>
+            <input type="text" id="grp-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
           </div>
         </div>
         <div class="form-actions">
@@ -1330,7 +1333,7 @@
           </div>
           <div class="form-group"><label data-i18n="modal.source_user_agent">User-Agent (订阅拉取及分组默认)</label><input type="text" id="src-user-agent"
               data-i18n-placeholder="modal.source_user_agent_placeholder" placeholder="留空使用系统默认"></div>
-          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2"
+          <div class="form-group"><label data-i18n="modal.custom_headers">自定义 Request Headers (JSON 格式)</label><textarea id="src-headers" rows="2" data-i18n-placeholder="placeholder.custom_headers"
               placeholder='例如: {"Referer": "https://example.com"}'></textarea></div>
           <div class="form-group">
             <label data-i18n="modal.proxy_type">代理类型</label>
@@ -1340,8 +1343,8 @@
             </select>
           </div>
           <div class="form-group" id="src-proxy-url-group" style="display:none">
-            <label>代理地址</label>
-            <input type="text" id="src-proxy-url" placeholder="socks5://user:pass@host:port">
+            <label data-i18n="modal.proxy_url">代理地址</label>
+            <input type="text" id="src-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
           </div>
         </div>
         <div class="form-actions">

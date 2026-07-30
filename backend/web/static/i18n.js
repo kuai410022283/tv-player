@@ -23,18 +23,7 @@ class I18nManager {
   async switchLanguage(lang) {
     this.currentLang = lang;
     localStorage.setItem('admin_lang', lang);
-    await this.init();
-    
-    // Also update sub-iframes if they exist and are loaded
-    const logsIframe = document.getElementById('logs-iframe');
-    if (logsIframe && logsIframe.contentWindow && logsIframe.contentWindow.location.href !== 'about:blank') {
-      logsIframe.contentWindow.location.reload();
-    }
-    const manualIframe = document.getElementById('manual-iframe');
-    if (manualIframe && manualIframe.contentWindow && manualIframe.contentWindow.location.href !== 'about:blank') {
-      const targetSrc = (lang === 'zh-CN' || lang === 'zh-TW') ? '/admin/manual.html' : '/admin/manual_en.html';
-      manualIframe.src = targetSrc;
-    }
+    window.location.reload();
   }
 
   getNestedValue(path) {

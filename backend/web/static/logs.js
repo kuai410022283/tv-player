@@ -131,7 +131,7 @@ async function loadClientList() {
     const res = await fetch(`${API}/admin/logs/clients`, { headers });
     const data = await res.json();
     if (data.code === 0 && data.data) {
-      els.clientList.innerHTML = '<option value="">-- 选择设备日志 --</option>';
+      els.clientList.innerHTML = `<option value="">${t('logs.select_client', '-- 选择设备日志 --')}</option>`;
       data.data.forEach(log => {
         const opt = document.createElement('option');
         opt.value = log.client_id;
@@ -152,7 +152,7 @@ function exportLogs() {
     url = `${API}/admin/logs/backend/export`;
   } else {
     if (!currentClient) {
-      alert('请先选择设备');
+      alert(t('logs.error_select_client', '请先选择设备'));
       return;
     }
     url = `${API}/admin/logs/clients/${currentClient}/export`;
@@ -170,7 +170,7 @@ function exportLogs() {
 
 async function deleteClientLog() {
   if (!currentClient) return;
-  if (!confirm('确定删除该设备的日志吗？')) return;
+  if (!confirm(t('logs.confirm_delete_client_logs', '确定删除该设备的日志吗？'))) return;
   
   try {
     const res = await fetch(`${API}/admin/logs/clients/${currentClient}`, { method: 'DELETE', headers });
