@@ -32,11 +32,30 @@ func (s *SQLiteStorage) Migrate() {
 		expires_at   TEXT DEFAULT '',
 		activated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+		updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+		last_verified_at TEXT DEFAULT ''
 	)`)
 	if err != nil {
 		slog.Warn("license: migrate table failed", "error", err)
 	}
+	// 动态为已有的数据库表添加 last_verified_at 字段
+	_, _ = s.db.Exec(`ALTER TABLE vip_license ADD COLUMN last_verified_at TEXT DEFAULT ''`)
+}
+
+// UpdateLastVerifiedAt 更新最后校验通过的时间（加密密文）
+func (s *SQLiteStorage) UpdateLastVerifiedAt(encryptedTime string) error {
+	_, err := s.db.Exec(`UPDATE vip_license SET last_verified_at=?, updated_at=CURRENT_TIMESTAMP WHERE status='activated'`)
+	return err
+}
+
+// GetLastVerifiedAt 获取最后校验通过的时间（加密密文）
+func (s *SQLiteStorage) GetLastVerifiedAt() (string, error) {
+	var lastVerified string
+	err := s.db.QueryRow(`SELECT coalesce(last_verified_at, '') FROM vip_license WHERE status='activated' ORDER BY id DESC LIMIT 1`).Scan(&lastVerified)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return lastVerified, err
 }
 
 func (s *SQLiteStorage) Load() (licenseKey, machineID, features, expiresAt, seq, activatedAt string, err error) {

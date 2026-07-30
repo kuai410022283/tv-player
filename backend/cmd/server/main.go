@@ -116,6 +116,7 @@ func main() {
 	go middleware.StartRateLimitCleanup(stop)
 	epgSvc.StartEPGScheduler()
 	go licenseStorage.StartCleanupTask(stop)
+	go license.StartExpiryChecker(stop)
 
 	// ── 初始化 Gin ──────────────────────────────────
 	gin.SetMode(gin.ReleaseMode)

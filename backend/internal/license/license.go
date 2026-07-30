@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -62,6 +63,10 @@ type LicenseStorage interface {
 	Delete() error
 	// SeqExists 检查序列号是否已在其他机器上使用过（防跨机器重放）
 	SeqExists(seq, machineID string) (bool, error)
+	// UpdateLastVerifiedAt 更新最后校验通过的时间（加密密文）
+	UpdateLastVerifiedAt(encryptedTime string) error
+	// GetLastVerifiedAt 获取最后校验通过的时间（加密密文）
+	GetLastVerifiedAt() (string, error)
 }
 
 // ── 初始化 ─────────────────────────────────────────────
@@ -144,19 +149,6 @@ func loadAndVerify() {
 		return
 	}
 
-	// 检查是否过期
-	if decExpire != "permanent" {
-		expDate, err := time.Parse("2006-01-02", decExpire)
-		if err != nil || time.Now().After(expDate) {
-			slog.Warn("license: 授权已过期", "expires_at", decExpire)
-			_ = gLicenseDB.Delete()
-			mu.Lock()
-			gInfo = &Info{Status: StatusExpired, MachineID: gMachineID, ExpiresAt: decExpire}
-			mu.Unlock()
-			return
-		}
-	}
-
 	// 全部通过
 	activeExpire := decExpire
 	if activeExpire == "permanent" {
@@ -171,7 +163,13 @@ func loadAndVerify() {
 		ActivatedAt: activatedAt,
 	}
 	mu.Unlock()
-	slog.Info("license: 授权验证通过")
+
+	// 启动时立即执行一次安全的防篡改和过期校验
+	if VerifyExpiry() {
+		slog.Info("license: 授权验证通过")
+	} else {
+		slog.Warn("license: 授权已失效或过期")
+	}
 }
 
 // ── 公开查询方法 ───────────────────────────────────────
@@ -282,6 +280,14 @@ func Activate(licenseKey string) (*Info, error) {
 	if gLicenseDB != nil {
 		if err := gLicenseDB.Save(licenseKey, gMachineID, "", decExpire, decSeq); err != nil {
 			return nil, fmt.Errorf("保存授权信息失败: %w", err)
+		}
+		// 初始化最后验证时间为当前网络时间或系统时间
+		initTime := fetchNetworkTime()
+		if initTime.IsZero() {
+			initTime = time.Now()
+		}
+		if encTime, err := EncryptLicense(initTime.Format(time.RFC3339)); err == nil {
+			_ = gLicenseDB.UpdateLastVerifiedAt(encTime)
 		}
 	}
 
@@ -565,4 +571,122 @@ func EncryptLicense(plaintext string) (string, error) {
 func deriveKey() []byte {
 	// 使用 PBKDF2 派生密钥，增加逆向难度
 	return pbkdf2.Key([]byte(embeddedSecret), []byte("MediaPlayer-VIP"), 10000, 32, sha256.New)
+}
+
+// ── 订阅过期与网络校验 ───────────────────────────────────────
+
+var timeServers = []string{
+	"https://www.baidu.com",
+	"https://www.taobao.com",
+	"https://www.apple.com",
+}
+
+// fetchNetworkTime 获取公网高可靠服务器时间
+func fetchNetworkTime() time.Time {
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	for _, url := range timeServers {
+		resp, err := client.Head(url)
+		if err != nil {
+			continue
+		}
+		_ = resp.Body.Close()
+		dateStr := resp.Header.Get("Date")
+		if dateStr == "" {
+			continue
+		}
+		// RFC1123: "Mon, 02 Jan 2006 15:04:05 MST"
+		t, err := time.Parse(time.RFC1123, dateStr)
+		if err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+// VerifyExpiry 静默校验授权过期与回拨情况。此方法无任何日志输出，静默执行。
+// 返回是否有效。如果无效，内部会更新内存状态且更新数据库状态。
+func VerifyExpiry() bool {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if gInfo == nil || gInfo.Status != StatusActivated {
+		return false
+	}
+	if gLicenseDB == nil {
+		return false
+	}
+
+	// 1. 获取要校验的当前时间（网络时间优先）
+	var checkTime time.Time
+	netTime := fetchNetworkTime()
+	if !netTime.IsZero() {
+		checkTime = netTime
+	} else {
+		checkTime = time.Now()
+	}
+
+	// 2. 防篡改与回拨检测
+	encLast, err := gLicenseDB.GetLastVerifiedAt()
+	if err == nil && encLast != "" {
+		decLast, err := decryptLicenseKey(encLast)
+		if err != nil {
+			// 解密失败判定为篡改，标记过期/吊销
+			revokeInternal()
+			return false
+		}
+		lastTime, err := time.Parse(time.RFC3339, decLast)
+		if err == nil {
+			// 如果当前校验时间小于上一次校验通过的时间，说明存在时钟回拨
+			if checkTime.Before(lastTime) {
+				revokeInternal()
+				return false
+			}
+		}
+	}
+
+	// 3. 校验过期时间
+	if gInfo.ExpiresAt != "" && gInfo.ExpiresAt != "permanent" {
+		expDate, err := time.Parse("2006-01-02", gInfo.ExpiresAt)
+		if err == nil {
+			// 过期判定：校验时间的“日期”是否在过期日期之后。
+			// 这里将 checkTime 转换为本地时区，然后格式化为 2006-01-02 进行天级别的比较
+			checkDate, _ := time.Parse("2006-01-02", checkTime.Local().Format("2006-01-02"))
+			if checkDate.After(expDate) {
+				revokeInternal()
+				return false
+			}
+		}
+	}
+
+	// 4. 校验通过，加密并更新最后校验时间
+	encTime, err := EncryptLicense(checkTime.Format(time.RFC3339))
+	if err == nil {
+		_ = gLicenseDB.UpdateLastVerifiedAt(encTime)
+	}
+
+	return true
+}
+
+func revokeInternal() {
+	_ = gLicenseDB.Delete()
+	gInfo = &Info{
+		Status:    StatusExpired,
+		MachineID: gMachineID,
+	}
+}
+
+// StartExpiryChecker 启动定时静默校验任务
+func StartExpiryChecker(stop <-chan struct{}) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			VerifyExpiry()
+		}
+	}
 }

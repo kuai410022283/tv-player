@@ -1,0 +1,15 @@
+R_DEF: Internal format may change without notice
+local
+id copy_btn
+id detail_text
+id expire_dropdown
+id expire_layout
+id generate_btn
+id machine_code_input
+id machine_code_layout
+id result_container
+id result_text
+layout activity_main
+mipmap ic_launcher
+string app_name
+style Theme.LicenseGen
