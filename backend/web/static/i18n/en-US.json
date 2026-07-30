@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "Hide EPG Panel",
     "hide_osd_panel_label": "Hide OSD Info Panel",
     "hide_settings_panel_label": "Hide Settings Panel",
+    "hide_community_label": "Hide Community",
+    "hide_qr_config_label": "Hide QR Config Code",
     "gesture_brightness_label": "Left Swipe Brightness",
     "gesture_volume_label": "Right Swipe Volume",
     "control_scheme_label": "Control Layout",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "Local Proxy Server",
     "preferred_server_index_label": "Server Selection",
     "auto_check_update_label": "Auto Check Updates",
-    "check_update_btn_label": "Show Update Button",
+    "check_update_label": "Show Update Button",
     "app_language_label": "Language Option",
     "opt_app_language_0": "Auto",
     "opt_app_language_1": "简体中文",
@@ -736,6 +738,8 @@
     "activate_success": "License activated successfully",
     "activate_failed": "Activation failed",
     "confirm_revoke": "Are you sure you want to revoke the current license?",
-    "revoked_success": "License revoked successfully"
+    "revoked_success": "License revoked successfully",
+    "benefits": "VIP Benefits",
+    "benefits_val": "Remote Configuration"
   }
 }

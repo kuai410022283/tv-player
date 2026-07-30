@@ -73,6 +73,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             Prefs.LANG_ZH_TW -> "zh-TW"
             Prefs.LANG_KO -> "ko"
             Prefs.LANG_JA -> "ja"
+            Prefs.LANG_RU -> "ru"
+            Prefs.LANG_DE -> "de"
+            Prefs.LANG_FR -> "fr"
             else -> "auto"
         }
         super.attachBaseContext(LocaleHelper.wrap(newBase, langCode))
@@ -567,7 +570,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     Prefs.LANG_ZH_TW -> "繁体中文"
                     Prefs.LANG_KO -> "한국어"
                     Prefs.LANG_JA -> "日本語"
-                    else -> "自动"
+                    Prefs.LANG_RU -> "Русский"
+                    Prefs.LANG_DE -> "Deutsch"
+                    Prefs.LANG_FR -> "Français"
+                    else -> getString(R.string.status_auto)
                 }
             }
         }
@@ -1140,7 +1146,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         R.id.btnSettingsAutoCheckUpdate,
         R.id.btnSettingsLanguage,
         R.id.btnSettingsCheckUpdate,
-        R.id.btnSettingsAbout
+        R.id.btnSettingsAbout,
+        R.id.btnCommunity
     )
 
     /** 动态修正设置栏焦点链，跳过被隐藏的项 */
@@ -1163,6 +1170,16 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         for (viewId in prefKeyToViewId.values) {
             findViewById<View>(viewId)?.visibility = View.VISIBLE
         }
+        
+        val btnCommunity = findViewById<View>(R.id.btnCommunity)
+        val layoutCommunityList = findViewById<View>(R.id.layoutCommunityList)
+        if (com.mediaplayer.app.data.api.RemoteConfigManager.isCommunityHidden()) {
+            btnCommunity?.visibility = View.GONE
+            layoutCommunityList?.visibility = View.GONE
+        } else {
+            btnCommunity?.visibility = View.VISIBLE
+        }
+
         // 再隐藏远程配置标记为隐藏的项
         for ((key, viewId) in prefKeyToViewId) {
             if (com.mediaplayer.app.data.api.RemoteConfigManager.isHidden(key)) {
@@ -1682,6 +1699,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Prefs.LANG_ZH_TW -> "繁体中文"
                 Prefs.LANG_KO -> "한국어"
                 Prefs.LANG_JA -> "日本語"
+                Prefs.LANG_RU -> "Русский"
+                Prefs.LANG_DE -> "Deutsch"
+                Prefs.LANG_FR -> "Français"
                 else -> getString(R.string.status_auto)
             }
         }
@@ -1691,8 +1711,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         btnSettingsLanguage?.setOnClickListener {
             if (isManagedSetting(Prefs.KEY_APP_LANGUAGE)) return@setOnClickListener
-            // 循环切换：0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
-            currentLang = (currentLang + 1) % 6
+            // 循环切换：0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 0
+            currentLang = (currentLang + 1) % 9
             prefs.edit().putInt(Prefs.KEY_APP_LANGUAGE, currentLang).apply()
             updateLanguageText()
 
@@ -1933,7 +1953,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         
         // --- QR Code Logic ---
         val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
-        if (ip != null) {
+        if (ip != null && !com.mediaplayer.app.data.api.RemoteConfigManager.isQrConfigHidden()) {
             setupQrConfigServer {
                 hideSettingsMenu()
                 Toast.makeText(this@MainActivity, getString(R.string.toast_main_config_reloading), Toast.LENGTH_LONG).show()

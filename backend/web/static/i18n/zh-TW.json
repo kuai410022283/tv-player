@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "隱藏節目單(EPG)",
     "hide_osd_panel_label": "隱藏OSD資訊面板",
     "hide_settings_panel_label": "隱藏設置欄",
+    "hide_community_label": "隱藏交流互動",
+    "hide_qr_config_label": "隱藏掃碼配置區",
     "gesture_brightness_label": "左側滑動調節亮度",
     "gesture_volume_label": "右側滑動調節音量",
     "control_scheme_label": "操控方式",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "本地代理",
     "preferred_server_index_label": "伺服器選擇",
     "auto_check_update_label": "自動更新",
-    "check_update_btn_label": "檢查更新按鈕",
+    "check_update_label": "檢查更新按鈕",
     "app_language_label": "多語言選擇",
     "opt_app_language_0": "自動",
     "opt_app_language_1": "簡體中文",
@@ -736,6 +738,8 @@
     "activate_success": "授權激活成功",
     "activate_failed": "激活失敗",
     "confirm_revoke": "確定要吊銷當前授權嗎？",
-    "revoked_success": "授權已吊銷"
+    "revoked_success": "授權已吊銷",
+    "benefits": "會員權益",
+    "benefits_val": "遠程配置"
   }
 }

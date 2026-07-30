@@ -27,6 +27,8 @@ object RemoteConfigManager {
     private var hideChannelList: Boolean = false
     private var hideEpgPanel: Boolean = false
     private var hideOsdPanel: Boolean = false
+    private var hideCommunity: Boolean = false
+    private var hideQrConfig: Boolean = false
 
     /** 远程配置应用后的回调，通知 UI 重新读取缓存设置 */
     var onConfigApplied: (() -> Unit)? = null
@@ -75,6 +77,8 @@ object RemoteConfigManager {
         hideChannelList = config.hideChannelList ?: false
         hideEpgPanel = config.hideEpgPanel ?: false
         hideOsdPanel = config.hideOsdPanel ?: false
+        hideCommunity = config.hideCommunity ?: false
+        hideQrConfig = config.hideQrConfig ?: false
         onConfigApplied?.invoke()
     }
 
@@ -105,6 +109,8 @@ object RemoteConfigManager {
     fun isChannelListHidden(): Boolean = hideChannelList
     fun isEpgPanelHidden(): Boolean = hideEpgPanel
     fun isOsdPanelHidden(): Boolean = hideOsdPanel
+    fun isCommunityHidden(): Boolean = hideCommunity
+    fun isQrConfigHidden(): Boolean = hideQrConfig
 
     // ── 配置键名映射 ────────────────────────────────────
     // 后端使用的 config_key 和客户端 Prefs 键名不一致时，在此映射。

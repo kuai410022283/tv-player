@@ -1950,9 +1950,9 @@ function onApprovePlanChange() {
     document.getElementById('approve-streams').value = opt.dataset.streams;
     if (descEl) {
       const days = parseInt(opt.dataset.days) || 0;
-      const desc = opt.dataset.desc || '暂无套餐描述';
-      const validityText = days > 0 ? days + ' 天' : '永久';
-      descEl.innerHTML = `套餐有效期：<strong>${validityText}</strong><br>套餐描述：${desc}`;
+      const desc = opt.dataset.desc || t('plans.no_desc', '暂无套餐描述');
+      const validityText = days > 0 ? days + ' ' + t('common.day', '天') : t('common.forever', '永久');
+      descEl.innerHTML = `${t('plans.validity_label', '套餐有效期')}：<strong>${validityText}</strong><br>${t('plans.desc_label', '套餐描述')}：${desc}`;
       descEl.style.display = 'block';
     }
   }
@@ -1974,9 +1974,9 @@ function onDefaultPlanChange() {
   } else {
     if (descEl) {
       const days = parseInt(opt.dataset.days) || 0;
-      const desc = opt.dataset.desc || '暂无套餐描述';
-      const validityText = days > 0 ? days + ' 天' : '永久';
-      descEl.innerHTML = `套餐有效期：<strong>${validityText}</strong><br>套餐描述：${desc}`;
+      const desc = opt.dataset.desc || t('plans.no_desc', '暂无套餐描述');
+      const validityText = days > 0 ? days + ' ' + t('common.day', '天') : t('common.forever', '永久');
+      descEl.innerHTML = `${t('plans.validity_label', '套餐有效期')}：<strong>${validityText}</strong><br>${t('plans.desc_label', '套餐描述')}：${desc}`;
       descEl.style.display = 'block';
     }
   }
@@ -2230,6 +2230,11 @@ async function loadLicenseStatus() {
           <div class="form-row">
             <label>${t('license.expire_time', '过期时间')}</label>
             <span style="flex:1;">${expiresDisplay}</span>
+          </div>
+
+          <div class="form-row">
+            <label>${t('license.benefits', '会员权益')}</label>
+            <span style="flex:1;color:#f59e0b;font-weight:600;">${t('license.benefits_val', '远程配置')}</span>
           </div>
           <div style="margin-top:8px;">
             <button class="btn btn-danger" onclick="revokeLicense()">${t('license.revoke_license', '吊销授权')}</button>
@@ -3345,6 +3350,8 @@ const CLIENT_CONFIG_ITEMS = [
   { group: '界面管控', key: 'hide_epg_panel', label: '隐藏节目单(EPG)', type: 'toggle' },
   { group: '界面管控', key: 'hide_osd_panel', label: '隐藏OSD信息面板', type: 'toggle' },
   { group: '界面管控', key: 'hide_settings_panel', label: '隐藏设置栏', type: 'toggle' },
+  { group: '界面管控', key: 'hide_community', label: '隐藏交流互动', type: 'toggle' },
+  { group: '界面管控', key: 'hide_qr_config', label: '隐藏扫码配置区', type: 'toggle' },
   // ── 设备与系统 ──
   // (客户端中该分类下为系统音量/画面亮度，均为本地设置，不可远程管控)
   // ── 周边扩展 ──

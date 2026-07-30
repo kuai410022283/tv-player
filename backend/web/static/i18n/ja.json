@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "EPGを非表示",
     "hide_osd_panel_label": "OSDパネルを非表示",
     "hide_settings_panel_label": "設定パネルを非表示",
+    "hide_community_label": "交流コミュニティを非表示",
+    "hide_qr_config_label": "QRコード設定エリアを非表示",
     "gesture_brightness_label": "左スワイプ輝度調整",
     "gesture_volume_label": "右スワイプ音量調整",
     "control_scheme_label": "操作方法",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "ローカルプロキシ",
     "preferred_server_index_label": "サーバー選択",
     "auto_check_update_label": "自動更新",
-    "check_update_btn_label": "更新ボタン表示",
+    "check_update_label": "更新ボタン表示",
     "app_language_label": "多言語選択",
     "opt_app_language_0": "自動",
     "opt_app_language_1": "简体中文",
@@ -736,6 +738,8 @@
     "activate_success": "ライセンスのアクティベーションに成功しました",
     "activate_failed": "アクティベーション失敗",
     "confirm_revoke": "現在のライセンスを無効にしますか？",
-    "revoked_success": "ライセンスが無効になりました"
+    "revoked_success": "ライセンスが無効になりました",
+    "benefits": "メンバー特典",
+    "benefits_val": "リモート設定"
   }
 }

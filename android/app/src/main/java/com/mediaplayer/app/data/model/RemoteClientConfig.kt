@@ -68,5 +68,9 @@ data class RemoteClientConfig(
     /** 隐藏节目单(EPG) */
     @SerializedName("hide_epg_panel")        val hideEpgPanel: Boolean? = null,
     /** 隐藏OSD信息面板 */
-    @SerializedName("hide_osd_panel")        val hideOsdPanel: Boolean? = null
+    @SerializedName("hide_osd_panel")        val hideOsdPanel: Boolean? = null,
+    /** 隐藏交流互动 */
+    @SerializedName("hide_community")        val hideCommunity: Boolean? = null,
+    /** 隐藏扫码配置 */
+    @SerializedName("hide_qr_config")        val hideQrConfig: Boolean? = null
 )

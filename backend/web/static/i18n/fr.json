@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "Masquer le panneau EPG",
     "hide_osd_panel_label": "Masquer le panneau OSD",
     "hide_settings_panel_label": "Masquer les paramètres",
+    "hide_community_label": "Masquer la communauté",
+    "hide_qr_config_label": "Masquer la zone de configuration du code QR",
     "gesture_brightness_label": "Luminosité par geste à gauche",
     "gesture_volume_label": "Volume par geste à droite",
     "control_scheme_label": "Disposition des commandes",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "Serveur proxy local",
     "preferred_server_index_label": "Choix du serveur",
     "auto_check_update_label": "Vérification automatique des mises à jour",
-    "check_update_btn_label": "Afficher le bouton de mise à jour",
+    "check_update_label": "Afficher le bouton de mise à jour",
     "app_language_label": "Option de langue",
     "opt_app_language_0": "Auto",
     "opt_app_language_1": "简体中文",
@@ -736,6 +738,8 @@
     "activate_success": "Licence activée avec succès",
     "activate_failed": "Activation rejetée",
     "confirm_revoke": "Êtes-vous sûr de vouloir révoquer la licence ?",
-    "revoked_success": "Licence révoquée avec succès"
+    "revoked_success": "Licence révoquée avec succès",
+    "benefits": "Avantages VIP",
+    "benefits_val": "Configuration à distance"
   }
 }

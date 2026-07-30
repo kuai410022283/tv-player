@@ -240,6 +240,7 @@ func isValidConfigKey(key string) bool {
 		"reverse_channel_keys": true,
 		"hide_settings_panel":  true, "hide_channel_list": true,
 		"hide_epg_panel": true, "hide_osd_panel": true,
+		"hide_community": true, "hide_qr_config": true,
 		"preferred_server_index": true, "auto_check_update": true, "check_update": true,
 		"app_language": true,
 	}
@@ -300,6 +301,8 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setBool("hide_channel_list", &cfg.HideChannelList)
 	setBool("hide_epg_panel", &cfg.HideEpgPanel)
 	setBool("hide_osd_panel", &cfg.HideOsdPanel)
+	setBool("hide_community", &cfg.HideCommunity)
+	setBool("hide_qr_config", &cfg.HideQrConfig)
 	setInt("preferred_server_index", &cfg.PreferredServerIndex)
 	setBool("auto_check_update", &cfg.AutoCheckUpdate)
 	setInt("app_language", &cfg.AppLanguage)

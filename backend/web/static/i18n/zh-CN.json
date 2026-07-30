@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "隐藏节目单(EPG)",
     "hide_osd_panel_label": "隐藏OSD信息面板",
     "hide_settings_panel_label": "隐藏设置栏",
+    "hide_community_label": "隐藏交流互动",
+    "hide_qr_config_label": "隐藏扫码配置区",
     "gesture_brightness_label": "左侧滑动调节亮度",
     "gesture_volume_label": "右侧滑动调节音量",
     "control_scheme_label": "操控方式",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "本地代理",
     "preferred_server_index_label": "服务器选择",
     "auto_check_update_label": "自动更新",
-    "check_update_btn_label": "检查更新按钮",
+    "check_update_label": "检查更新按钮",
     "app_language_label": "多语言选择",
     "opt_app_language_0": "自动",
     "opt_app_language_1": "简体中文",
@@ -736,6 +738,8 @@
     "activate_success": "授权激活成功",
     "activate_failed": "激活失败",
     "confirm_revoke": "确定要吊销当前授权吗？",
-    "revoked_success": "授权已吊销"
+    "revoked_success": "授权已吊销",
+    "benefits": "会员权益",
+    "benefits_val": "远程配置"
   }
 }

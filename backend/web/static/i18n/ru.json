@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "Скрыть панель EPG",
     "hide_osd_panel_label": "Скрыть OSD инфопанель",
     "hide_settings_panel_label": "Скрыть панель настроек",
+    "hide_community_label": "Скрыть сообщество",
+    "hide_qr_config_label": "Скрыть зону настройки QR-кода",
     "gesture_brightness_label": "Яркость жестом слева",
     "gesture_volume_label": "Громкость жестом справа",
     "control_scheme_label": "Раскладка управления",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "Локальный прокси-сервер",
     "preferred_server_index_label": "Выбор сервера",
     "auto_check_update_label": "Автопроверка обновлений",
-    "check_update_btn_label": "Показывать кнопку обновления",
+    "check_update_label": "Показывать кнопку обновления",
     "app_language_label": "Язык интерфейса",
     "opt_app_language_0": "Авто",
     "opt_app_language_1": "简体中文",
@@ -713,7 +715,8 @@
     "opt_app_language_4": "한국어",
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "Русский",
-    "opt_app_language_7": "Deutsch"
+    "opt_app_language_7": "Deutsch",
+    "opt_app_language_8": "Французский"
   },
   "license": {
     "status_error": "Ошибка проверки лицензии",
@@ -735,6 +738,8 @@
     "activate_success": "Лицензия успешно активирована",
     "activate_failed": "Активация отклонена",
     "confirm_revoke": "Вы уверены, что хотите отозвать лицензию?",
-    "revoked_success": "Лицензия успешно отозвана"
+    "revoked_success": "Лицензия успешно отозвана",
+    "benefits": "Преимущества подписки",
+    "benefits_val": "Удаленная настройка"
   }
 }

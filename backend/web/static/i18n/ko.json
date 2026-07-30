@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "편성표(EPG) 숨기기",
     "hide_osd_panel_label": "OSD 패널 숨기기",
     "hide_settings_panel_label": "설정 메뉴 숨기기",
+    "hide_community_label": "소통 및 커뮤니티 숨기기",
+    "hide_qr_config_label": "QR 코드 설정 영역 숨기기",
     "gesture_brightness_label": "왼쪽 슬라이드 밝기 조절",
     "gesture_volume_label": "오른쪽 슬라이드 음량 조절",
     "control_scheme_label": "조작 방식",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "로컬 프록시",
     "preferred_server_index_label": "서버 선택",
     "auto_check_update_label": "자동 업데이트",
-    "check_update_btn_label": "업데이트 확인 버튼",
+    "check_update_label": "업데이트 확인 버튼",
     "app_language_label": "다국어 선택",
     "opt_app_language_0": "자동",
     "opt_app_language_1": "简体中文",
@@ -736,6 +738,8 @@
     "activate_success": "라이선스가 성공적으로 활성화되었습니다",
     "activate_failed": "활성화 실패",
     "confirm_revoke": "현재 라이선스를 해제하시겠습니까?",
-    "revoked_success": "라이선스가 해제되었습니다"
+    "revoked_success": "라이선스가 해제되었습니다",
+    "benefits": "멤버십 혜택",
+    "benefits_val": "원격 설정"
   }
 }

@@ -685,6 +685,8 @@
     "hide_epg_panel_label": "EPG-Panel ausblenden",
     "hide_osd_panel_label": "OSD-Infopanel ausblenden",
     "hide_settings_panel_label": "Einstellungs-Panel ausblenden",
+    "hide_community_label": "Community ausblenden",
+    "hide_qr_config_label": "QR-Code-Konfigurationsbereich ausblenden",
     "gesture_brightness_label": "Helligkeitsgeste links",
     "gesture_volume_label": "Lautstärkegeste rechts",
     "control_scheme_label": "Steuerungslayout",
@@ -704,7 +706,7 @@
     "local_proxy_enabled_label": "Lokaler Proxy-Server",
     "preferred_server_index_label": "Serverauswahl",
     "auto_check_update_label": "Automatische Updates",
-    "check_update_btn_label": "Update-Button anzeigen",
+    "check_update_label": "Update-Button anzeigen",
     "app_language_label": "Spracheinstellung",
     "opt_app_language_0": "Auto",
     "opt_app_language_1": "简体中文",
@@ -713,7 +715,8 @@
     "opt_app_language_4": "한국어",
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "Russisch",
-    "opt_app_language_7": "Deutsch"
+    "opt_app_language_7": "Deutsch",
+    "opt_app_language_8": "Französisch"
   },
   "license": {
     "status_error": "Fehler bei der Lizenzprüfung",
@@ -735,6 +738,8 @@
     "activate_success": "Lizenz erfolgreich aktiviert",
     "activate_failed": "Aktivierung fehlgeschlagen",
     "confirm_revoke": "Sind Sie sicher, dass Sie die Lizenz widerrufen möchten?",
-    "revoked_success": "Lizenz erfolgreich widerrufen"
+    "revoked_success": "Lizenz erfolgreich widerrufen",
+    "benefits": "VIP-Vorteile",
+    "benefits_val": "Fernkonfiguration"
   }
 }

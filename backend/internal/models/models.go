@@ -383,6 +383,8 @@ type ClientRemoteConfig struct {
 	HideChannelList   *bool `json:"hide_channel_list,omitempty"`   // 隐藏频道列表
 	HideEpgPanel      *bool `json:"hide_epg_panel,omitempty"`      // 隐藏节目单(EPG)
 	HideOsdPanel      *bool `json:"hide_osd_panel,omitempty"`      // 隐藏OSD信息面板
+	HideCommunity     *bool `json:"hide_community,omitempty"`      // 隐藏交流互动
+	HideQrConfig      *bool `json:"hide_qr_config,omitempty"`      // 隐藏扫码配置
 }
 
 // ClientConfigEntry 对应数据库 client_remote_configs 表的单条记录

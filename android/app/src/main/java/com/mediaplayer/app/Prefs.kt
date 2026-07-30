@@ -18,7 +18,7 @@ object Prefs {
     const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
     const val KEY_CHECK_UPDATE_DUMMY = "check_update"
     
-    // 多语言设置：0=自动, 1=简体中文, 2=English, 3=繁体中文, 4=韩文, 5=日语
+    // 多语言设置：0=自动, 1=简体中文, 2=English, 3=繁体中文, 4=韩文, 5=日语, 6=俄语, 7=德语, 8=法语
     const val KEY_APP_LANGUAGE = "app_language"
     const val LANG_AUTO = 0
     const val LANG_ZH_CN = 1
@@ -26,6 +26,9 @@ object Prefs {
     const val LANG_ZH_TW = 3
     const val LANG_KO = 4
     const val LANG_JA = 5
+    const val LANG_RU = 6
+    const val LANG_DE = 7
+    const val LANG_FR = 8
     
     // 全局细线进度条：0=关闭, 1=顶部, 2=底部
     const val KEY_GLOBAL_PROGRESS_BAR = "global_progress_bar"

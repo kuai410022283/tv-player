@@ -34,6 +34,9 @@ object LocaleHelper {
             "en" -> Locale.ENGLISH
             "ko" -> Locale.KOREAN
             "ja" -> Locale.JAPANESE
+            "ru" -> Locale("ru")
+            "de" -> Locale.GERMAN
+            "fr" -> Locale.FRENCH
             else -> Locale.getDefault()
         }
     }
