@@ -117,8 +117,8 @@ func TestVerifyExpiry_Expired(t *testing.T) {
 		t.Errorf("expected status to be expired, got %v", status)
 	}
 
-	if !mockDB.deleted {
-		t.Error("expected database record to be deleted/marked revoked")
+	if mockDB.deleted {
+		t.Error("expected database record not to be deleted/marked revoked on soft expiration")
 	}
 }
 
