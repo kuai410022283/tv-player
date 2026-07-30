@@ -82,14 +82,54 @@ object RemoteConfigManager {
         onConfigApplied?.invoke()
     }
 
-    /** 保存 backup_servers 到本地（修复Bug4）*/
+    /** 保存 backup_servers 到本地并与当前主服务器合并去重，防止配置丢失 */
     fun saveBackupServers(context: Context, backupServers: List<String>?) {
         if (backupServers.isNullOrEmpty()) return
         val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
-        // 转换为 ServerEntry 格式后存入，与 ServerAuthFlowManager.getCandidateServers() 兼容
-        val gson = Gson()
-        val entries = backupServers.map { mapOf("url" to it, "label" to "") }
-        prefs.edit().putString(Prefs.KEY_SERVER_URLS, gson.toJson(entries)).apply()
+        val currentServer = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
+
+        val mergedList = mutableListOf<com.mediaplayer.app.data.model.ServerEntry>()
+        // 1. 将当前正在使用的主服务器放在最前，确保主配置不被覆盖
+        if (currentServer.isNotEmpty()) {
+            mergedList.add(com.mediaplayer.app.data.model.ServerEntry("", currentServer))
+        }
+
+        // 2. 获取原本地保存的历史服务器列表
+        val serverListJson = prefs.getString(Prefs.KEY_SERVER_URLS, null)
+        if (serverListJson != null) {
+            try {
+                val arr = Gson().fromJson(serverListJson, Array<com.mediaplayer.app.data.model.ServerEntry>::class.java)
+                mergedList.addAll(arr)
+            } catch (_: Exception) {
+                try {
+                    val arr = Gson().fromJson(serverListJson, Array<String>::class.java)
+                    mergedList.addAll(arr.map { com.mediaplayer.app.data.model.ServerEntry("", it) })
+                } catch (_: Exception) {}
+            }
+        }
+
+        // 3. 将获取到的最新备用地址进行智能解码（支持 Base64 和明文 HTTP/HTTPS 混合兼容）
+        val resolvedBackupServers = backupServers.map { url ->
+            val decoded = try {
+                val bytes = android.util.Base64.decode(url, android.util.Base64.DEFAULT)
+                String(bytes, Charsets.UTF_8).trim()
+            } catch (_: Exception) {
+                null
+            }
+            // 只有成功解码且解码后是以 http:// 或 https:// 开头的合法网址，才使用解码后的地址
+            if (decoded != null && (decoded.startsWith("http://", ignoreCase = true) || decoded.startsWith("https://", ignoreCase = true))) {
+                decoded
+            } else {
+                url.trim()
+            }
+        }
+        mergedList.addAll(resolvedBackupServers.map { com.mediaplayer.app.data.model.ServerEntry("", it) })
+
+        // 4. 过滤空值并利用 distinctBy 对 URL 进行去重（优先保留最前面的主服务器和历史手动配置）
+        val finalList = mergedList.filter { it.url.isNotBlank() }.distinctBy { it.url }
+
+        // 5. 保存回本地配置中
+        prefs.edit().putString(Prefs.KEY_SERVER_URLS, Gson().toJson(finalList)).apply()
     }
 
     /**

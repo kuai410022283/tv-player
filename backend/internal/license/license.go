@@ -576,9 +576,9 @@ func deriveKey() []byte {
 // ── 订阅过期与网络校验 ───────────────────────────────────────
 
 var timeServers = []string{
-	"https://www.baidu.com",
-	"https://www.taobao.com",
-	"https://www.apple.com",
+	"http://www.baidu.com",
+	"http://www.bing.com",
+	"http://www.apple.com",
 }
 
 // fetchNetworkTime 获取公网高可靠服务器时间
@@ -611,7 +611,7 @@ func VerifyExpiry() bool {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if gInfo == nil || gInfo.Status != StatusActivated {
+	if gInfo == nil || (gInfo.Status != StatusActivated && gInfo.Status != StatusExpired) {
 		return false
 	}
 	if gLicenseDB == nil {
@@ -621,7 +621,8 @@ func VerifyExpiry() bool {
 	// 1. 获取要校验的当前时间（网络时间优先）
 	var checkTime time.Time
 	netTime := fetchNetworkTime()
-	if !netTime.IsZero() {
+	isNetworkTime := !netTime.IsZero()
+	if isNetworkTime {
 		checkTime = netTime
 	} else {
 		checkTime = time.Now()
@@ -632,7 +633,7 @@ func VerifyExpiry() bool {
 	if err == nil && encLast != "" {
 		decLast, err := decryptLicenseKey(encLast)
 		if err != nil {
-			// 解密失败判定为篡改，标记过期/吊销
+			// 解密失败判定为数据被篡改，执行真正吊销（删除记录）
 			revokeInternal()
 			return false
 		}
@@ -640,7 +641,14 @@ func VerifyExpiry() bool {
 		if err == nil {
 			// 如果当前校验时间小于上一次校验通过的时间，说明存在时钟回拨
 			if checkTime.Before(lastTime) {
-				revokeInternal()
+				// 若因断网/无法连接公网导致退化为本地时间，本地时钟早于上次校验时间有可能是开机尚未NTP同步。
+				// 我们仅在内存中置为 StatusExpired（不永久吊销数据库记录），以便时钟同步后自动恢复。
+				if !isNetworkTime {
+					gInfo.Status = StatusExpired
+				} else {
+					// 确凿的网络时间发生回拨，判定为恶意回拨，调用吊销逻辑
+					revokeInternal()
+				}
 				return false
 			}
 		}
@@ -654,13 +662,17 @@ func VerifyExpiry() bool {
 			// 这里将 checkTime 转换为本地时区，然后格式化为 2006-01-02 进行天级别的比较
 			checkDate, _ := time.Parse("2006-01-02", checkTime.Local().Format("2006-01-02"))
 			if checkDate.After(expDate) {
-				revokeInternal()
+				// 过期不需要从数据库物理吊销记录，只需内存置为 StatusExpired 限制使用，允许用户续期
+				gInfo.Status = StatusExpired
 				return false
 			}
 		}
 	}
 
-	// 4. 校验通过，加密并更新最后校验时间
+	// 4. 校验通过，恢复状态（可能此前因为时间问题被临时置为了 StatusExpired）
+	gInfo.Status = StatusActivated
+
+	// 5. 校验通过，加密并更新最后校验时间
 	encTime, err := EncryptLicense(checkTime.Format(time.RFC3339))
 	if err == nil {
 		_ = gLicenseDB.UpdateLastVerifiedAt(encTime)

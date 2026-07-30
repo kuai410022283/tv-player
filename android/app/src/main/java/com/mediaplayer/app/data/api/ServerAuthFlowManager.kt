@@ -278,7 +278,22 @@ class ServerAuthFlowManager(
             emptyList()
         }
         val defaultUrl = prefs.getString(Prefs.KEY_SERVER_URL, Prefs.DEFAULT_SERVER_URL) ?: Prefs.DEFAULT_SERVER_URL
-        var candidates = serverList.ifEmpty { listOf(defaultUrl) }
+        val rawCandidates = serverList.ifEmpty { listOf(defaultUrl) }
+        
+        // 智能洗平：如果读取到的历史数据是 Base64 脏数据，自动转换为明文 http/s 地址，实现无缝升级
+        var candidates = rawCandidates.map { url ->
+            val decoded = try {
+                val bytes = android.util.Base64.decode(url, android.util.Base64.DEFAULT)
+                String(bytes, Charsets.UTF_8).trim()
+            } catch (_: Exception) {
+                null
+            }
+            if (decoded != null && (decoded.startsWith("http://", ignoreCase = true) || decoded.startsWith("https://", ignoreCase = true))) {
+                decoded
+            } else {
+                url.trim()
+            }
+        }
         
         // 核心修复：不应该“只返回首选线路”导致一条路走到黑。
         // 如果用户锁定了首选线路，应该将其“提拔”到列表最前面，依然保留后续备用节点作为防线。
