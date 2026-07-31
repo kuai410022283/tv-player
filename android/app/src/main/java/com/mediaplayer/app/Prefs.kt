@@ -112,4 +112,8 @@ object Prefs {
     const val KEY_CONTROL_SCHEME = "control_scheme"
     const val CONTROL_SCHEME_MODERN = 0
     const val CONTROL_SCHEME_TRADITIONAL = 1
+
+    // 定制包配置桩：是否允许用户扫码修改服务器配置（打包时如果定制为直连，会被后端置为 false 并隐藏本地配置二维码）
+    const val ALLOW_SERVER_CONFIG = true
 }
+

@@ -15,6 +15,7 @@
     "remote_config": "Config à distance",
     "global_settings": "Paramètres globaux",
     "check_update": "Mise à jour",
+    "client_custom": "Personnalisation du client",
     "sync": "Synchronisation",
     "system_logs": "Journaux système",
     "help": "Aide",

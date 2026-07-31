@@ -15,7 +15,17 @@ type ClientService struct {
 }
 
 func NewClientService(db *sql.DB) *ClientService {
+	// 自动修复由于超大天数计算导致的时间格式损坏，防止数据库读取崩溃
+	_, _ = db.Exec(`UPDATE clients SET expires_at = '9999-12-31 23:59:59' WHERE instr(expires_at, '-') > 5`)
 	return &ClientService{db: db}
+}
+
+func capExpiration(t time.Time) time.Time {
+	maxTime := time.Date(9999, 12, 31, 23, 59, 59, 0, t.Location())
+	if t.After(maxTime) {
+		return maxTime
+	}
+	return t
 }
 
 // ── Token 生成 ─────────────────────────────────────────
@@ -66,7 +76,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 					planID = pid
 					maxStreams = pStreams
 					if days > 0 {
-						t := now.AddDate(0, 0, days)
+						t := capExpiration(now.AddDate(0, 0, days))
 						expiresAt = &t
 					}
 				}
@@ -80,7 +90,7 @@ func (s *ClientService) Register(req *models.ClientRegisterReq, ip string) (*mod
 				_, _ = fmt.Sscanf(val, "%d", &days)
 			}
 			if days > 0 {
-				t := now.AddDate(0, 0, days)
+				t := capExpiration(now.AddDate(0, 0, days))
 				expiresAt = &t
 			}
 		}
@@ -202,7 +212,7 @@ func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, ap
 		if err == nil {
 			maxStreams = pStreams
 			if days > 0 {
-				t := now.AddDate(0, 0, days)
+				t := capExpiration(now.AddDate(0, 0, days))
 				expiresAt = &t
 			}
 		} else {
@@ -210,7 +220,7 @@ func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, ap
 		}
 	} else {
 		if req.MaxDays > 0 {
-			t := now.AddDate(0, 0, req.MaxDays)
+			t := capExpiration(now.AddDate(0, 0, req.MaxDays))
 			expiresAt = &t
 		}
 	}

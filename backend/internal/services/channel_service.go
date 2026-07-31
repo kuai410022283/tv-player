@@ -1273,25 +1273,4 @@ func (s *ChannelService) DeleteM3USource(id int64) error {
 	return err
 }
 
-// ── EPG ────────────────────────────────────────────────
 
-func (s *ChannelService) GetEPGPrograms(channelID string) ([]models.EPGProgram, error) {
-	rows, err := s.db.Query(`SELECT id, epg_channel_id, title, start_time, end_time, description FROM epg_programs WHERE epg_channel_id=? ORDER BY start_time`, channelID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var items []models.EPGProgram
-	for rows.Next() {
-		var p models.EPGProgram
-		if err := rows.Scan(&p.ID, &p.ChannelID, &p.Title, &p.StartTime, &p.EndTime, &p.Desc); err != nil {
-			return nil, err
-		}
-		items = append(items, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}

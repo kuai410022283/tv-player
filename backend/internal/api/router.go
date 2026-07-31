@@ -12,10 +12,11 @@ type Handlers struct {
 	PlanHandler    *PlanHandler
 	LogHandler     *handlers.LogHandler
 	LicenseHandler *handlers.LicenseHandler
+	CustomHandler  *CustomHandler
 }
 
-func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler, lh *handlers.LogHandler, lih *handlers.LicenseHandler) *Handlers {
-	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph, LogHandler: lh, LicenseHandler: lih}
+func NewHandlers(h *Handler, ch *ClientHandler, ph *PlanHandler, lh *handlers.LogHandler, lih *handlers.LicenseHandler, custH *CustomHandler) *Handlers {
+	return &Handlers{Handler: h, ClientHandler: ch, PlanHandler: ph, LogHandler: lh, LicenseHandler: lih, CustomHandler: custH}
 }
 
 func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
@@ -146,6 +147,22 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminLicense.GET("/status", hs.LicenseHandler.GetStatus)
 			adminLicense.POST("/activate", hs.LicenseHandler.Activate)
 			adminLicense.POST("/revoke", hs.LicenseHandler.Revoke)
+		}
+
+		// 管理端：客户端定制管理
+		adminCustom := api.Group("/admin/custom")
+		adminCustom.Use(middleware.RequireAdmin())
+		adminCustom.Use(middleware.RequireVIP())
+		{
+			adminCustom.GET("/status", hs.CustomHandler.GetStatus)
+			adminCustom.POST("/setup-env", hs.CustomHandler.SetupEnv)
+			adminCustom.POST("/cancel-setup", hs.CustomHandler.CancelSetup)
+			adminCustom.GET("/settings", hs.CustomHandler.GetSettings)
+			adminCustom.POST("/settings", hs.CustomHandler.SaveSettings)
+			adminCustom.POST("/upload-jks", hs.CustomHandler.UploadJks)
+			adminCustom.POST("/upload-logo", hs.CustomHandler.UploadLogo)
+			adminCustom.POST("/build", hs.CustomHandler.Build)
+			adminCustom.GET("/build-log", hs.CustomHandler.GetBuildLog)
 		}
 
 		// 管理端：全局客户端远程配置（需要 VIP 授权）

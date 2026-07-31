@@ -15,6 +15,7 @@
     "remote_config": "遠端設定",
     "global_settings": "全域設定",
     "check_update": "檢查更新",
+    "client_custom": "用戶端客製化",
     "sync": "主備同步",
     "system_logs": "系統記錄",
     "help": "說明",

@@ -3349,7 +3349,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         tvAuthWaiting?.visibility = View.VISIBLE
         findViewById<TextView>(R.id.tvAuthStatus)?.text = message
         
-        val actualShowQr = showQr ?: (layoutAuthQrConfig?.visibility == View.VISIBLE)
+        val actualShowQr = (showQr ?: (layoutAuthQrConfig?.visibility == View.VISIBLE)) && Prefs.ALLOW_SERVER_CONFIG
         
         // 面板已可见时，跳过二维码生成，避免闪烁
         if (actualShowQr && layoutAuthQrConfig?.visibility == View.VISIBLE) {

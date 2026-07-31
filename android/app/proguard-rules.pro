@@ -76,3 +76,8 @@
 
 # MPV Player
 -keep class is.xyz.mpv.** { *; }
+
+# Keep Prefs constants for backend customization
+-keep class com.mediaplayer.app.Prefs { *; }
+-keepclassmembers class com.mediaplayer.app.Prefs { *; }
+

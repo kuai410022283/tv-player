@@ -69,4 +69,11 @@ android/release.keystore
 docs
 *.strm
 
+# 忽略打包工具目录下的压缩包和解压文件
+backend/linux-通用修改app名称工具/jre/
+backend/linux-通用修改app名称工具/linux_tools/
+backend/linux-通用修改app名称工具/temp_unpacked/
+backend/linux-通用修改app名称工具/*.tar.gz
+backend/linux-通用修改app名称工具/*.jar
+
 

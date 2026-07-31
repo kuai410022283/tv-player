@@ -298,6 +298,13 @@ func (h *ClientHandler) Approve(c *gin.Context) {
 		slog.Warn("approve: invalid request body", "error", err)
 	}
 
+	if req.MaxDays > 999999 {
+		req.MaxDays = 999999
+	}
+	if req.MaxStreams > 9999 {
+		req.MaxStreams = 9999
+	}
+
 	approver := c.GetString("operator")
 	if approver == "" {
 		approver = "admin"

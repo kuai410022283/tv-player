@@ -15,6 +15,7 @@
     "remote_config": "远程配置",
     "global_settings": "全局设置",
     "check_update": "检查更新",
+    "client_custom": "客户端定制",
     "sync": "主备同步",
     "system_logs": "系统日志",
     "help": "帮助",

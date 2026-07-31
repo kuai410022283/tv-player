@@ -15,6 +15,7 @@
     "remote_config": "リモート設定",
     "global_settings": "全般設定",
     "check_update": "アップデート確認",
+    "client_custom": "クライアントのカスタマイズ",
     "sync": "主従同期",
     "system_logs": "システムログ",
     "help": "ヘルプ",

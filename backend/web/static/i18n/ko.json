@@ -15,6 +15,7 @@
     "remote_config": "원격 설정",
     "global_settings": "전역 설정",
     "check_update": "업데이트 확인",
+    "client_custom": "클라이언트 맞춤 설정",
     "sync": "주·예비 동기화",
     "system_logs": "시스템 로그",
     "help": "도움말",

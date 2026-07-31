@@ -15,6 +15,7 @@
     "remote_config": "Remote Config",
     "global_settings": "Global Settings",
     "check_update": "Check Update",
+    "client_custom": "Client Customization",
     "sync": "Master-Backup Sync",
     "system_logs": "System Logs",
     "help": "Help",

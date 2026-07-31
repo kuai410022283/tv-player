@@ -237,6 +237,7 @@ function showSection(name, el) {
     'client-config': loadGlobalClientConfig,
     'client-settings': loadClientSettings,
     'update': loadUpdates,
+    'client-custom': loadCustomPage,
     'sync': loadSyncSettings,
     'system-logs': () => {
       const iframe = document.getElementById('logs-iframe');
@@ -2313,6 +2314,10 @@ async function updateLicenseUI() {
     const navRemoteConfig = document.getElementById('nav-client-config');
     if (navRemoteConfig) navRemoteConfig.style.display = activated ? '' : 'none';
 
+    // 控制客户端定制导航项显隐
+    const navClientCustom = document.getElementById('nav-client-custom');
+    if (navClientCustom) navClientCustom.style.display = activated ? '' : 'none';
+
     // 控制设备详情弹窗中的"远程配置"Tab按钮
     const tabConfig = document.getElementById('tab-btn-config');
     if (tabConfig) tabConfig.style.display = activated ? '' : 'none';
@@ -2320,6 +2325,8 @@ async function updateLicenseUI() {
     // 授权接口不可用时，隐藏所有授权相关 UI
     const navRemoteConfig = document.getElementById('nav-client-config');
     if (navRemoteConfig) navRemoteConfig.style.display = 'none';
+    const navClientCustom = document.getElementById('nav-client-custom');
+    if (navClientCustom) navClientCustom.style.display = 'none';
     const tabConfig = document.getElementById('tab-btn-config');
     if (tabConfig) tabConfig.style.display = 'none';
   }
@@ -3758,4 +3765,378 @@ async function resetClientConfig(clientId) {
     loadClientConfigTab(clientId);
   }
 }
+
+// ═══ 客户端个性化定制打包 ════════════════════════════════
+let customEnvPollInterval = null;
+let customBuildPollInterval = null;
+
+async function loadCustomPage() {
+  if (customEnvPollInterval) clearInterval(customEnvPollInterval);
+  if (customBuildPollInterval) clearInterval(customBuildPollInterval);
+
+  await refreshCustomEnvStatus();
+  await loadCustomSettings();
+}
+
+async function refreshCustomEnvStatus(silent = false) {
+  try {
+    const r = await api('/admin/custom/status', { silent: silent });
+    const env = r.data || {};
+    
+    // 渲染可用官方底本下拉框
+    const baseSelect = document.getElementById('cust-base-version');
+    if (baseSelect && env.available_bases) {
+      const currentSelected = baseSelect.value;
+      baseSelect.innerHTML = env.available_bases.map(b => 
+        `<option value="${esc(b.dir)}">${esc(b.version)} (代码: ${b.code})</option>`
+      ).join('');
+      if (currentSelected && [...baseSelect.options].some(o => o.value === currentSelected)) {
+        baseSelect.value = currentSelected;
+      }
+    }
+
+    // 渲染环境就绪标记
+    const envBadge = document.getElementById('custom-env-badge');
+    const formContainer = document.getElementById('custom-form-container');
+    const baseStatus = document.getElementById('custom-base-apk-status');
+    const envBtnBox = document.getElementById('custom-env-btn-box');
+    const downloadBox = document.getElementById('custom-env-download-box');
+
+    // 官方底本检测
+    if (env.base_apk_ready) {
+      baseStatus.innerHTML = `🟢 <strong>官方基础底本已就绪</strong>：<code style="background:var(--bg3);padding:2px 6px;border-radius:4px;">${esc(env.base_apk_path)}</code> (版本名: ${esc(env.base_version)}, 版本号: ${env.base_code})`;
+      baseStatus.style.color = '#52c41a';
+    } else {
+      baseStatus.innerHTML = `🔴 <strong>尚未检测到官方底本客户端</strong>：请先前往【系统更新】下载或上传官方版本 APK (将保存在 web/download/ 下)`;
+      baseStatus.style.color = '#ff4d4f';
+    }
+
+    if (env.tools_ready) {
+      envBadge.textContent = '环境就绪';
+      envBadge.style.background = '#52c41a';
+      envBtnBox.style.display = 'none';
+      downloadBox.style.display = 'none';
+      
+      if (customEnvPollInterval) {
+        clearInterval(customEnvPollInterval);
+        customEnvPollInterval = null;
+      }
+      
+      // 只有工具链和官方底本均就绪时才解锁表单
+      if (env.base_apk_ready) {
+        formContainer.style.opacity = '1';
+        formContainer.style.pointerEvents = 'auto';
+      } else {
+        formContainer.style.opacity = '0.5';
+        formContainer.style.pointerEvents = 'none';
+      }
+    } else {
+      envBadge.textContent = '环境未就绪';
+      envBadge.style.background = '#f5222d';
+      formContainer.style.opacity = '0.5';
+      formContainer.style.pointerEvents = 'none';
+      
+      if (env.downloading) {
+        envBtnBox.style.display = 'none';
+        downloadBox.style.display = 'block';
+        renderCustomDownloadProgress(env.tools);
+        // 继续轮询
+        if (!customEnvPollInterval) {
+          customEnvPollInterval = setInterval(() => refreshCustomEnvStatus(true), 1500);
+        }
+      } else {
+        if (customEnvPollInterval) {
+          clearInterval(customEnvPollInterval);
+          customEnvPollInterval = null;
+        }
+        envBtnBox.style.display = 'block';
+        // 如果有任何一个工具报错，或者下载进度未完成，说明处于异常中断状态，保持展示以显示红字错误原因
+        const hasError = env.tools.some(t => t.error || (t.progress > 0 && t.progress < 100));
+        if (hasError) {
+          downloadBox.style.display = 'block';
+          renderCustomDownloadProgress(env.tools);
+        } else {
+          downloadBox.style.display = 'none';
+        }
+      }
+    }
+
+    // 处理打包状态
+    const consoleBox = document.getElementById('custom-build-console');
+    const statusBadge = document.getElementById('custom-build-status-badge');
+    const spinner = document.getElementById('cust-console-spinner');
+    const logBox = document.getElementById('custom-build-log');
+    const resultBox = document.getElementById('custom-result-actions');
+    const downloadBtn = document.getElementById('btn-custom-download-apk');
+    const qrBox = document.getElementById('custom-download-qrcode');
+
+    statusBadge.textContent = env.build_status;
+    if (env.build_status === 'idle') {
+      consoleBox.style.display = 'none';
+      resultBox.style.display = 'none';
+    } else if (env.build_status === 'building') {
+      consoleBox.style.display = 'block';
+      resultBox.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      document.getElementById('btn-custom-build').disabled = true;
+      document.getElementById('btn-custom-build').textContent = '⏳ 正在打包中，请稍候...';
+      
+      if (!customBuildPollInterval) {
+        customBuildPollInterval = setInterval(pollBuildLog, 1500);
+      }
+    } else {
+      // success 或 failed
+      consoleBox.style.display = 'block';
+      spinner.style.display = 'none';
+      document.getElementById('btn-custom-build').disabled = false;
+      document.getElementById('btn-custom-build').textContent = '🛠️ 开始打包生成定制客户端';
+      
+      if (customBuildPollInterval) {
+        clearInterval(customBuildPollInterval);
+        customBuildPollInterval = null;
+      }
+      
+      if (env.build_status === 'success') {
+        statusBadge.style.background = '#52c41a';
+        resultBox.style.display = 'flex';
+        
+        const apkUrls = env.apk_urls || (env.apk_url ? [env.apk_url] : []);
+        let buttonsHtml = '';
+        apkUrls.forEach(url => {
+          const filename = url.substring(url.lastIndexOf('/') + 1);
+          buttonsHtml += `<button class="btn btn-primary" onclick="window.open('${esc(url)}', '_blank')" style="white-space:nowrap;">📥 下载 ${esc(filename)}</button>`;
+        });
+        
+        // 动态覆盖和包装下载按钮区域
+        const btnContainer = document.getElementById('custom-download-buttons-container');
+        if (btnContainer) {
+          btnContainer.innerHTML = buttonsHtml;
+        } else if (downloadBtn) {
+          downloadBtn.outerHTML = `<div id="custom-download-buttons-container" style="display:flex; flex-wrap:wrap; gap:8px;">${buttonsHtml}</div>`;
+        }
+        
+        if (apkUrls.length > 0) {
+          qrBox.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(window.location.origin + apkUrls[0])}" style="width:72px;height:72px;border:none;">`;
+        }
+      } else {
+        statusBadge.style.background = '#f5222d';
+        resultBox.style.display = 'none';
+      }
+      // 拉取最后一次完整日志
+      pollBuildLog();
+    }
+
+  } catch (e) {
+    console.error('Error fetching custom env status:', e);
+  }
+}
+
+function renderCustomDownloadProgress(tools) {
+  const container = document.getElementById('custom-progress-bars');
+  container.innerHTML = tools.map(t => {
+    const color = t.error ? '#f5222d' : '#1890ff';
+    
+    let text = `${t.progress}%`;
+    let titleAttr = '';
+    if (t.error) {
+      titleAttr = `title="${esc(t.error)}" style="cursor:help;"`;
+      let shortErr = t.error;
+      const parts = shortErr.split(': ');
+      if (parts.length > 1) {
+        shortErr = parts[parts.length - 1]; // 抓取最右侧核心错误原因，如 TLS handshake timeout
+      }
+      if (shortErr.length > 40) {
+        shortErr = shortErr.slice(0, 38) + '...';
+      }
+      text = `失败: ${esc(shortErr)}`;
+    }
+
+    return `<div style="font-size:12px; margin-bottom:4px; display:flex; justify-content:space-between;">
+      <span>${esc(t.name)}</span>
+      <span style="color:${color}; font-weight:500;" ${titleAttr}>${text}</span>
+    </div>
+    <div style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:10px;">
+      <div style="width:${t.progress}%; height:100%; background:${color}; transition: width 0.3s ease;"></div>
+    </div>`;
+  }).join('');
+}
+
+async function setupCustomEnv() {
+  const proxySelect = document.getElementById('custom-proxy-select');
+  const proxyUrl = proxySelect ? proxySelect.value : "";
+
+  try {
+    await api('/admin/custom/setup-env', {
+      method: 'POST',
+      body: JSON.stringify({ proxy_url: proxyUrl })
+    });
+    toast('开始部署打包环境...', 'success');
+    refreshCustomEnvStatus();
+  } catch (e) {}
+}
+
+async function cancelCustomEnv() {
+  try {
+    await api('/admin/custom/cancel-setup', { method: 'POST' });
+    toast('已发送停止下载指令', 'info');
+    refreshCustomEnvStatus();
+  } catch (e) {}
+}
+
+async function loadCustomSettings() {
+  try {
+    const r = await api('/admin/custom/settings');
+    const s = r.data || {};
+    if (document.getElementById('cust-base-version')) {
+      document.getElementById('cust-base-version').value = s.base_version || '';
+    }
+    document.getElementById('cust-app-name').value = s.app_name || '';
+    document.getElementById('cust-version-name').value = s.version_name || '';
+    document.getElementById('cust-version-code').value = s.version_code || '';
+    document.getElementById('cust-server-url').value = s.default_server_url || '';
+    document.getElementById('cust-jks-enabled').checked = s.custom_keystore_enabled;
+    document.getElementById('cust-jks-alias').value = s.keystore_alias || '';
+    document.getElementById('cust-jks-storepass').value = s.keystore_password || '';
+    document.getElementById('cust-jks-keypass').value = s.key_password || '';
+    
+    onCustomJksToggle(s.custom_keystore_enabled);
+  } catch (e) {}
+}
+
+function onCustomJksToggle(checked) {
+  document.getElementById('custom-jks-fields').style.display = checked ? 'block' : 'none';
+}
+
+function toggleCustomJksFields() {
+  const cb = document.getElementById('cust-jks-enabled');
+  cb.checked = !cb.checked;
+  onCustomJksToggle(cb.checked);
+}
+
+async function uploadCustomLogo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('logo', file);
+  
+  showLoading();
+  try {
+    const headers = {};
+    if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+    const res = await fetch(API + '/admin/custom/upload-logo', {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+    const r = await res.json();
+    if (res.ok) {
+      toast('图标上传成功', 'success');
+      // 预览上传的图片
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('cust-logo-preview-box').style.display = 'flex';
+        document.getElementById('cust-logo-preview').src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      toast(r.message || '上传图标失败', 'error');
+    }
+  } catch (e) {
+    toast('上传失败: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function uploadCustomJks(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('jks', file);
+  
+  showLoading();
+  try {
+    const headers = {};
+    if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+    const res = await fetch(API + '/admin/custom/upload-jks', {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+    const r = await res.json();
+    if (res.ok) {
+      toast('签名证书上传成功', 'success');
+      document.getElementById('cust-jks-upload-status').textContent = '已上传 (' + file.name + ')';
+      document.getElementById('cust-jks-upload-status').style.color = '#52c41a';
+    } else {
+      toast(r.message || '上传证书失败', 'error');
+    }
+  } catch (e) {
+    toast('上传失败: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function saveCustomSettings() {
+  const d = {
+    base_version: document.getElementById('cust-base-version') ? document.getElementById('cust-base-version').value : '',
+    app_name: document.getElementById('cust-app-name').value,
+    version_name: document.getElementById('cust-version-name').value,
+    version_code: parseInt(document.getElementById('cust-version-code').value) || 0,
+    default_server_url: document.getElementById('cust-server-url').value,
+    custom_keystore_enabled: document.getElementById('cust-jks-enabled').checked,
+    keystore_alias: document.getElementById('cust-jks-alias').value,
+    keystore_password: document.getElementById('cust-jks-storepass').value,
+    key_password: document.getElementById('cust-jks-keypass').value
+  };
+
+  if (!d.app_name || !d.version_name || !d.version_code) {
+    toast('请填写必填项(应用名称、版本名称、版本号)', 'error');
+    return;
+  }
+
+  await api('/admin/custom/settings', {
+    method: 'POST',
+    body: JSON.stringify(d)
+  });
+  toast('设置保存成功');
+}
+
+async function buildCustomApk() {
+  // 先保存设置
+  await saveCustomSettings();
+  
+  try {
+    await api('/admin/custom/build', { method: 'POST' });
+    toast('开始在后台生成定制版 APK...', 'success');
+    refreshCustomEnvStatus();
+  } catch (e) {}
+}
+
+async function pollBuildLog() {
+  try {
+    const res = await fetch(API + '/admin/custom/build-log', {
+      headers: adminToken ? { 'Authorization': 'Bearer ' + adminToken } : {}
+    });
+    if (res.ok) {
+      const log = await res.text();
+      const logBox = document.getElementById('custom-build-log');
+      logBox.textContent = log;
+      logBox.scrollTop = logBox.scrollHeight; // 滚动到底部
+    }
+  } catch (e) {}
+  
+  // 定期拉取状态
+  if (customBuildPollInterval) {
+    const r = await api('/admin/custom/status', { silent: true });
+    const env = r.data || {};
+    if (env.build_status !== 'building') {
+      refreshCustomEnvStatus();
+    }
+  }
+}
+
 
