@@ -926,10 +926,17 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			tempUnsignedApk := filepath.Join(tempDir, "temp_unsigned.apk")
 			tempAlignedApk := filepath.Join(tempDir, "temp_aligned.apk")
 			tempUnpackedDir := filepath.Join(tempDir, "unpacked")
+			tempFrameDir := filepath.Join(tempDir, "framework")
+			_ = os.MkdirAll(tempFrameDir, 0755)
+
+			// 尝试预先创建用户主目录下的 apktool 框架目录，防止权限不足报错
+			if userHome, err := os.UserHomeDir(); err == nil && userHome != "" {
+				_ = os.MkdirAll(filepath.Join(userHome, ".local", "share", "apktool", "framework"), 0755)
+			}
 
 			// 1. 反编译
 			s.appendLog(">>> [1/5] 正在解析应用底本...")
-			decompileArgs := []string{"-jar", apktoolJar, "d", currentBaseApk, "-o", tempUnpackedDir, "-f"}
+			decompileArgs := []string{"-jar", apktoolJar, "d", "-p", tempFrameDir, currentBaseApk, "-o", tempUnpackedDir, "-f"}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, decompileArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 解析应用底本失败: %v", baseName, err)
@@ -958,7 +965,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 			// 3. 重新编译打包
 			s.appendLog(">>> [3/5] 正在编译构建客户端应用...")
-			rebuildArgs := []string{"-jar", apktoolJar, "b", tempUnpackedDir, "-o", tempUnsignedApk}
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
