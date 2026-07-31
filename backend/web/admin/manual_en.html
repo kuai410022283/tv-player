@@ -323,12 +323,12 @@
   <strong>Note:</strong> Multiplexing requires Direct Mode to be disabled, and the stream format must be proxied (e.g., TS, HLS). Protocols like RTSP do not support multiplexing.
 </div>
 
-<h3>Proxy Configuration (SOCKS5)</h3>
+<h3>Proxy Configuration (HTTP / HTTPS / SOCKS5)</h3>
 <p>The system supports a 3-tier proxy configuration inheritance hierarchy: <strong>Channel → Group → Source</strong>, sorted by priority.</p>
 <ul>
   <li><strong>Inherit Group Settings</strong> — Uses the proxy configured on the group level.</li>
   <li><strong>Direct (Override Inherited)</strong> — Forces no proxy, bypassing upper-level configurations.</li>
-  <li><strong>SOCKS5</strong> — Custom SOCKS5 proxy address, format: <code>socks5://user:pass@host:port</code>.</li>
+  <li><strong>HTTP / HTTPS / SOCKS5</strong> — Custom proxy address, format: <code>http://user:pass@host:port</code> or <code>socks5://user:pass@host:port</code>.</li>
 </ul>
 <p>In the channel editor, you can customize the proxy settings to override group and source default options.</p>
 
@@ -873,8 +873,8 @@
 <h3>Q: What is the "Enable Channel" switch?</h3>
 <p>Each channel has an "Enable" switch. When turned off, the channel is hidden from client lists and subscription exports, but remains visible in the admin panel. This is useful for temporarily hiding channels without deleting them.</p>
 
-<h3>Q: How to configure SOCKS5 proxy?</h3>
-<p>SOCKS5 proxy settings support 3 levels of inheritance (Channel → Group → Source) in their respective editing modals. Proxy URLs should be in the format: <code>socks5://user:pass@host:port</code>. Setting "Direct" blocks upper inheritance.</p>
+<h3>Q: How to configure HTTP / HTTPS / SOCKS5 proxy?</h3>
+<p>Proxy settings support 3 levels of inheritance (Channel → Group → Source) in their respective editing modals. Proxy URLs should be in the format: <code>http://user:pass@host:port</code> or <code>socks5://user:pass@host:port</code>. Setting "Direct" blocks upper inheritance.</p>
 
 <h3>Q: What does source "Manual" mean?</h3>
 <p>"Manual" means the channel was added by the administrator manually, rather than imported or synchronized via M3U sources. Channels synced from sources show the source name.</p>

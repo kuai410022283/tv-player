@@ -20,7 +20,7 @@ type ChannelGroup struct {
 	EnableMultiplex int       `json:"enable_multiplex" db:"enable_multiplex"`
 	CanMultiplex    bool      `json:"can_multiplex" db:"-"`
 	NonMuxCount     int       `json:"non_mux_count" db:"-"`
-	ProxyType       string    `json:"proxy_type,omitempty" db:"proxy_type"` // socks5
+	ProxyType       string    `json:"proxy_type,omitempty" db:"proxy_type"` // none, socks5, http, https
 	ProxyURL        string    `json:"proxy_url,omitempty" db:"proxy_url"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
@@ -59,7 +59,7 @@ type Channel struct {
 	ContentType     string    `json:"content_type" db:"content_type"` // live, vod, 空=自动推断
 	Fcc             string    `json:"fcc,omitempty" db:"fcc"`
 	FccType         string    `json:"fcc_type,omitempty" db:"fcc_type"`
-	ProxyType       string    `json:"proxy_type,omitempty" db:"proxy_type"` // socks5
+	ProxyType       string    `json:"proxy_type,omitempty" db:"proxy_type"` // none, socks5, http, https
 	ProxyURL        string    `json:"proxy_url,omitempty" db:"proxy_url"`
 	CanMultiplex    bool      `json:"can_multiplex" db:"-"`
 	LinkedChannelID int64     `json:"linked_channel_id" db:"linked_channel_id"`
@@ -158,7 +158,7 @@ type M3USource struct {
 	SyncInterval  int       `json:"sync_interval" db:"sync_interval"` // In hours
 	UserAgent     string    `json:"user_agent,omitempty" db:"user_agent"`
 	CustomHeaders string    `json:"custom_headers,omitempty" db:"custom_headers"`
-	ProxyType     string    `json:"proxy_type,omitempty" db:"proxy_type"` // socks5
+	ProxyType     string    `json:"proxy_type,omitempty" db:"proxy_type"` // none, socks5, http, https
 	ProxyURL      string    `json:"proxy_url,omitempty" db:"proxy_url"`
 	LastSync      time.Time `json:"last_sync,omitempty" db:"last_sync"`
 	SyncStatus    string    `json:"sync_status" db:"sync_status"` // idle, syncing, error

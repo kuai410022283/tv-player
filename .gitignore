@@ -76,4 +76,6 @@ backend/linux-通用修改app名称工具/temp_unpacked/
 backend/linux-通用修改app名称工具/*.tar.gz
 backend/linux-通用修改app名称工具/*.jar
 
+backend/library/*
+
 

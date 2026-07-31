@@ -161,6 +161,7 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminCustom.POST("/settings", hs.CustomHandler.SaveSettings)
 			adminCustom.POST("/upload-jks", hs.CustomHandler.UploadJks)
 			adminCustom.POST("/upload-logo", hs.CustomHandler.UploadLogo)
+			adminCustom.POST("/upload-banner", hs.CustomHandler.UploadBanner)
 			adminCustom.POST("/build", hs.CustomHandler.Build)
 			adminCustom.GET("/build-log", hs.CustomHandler.GetBuildLog)
 		}

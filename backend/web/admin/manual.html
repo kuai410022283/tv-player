@@ -323,12 +323,12 @@
   <strong>注意：</strong>复用流需要关闭直连模式，且流格式必须是代理可转发的格式（如 TS、HLS）。RTSP 等协议不支持复用。
 </div>
 
-<h3>代理配置（SOCKS5）</h3>
+<h3>代理配置（HTTP / HTTPS / SOCKS5）</h3>
 <p>系统支持三级代理配置继承体系：<strong>频道 → 分组 → 源</strong>，优先级从高到低。</p>
 <ul>
   <li><strong>继承分组代理设置</strong> — 使用分组中配置的代理</li>
   <li><strong>不代理（覆盖继承）</strong> — 强制不使用代理，覆盖上级设置</li>
-  <li><strong>SOCKS5</strong> — 自定义 SOCKS5 代理地址，格式：<code>socks5://user:pass@host:port</code></li>
+  <li><strong>HTTP / HTTPS / SOCKS5</strong> — 自定义代理地址，格式：<code>http://user:pass@host:port</code> 或 <code>socks5://user:pass@host:port</code></li>
 </ul>
 <p>在频道编辑中可单独设置代理类型，覆盖分组和源级别的配置。</p>
 
@@ -873,8 +873,8 @@
 <h3>Q: 什么是"启用频道"开关？有什么用？</h3>
 <p>每个频道都有一个"启用"开关。关闭后，该频道不会出现在客户端频道列表和任何订阅导出中，但在管理后台仍然可见，方便随时重新启用。适用于暂时不想删除但又不想展示给用户的频道。</p>
 
-<h3>Q: SOCKS5 代理如何配置？</h3>
-<p>SOCKS5 代理支持三级继承（频道 → 分组 → 源），可在对应层级的编辑弹窗中设置。代理地址格式为 <code>socks5://user:pass@host:port</code>。设置"不代理"可强制中断继承链。</p>
+<h3>Q: 代理服务器（HTTP / HTTPS / SOCKS5）如何配置？</h3>
+<p>代理支持三级继承（频道 → 分组 → 源），可在对应层级的编辑弹窗中选择 HTTP、HTTPS 或 SOCKS5 代理。代理地址格式为 <code>http://user:pass@host:port</code> 或 <code>socks5://user:pass@host:port</code>。设置"不代理"可强制中断继承链。</p>
 
 <h3>Q: 频道来源显示为"手动"是什么意思？</h3>
 <p>"手动"表示该频道是通过后台手动添加的，而非通过 M3U 源自动同步导入的。M3U 源导入的频道会显示对应的源名称。</p>

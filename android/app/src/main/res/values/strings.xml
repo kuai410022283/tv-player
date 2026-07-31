@@ -29,7 +29,7 @@
     <string name="settings_player_core">播放内核</string>
     <string name="settings_audio_passthrough">音频直通</string>
     <string name="settings_stop_previous">释放内存</string>
-    <string name="settings_pip">画中画</string>
+    <string name="settings_pip">窗口模式</string>
     <string name="settings_show_logo">显示台标</string>
     <string name="settings_time_mode">时间显示</string>
     <string name="settings_network_cache">网络缓存</string>
@@ -38,8 +38,8 @@
     <string name="settings_gesture_brightness">滑动亮度</string>
     <string name="settings_gesture_volume">滑动音量</string>
     <string name="settings_control_scheme">操控方案</string>
-    <string name="settings_global_progress">全局进度条</string>
-    <string name="settings_group_source">显示分组来源</string>
+    <string name="settings_global_progress">全局进度</string>
+    <string name="settings_group_source">显示来源</string>
     <string name="settings_dns_policy">DNS 策略</string>
     <string name="settings_preferred_server">服务器</string>
     <string name="settings_auto_start">开机自启</string>

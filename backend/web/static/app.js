@@ -709,6 +709,7 @@ function showAddChannelModal() {
   document.getElementById('ch-proxy-type').value = '';
   document.getElementById('ch-proxy-url').value = '';
   document.getElementById('ch-proxy-url-group').style.display = 'none';
+  updateProxyPlaceholder('ch-proxy-type', 'ch-proxy-url');
   document.getElementById('ch-sort').value = 0;
   const mirrorAction = document.getElementById('ch-mirror-action');
   if (mirrorAction) mirrorAction.style.display = 'none';
@@ -737,8 +738,8 @@ async function saveChannel() {
     sort_order: parseInt(document.getElementById('ch-sort').value) || 0
   };
   if (!d.name || !d.stream_url) { toast(t('modal.error_fill_name_url', '请填写名称和流地址'), 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
-  if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
+  if (['socks5', 'http', 'https'].includes(d.proxy_type) && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
+  if (!['socks5', 'http', 'https'].includes(d.proxy_type)) { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
@@ -776,7 +777,8 @@ async function editChannel(id) {
   document.getElementById('ch-content-type').value = c.content_type || '';
   document.getElementById('ch-proxy-type').value = c.proxy_type || '';
   document.getElementById('ch-proxy-url').value = c.proxy_url || '';
-  document.getElementById('ch-proxy-url-group').style.display = (c.proxy_type === 'socks5') ? 'block' : 'none';
+  document.getElementById('ch-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(c.proxy_type)) ? 'block' : 'none';
+  updateProxyPlaceholder('ch-proxy-type', 'ch-proxy-url');
   document.getElementById('ch-sort').value = c.sort_order || 0;
   document.getElementById('channel-modal-title').textContent = t('modal.channel_edit_title', '编辑频道');
 
@@ -1098,6 +1100,7 @@ function showAddGroupModal() {
   document.getElementById('grp-proxy-type').value = '';
   document.getElementById('grp-proxy-url').value = '';
   document.getElementById('grp-proxy-url-group').style.display = 'none';
+  updateProxyPlaceholder('grp-proxy-type', 'grp-proxy-url');
   showModal('group-modal');
 }
 
@@ -1114,8 +1117,8 @@ async function saveGroup() {
     proxy_url: document.getElementById('grp-proxy-url').value
   };
   if (!d.name) { toast(t('modal.error_fill_name', '请填写名称'), 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
-  if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
+  if (['socks5', 'http', 'https'].includes(d.proxy_type) && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
+  if (!['socks5', 'http', 'https'].includes(d.proxy_type)) { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
@@ -1144,7 +1147,8 @@ function editGroup(id) {
   document.getElementById('group-modal-title').textContent = t('groups.edit_group', '编辑分组');
   document.getElementById('grp-proxy-type').value = g.proxy_type || '';
   document.getElementById('grp-proxy-url').value = g.proxy_url || '';
-  document.getElementById('grp-proxy-url-group').style.display = (g.proxy_type === 'socks5') ? 'block' : 'none';
+  document.getElementById('grp-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(g.proxy_type)) ? 'block' : 'none';
+  updateProxyPlaceholder('grp-proxy-type', 'grp-proxy-url');
   showModal('group-modal');
 }
 
@@ -1258,6 +1262,7 @@ function showAddSourceModal() {
   document.getElementById('src-proxy-type').value = '';
   document.getElementById('src-proxy-url').value = '';
   document.getElementById('src-proxy-url-group').style.display = 'none';
+  updateProxyPlaceholder('src-proxy-type', 'src-proxy-url');
   showModal('source-modal');
 }
 
@@ -1274,7 +1279,8 @@ function editSource(id) {
   document.getElementById('src-headers').value = s.custom_headers || '';
   document.getElementById('src-proxy-type').value = s.proxy_type || '';
   document.getElementById('src-proxy-url').value = s.proxy_url || '';
-  document.getElementById('src-proxy-url-group').style.display = (s.proxy_type === 'socks5') ? 'block' : 'none';
+  document.getElementById('src-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(s.proxy_type)) ? 'block' : 'none';
+  updateProxyPlaceholder('src-proxy-type', 'src-proxy-url');
   showModal('source-modal');
 }
 
@@ -1291,8 +1297,8 @@ async function saveSource() {
     proxy_url: document.getElementById('src-proxy-url').value
   };
   if (!d.name || !d.url) { toast(t('sources.error_fill_complete', '请填写完整'), 'error'); return; }
-  if (d.proxy_type === 'socks5' && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
-  if (d.proxy_type !== 'socks5') { d.proxy_url = ''; }
+  if (['socks5', 'http', 'https'].includes(d.proxy_type) && !d.proxy_url) { toast(t('modal.error_fill_proxy', '请填写代理地址'), 'error'); return; }
+  if (!['socks5', 'http', 'https'].includes(d.proxy_type)) { d.proxy_url = ''; }
   if (d.custom_headers) {
     try {
       JSON.parse(d.custom_headers);
@@ -2235,7 +2241,10 @@ async function loadLicenseStatus() {
 
           <div class="form-row">
             <label>${t('license.benefits', '会员权益')}</label>
-            <span style="flex:1;color:#f59e0b;font-weight:600;">${t('license.benefits_val', '远程配置')}</span>
+            <div style="flex:1;display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val', '远程配置')}</span>
+              <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val2', '客户端定制')}</span>
+            </div>
           </div>
           <div style="margin-top:8px;">
             <button class="btn btn-danger" onclick="revokeLicense()">${t('license.revoke_license', '吊销授权')}</button>
@@ -3326,15 +3335,34 @@ async function forceSyncFromMaster() {
   }
 }
 
+function updateProxyPlaceholder(typeSelectId, urlInputId) {
+  const select = document.getElementById(typeSelectId);
+  const input = document.getElementById(urlInputId);
+  if (!select || !input) return;
+  const val = select.value;
+  if (val === 'http') {
+    input.placeholder = 'http://user:pass@host:port';
+  } else if (val === 'https') {
+    input.placeholder = 'https://user:pass@host:port';
+  } else if (val === 'socks5') {
+    input.placeholder = 'socks5://user:pass@host:port';
+  } else {
+    input.placeholder = t('modal.proxy_url_placeholder', 'http://user:pass@host:port 或 socks5://user:pass@host:port');
+  }
+}
+
 // Proxy type toggle handlers
 document.getElementById('src-proxy-type').addEventListener('change', function () {
-  document.getElementById('src-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
+  document.getElementById('src-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+  updateProxyPlaceholder('src-proxy-type', 'src-proxy-url');
 });
 document.getElementById('grp-proxy-type').addEventListener('change', function () {
-  document.getElementById('grp-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
+  document.getElementById('grp-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+  updateProxyPlaceholder('grp-proxy-type', 'grp-proxy-url');
 });
 document.getElementById('ch-proxy-type').addEventListener('change', function () {
-  document.getElementById('ch-proxy-url-group').style.display = (this.value === 'socks5') ? 'block' : 'none';
+  document.getElementById('ch-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+  updateProxyPlaceholder('ch-proxy-type', 'ch-proxy-url');
 });
 
 // ═══════════════════════════════════════════════════════
@@ -3788,28 +3816,21 @@ async function refreshCustomEnvStatus(silent = false) {
     if (baseSelect && env.available_bases) {
       const currentSelected = baseSelect.value;
       baseSelect.innerHTML = env.available_bases.map(b => 
-        `<option value="${esc(b.dir)}">${esc(b.version)} (代码: ${b.code})</option>`
+        `<option value="${esc(b.dir)}">${esc(b.version)} (${t('client_custom.version_code_suffix', '代码: {code}').replace('{code}', b.code)})</option>`
       ).join('');
       if (currentSelected && [...baseSelect.options].some(o => o.value === currentSelected)) {
         baseSelect.value = currentSelected;
+      } else if (baseSelect.options.length > 0) {
+        // 默认选中第一个（最高版本）
+        baseSelect.value = baseSelect.options[0].value;
       }
     }
 
     // 渲染环境就绪标记
     const envBadge = document.getElementById('custom-env-badge');
     const formContainer = document.getElementById('custom-form-container');
-    const baseStatus = document.getElementById('custom-base-apk-status');
     const envBtnBox = document.getElementById('custom-env-btn-box');
     const downloadBox = document.getElementById('custom-env-download-box');
-
-    // 官方底本检测
-    if (env.base_apk_ready) {
-      baseStatus.innerHTML = `🟢 <strong>官方基础底本已就绪</strong>：<code style="background:var(--bg3);padding:2px 6px;border-radius:4px;">${esc(env.base_apk_path)}</code> (版本名: ${esc(env.base_version)}, 版本号: ${env.base_code})`;
-      baseStatus.style.color = '#52c41a';
-    } else {
-      baseStatus.innerHTML = `🔴 <strong>尚未检测到官方底本客户端</strong>：请先前往【系统更新】下载或上传官方版本 APK (将保存在 web/download/ 下)`;
-      baseStatus.style.color = '#ff4d4f';
-    }
 
     if (env.tools_ready) {
       envBadge.textContent = '环境就绪';
@@ -3991,6 +4012,9 @@ async function loadCustomSettings() {
       document.getElementById('cust-base-version').value = s.base_version || '';
     }
     document.getElementById('cust-app-name').value = s.app_name || '';
+    if (document.getElementById('cust-package-name')) {
+      document.getElementById('cust-package-name').value = s.package_name || '';
+    }
     document.getElementById('cust-version-name').value = s.version_name || '';
     document.getElementById('cust-version-code').value = s.version_code || '';
     document.getElementById('cust-server-url').value = s.default_server_url || '';
@@ -4049,6 +4073,41 @@ async function uploadCustomLogo(event) {
   }
 }
 
+async function uploadCustomBanner(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('banner', file);
+  
+  showLoading();
+  try {
+    const headers = {};
+    if (adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+    const res = await fetch(API + '/admin/custom/upload-banner', {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+    const r = await res.json();
+    if (res.ok) {
+      toast('TV 宽屏横幅上传成功', 'success');
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('cust-banner-preview-box').style.display = 'flex';
+        document.getElementById('cust-banner-preview').src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      toast(r.message || '上传横幅失败', 'error');
+    }
+  } catch (e) {
+    toast('上传失败: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 async function uploadCustomJks(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -4084,6 +4143,7 @@ async function saveCustomSettings() {
   const d = {
     base_version: document.getElementById('cust-base-version') ? document.getElementById('cust-base-version').value : '',
     app_name: document.getElementById('cust-app-name').value,
+    package_name: document.getElementById('cust-package-name') ? document.getElementById('cust-package-name').value : '',
     version_name: document.getElementById('cust-version-name').value,
     version_code: parseInt(document.getElementById('cust-version-code').value) || 0,
     default_server_url: document.getElementById('cust-server-url').value,

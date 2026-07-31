@@ -108,6 +108,27 @@ func (h *CustomHandler) UploadLogo(c *gin.Context) {
 	ok(c, gin.H{"message": "应用图标上传成功"})
 }
 
+// POST /api/v1/admin/custom/upload-banner
+func (h *CustomHandler) UploadBanner(c *gin.Context) {
+	file, err := c.FormFile("banner")
+	if err != nil {
+		fail(c, 400, "获取上传文件失败")
+		return
+	}
+	src, err := file.Open()
+	if err != nil {
+		fail(c, 500, "打开文件失败")
+		return
+	}
+	defer src.Close()
+
+	if err := h.customSvc.SaveUserBanner(src); err != nil {
+		fail(c, 500, "保存 TV 横幅失败: "+err.Error())
+		return
+	}
+	ok(c, gin.H{"message": "Android TV 宽屏横幅上传成功"})
+}
+
 // POST /api/v1/admin/custom/build
 func (h *CustomHandler) Build(c *gin.Context) {
 	if err := h.customSvc.StartBuildPackage(); err != nil {

@@ -143,10 +143,14 @@ func (sp *StreamProxy) getProxyClient(ch *models.Channel) *http.Client {
 		return sp.client
 	}
 
+	if !strings.Contains(proxyURL, "://") {
+		proxyURL = proxyType + "://" + proxyURL
+	}
+
 	proxyParsed, err := url.Parse(proxyURL)
 	if err != nil {
 		atomic.AddInt64(&proxyErrorCount, 1)
-		slog.Error("SOCKS5代理地址格式错误，已回退直连", "proxy_url", proxyURL, "error", err, "total_errors", atomic.LoadInt64(&proxyErrorCount))
+		slog.Error("代理地址格式错误，已回退直连", "proxy_type", proxyType, "proxy_url", proxyURL, "error", err, "total_errors", atomic.LoadInt64(&proxyErrorCount))
 		return sp.client
 	}
 
@@ -173,6 +177,18 @@ func (sp *StreamProxy) getProxyClient(ch *models.Channel) *http.Client {
 				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return dialer.Dial(network, addr)
 				},
+				TLSHandshakeTimeout:   10 * time.Second,
+				ResponseHeaderTimeout: 30 * time.Second,
+				IdleConnTimeout:       90 * time.Second,
+				MaxIdleConns:          100,
+				MaxIdleConnsPerHost:   10,
+			},
+			CheckRedirect: sp.client.CheckRedirect,
+		}
+	case "http", "https":
+		return &http.Client{
+			Transport: &http.Transport{
+				Proxy:                 http.ProxyURL(proxyParsed),
 				TLSHandshakeTimeout:   10 * time.Second,
 				ResponseHeaderTimeout: 30 * time.Second,
 				IdleConnTimeout:       90 * time.Second,

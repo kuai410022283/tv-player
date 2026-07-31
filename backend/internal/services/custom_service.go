@@ -60,6 +60,7 @@ type EnvStatus struct {
 // CustomSettings 定制化设置
 type CustomSettings struct {
 	AppName               string `json:"app_name"`
+	PackageName           string `json:"package_name"`
 	VersionName           string `json:"version_name"`
 	VersionCode           int    `json:"version_code"`
 	DefaultServerURL      string `json:"default_server_url"`
@@ -712,6 +713,22 @@ func (s *CustomService) SaveUserLogo(r io.Reader) error {
 	return err
 }
 
+// SaveUserBanner 保存用户上传的 TV 宽屏横幅并记录配置
+func (s *CustomService) SaveUserBanner(r io.Reader) error {
+	dest := filepath.Join(s.toolsDir, "custom_banner.png")
+	out, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, r)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`INSERT INTO user_settings (key, value) VALUES ('custom_banner_path', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, dest)
+	return err
+}
+
 // StartBuildPackage 启动异步编译定制客户端
 func (s *CustomService) StartBuildPackage() error {
 	env := s.GetEnvStatus()
@@ -831,7 +848,6 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 	apktoolJar := filepath.Join(s.toolsDir, "apktool.jar")
 	apksignerJar := filepath.Join(s.toolsDir, "apksigner.jar")
-	zipalignJar := filepath.Join(s.toolsDir, "zipalign.jar")
 
 	if !fileExists(apktoolJar) || !fileExists(apksignerJar) {
 		s.buildStatus = "failed"
@@ -887,10 +903,10 @@ func (s *CustomService) runBuild(baseApkPath string) {
 	for idx, currentBaseApk := range baseApks {
 		baseName := filepath.Base(currentBaseApk)
 		s.appendLog("\n>>> ------------------------------------------------------------")
-		s.appendLog(">>> 正在定制打包 (%d/%d): %s", idx+1, len(baseApks), baseName)
+		s.appendLog(">>> 正在生成定制客户端 (%d/%d): %s", idx+1, len(baseApks), baseName)
 		s.appendLog(">>> ------------------------------------------------------------")
 
-		// 动态生成输出文件名 (如 mediaplayer-v1.1.16-all-release.apk -> mediaplayer-v1.1.16-all-release_custom.apk)
+		// 动态生成输出文件名
 		outApkName := strings.TrimSuffix(baseName, filepath.Ext(baseName)) + "_custom.apk"
 		outputApkPath := filepath.Join(outputDir, outApkName)
 
@@ -902,7 +918,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			s.appendLog("[ERROR] %s", s.buildError)
 			return
 		}
-		
+
 		// 任务执行完成后彻底清空此临时文件夹
 		func() {
 			defer os.RemoveAll(tempDir)
@@ -912,61 +928,63 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			tempUnpackedDir := filepath.Join(tempDir, "unpacked")
 
 			// 1. 反编译
-			s.appendLog(">>> [1/5] 正在反编译底本...")
+			s.appendLog(">>> [1/5] 正在解析应用底本...")
 			decompileArgs := []string{"-jar", apktoolJar, "d", currentBaseApk, "-o", tempUnpackedDir, "-f"}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, decompileArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
-				s.buildError = fmt.Sprintf("[%s] 反编译底本失败: %v", baseName, err)
+				s.buildError = fmt.Sprintf("[%s] 解析应用底本失败: %v", baseName, err)
 				return
 			}
 
 			// 2. 定制修改
 			modifiers := []ApkModifier{
 				&AppNameModifier{},
+				&PackageNameModifier{},
 				&VersionModifier{},
-				&LogoAndBannerModifier{CustomLogoPath: s.getSettingDb("custom_logo_path", "")},
+				&LogoAndBannerModifier{
+					CustomLogoPath:   s.getSettingDb("custom_logo_path", ""),
+					CustomBannerPath: s.getSettingDb("custom_banner_path", ""),
+				},
 				&SmaliConfigModifier{},
 			}
-			s.appendLog(">>> [2/5] 开始执行定制修改器管道...")
+			s.appendLog(">>> [2/5] 正在应用个性化定制配置...")
 			for _, mod := range modifiers {
-				s.appendLog(">>> 执行修改器: %s", mod.Name())
 				if err := mod.Modify(ctx, tempUnpackedDir, &settings, s.appendLog); err != nil {
 					s.buildStatus = "failed"
-					s.buildError = fmt.Sprintf("[%s] 修改器 %s 执行失败: %v", baseName, mod.Name(), err)
+					s.buildError = fmt.Sprintf("[%s] 配置项 %s 处理失败: %v", baseName, mod.Name(), err)
 					return
 				}
 			}
 
 			// 3. 重新编译打包
-			s.appendLog(">>> [3/5] 正在重新编译打包中...")
+			s.appendLog(">>> [3/5] 正在编译构建客户端应用...")
 			rebuildArgs := []string{"-jar", apktoolJar, "b", tempUnpackedDir, "-o", tempUnsignedApk}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
-				s.buildError = fmt.Sprintf("[%s] 重新打包失败: %v", baseName, err)
+				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
 				return
 			}
 
 			// 4. 对齐优化
-			s.appendLog(">>> [4/5] 正在对齐优化 APK...")
-			execCmd, flags := s.getZipalignCmd(javaCmd, zipalignJar, s.appendLog)
+			s.appendLog(">>> [4/5] 正在优化应用结构...")
+			execCmd, flags := s.getZipalignCmd(javaCmd, s.appendLog)
 			if execCmd != javaCmd {
 				alignArgs := append(flags, tempUnsignedApk, tempAlignedApk)
 				if err := ExecuteCommandWithLog(ctx, execCmd, alignArgs, s.appendLog); err != nil {
 					s.buildStatus = "failed"
-					s.buildError = fmt.Sprintf("[%s] 原生对齐优化失败: %v", baseName, err)
+					s.buildError = fmt.Sprintf("[%s] 优化应用结构失败: %v", baseName, err)
 					return
 				}
 			} else {
-				s.appendLog("[WARN] 未检测到原生 zipalign 二进制工具，建议在 Linux 服务器运行 'apt install -y zipalign' 以获最佳兼容性")
 				if err := NativeZipAlign(tempUnsignedApk, tempAlignedApk, 4); err != nil {
 					s.buildStatus = "failed"
-					s.buildError = fmt.Sprintf("[%s] 原生 Go 对齐优化失败: %v", baseName, err)
+					s.buildError = fmt.Sprintf("[%s] 原生对齐优化失败: %v", baseName, err)
 					return
 				}
 			}
 
 			// 5. 签名
-			s.appendLog(">>> [5/5] 正在对 APK 进行签名并输出...")
+			s.appendLog(">>> [5/5] 正在完成数字签名...")
 			signArgs := []string{
 				"-jar", apksignerJar, "sign",
 				"--ks", keystorePath,
@@ -980,11 +998,11 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, signArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
-				s.buildError = fmt.Sprintf("[%s] 签名失败: %v", baseName, err)
+				s.buildError = fmt.Sprintf("[%s] 数字签名失败: %v", baseName, err)
 				return
 			}
 
-			s.appendLog("[SUCCESS] 成功生成定制客户端: %s", outputApkPath)
+			s.appendLog("[SUCCESS] 成功生成定制客户端: %s", outApkName)
 		}()
 
 		// 如果在中途某一个底本打包出错，立即中止后续打包
@@ -1102,7 +1120,7 @@ func (s *CustomService) FindBaseApkInDir(dirName string) (path string, versionNa
 }
 
 // getZipalignCmd 智能检测并优先返回原生 zipalign 可执行二进制文件及参数
-func (s *CustomService) getZipalignCmd(javaCmd, zipalignJar string, logFunc func(string, ...interface{})) (cmd string, args []string) {
+func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...interface{})) (cmd string, args []string) {
 	// 1. 检测本地 linux_tools/zipalign 可执行文件
 	localBinName := "zipalign"
 	if runtime.GOOS == "windows" {

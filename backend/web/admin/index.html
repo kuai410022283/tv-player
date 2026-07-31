@@ -1071,15 +1071,14 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px; color:#f59e0b;">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                打包编译环境状态
+                <span data-i18n="client_custom.env_status">打包编译环境状态</span>
               </span>
-              <span id="custom-env-badge" style="font-size:12px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff;">检测中...</span>
+              <span id="custom-env-badge" data-i18n="client_custom.checking" style="font-size:12px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff;">检测中...</span>
             </h3>
-            <div id="custom-base-apk-status" style="font-size:13px; color:var(--text2); margin-bottom:12px;"></div>
             <div id="custom-env-download-box" style="display:none; margin-top:16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <div style="font-size:13px; color:var(--text1); font-weight:600;">正在并发下载部署依赖工具，请稍候...</div>
-                <button class="btn btn-danger btn-sm" onclick="cancelCustomEnv()" style="padding: 2px 8px; font-size: 11px;">停止下载</button>
+                <div style="font-size:13px; color:var(--text1); font-weight:600;" data-i18n="client_custom.downloading_tools">正在并发下载部署依赖工具，请稍候...</div>
+                <button class="btn btn-danger btn-sm" onclick="cancelCustomEnv()" data-i18n="client_custom.stop_download" style="padding: 2px 8px; font-size: 11px;">停止下载</button>
               </div>
               <div id="custom-progress-bars" style="display:flex; flex-direction:column; gap:10px;">
                 <!-- 进度条动态插入 -->
@@ -1087,9 +1086,9 @@
             </div>
             <div id="custom-env-btn-box" style="margin-top:12px; display:none;">
               <div class="form-group" style="margin-bottom: 12px; max-width: 400px;">
-                <label style="font-size: 12px; font-weight: 600; color: var(--text1); margin-bottom: 6px; display: block;">GitHub 下载加速代理 (解决国内下载慢/失败)</label>
+                <label style="font-size: 12px; font-weight: 600; color: var(--text1); margin-bottom: 6px; display: block;" data-i18n="client_custom.proxy_label">GitHub 下载加速代理 (解决国内下载慢/失败)</label>
                 <select id="custom-proxy-select" style="height: 36px; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
-                  <option value="">直连 (无加速)</option>
+                  <option value="" data-i18n="client_custom.proxy_direct">直连 (无加速)</option>
                   <option value="https://cf.612526.xyz/" selected>https://cf.612526.xyz</option>
                   <option value="https://gh.felicity.ac.cn/">https://gh.felicity.ac.cn</option>
                   <option value="https://gh-proxy.org/">https://gh-proxy.org</option>
@@ -1098,7 +1097,7 @@
                   <option value="https://edgeone.gh-proxy.org/">https://edgeone.gh-proxy.org</option>
                 </select>
               </div>
-              <button class="btn btn-primary" onclick="setupCustomEnv()">⚡ 一键部署打包环境</button>
+              <button class="btn btn-primary" onclick="setupCustomEnv()" data-i18n="client_custom.deploy_env">⚡ 一键部署打包环境</button>
             </div>
           </div>
 
@@ -1106,40 +1105,56 @@
           <div id="custom-form-container" style="opacity:0.5; pointer-events:none;">
             <div class="form-row">
               <div class="form-group" style="flex: 1.2;">
-                <label>官方底本版本 <span style="color:var(--danger)">*</span></label>
+                <label data-i18n="client_custom.base_version_label">官方底本版本 <span style="color:var(--danger)">*</span></label>
                 <select id="cust-base-version" style="height: 38px; padding: 6px 12px; border-radius: 4px; font-size: 13px; border: 1px solid var(--border); background: var(--bg2); color: var(--text1); width: 100%;">
                   <!-- 动态底本选项 -->
                 </select>
               </div>
               <div class="form-group">
-                <label>应用名称 <span style="color:var(--danger)">*</span></label>
-                <input type="text" id="cust-app-name" placeholder="例如：我的电视播放器">
+                <label data-i18n="client_custom.app_name_label">应用名称 <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="cust-app-name" data-i18n-placeholder="client_custom.app_name_placeholder" placeholder="例如：我的电视播放器">
               </div>
               <div class="form-group">
-                <label>版本名称 (Version Name) <span style="color:var(--danger)">*</span></label>
-                <input type="text" id="cust-version-name" placeholder="例如：1.0.8">
+                <label data-i18n="client_custom.package_name_label">包名 (Package Name) <span style="color:var(--warning)">可选</span></label>
+                <input type="text" id="cust-package-name" data-i18n-placeholder="client_custom.package_name_placeholder" placeholder="例如：com.mediaplayer.app">
+                <small style="color:var(--text-muted);display:block;margin-top:4px;" data-i18n="client_custom.package_name_hint">用于解决部分电视系统的安装限制，留空则使用默认包名</small>
               </div>
               <div class="form-group">
-                <label>版本代码 (Version Code) <span style="color:var(--danger)">*</span></label>
-                <input type="number" id="cust-version-code" placeholder="例如：108">
+                <label data-i18n="client_custom.version_name_label">版本名称 (Version Name) <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="cust-version-name" data-i18n-placeholder="client_custom.version_name_placeholder" placeholder="例如：1.0.8">
+              </div>
+              <div class="form-group">
+                <label data-i18n="client_custom.version_code_label">版本代码 (Version Code) <span style="color:var(--danger)">*</span></label>
+                <input type="number" id="cust-version-code" data-i18n-placeholder="client_custom.version_code_placeholder" placeholder="例如：108">
               </div>
             </div>
 
-            <div class="form-row">
-              <div class="form-group" style="flex: 2;">
-                <label>内置默认服务器地址 (可选，硬编码进客户端，开机即用免扫码)</label>
-                <input type="text" id="cust-server-url" placeholder="例如：http://tv.yourdomain.com:9527">
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label>应用图标 Logo (.png 格式)</label>
-                <div style="display:flex; gap:10px; align-items:center;">
-                  <input type="file" id="cust-logo-file" accept="image/png" style="display:none;" onchange="uploadCustomLogo(event)">
-                  <button class="btn btn-ghost" onclick="document.getElementById('cust-logo-file').click()" style="white-space:nowrap;">选择 PNG 图标</button>
-                  <div id="cust-logo-preview-box" style="width:38px; height:38px; border: 1px solid var(--border); border-radius: 4px; display:none; background: var(--bg2); align-items:center; justify-content:center;">
-                    <img id="cust-logo-preview" style="max-width:32px; max-height:32px; border-radius:2px;">
-                  </div>
+            <div class="form-group">
+              <label data-i18n="client_custom.server_url_label">内置默认服务器地址 (可选，硬编码进客户端，开机即用免扫码)</label>
+              <input type="text" id="cust-server-url" data-i18n-placeholder="client_custom.server_url_placeholder" placeholder="例如：http://tv.yourdomain.com:9527" style="height: 38px;">
+            </div>
+
+            <div class="form-group">
+              <label data-i18n="client_custom.logo_label">应用图标 Logo (.png 格式)</label>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <input type="file" id="cust-logo-file" accept="image/png" style="display:none;" onchange="uploadCustomLogo(event)">
+                <button class="btn btn-ghost" onclick="document.getElementById('cust-logo-file').click()" data-i18n="client_custom.select_png" style="white-space:nowrap;">选择 PNG 图标</button>
+                <div id="cust-logo-preview-box" style="width:38px; height:38px; border: 1px solid var(--border); border-radius: 4px; display:none; background: var(--bg2); align-items:center; justify-content:center;">
+                  <img id="cust-logo-preview" style="max-width:32px; max-height:32px; border-radius:2px;">
                 </div>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label data-i18n="client_custom.banner_label">Android TV 宽屏横幅 (banner.png, 320x180 推荐, 可选)</label>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <input type="file" id="cust-banner-file" accept="image/png" style="display:none;" onchange="uploadCustomBanner(event)">
+                <button class="btn btn-ghost" onclick="document.getElementById('cust-banner-file').click()" data-i18n="client_custom.select_banner" style="white-space:nowrap;">选择 Banner 图片</button>
+                <div id="cust-banner-preview-box" style="width:80px; height:45px; border: 1px solid var(--border); border-radius: 4px; display:none; background: var(--bg2); align-items:center; justify-content:center;">
+                  <img id="cust-banner-preview" style="max-width:76px; max-height:41px; border-radius:2px;">
+                </div>
+              </div>
+              <div style="font-size: 11px; color: var(--text2); margin-top: 4px;" data-i18n="client_custom.banner_desc">未上传时自动从常规图标等比缩放合成。Android TV 桌面（小米电视、当贝等）的推荐位/置顶图标使用此横幅。</div>
             </div>
 
             <hr style="margin:20px 0; border:none; border-top:1px solid var(--border)">
@@ -1148,40 +1163,40 @@
             <div class="form-group">
               <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;" onclick="toggleCustomJksFields()">
                 <input type="checkbox" id="cust-jks-enabled" onchange="onCustomJksToggle(this.checked)" style="width:16px; height:16px;">
-                使用自定义签名证书 (JKS)
+                <span data-i18n="client_custom.jks_enabled">使用自定义签名证书 (JKS)</span>
               </label>
             </div>
 
             <div id="custom-jks-fields" style="display:none; padding:16px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg1); margin-bottom: 20px;">
               <div class="form-row">
                 <div class="form-group">
-                  <label>上传证书文件 (.jks / .keystore)</label>
+                  <label data-i18n="client_custom.jks_upload_label">上传证书文件 (.jks / .keystore)</label>
                   <div style="display:flex; gap:10px; align-items:center;">
                     <input type="file" id="cust-jks-file" accept=".jks,.keystore" style="display:none;" onchange="uploadCustomJks(event)">
-                    <button class="btn btn-ghost" onclick="document.getElementById('cust-jks-file').click()">选择证书文件</button>
-                    <span id="cust-jks-upload-status" style="font-size:12px; color:var(--text2)">未上传</span>
+                    <button class="btn btn-ghost" onclick="document.getElementById('cust-jks-file').click()" data-i18n="client_custom.jks_select_file">选择证书文件</button>
+                    <span id="cust-jks-upload-status" data-i18n="client_custom.jks_not_uploaded" style="font-size:12px; color:var(--text2)">未上传</span>
                   </div>
                 </div>
                 <div class="form-group">
-                  <label>证书别名 (Alias)</label>
-                  <input type="text" id="cust-jks-alias" placeholder="例如：my-key-alias">
+                  <label data-i18n="client_custom.jks_alias">证书别名 (Alias)</label>
+                  <input type="text" id="cust-jks-alias" data-i18n-placeholder="client_custom.jks_alias_placeholder" placeholder="例如：my-key-alias">
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label>密钥库密码 (Store Password)</label>
-                  <input type="password" id="cust-jks-storepass" placeholder="请输入密钥库密码">
+                  <label data-i18n="client_custom.jks_storepass">密钥库密码 (Store Password)</label>
+                  <input type="password" id="cust-jks-storepass" data-i18n-placeholder="client_custom.jks_storepass_placeholder" placeholder="请输入密钥库密码">
                 </div>
                 <div class="form-group">
-                  <label>别名密码 (Key Password)</label>
-                  <input type="password" id="cust-jks-keypass" placeholder="请输入别名密码">
+                  <label data-i18n="client_custom.jks_keypass">别名密码 (Key Password)</label>
+                  <input type="password" id="cust-jks-keypass" data-i18n-placeholder="client_custom.jks_keypass_placeholder" placeholder="请输入别名密码">
                 </div>
               </div>
             </div>
 
             <div class="form-actions" style="justify-content:flex-start; margin-top:20px; gap:12px;">
-              <button class="btn btn-primary" onclick="saveCustomSettings()">保存个性化参数</button>
-              <button id="btn-custom-build" class="btn btn-warn" onclick="buildCustomApk()">🛠️ 开始打包生成定制客户端</button>
+              <button class="btn btn-primary" onclick="saveCustomSettings()" data-i18n="client_custom.save_settings">保存个性化参数</button>
+              <button id="btn-custom-build" class="btn btn-warn" onclick="buildCustomApk()" data-i18n="client_custom.build_button">🛠️ 开始打包生成定制客户端</button>
             </div>
           </div>
 
@@ -1190,20 +1205,20 @@
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <h3 style="font-weight:600; font-size:14px; border-bottom:none; padding-bottom:0; display:flex; align-items:center; gap:6px;">
                 <span class="loading-spinner" id="cust-console-spinner" style="width:14px; height:14px; display:inline-block; border-width:2px; vertical-align:middle; display:none;"></span>
-                编译构建日志控制台
+                <span data-i18n="client_custom.build_console">编译构建日志控制台</span>
               </h3>
-              <span id="custom-build-status-badge" style="font-size:11px; padding:2px 8px; border-radius:10px; background:var(--bg3); color:var(--text2)">idle</span>
+              <span id="custom-build-status-badge" data-i18n="client_custom.idle" style="font-size:11px; padding:2px 8px; border-radius:10px; background:var(--bg3); color:var(--text2)">idle</span>
             </div>
             <pre id="custom-build-log" style="background:#0f172a; color:#f8fafc; padding:16px; border-radius:6px; font-family:var(--font-mono, monospace); font-size:12px; height:260px; overflow-y:auto; margin:0; border:1px solid #1e293b; white-space:pre-wrap; word-break:break-all;"></pre>
             
             <div id="custom-result-actions" style="margin-top:16px; display:none; flex-direction:column; gap:16px; background:rgba(22, 186, 170, 0.05); padding:16px; border:1px solid var(--accent); border-radius:var(--radius);">
               <div>
-                <h4 style="margin:0 0 6px 0; color:var(--accent);">🎉 定制客户端生成成功！</h4>
-                <div style="font-size:12px; color:var(--text2);">您可以通过下方按钮直接下载，或使用手机/电视端扫码直接下载。已自动挂载到 OTA 升级管理中。</div>
+                <h4 style="margin:0 0 6px 0; color:var(--accent);" data-i18n="client_custom.build_success">🎉 定制客户端生成成功！</h4>
+                <div style="font-size:12px; color:var(--text2);" data-i18n="client_custom.build_success_desc">您可以通过下方按钮直接下载，或使用手机/电视端扫码直接下载。已自动挂载到 OTA 升级管理中。</div>
               </div>
               <div style="display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
                 <div id="custom-download-buttons-container" style="display:flex; flex-wrap:wrap; gap:8px; flex:1; min-width:280px;">
-                  <button class="btn btn-primary" id="btn-custom-download-apk">📥 下载定制版 APK</button>
+                  <button class="btn btn-primary" id="btn-custom-download-apk" data-i18n="client_custom.download_apk">📥 下载定制版 APK</button>
                 </div>
                 <div id="custom-download-qrcode" style="width:80px; height:80px; background:#fff; padding:4px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                   <!-- 二维码动态插入 -->
@@ -1389,11 +1404,13 @@
               <option value="" data-i18n="modal.proxy_inherit_group">继承分组代理设置</option>
               <option value="none" data-i18n="modal.proxy_none">不代理（覆盖继承）</option>
               <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
+              <option value="http" data-i18n="modal.proxy_http">HTTP</option>
+              <option value="https" data-i18n="modal.proxy_https">HTTPS</option>
             </select>
           </div>
           <div class="form-group" id="ch-proxy-url-group" style="display:none">
             <label data-i18n="modal.proxy_url">代理地址</label>
-            <input type="text" id="ch-proxy-url" data-i18n-placeholder="modal.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
+            <input type="text" id="ch-proxy-url" data-i18n-placeholder="modal.proxy_url_placeholder" placeholder="http://user:pass@host:port 或 socks5://user:pass@host:port">
           </div>
           <div class="form-group"><label data-i18n="modal.sort_order">排序</label><input type="number" id="ch-sort" value="0" data-i18n-placeholder="modal.sort_order_placeholder" placeholder="数字越小越靠前">
           </div>
@@ -1454,11 +1471,13 @@
               <option value="" data-i18n="modal.proxy_inherit_source">继承源代理设置</option>
               <option value="none" data-i18n="modal.proxy_none">不代理（覆盖继承）</option>
               <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
+              <option value="http" data-i18n="modal.proxy_http">HTTP</option>
+              <option value="https" data-i18n="modal.proxy_https">HTTPS</option>
             </select>
           </div>
           <div class="form-group" id="grp-proxy-url-group" style="display:none">
             <label data-i18n="modal.proxy_url">代理地址</label>
-            <input type="text" id="grp-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
+            <input type="text" id="grp-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="http://user:pass@host:port 或 socks5://user:pass@host:port">
           </div>
         </div>
         <div class="form-actions">
@@ -1506,11 +1525,13 @@
             <select id="src-proxy-type">
               <option value="" data-i18n="modal.proxy_disabled">不使用代理</option>
               <option value="socks5" data-i18n="modal.proxy_socks5">SOCKS5</option>
+              <option value="http" data-i18n="modal.proxy_http">HTTP</option>
+              <option value="https" data-i18n="modal.proxy_https">HTTPS</option>
             </select>
           </div>
           <div class="form-group" id="src-proxy-url-group" style="display:none">
             <label data-i18n="modal.proxy_url">代理地址</label>
-            <input type="text" id="src-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="socks5://user:pass@host:port">
+            <input type="text" id="src-proxy-url" data-i18n-placeholder="placeholder.proxy_url_placeholder" placeholder="http://user:pass@host:port 或 socks5://user:pass@host:port">
           </div>
         </div>
         <div class="form-actions">
