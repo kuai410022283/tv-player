@@ -78,7 +78,7 @@ func (h *CustomHandler) UploadJks(c *gin.Context) {
 		fail(c, 500, "打开文件失败")
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := h.customSvc.SaveUserJks(src); err != nil {
 		fail(c, 500, "保存证书失败: "+err.Error())
@@ -99,7 +99,7 @@ func (h *CustomHandler) UploadLogo(c *gin.Context) {
 		fail(c, 500, "打开文件失败")
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := h.customSvc.SaveUserLogo(src); err != nil {
 		fail(c, 500, "保存图标失败: "+err.Error())
@@ -120,7 +120,7 @@ func (h *CustomHandler) UploadBanner(c *gin.Context) {
 		fail(c, 500, "打开文件失败")
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := h.customSvc.SaveUserBanner(src); err != nil {
 		fail(c, 500, "保存 TV 横幅失败: "+err.Error())

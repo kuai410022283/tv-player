@@ -543,7 +543,7 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 		fail(c, 500, "读取上传文件失败")
 		return
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if _, err := fmt.Fprintf(f, "\n--- Log Upload: %s ---\n", time.Now().Format(time.RFC3339)); err != nil {
 		fail(c, 500, "写入日志失败")

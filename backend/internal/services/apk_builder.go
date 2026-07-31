@@ -235,7 +235,7 @@ func (m *LogoAndBannerModifier) Modify(ctx context.Context, tempDir string, sett
 	} else if m.CustomLogoPath != "" && fileExists(m.CustomLogoPath) {
 		logoFile, err := os.Open(m.CustomLogoPath)
 		if err == nil {
-			defer logoFile.Close()
+			defer func() { _ = logoFile.Close() }()
 			logoImg, _, err := image.Decode(logoFile)
 			if err == nil {
 				bannerWidth := 320
@@ -266,7 +266,7 @@ func (m *LogoAndBannerModifier) Modify(ctx context.Context, tempDir string, sett
 				outBannerFile, err := os.OpenFile(bannerPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 				if err == nil {
 					_ = png.Encode(outBannerFile, bannerImg)
-					outBannerFile.Close()
+					_ = outBannerFile.Close()
 				}
 			}
 		}
@@ -584,7 +584,7 @@ func (m *PackageNameModifier) Modify(ctx context.Context, tempDir string, settin
 			}
 		}
 		// 删除旧目录
-		os.RemoveAll(oldDir)
+		_ = os.RemoveAll(oldDir)
 	}
 
 	return nil

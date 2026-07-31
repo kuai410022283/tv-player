@@ -490,7 +490,7 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 		return err
 	}
 	defer func() {
-		out.Close()
+		_ = out.Close()
 		_ = os.Remove(tempFile)
 	}()
 
@@ -517,7 +517,7 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 			return readErr
 		}
 	}
-	out.Close()
+	_ = out.Close()
 
 	// 下载完成，重命名文件
 	if err := os.Rename(tempFile, destPath); err != nil {
@@ -567,13 +567,13 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	gzReader, err := gzip.NewReader(file)
 	if err != nil {
 		return err
 	}
-	defer gzReader.Close()
+	defer func() { _ = gzReader.Close() }()
 
 	tarReader := tar.NewReader(gzReader)
 	for {
@@ -614,10 +614,10 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 				return err
 			}
 			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
+				_ = outFile.Close()
 				return err
 			}
-			outFile.Close()
+			_ = outFile.Close()
 		}
 	}
 	return nil
@@ -692,7 +692,7 @@ func (s *CustomService) SaveUserJks(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, err = io.Copy(out, r)
 	return err
 }
@@ -704,7 +704,7 @@ func (s *CustomService) SaveUserLogo(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, err = io.Copy(out, r)
 	if err != nil {
 		return err
@@ -720,7 +720,7 @@ func (s *CustomService) SaveUserBanner(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	_, err = io.Copy(out, r)
 	if err != nil {
 		return err
@@ -921,7 +921,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 		// 任务执行完成后彻底清空此临时文件夹
 		func() {
-			defer os.RemoveAll(tempDir)
+			defer func() { _ = os.RemoveAll(tempDir) }()
 
 			tempUnsignedApk := filepath.Join(tempDir, "temp_unsigned.apk")
 			tempAlignedApk := filepath.Join(tempDir, "temp_aligned.apk")
@@ -1193,13 +1193,13 @@ func NativeZipAlign(inputPath, outputPath string, align int64) error {
 	if err != nil {
 		return fmt.Errorf("读取 Zip 失败: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	out, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("创建输出 Zip 失败: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	cw := &zipCountWriter{w: out}
 	w := zip.NewWriter(cw)
@@ -1217,8 +1217,6 @@ func NativeZipAlign(inputPath, outputPath string, align int64) error {
 			Flags:              header.Flags,
 			Method:             header.Method,
 			Modified:           header.Modified,
-			ModifiedTime:       header.ModifiedTime,
-			ModifiedDate:       header.ModifiedDate,
 			CRC32:              header.CRC32,
 			CompressedSize64:   header.CompressedSize64,
 			UncompressedSize64: header.UncompressedSize64,

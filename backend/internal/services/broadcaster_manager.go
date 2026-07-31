@@ -313,7 +313,7 @@ func (sp *StreamProxy) getOrCreateBroadcaster(channelID int64, ch *models.Channe
 	// Start reader goroutine
 	go func(b *ChannelBroadcaster, body io.ReadCloser) {
 		defer slog.Info("stream multiplex reader stopped", "channel_id", channelID, "url", b.URL)
-		defer body.Close()
+		defer func() { _ = body.Close() }()
 		defer b.Stop()
 
 		bufferSize := 64 * 1024
