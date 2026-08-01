@@ -3360,18 +3360,27 @@ function updateProxyPlaceholder(typeSelectId, urlInputId) {
 }
 
 // Proxy type toggle handlers
-document.getElementById('src-proxy-type').addEventListener('change', function () {
-  document.getElementById('src-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
-  updateProxyPlaceholder('src-proxy-type', 'src-proxy-url');
-});
-document.getElementById('grp-proxy-type').addEventListener('change', function () {
-  document.getElementById('grp-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
-  updateProxyPlaceholder('grp-proxy-type', 'grp-proxy-url');
-});
-document.getElementById('ch-proxy-type').addEventListener('change', function () {
-  document.getElementById('ch-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
-  updateProxyPlaceholder('ch-proxy-type', 'ch-proxy-url');
-});
+const srcProxyType = document.getElementById('src-proxy-type');
+if (srcProxyType) {
+  srcProxyType.addEventListener('change', function () {
+    document.getElementById('src-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+    updateProxyPlaceholder('src-proxy-type', 'src-proxy-url');
+  });
+}
+const grpProxyType = document.getElementById('grp-proxy-type');
+if (grpProxyType) {
+  grpProxyType.addEventListener('change', function () {
+    document.getElementById('grp-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+    updateProxyPlaceholder('grp-proxy-type', 'grp-proxy-url');
+  });
+}
+const chProxyType = document.getElementById('ch-proxy-type');
+if (chProxyType) {
+  chProxyType.addEventListener('change', function () {
+    document.getElementById('ch-proxy-url-group').style.display = (['socks5', 'http', 'https'].includes(this.value)) ? 'block' : 'none';
+    updateProxyPlaceholder('ch-proxy-type', 'ch-proxy-url');
+  });
+}
 
 // ═══════════════════════════════════════════════════════
 // 远程配置 - 全局配置
