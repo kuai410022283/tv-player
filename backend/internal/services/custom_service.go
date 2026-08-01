@@ -676,7 +676,6 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 }
 
 func (s *CustomService) extractTarGz(tarPath, destDir string) error {
-	_ = os.RemoveAll(destDir)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
 	}
