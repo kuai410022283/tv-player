@@ -1005,21 +1005,26 @@ func (s *CustomService) runBuild(baseApkPath string) {
 	}
 
 	// 2. 检测并准备 Java 可执行文件路径
+	// 优先使用系统 Java（Docker 中由包管理器提供，兼容性最好；本地 JRE 可能因 glibc/musl 不兼容而无法执行）
 	javaCmd := "java"
-
-	arch := runtime.GOARCH
-	jreDirName := "jre-x64"
-	if arch == "arm64" {
-		jreDirName = "jre-arm64"
-	}
-	localJava := filepath.Join(s.toolsDir, jreDirName, "bin", "java")
-
-	if fileExists(localJava) {
-		_ = os.Chmod(localJava, 0755)
-		javaCmd = localJava
-		s.appendLog("[INFO] 使用内置本地 JRE: %s", javaCmd)
+	if systemJava, err := exec.LookPath("java"); err == nil {
+		javaCmd = systemJava
+		s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
 	} else {
-		s.appendLog("[WARN] 未找到本地 JRE，将自动降级尝试使用系统全局环境变量中的 'java' 命令")
+		// 系统无 Java，尝试使用内置本地 JRE
+		arch := runtime.GOARCH
+		jreDirName := "jre-x64"
+		if arch == "arm64" {
+			jreDirName = "jre-arm64"
+		}
+		localJava := filepath.Join(s.toolsDir, jreDirName, "bin", "java")
+		if fileExists(localJava) {
+			_ = os.Chmod(localJava, 0755)
+			javaCmd = localJava
+			s.appendLog("[INFO] 使用内置本地 JRE: %s", javaCmd)
+		} else {
+			s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
+		}
 	}
 
 	apktoolJar := filepath.Join(s.toolsDir, "apktool.jar")
