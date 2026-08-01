@@ -2,7 +2,8 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /build
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 COPY . .
 
@@ -15,7 +16,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = "v6" ] && echo "6" || echo "") \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = "v6" ] && echo "6" || echo "") \
     GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} CGO_ENABLED=0 go build \
     -ldflags "-s -w -X main.Version=${VERSION} -X github.com/mediaplayer/backend/internal/license.embeddedSecret=${LICENSE_SECRET}" \
     -o mediaplayer ./cmd/server
