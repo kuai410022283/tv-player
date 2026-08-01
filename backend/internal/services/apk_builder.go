@@ -344,10 +344,12 @@ func (m *SmaliConfigModifier) Modify(ctx context.Context, tempDir string, settin
 		}
 	}
 
-	// 3. 将 ALLOW_SERVER_CONFIG 设为 false，以隐藏二维码页面
-	err = replaceSmaliConstant(prefsSmaliPath, "ALLOW_SERVER_CONFIG", false)
-	if err != nil {
-		return fmt.Errorf("修改 ALLOW_SERVER_CONFIG 常量失败: %w", err)
+	// 3. 当设置了服务器地址时，隐藏二维码页面；否则保留扫码页让用户自行配置
+	if settings.DefaultServerURL != "" {
+		err = replaceSmaliConstant(prefsSmaliPath, "ALLOW_SERVER_CONFIG", false)
+		if err != nil {
+			return fmt.Errorf("修改 ALLOW_SERVER_CONFIG 常量失败: %w", err)
+		}
 	}
 
 	// 4. 替换 smali 代码中所有 http://0.0.0.0:9527 占位符为明文地址
