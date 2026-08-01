@@ -23,7 +23,12 @@ RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = 
 # ── 运行阶段 ─────────────────────────────────────────
 FROM alpine:3.19
 
-RUN apk add --no-cache sqlite-libs ca-certificates tzdata curl su-exec openssl openjdk17-jre
+# 安装 JRE：优先 openjdk17，不支持的系统降级到 openjdk11/openjdk8，均不支持则跳过（arm/v7 等 32 位架构可能无预编译包）
+RUN apk add --no-cache sqlite-libs ca-certificates tzdata curl su-exec openssl && \
+    (apk add --no-cache openjdk17-jre 2>/dev/null || \
+     apk add --no-cache openjdk11-jre 2>/dev/null || \
+     apk add --no-cache openjdk8-jre 2>/dev/null || \
+     echo "Warning: No OpenJDK package available for this architecture")
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)
 RUN addgroup -g 1000 -S mediaplayer && adduser -u 1000 -S mediaplayer -G mediaplayer -h /app
