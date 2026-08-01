@@ -1,0 +1,108 @@
+name: Publish - Binaries
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如 v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  go-release:
+    name: Go ${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: ""
+          - goos: linux
+            goarch: arm64
+            suffix: ""
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+            suffix: "-armv7l"
+          - goos: linux
+            goarch: loong64
+            suffix: ""
+          - goos: linux
+            goarch: riscv64
+            suffix: ""
+          - goos: darwin
+            goarch: amd64
+            suffix: ""
+          - goos: darwin
+            goarch: arm64
+            suffix: ""
+          - goos: windows
+            goarch: amd64
+            suffix: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: backend/go.sum
+
+      - name: Install cross-compile deps
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu musl-tools libsqlite3-dev
+
+      - name: Build and Package
+        working-directory: backend
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ inputs.version }}
+        run: |
+          CC=""
+          if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "arm64" ]; then
+            CC="aarch64-linux-gnu-gcc"
+          fi
+
+          BINARY_NAME="mediaplayer"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="mediaplayer.exe"
+          fi
+
+          CC=$CC go build \
+            -ldflags "-s -w -X main.Version=$VERSION -X github.com/mediaplayer/backend/internal/license.embeddedSecret=MediaPlayer-LAOK-v1.0.0" \
+            -o $BINARY_NAME \
+            ./cmd/server
+
+          PKG_NAME="mediaplayer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}"
+          mkdir -p $PKG_NAME
+          mv $BINARY_NAME $PKG_NAME/
+          cp -r web $PKG_NAME/
+          cp config.yaml $PKG_NAME/
+          rm -rf $PKG_NAME/web/download/*.apk || true
+          rm -f $PKG_NAME/web/build.sh || true
+
+          if [ "$GOOS" = "windows" ]; then
+            zip -r ${PKG_NAME}.zip $PKG_NAME/
+          else
+            tar -czvf ${PKG_NAME}.tar.gz $PKG_NAME/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          path: |
+            backend/*.tar.gz
+            backend/*.zip
+          retention-days: 3
