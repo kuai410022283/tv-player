@@ -1146,7 +1146,21 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 			// 3. 重新编译打包
 			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
-			rebuildArgs := []string{"-jar", apktoolJar, "b", "-c", "--use-aapt2", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			// 优先使用系统 aapt（全架构原生支持），替代 apktool 内置的 x86_64 专用 aapt2
+			aaptBin := ""
+			if fileExists("/usr/bin/aapt") {
+				aaptBin = "/usr/bin/aapt"
+			} else if p, err := exec.LookPath("aapt"); err == nil {
+				aaptBin = p
+			}
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "-c", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			if aaptBin != "" {
+				rebuildArgs = append(rebuildArgs, "-a", aaptBin)
+				s.appendLog("[INFO] 使用系统原生 aapt: %s", aaptBin)
+			} else {
+				rebuildArgs = append(rebuildArgs, "--use-aapt2")
+				s.appendLog("[WARN] 系统无原生 aapt，退化使用 apktool 内置 aapt2（仅 x86_64 可用）")
+			}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
@@ -1365,17 +1379,7 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 }
 
 // NativeZipAlign 纯 Go 语言实现的 Android 0xd990 规范 4 字节 Zip 边界对齐算法
-type zipCountWriter struct {
-	w     io.Writer
-	count int64
-}
-
-func (cw *zipCountWriter) Write(p []byte) (int, error) {
-	n, err := cw.w.Write(p)
-	cw.count += int64(n)
-	return n, err
-}
-
+// 手动写入 ZIP 结构，避免 zip.Writer 内部缓冲导致偏移量计算错误
 func NativeZipAlign(inputPath, outputPath string, align int64) error {
 	r, err := zip.OpenReader(inputPath)
 	if err != nil {
@@ -1389,33 +1393,40 @@ func NativeZipAlign(inputPath, outputPath string, align int64) error {
 	}
 	defer func() { _ = out.Close() }()
 
-	cw := &zipCountWriter{w: out}
-	w := zip.NewWriter(cw)
+	// 手动写入，精确跟踪偏移量
+	type cdEntry struct {
+		header []byte // 预构建的 central directory entry
+	}
+	var cdEntries []cdEntry
+	var offset int64
+	buf := make([]byte, 0, 64*1024)
+
+	writeBuf := func(data []byte) error {
+		n, err := out.Write(data)
+		offset += int64(n)
+		return err
+	}
+	writeBufFull := func(data []byte) error {
+		for len(data) > 0 {
+			n, err := out.Write(data)
+			if err != nil {
+				return err
+			}
+			offset += int64(n)
+			data = data[n:]
+		}
+		return nil
+	}
 
 	for _, f := range r.File {
 		header := f.FileHeader
 		cleanExtra := cleanAlignmentExtra(header.Extra)
 
-		newHeader := &zip.FileHeader{
-			Name:               header.Name,
-			Comment:            header.Comment,
-			NonUTF8:            header.NonUTF8,
-			CreatorVersion:     header.CreatorVersion,
-			ReaderVersion:      header.ReaderVersion,
-			Flags:              header.Flags,
-			Method:             header.Method,
-			Modified:           header.Modified,
-			CRC32:              header.CRC32,
-			CompressedSize64:   header.CompressedSize64,
-			UncompressedSize64: header.UncompressedSize64,
-			Extra:              cleanExtra,
-		}
-
+		// 计算数据偏移量，添加对齐填充
+		extra := cleanExtra
 		if header.Method == zip.Store {
-			currentOffset := cw.count
-			baseDataOffset := currentOffset + 30 + int64(len(newHeader.Name)) + int64(len(newHeader.Extra))
+			baseDataOffset := offset + 30 + int64(len(header.Name)) + int64(len(extra))
 			padding := (align - (baseDataOffset % align)) % align
-
 			if padding > 0 {
 				if padding < 4 {
 					padding += align
@@ -1423,29 +1434,127 @@ func NativeZipAlign(inputPath, outputPath string, align int64) error {
 				extraPadding := make([]byte, padding)
 				binary.LittleEndian.PutUint16(extraPadding[0:2], 0xd990)
 				binary.LittleEndian.PutUint16(extraPadding[2:4], uint16(padding-4))
-				newHeader.Extra = append(newHeader.Extra, extraPadding...)
+				extra = append(extra, extraPadding...)
 			}
 		}
 
-		targetWriter, err := w.CreateRaw(newHeader)
-		if err != nil {
-			return fmt.Errorf("创建 zip entry 失败 (%s): %w", header.Name, err)
+		localHeaderOffset := offset
+
+		// 构建 local file header
+		buf = buf[:0]
+		buf = binary.LittleEndian.AppendUint32(buf, 0x04034b50)           // signature
+		buf = binary.LittleEndian.AppendUint16(buf, header.ReaderVersion) // version needed
+		buf = binary.LittleEndian.AppendUint16(buf, header.Flags)         // flags
+		buf = binary.LittleEndian.AppendUint16(buf, header.Method)        // method
+		modifiedTime, modifiedDate := msDosTime(header.Modified)
+		buf = binary.LittleEndian.AppendUint16(buf, modifiedTime) // mod time
+		buf = binary.LittleEndian.AppendUint16(buf, modifiedDate) // mod date
+		if header.Flags&0x0008 != 0 {
+			buf = binary.LittleEndian.AppendUint32(buf, 0) // crc32 (in data descriptor)
+			buf = binary.LittleEndian.AppendUint32(buf, 0) // compressed size
+			buf = binary.LittleEndian.AppendUint32(buf, 0) // uncompressed size
+		} else {
+			buf = binary.LittleEndian.AppendUint32(buf, header.CRC32)
+			buf = binary.LittleEndian.AppendUint32(buf, uint32(header.CompressedSize64))
+			buf = binary.LittleEndian.AppendUint32(buf, uint32(header.UncompressedSize64))
+		}
+		buf = binary.LittleEndian.AppendUint16(buf, uint16(len(header.Name))) // name len
+		buf = binary.LittleEndian.AppendUint16(buf, uint16(len(extra)))       // extra len
+		buf = append(buf, header.Name...)
+		buf = append(buf, extra...)
+		if err := writeBuf(buf); err != nil {
+			return fmt.Errorf("写入 local header 失败 (%s): %w", header.Name, err)
 		}
 
+		// 写入文件数据
 		rc, err := f.OpenRaw()
 		if err != nil {
-			return fmt.Errorf("读取源 zip entry 失败 (%s): %v", header.Name, err)
+			return fmt.Errorf("读取源 zip entry 失败 (%s): %w", header.Name, err)
 		}
-
-		if _, err := io.Copy(targetWriter, rc); err != nil {
-			return fmt.Errorf("写入 zip entry 失败 (%s): %v", header.Name, err)
-		}
+		dataSize := int64(header.CompressedSize64)
+		written, err := io.Copy(out, rc)
 		if closer, ok := rc.(io.Closer); ok {
 			_ = closer.Close()
 		}
+		if err != nil {
+			return fmt.Errorf("写入数据失败 (%s): %w", header.Name, err)
+		}
+		offset += written
+
+		// 写入 data descriptor（如果 flags bit 3 设置）
+		if header.Flags&0x0008 != 0 {
+			dd := make([]byte, 16)
+			binary.LittleEndian.PutUint32(dd[0:4], 0x08074b50) // data descriptor signature
+			binary.LittleEndian.PutUint32(dd[4:8], header.CRC32)
+			binary.LittleEndian.PutUint32(dd[8:12], uint32(header.CompressedSize64))
+			binary.LittleEndian.PutUint32(dd[12:16], uint32(header.UncompressedSize64))
+			if err := writeBuf(dd); err != nil {
+				return fmt.Errorf("写入 data descriptor 失败 (%s): %w", header.Name, err)
+			}
+		}
+
+		// 验证数据大小
+		if written != dataSize {
+			return fmt.Errorf("数据大小不匹配 (%s): 期望 %d, 实际 %d", header.Name, dataSize, written)
+		}
+
+		// 构建 central directory entry
+		cd := make([]byte, 0, 46+len(header.Name)+len(extra)+len(header.Comment))
+		cd = binary.LittleEndian.AppendUint32(cd, 0x02014b50)            // signature
+		cd = binary.LittleEndian.AppendUint16(cd, header.CreatorVersion) // version made by
+		cd = binary.LittleEndian.AppendUint16(cd, header.ReaderVersion)  // version needed
+		cd = binary.LittleEndian.AppendUint16(cd, header.Flags)          // flags
+		cd = binary.LittleEndian.AppendUint16(cd, header.Method)         // method
+		cd = binary.LittleEndian.AppendUint16(cd, modifiedTime)          // mod time
+		cd = binary.LittleEndian.AppendUint16(cd, modifiedDate)          // mod date
+		cd = binary.LittleEndian.AppendUint32(cd, header.CRC32)
+		cd = binary.LittleEndian.AppendUint32(cd, uint32(header.CompressedSize64))
+		cd = binary.LittleEndian.AppendUint32(cd, uint32(header.UncompressedSize64))
+		cd = binary.LittleEndian.AppendUint16(cd, uint16(len(header.Name)))    // name len
+		cd = binary.LittleEndian.AppendUint16(cd, uint16(len(extra)))          // extra len
+		cd = binary.LittleEndian.AppendUint16(cd, uint16(len(header.Comment))) // comment len
+		cd = binary.LittleEndian.AppendUint16(cd, 0)                           // disk number start
+		cd = binary.LittleEndian.AppendUint16(cd, 0)                           // internal attrs
+		cd = binary.LittleEndian.AppendUint32(cd, 0)                           // external attrs
+		cd = binary.LittleEndian.AppendUint32(cd, uint32(localHeaderOffset))   // local header offset
+		cd = append(cd, header.Name...)
+		cd = append(cd, extra...)
+		cd = append(cd, header.Comment...)
+		cdEntries = append(cdEntries, cdEntry{header: cd})
 	}
 
-	return w.Close()
+	// 写入 central directory
+	cdOffset := offset
+	cdSize := int64(0)
+	for _, e := range cdEntries {
+		if err := writeBufFull(e.header); err != nil {
+			return fmt.Errorf("写入 central directory 失败: %w", err)
+		}
+		cdSize += int64(len(e.header))
+	}
+
+	// 写入 end of central directory record
+	eocd := make([]byte, 22)
+	binary.LittleEndian.PutUint32(eocd[0:4], 0x06054b50)               // signature
+	binary.LittleEndian.PutUint16(eocd[4:6], 0)                        // disk number
+	binary.LittleEndian.PutUint16(eocd[6:8], 0)                        // cd disk number
+	binary.LittleEndian.PutUint16(eocd[8:10], uint16(len(cdEntries)))  // cd entries on disk
+	binary.LittleEndian.PutUint16(eocd[10:12], uint16(len(cdEntries))) // total cd entries
+	binary.LittleEndian.PutUint32(eocd[12:16], uint32(cdSize))         // cd size
+	binary.LittleEndian.PutUint32(eocd[16:20], uint32(cdOffset))       // cd offset
+	binary.LittleEndian.PutUint16(eocd[20:22], 0)                      // comment length
+	if err := writeBuf(eocd); err != nil {
+		return fmt.Errorf("写入 EOCD 失败: %w", err)
+	}
+
+	return nil
+}
+
+// msDosTime 将 time.Time 转换为 MS-DOS 日期时间格式
+func msDosTime(t time.Time) (timeVal, dateVal uint16) {
+	timeVal = uint16(t.Second()/2 | t.Minute()<<5 | t.Hour()<<11)
+	dateVal = uint16(t.Day() | int(t.Month())<<5 | (t.Year()-1980)<<9)
+	return
 }
 
 func cleanAlignmentExtra(extra []byte) []byte {

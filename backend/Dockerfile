@@ -23,9 +23,13 @@ RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = 
 # ── 运行阶段 ─────────────────────────────────────────
 FROM debian:bookworm-slim
 
-# 安装运行时依赖 + JRE（glibc 原生，所有架构均有预编译包，含 arm/v7）
+# 安装运行时依赖 + JRE + Android 构建工具（glibc 原生，所有架构均有预编译包）
+# zipalign: APK 4 字节对齐（由 android-platform-build 源码包提供）
+# aapt:     Android 资源打包工具（由 android-platform-frameworks-base 源码包提供）
+#           用于替代 apktool 内置的 x86_64 专用 aapt2，确保 ARM64/ARMv7 下可用
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
+    zipalign aapt \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)
