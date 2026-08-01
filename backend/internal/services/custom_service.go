@@ -406,15 +406,181 @@ func (s *CustomService) CancelSetupEnvironment() {
 	}
 	s.cancelMu.Unlock()
 
-	// 将所有未完成的进度标记为“下载已取消”错误
+	// 将所有未完成的进度标记为\u201c下载已取消\u201d错误
 	s.progressMap.Range(func(key, value interface{}) bool {
 		filename := key.(string)
 		prog := value.(int)
 		if prog < 100 {
-			s.errorMap.Store(filename, "下载已取消")
+			s.errorMap.Store(filename, "\u4e0b\u8f7d\u5df2\u53d6\u6d88")
 		}
 		return true
 	})
+}
+
+// ResetEnvironment 一键清理打包环境依赖（删除 library/apk-tools/v1 目录）
+func (s *CustomService) ResetEnvironment() error {
+	if err := os.RemoveAll(s.toolsDir); err != nil {
+		return fmt.Errorf("清理依赖目录失败: %w", err)
+	}
+	// 重新创建空目录
+	if err := os.MkdirAll(s.toolsDir, 0755); err != nil {
+		return fmt.Errorf("重建依赖目录失败: %w", err)
+	}
+	// 清除下载进度
+	s.progressMap.Range(func(key, value interface{}) bool {
+		s.progressMap.Delete(key)
+		return true
+	})
+	s.errorMap.Range(func(key, value interface{}) bool {
+		s.errorMap.Delete(key)
+		return true
+	})
+	return nil
+}
+
+// UploadedFileInfo 上传文件状态
+type UploadedFileInfo struct {
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Exists  bool   `json:"exists"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"mod_time"`
+}
+
+// GetUploadedFileStatus 获取所有已上传文件的状态
+func (s *CustomService) GetUploadedFileStatus() []UploadedFileInfo {
+	files := []struct {
+		ftype string
+		path  string
+		name  string
+	}{
+		{"jks", filepath.Join(s.toolsDir, "user-release-key.jks"), "user-release-key.jks"},
+		{"logo", filepath.Join(s.toolsDir, "logo.png"), "logo.png"},
+		{"banner", filepath.Join(s.toolsDir, "custom_banner.png"), "custom_banner.png"},
+	}
+
+	var result []UploadedFileInfo
+	for _, f := range files {
+		info := UploadedFileInfo{Type: f.ftype, Name: f.name}
+		if stat, err := os.Stat(f.path); err == nil && !stat.IsDir() {
+			info.Exists = true
+			info.Size = stat.Size()
+			info.ModTime = stat.ModTime().Format("2006-01-02 15:04:05")
+		}
+		result = append(result, info)
+	}
+	return result
+}
+
+// DeleteUploadedFile 删除指定类型的已上传文件
+func (s *CustomService) DeleteUploadedFile(fileType string) error {
+	var filePath string
+	switch fileType {
+	case "jks":
+		filePath = filepath.Join(s.toolsDir, "user-release-key.jks")
+	case "logo":
+		filePath = filepath.Join(s.toolsDir, "logo.png")
+	case "banner":
+		filePath = filepath.Join(s.toolsDir, "custom_banner.png")
+	default:
+		return fmt.Errorf("不支持的文件类型: %s", fileType)
+	}
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("删除文件失败: %w", err)
+	}
+	// 清除数据库中的路径记录
+	if s.db != nil {
+		key := "custom_" + fileType + "_path"
+		if fileType == "logo" {
+			key = "custom_logo_path"
+		} else if fileType == "banner" {
+			key = "custom_banner_path"
+		}
+		_, _ = s.db.Exec(`DELETE FROM user_settings WHERE key=?`, key)
+	}
+	return nil
+}
+
+// DownloadVersionInfo 已下载的版本目录信息
+type DownloadVersionInfo struct {
+	Dir     string `json:"dir"`
+	ModTime string `json:"mod_time"`
+	HasApk  bool   `json:"has_apk"`
+	Size    string `json:"size"`
+}
+
+// ListDownloadVersions 列出 web/download 下所有已下载的版本目录
+func (s *CustomService) ListDownloadVersions() []DownloadVersionInfo {
+	downloadDir := filepath.Join("web", "download")
+	entries, err := os.ReadDir(downloadDir)
+	if err != nil {
+		return nil
+	}
+
+	var list []DownloadVersionInfo
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		dirPath := filepath.Join(downloadDir, entry.Name())
+		hasApk := false
+		var totalSize int64
+		_ = filepath.Walk(dirPath, func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !fi.IsDir() {
+				totalSize += fi.Size()
+				if strings.HasSuffix(strings.ToLower(fi.Name()), ".apk") {
+					hasApk = true
+				}
+			}
+			return nil
+		})
+
+		sizeStr := formatSize(totalSize)
+		modTime := info.ModTime().Format("2006-01-02 15:04:05")
+		list = append(list, DownloadVersionInfo{
+			Dir:     entry.Name(),
+			ModTime: modTime,
+			HasApk:  hasApk,
+			Size:    sizeStr,
+		})
+	}
+	return list
+}
+
+// DeleteDownloadVersion 删除指定版本目录（web/download/{dir}）
+func (s *CustomService) DeleteDownloadVersion(dir string) error {
+	// 防止路径穿越
+	dir = filepath.Base(dir)
+	if dir == "." || dir == ".." || dir == "" {
+		return fmt.Errorf("无效的目录名")
+	}
+	dirPath := filepath.Join("web", "download", dir)
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		return fmt.Errorf("目录不存在: %s", dir)
+	}
+	return os.RemoveAll(dirPath)
+}
+
+// formatSize 字节数转人性化大小
+func formatSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func (s *CustomService) downloadTool(ctx context.Context, url, filename string) error {
@@ -945,8 +1111,16 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				_ = os.MkdirAll(filepath.Join(userHome, ".local", "share", "apktool", "framework"), 0755)
 			}
 
+			// 0. 安装框架文件，确保不同环境（虚拟机/实体机）资源解码一致
+			s.appendLog(">>> [1/6] 正在安装框架资源...")
+			installFrameArgs := []string{"-jar", apktoolJar, "if", "-p", tempFrameDir, currentBaseApk}
+			if err := ExecuteCommandWithLog(ctx, javaCmd, installFrameArgs, s.appendLog); err != nil {
+				s.appendLog("[WARN] 安装框架资源失败，尝试继续: %v", err)
+				// 不中断流程，某些 APK 可能不需要框架文件
+			}
+
 			// 1. 反编译
-			s.appendLog(">>> [1/5] 正在解析应用底本...")
+			s.appendLog(">>> [2/6] 正在解析应用底本...")
 			decompileArgs := []string{"-jar", apktoolJar, "d", "-p", tempFrameDir, currentBaseApk, "-o", tempUnpackedDir, "-f"}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, decompileArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
@@ -965,7 +1139,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				},
 				&SmaliConfigModifier{},
 			}
-			s.appendLog(">>> [2/5] 正在应用个性化定制配置...")
+			s.appendLog(">>> [3/6] 正在应用个性化定制配置...")
 			for _, mod := range modifiers {
 				if err := mod.Modify(ctx, tempUnpackedDir, &settings, s.appendLog); err != nil {
 					s.buildStatus = "failed"
@@ -975,8 +1149,8 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			}
 
 			// 3. 重新编译打包
-			s.appendLog(">>> [3/5] 正在编译构建客户端应用...")
-			rebuildArgs := []string{"-jar", apktoolJar, "b", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "--use-aapt2", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
@@ -984,7 +1158,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			}
 
 			// 4. 对齐优化
-			s.appendLog(">>> [4/5] 正在优化应用结构...")
+			s.appendLog(">>> [5/6] 正在优化应用结构...")
 			execCmd, flags := s.getZipalignCmd(javaCmd, s.appendLog)
 			if execCmd != javaCmd {
 				alignArgs := append(flags, tempUnsignedApk, tempAlignedApk)
@@ -1002,7 +1176,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			}
 
 			// 5. 签名
-			s.appendLog(">>> [5/5] 正在完成数字签名...")
+			s.appendLog(">>> [6/6] 正在完成数字签名...")
 			var signArgs []string
 			if usePemSigning {
 				signArgs = []string{
@@ -1109,7 +1283,7 @@ func (s *CustomService) generateDefaultSigningKeypair(keyPemPath, certPemPath st
 	if err != nil {
 		return fmt.Errorf("创建私钥文件失败: %w", err)
 	}
-	defer keyFile.Close()
+	defer func() { _ = keyFile.Close() }()
 	if err := pem.Encode(keyFile, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
 		return fmt.Errorf("写入私钥 PEM 失败: %w", err)
 	}
@@ -1119,7 +1293,7 @@ func (s *CustomService) generateDefaultSigningKeypair(keyPemPath, certPemPath st
 	if err != nil {
 		return fmt.Errorf("创建证书文件失败: %w", err)
 	}
-	defer certFile.Close()
+	defer func() { _ = certFile.Close() }()
 	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
 		return fmt.Errorf("写入证书 PEM 失败: %w", err)
 	}

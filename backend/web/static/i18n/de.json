@@ -55,6 +55,7 @@
     "jks_upload_label": "Zertifikatsdatei hochladen (.jks / .keystore)",
     "jks_select_file": "Zertifikatsdatei auswählen",
     "jks_not_uploaded": "Nicht hochgeladen",
+    "delete_file": "Löschen",
     "jks_alias": "Zertifikatsalias",
     "jks_alias_placeholder": "z.B. my-key-alias",
     "jks_storepass": "Keystore-Passwort (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 Benutzerdefinierte APK erfolgreich erstellt!",
     "build_success_desc": "Direkt über den Button unten herunterladen oder QR-Code auf dem Handy/TV scannen. Bereits mit OTA-Update-Management verknüpft.",
-    "download_apk": "📥 Benutzerdefinierte APK herunterladen"
+    "download_apk": "📥 Benutzerdefinierte APK herunterladen",
+    "reset_env": "Abhängigkeiten zurücksetzen",
+    "reset_env_confirm": "Sind Sie sicher, dass Sie alle Abhängigkeiten der Build-Umgebung bereinigen möchten? Danach ist ein erneutes Deployment erforderlich.",
+    "reset_env_success": "Abhängigkeiten bereinigt",
+    "delete_file_confirm": "Sind Sie sicher, dass Sie die hochgeladene {type}-Datei löschen möchten?",
+    "delete_file_success": "Datei gelöscht",
+    "uploaded_status": "Hochgeladen ({name}, {size})"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -493,7 +500,11 @@
     "stop_download": "Download stoppen",
     "view_changelog": "Änderungen auf GitHub ansehen",
     "download_failed": "Download fehlgeschlagen",
-    "latest_suffix": "Neueste"
+    "latest_suffix": "Neueste",
+    "downloaded_versions": "Auf den Server heruntergeladene Versionen",
+    "has_apk": "Mit APK",
+    "delete_version_confirm": "Sind Sie sicher, dass Sie das Versionsverzeichnis \"{dir}\" löschen möchten? Dies kann nicht rückgängig gemacht werden.",
+    "delete_version_success": "Versionsverzeichnis gelöscht"
   },
   "sync": {
     "master_config_title": "Autorisierungskonfiguration des Hauptservers",

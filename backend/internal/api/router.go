@@ -164,6 +164,11 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminCustom.POST("/upload-banner", hs.CustomHandler.UploadBanner)
 			adminCustom.POST("/build", hs.CustomHandler.Build)
 			adminCustom.GET("/build-log", hs.CustomHandler.GetBuildLog)
+			adminCustom.POST("/reset-env", hs.CustomHandler.ResetEnv)
+			adminCustom.GET("/file-status", hs.CustomHandler.GetFileStatus)
+			adminCustom.DELETE("/uploaded-file", hs.CustomHandler.DeleteUploadedFile)
+			adminCustom.GET("/download-versions", hs.CustomHandler.ListDownloadVersions)
+			adminCustom.DELETE("/download-versions/:dir", hs.CustomHandler.DeleteDownloadVersion)
 		}
 
 		// 管理端：全局客户端远程配置（需要 VIP 授权）

@@ -50,7 +50,7 @@ tr:hover td{background:var(--bg3)}
 .badge-hls,.badge-flv,.badge-rtmp,.badge-rtsp,.badge-mp4,.badge-dash{color:#1e9fff;background:rgba(30,159,255,.1);border-color:#1e9fff}
 
 /* ── Buttons ── */
-.btn{height:32px;padding:0 16px;border-radius:2px;border:1px solid transparent;cursor:pointer;font-size:14px;font-weight:400;transition:all .3s;display:inline-flex;align-items:center;justify-content:center}
+.btn{height:32px;padding:0 16px;border-radius:2px;border:1px solid transparent;cursor:pointer;font-size:14px;font-weight:400;transition:all .3s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;flex-shrink:0}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.8}
 .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.8}
 .btn-warn{background:var(--warn);color:#fff}.btn-warn:hover{opacity:.8}

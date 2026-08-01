@@ -156,3 +156,48 @@ func (h *CustomHandler) GetBuildLog(c *gin.Context) {
 	logs := h.customSvc.GetBuildLog()
 	c.String(http.StatusOK, logs)
 }
+
+// POST /api/v1/admin/custom/reset-env
+func (h *CustomHandler) ResetEnv(c *gin.Context) {
+	if err := h.customSvc.ResetEnvironment(); err != nil {
+		fail(c, 500, "清理依赖失败: "+err.Error())
+		return
+	}
+	ok(c, gin.H{"message": "打包环境依赖已清理，可重新部署"})
+}
+
+// GET /api/v1/admin/custom/file-status
+func (h *CustomHandler) GetFileStatus(c *gin.Context) {
+	files := h.customSvc.GetUploadedFileStatus()
+	ok(c, files)
+}
+
+// DELETE /api/v1/admin/custom/uploaded-file
+func (h *CustomHandler) DeleteUploadedFile(c *gin.Context) {
+	fileType := c.Query("type")
+	if fileType == "" {
+		fail(c, 400, "请指定文件类型 (jks/logo/banner)")
+		return
+	}
+	if err := h.customSvc.DeleteUploadedFile(fileType); err != nil {
+		fail(c, 500, "删除文件失败: "+err.Error())
+		return
+	}
+	ok(c, gin.H{"message": "文件已删除"})
+}
+
+// GET /api/v1/admin/custom/download-versions
+func (h *CustomHandler) ListDownloadVersions(c *gin.Context) {
+	versions := h.customSvc.ListDownloadVersions()
+	ok(c, versions)
+}
+
+// DELETE /api/v1/admin/custom/download-versions/:dir
+func (h *CustomHandler) DeleteDownloadVersion(c *gin.Context) {
+	dir := c.Param("dir")
+	if err := h.customSvc.DeleteDownloadVersion(dir); err != nil {
+		fail(c, 500, "删除版本目录失败: "+err.Error())
+		return
+	}
+	ok(c, gin.H{"message": "版本目录已删除"})
+}

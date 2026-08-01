@@ -55,6 +55,7 @@
     "jks_upload_label": "上传证书文件 (.jks / .keystore)",
     "jks_select_file": "选择证书文件",
     "jks_not_uploaded": "未上传",
+    "delete_file": "删除",
     "jks_alias": "证书别名 (Alias)",
     "jks_alias_placeholder": "例如：my-key-alias",
     "jks_storepass": "密钥库密码 (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 定制客户端生成成功！",
     "build_success_desc": "您可以通过下方按钮直接下载，或使用手机/电视端扫码直接下载。已自动挂载到 OTA 升级管理中。",
-    "download_apk": "📥 下载定制版 APK"
+    "download_apk": "📥 下载定制版 APK",
+    "reset_env": "重置依赖环境",
+    "reset_env_confirm": "确定要清理所有打包环境依赖吗？清理后需要重新部署。",
+    "reset_env_success": "依赖环境已清理",
+    "delete_file_confirm": "确定要删除已上传的{type}文件吗？",
+    "delete_file_success": "文件已删除",
+    "uploaded_status": "已上传 ({name}, {size})"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -493,7 +500,11 @@
     "stop_download": "停止下载",
     "view_changelog": "在 GitHub 仓库查看更新日志",
     "download_failed": "下载失败",
-    "latest_suffix": "最新"
+    "latest_suffix": "最新",
+    "downloaded_versions": "已下载至服务端的版本",
+    "has_apk": "含APK",
+    "delete_version_confirm": "确定要删除版本目录 \"{dir}\" 吗？此操作不可恢复。",
+    "delete_version_success": "版本目录已删除"
   },
   "sync": {
     "master_config_title": "主服务器授权设置区 (供备机连接用)",

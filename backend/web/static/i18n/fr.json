@@ -55,6 +55,7 @@
     "jks_upload_label": "Télécharger le fichier certificat (.jks / .keystore)",
     "jks_select_file": "Choisir le fichier certificat",
     "jks_not_uploaded": "Non téléchargé",
+    "delete_file": "Supprimer",
     "jks_alias": "Alias du certificat",
     "jks_alias_placeholder": "ex: my-key-alias",
     "jks_storepass": "Mot de passe du magasin (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 APK personnalisé généré avec succès !",
     "build_success_desc": "Téléchargez directement via le bouton ci-dessous, ou scannez le QR code sur votre téléphone/TV. Déjà lié à la gestion des mises à jour OTA.",
-    "download_apk": "📥 Télécharger l'APK personnalisé"
+    "download_apk": "📥 Télécharger l'APK personnalisé",
+    "reset_env": "Réinitialiser les dépendances",
+    "reset_env_confirm": "Êtes-vous sûr de vouloir nettoyer toutes les dépendances de l'environnement de compilation ? Vous devrez redéployer ensuite.",
+    "reset_env_success": "Dépendances nettoyées",
+    "delete_file_confirm": "Êtes-vous sûr de vouloir supprimer le fichier {type} téléchargé ?",
+    "delete_file_success": "Fichier supprimé",
+    "uploaded_status": "Téléchargé ({name}, {size})"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -493,7 +500,11 @@
     "stop_download": "Arrêter le téléchargement",
     "view_changelog": "Voir les modifications sur GitHub",
     "download_failed": "Échec du téléchargement",
-    "latest_suffix": "Dernière"
+    "latest_suffix": "Dernier",
+    "downloaded_versions": "Versions téléchargées sur le serveur",
+    "has_apk": "Avec APK",
+    "delete_version_confirm": "Êtes-vous sûr de vouloir supprimer le répertoire de version \"{dir}\" ? Cette action est irréversible.",
+    "delete_version_success": "Répertoire de version supprimé"
   },
   "sync": {
     "master_config_title": "Configuration d'autorisation du serveur principal",

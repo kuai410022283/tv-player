@@ -55,6 +55,7 @@
     "jks_upload_label": "인증서 파일 업로드 (.jks / .keystore)",
     "jks_select_file": "인증서 파일 선택",
     "jks_not_uploaded": "업로드되지 않음",
+    "delete_file": "삭제",
     "jks_alias": "인증서 별칭 (Alias)",
     "jks_alias_placeholder": "예: my-key-alias",
     "jks_storepass": "키스토어 비밀번호 (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 맞춤 APK 생성 성공!",
     "build_success_desc": "아래 버튼을 통해 직접 다운로드하거나, 휴대폰/TV로 QR 코드를 스캔하여 다운로드하세요. OTA 업데이트 관리에 자동으로 연결됩니다.",
-    "download_apk": "📥 맞춤 APK 다운로드"
+    "download_apk": "📥 맞춤 APK 다운로드",
+    "reset_env": "의존성 재설정",
+    "reset_env_confirm": "모든 패키징 환경 의존성을 정리하시겠습니까? 정리 후 다시 배포해야 합니다.",
+    "reset_env_success": "의존성이 정리되었습니다",
+    "delete_file_confirm": "업로드된 {type} 파일을 삭제하시겠습니까?",
+    "delete_file_success": "파일이 삭제되었습니다",
+    "uploaded_status": "업로드됨 ({name}, {size})"
   },
   "dashboard": {
     "title": "대시보드",
@@ -493,7 +500,11 @@
     "stop_download": "다운로드 중지",
     "view_changelog": "GitHub에서 변경 내역 보기",
     "download_failed": "다운로드 실패",
-    "latest_suffix": "최신"
+    "latest_suffix": "최신",
+    "downloaded_versions": "서버에 다운로드된 버전",
+    "has_apk": "APK 있음",
+    "delete_version_confirm": "버전 디렉토리 \"{dir}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "delete_version_success": "버전 디렉토리가 삭제되었습니다"
   },
   "sync": {
     "master_config_title": "마스터 서버 인증 설정 (예비 노드 연결용)",

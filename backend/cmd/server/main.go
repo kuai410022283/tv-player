@@ -216,6 +216,10 @@ func main() {
 	// 开机广告支持
 	_ = os.MkdirAll("./library/ad", 0755)
 	r.Static("/ad", "./library/ad")
+
+	// 客户端定制上传文件
+	_ = os.MkdirAll("./library/apk-tools/v1", 0755)
+	r.Static("/library/apk-tools/v1", "./library/apk-tools/v1")
 	r.Static("/static", "./web/static")
 	r.Static("/admin", "./web/admin")
 	r.Static("/download", "./web/download")

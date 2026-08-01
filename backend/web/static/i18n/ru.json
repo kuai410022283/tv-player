@@ -55,6 +55,7 @@
     "jks_upload_label": "Загрузить файл сертификата (.jks / .keystore)",
     "jks_select_file": "Выбрать файл сертификата",
     "jks_not_uploaded": "Не загружен",
+    "delete_file": "Удалить",
     "jks_alias": "Псевдоним сертификата (Alias)",
     "jks_alias_placeholder": "например: my-key-alias",
     "jks_storepass": "Пароль хранилища (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 Кастомный APK успешно создан!",
     "build_success_desc": "Скачайте напрямую через кнопку ниже или отсканируйте QR-код на телефоне/TV. Уже подключено к OTA-обновлениям.",
-    "download_apk": "📥 Скачать кастомный APK"
+    "download_apk": "📥 Скачать кастомный APK",
+    "reset_env": "Сбросить зависимости",
+    "reset_env_confirm": "Вы уверены, что хотите очистить все зависимости среды сборки? После очистки потребуется повторное развертывание.",
+    "reset_env_success": "Зависимости очищены",
+    "delete_file_confirm": "Вы уверены, что хотите удалить загруженный файл {type}?",
+    "delete_file_success": "Файл удален",
+    "uploaded_status": "Загружено ({name}, {size})"
   },
   "dashboard": {
     "title": "Панель управления",
@@ -493,7 +500,11 @@
     "stop_download": "Остановить загрузку",
     "view_changelog": "Посмотреть изменения на GitHub",
     "download_failed": "Ошибка скачивания",
-    "latest_suffix": "Новейшая"
+    "latest_suffix": "Новейшая",
+    "downloaded_versions": "Версии, загруженные на сервер",
+    "has_apk": "Есть APK",
+    "delete_version_confirm": "Вы уверены, что хотите удалить каталог версии \"{dir}\"? Это действие нельзя отменить.",
+    "delete_version_success": "Каталог версии удален"
   },
   "sync": {
     "master_config_title": "Конфигурация авторизации главного сервера",

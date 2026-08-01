@@ -2743,6 +2743,10 @@ function changePageSize(newSize, changePageFuncName) {
     clientLogPageSize = size;
     clientLogPage = 1;
     loadClientLogs();
+  } else if (changePageFuncName === 'changeDownloadPage') {
+    downloadVersionsPageSize = size;
+    downloadVersionsPage = 1;
+    renderDownloadVersions();
   }
 }
 
@@ -2865,6 +2869,7 @@ async function loadUpdates() {
 
   if (githubReleasesCache) {
     renderUpdateReleases(githubReleasesCache);
+    loadDownloadedVersions();
     return;
   }
 
@@ -2884,6 +2889,7 @@ async function loadUpdates() {
     document.getElementById('update-loading').style.display = 'none';
     document.getElementById('update-error').style.display = 'block';
   }
+  loadDownloadedVersions();
 }
 
 function renderUpdateReleases(releases) {
@@ -3804,6 +3810,7 @@ async function loadCustomPage() {
 
   await refreshCustomEnvStatus();
   await loadCustomSettings();
+  refreshUploadedFileStatus();
 }
 
 async function refreshCustomEnvStatus(silent = false) {
@@ -4004,6 +4011,142 @@ async function cancelCustomEnv() {
   } catch (e) {}
 }
 
+async function resetCustomEnv() {
+  if (!confirm(t('client_custom.reset_env_confirm'))) return;
+  try {
+    await api('/admin/custom/reset-env', { method: 'POST' });
+    toast(t('client_custom.reset_env_success'), 'success');
+    refreshCustomEnvStatus();
+  } catch (e) {}
+}
+
+async function deleteUploadedFile(type) {
+  const typeNames = { jks: t('client_custom.jks_upload_label'), logo: t('client_custom.logo_label'), banner: t('client_custom.banner_label') };
+  if (!confirm(t('client_custom.delete_file_confirm').replace('{type}', typeNames[type] || type))) return;
+  try {
+    await api('/admin/custom/uploaded-file?type=' + encodeURIComponent(type), { method: 'DELETE' });
+    toast(t('client_custom.delete_file_success'), 'success');
+    if (type === 'logo') {
+      document.getElementById('cust-logo-preview-box').style.display = 'none';
+      document.getElementById('btn-cust-logo-del').style.display = 'none';
+    } else if (type === 'banner') {
+      document.getElementById('cust-banner-preview-box').style.display = 'none';
+      document.getElementById('btn-cust-banner-del').style.display = 'none';
+    } else if (type === 'jks') {
+      document.getElementById('cust-jks-upload-status').textContent = t('client_custom.jks_not_uploaded');
+      document.getElementById('cust-jks-upload-status').style.color = '';
+      document.getElementById('btn-cust-jks-del').style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+async function refreshUploadedFileStatus() {
+  try {
+    const r = await api('/admin/custom/file-status');
+    const files = r.data || [];
+    for (const f of files) {
+      if (f.exists) {
+        if (f.type === 'logo') {
+          document.getElementById('cust-logo-preview').src = '/library/apk-tools/v1/logo.png?t=' + Date.now();
+          document.getElementById('cust-logo-preview-box').style.display = 'flex';
+          document.getElementById('btn-cust-logo-del').style.display = '';
+        } else if (f.type === 'banner') {
+          document.getElementById('cust-banner-preview').src = '/library/apk-tools/v1/custom_banner.png?t=' + Date.now();
+          document.getElementById('cust-banner-preview-box').style.display = 'flex';
+          document.getElementById('btn-cust-banner-del').style.display = '';
+        } else if (f.type === 'jks') {
+          document.getElementById('cust-jks-upload-status').textContent = t('client_custom.uploaded_status').replace('{name}', f.name).replace('{size}', formatSize(f.size));
+          document.getElementById('cust-jks-upload-status').style.color = '#52c41a';
+          document.getElementById('btn-cust-jks-del').style.display = '';
+        }
+      } else {
+        // 文件不存在时隐藏预览和删除按钮
+        if (f.type === 'logo') {
+          document.getElementById('cust-logo-preview-box').style.display = 'none';
+          document.getElementById('btn-cust-logo-del').style.display = 'none';
+        } else if (f.type === 'banner') {
+          document.getElementById('cust-banner-preview-box').style.display = 'none';
+          document.getElementById('btn-cust-banner-del').style.display = 'none';
+        } else if (f.type === 'jks') {
+          document.getElementById('cust-jks-upload-status').textContent = t('client_custom.jks_not_uploaded');
+          document.getElementById('cust-jks-upload-status').style.color = '';
+          document.getElementById('btn-cust-jks-del').style.display = 'none';
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// 检查更新页面：加载已下载版本列表
+let downloadVersionsCache = [];
+let downloadVersionsPage = 1;
+let downloadVersionsPageSize = 20;
+
+async function loadDownloadedVersions() {
+  try {
+    const r = await api('/admin/custom/download-versions');
+    downloadVersionsCache = r.data || [];
+    downloadVersionsPage = 1;
+    renderDownloadVersions();
+  } catch (e) {}
+}
+
+function changeDownloadPage(page) {
+  downloadVersionsPage = page;
+  renderDownloadVersions();
+}
+
+function renderDownloadVersions() {
+  const container = document.getElementById('update-downloaded-versions');
+  const list = document.getElementById('update-version-list');
+  if (!container || !list) return;
+
+  if (downloadVersionsCache.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+
+  const totalPages = Math.ceil(downloadVersionsCache.length / downloadVersionsPageSize);
+  const start = (downloadVersionsPage - 1) * downloadVersionsPageSize;
+  const page = downloadVersionsCache.slice(start, start + downloadVersionsPageSize);
+
+  list.innerHTML = page.map(v => `
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg1); border-radius:var(--radius); border:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-weight:600; font-size:13px;">${escapeHtml(v.dir)}</span>
+        <span style="font-size:11px; color:var(--text2);">${v.mod_time}</span>
+        <span style="font-size:11px; color:var(--text2);">${v.size}</span>
+        ${v.has_apk ? '<span style="font-size:11px; color:#52c41a;">✓ ' + t('update.has_apk') + '</span>' : ''}
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteDownloadVersion('${escapeHtml(v.dir)}')" style="padding:4px 12px; font-size:12px;">${t('client_custom.delete_file')}</button>
+    </div>
+  `).join('');
+
+  renderPagination('update-version-pagination', downloadVersionsPage, totalPages, 'changeDownloadPage', downloadVersionsPageSize);
+}
+
+async function deleteDownloadVersion(dir) {
+  if (!confirm(t('update.delete_version_confirm').replace('{dir}', dir))) return;
+  try {
+    await api('/admin/custom/download-versions/' + encodeURIComponent(dir), { method: 'DELETE' });
+    toast(t('update.delete_version_success'), 'success');
+    loadDownloadedVersions();
+  } catch (e) {}
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 async function loadCustomSettings() {
   try {
     const r = await api('/admin/custom/settings');
@@ -4061,6 +4204,7 @@ async function uploadCustomLogo(event) {
       reader.onload = function(e) {
         document.getElementById('cust-logo-preview-box').style.display = 'flex';
         document.getElementById('cust-logo-preview').src = e.target.result;
+        document.getElementById('btn-cust-logo-del').style.display = '';
       };
       reader.readAsDataURL(file);
     } else {
@@ -4096,6 +4240,7 @@ async function uploadCustomBanner(event) {
       reader.onload = function(e) {
         document.getElementById('cust-banner-preview-box').style.display = 'flex';
         document.getElementById('cust-banner-preview').src = e.target.result;
+        document.getElementById('btn-cust-banner-del').style.display = '';
       };
       reader.readAsDataURL(file);
     } else {
@@ -4127,8 +4272,9 @@ async function uploadCustomJks(event) {
     const r = await res.json();
     if (res.ok) {
       toast('签名证书上传成功', 'success');
-      document.getElementById('cust-jks-upload-status').textContent = '已上传 (' + file.name + ')';
+      document.getElementById('cust-jks-upload-status').textContent = t('client_custom.uploaded_status').replace('{name}', file.name).replace('{size}', formatSize(file.size));
       document.getElementById('cust-jks-upload-status').style.color = '#52c41a';
+      document.getElementById('btn-cust-jks-del').style.display = '';
     } else {
       toast(r.message || '上传证书失败', 'error');
     }

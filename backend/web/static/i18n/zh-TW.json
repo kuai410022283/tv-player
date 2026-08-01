@@ -55,6 +55,7 @@
     "jks_upload_label": "上傳證書文件 (.jks / .keystore)",
     "jks_select_file": "選擇證書文件",
     "jks_not_uploaded": "未上傳",
+    "delete_file": "刪除",
     "jks_alias": "證書別名 (Alias)",
     "jks_alias_placeholder": "例如：my-key-alias",
     "jks_storepass": "密鑰庫密碼 (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 定製客戶端生成成功！",
     "build_success_desc": "您可以通過下方按鈕直接下載，或使用手機/電視端掃碼直接下載。已自動掛載到 OTA 升級管理中。",
-    "download_apk": "📥 下載定製版 APK"
+    "download_apk": "📥 下載定製版 APK",
+    "reset_env": "重置依賴環境",
+    "reset_env_confirm": "確定要清理所有打包環境依賴嗎？清理後需要重新部署。",
+    "reset_env_success": "依賴環境已清理",
+    "delete_file_confirm": "確定要刪除已上傳的{type}文件嗎？",
+    "delete_file_success": "文件已刪除",
+    "uploaded_status": "已上傳 ({name}, {size})"
   },
   "dashboard": {
     "title": "儀表板",
@@ -493,7 +500,11 @@
     "stop_download": "停止下載",
     "view_changelog": "在 GitHub 倉庫檢視更新日誌",
     "download_failed": "下載失敗",
-    "latest_suffix": "最新"
+    "latest_suffix": "最新",
+    "downloaded_versions": "已下載至伺服器的版本",
+    "has_apk": "含APK",
+    "delete_version_confirm": "確定要刪除版本目錄 \"{dir}\" 嗎？此操作不可恢復。",
+    "delete_version_success": "版本目錄已刪除"
   },
   "sync": {
     "master_config_title": "主伺服器授權設定區 (供備機連接用)",

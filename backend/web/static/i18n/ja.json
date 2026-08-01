@@ -55,6 +55,7 @@
     "jks_upload_label": "証明書ファイルをアップロード (.jks / .keystore)",
     "jks_select_file": "証明書ファイルを選択",
     "jks_not_uploaded": "未アップロード",
+    "delete_file": "削除",
     "jks_alias": "証明書エイリアス (Alias)",
     "jks_alias_placeholder": "例: my-key-alias",
     "jks_storepass": "キーストアパスワード (Store Password)",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 カスタムAPKの生成に成功しました！",
     "build_success_desc": "下のボタンから直接ダウンロードするか、スマートフォン/TVでQRコードをスキャンしてダウンロードしてください。OTAアップデート管理に自動的にリンクされています。",
-    "download_apk": "📥 カスタムAPKをダウンロード"
+    "download_apk": "📥 カスタムAPKをダウンロード",
+    "reset_env": "依存関係をリセット",
+    "reset_env_confirm": "すべてのパッケージ環境の依存関係をクリアしてもよろしいですか？クリア後は再デプロイが必要です。",
+    "reset_env_success": "依存関係をクリアしました",
+    "delete_file_confirm": "アップロードされた{type}ファイルを削除してもよろしいですか？",
+    "delete_file_success": "ファイルを削除しました",
+    "uploaded_status": "アップロード済み ({name}, {size})"
   },
   "dashboard": {
     "title": "ダッシュボード",
@@ -493,7 +500,11 @@
     "stop_download": "ダウンロードを停止",
     "view_changelog": "GitHub で更新履歴を表示",
     "download_failed": "ダウンロード失敗",
-    "latest_suffix": "最新"
+    "latest_suffix": "最新",
+    "downloaded_versions": "サーバーにダウンロードされたバージョン",
+    "has_apk": "APKあり",
+    "delete_version_confirm": "バージョンディレクトリ \"{dir}\" を削除してもよろしいですか？この操作は元に戻せません。",
+    "delete_version_success": "バージョンディレクトリを削除しました"
   },
   "sync": {
     "master_config_title": "マスターサーバー認証設定 (バックアップ接続用)",

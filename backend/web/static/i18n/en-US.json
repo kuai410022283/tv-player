@@ -55,6 +55,7 @@
     "jks_upload_label": "Upload Certificate File (.jks / .keystore)",
     "jks_select_file": "Select Certificate File",
     "jks_not_uploaded": "Not Uploaded",
+    "delete_file": "Delete",
     "jks_alias": "Certificate Alias",
     "jks_alias_placeholder": "e.g. my-key-alias",
     "jks_storepass": "Store Password",
@@ -67,7 +68,13 @@
     "idle": "idle",
     "build_success": "🎉 Custom APK Generated Successfully!",
     "build_success_desc": "Download directly via the button below, or scan the QR code on your phone/TV. Already linked to OTA update management.",
-    "download_apk": "📥 Download Custom APK"
+    "download_apk": "📥 Download Custom APK",
+    "reset_env": "Reset Dependencies",
+    "reset_env_confirm": "Are you sure you want to clean all packaging environment dependencies? You will need to re-deploy afterwards.",
+    "reset_env_success": "Dependencies cleaned",
+    "delete_file_confirm": "Are you sure you want to delete the uploaded {type} file?",
+    "delete_file_success": "File deleted",
+    "uploaded_status": "Uploaded ({name}, {size})"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -493,7 +500,11 @@
     "stop_download": "Stop Download",
     "view_changelog": "View Changelog on GitHub",
     "download_failed": "Download failed",
-    "latest_suffix": "Latest"
+    "latest_suffix": "Latest",
+    "downloaded_versions": "Versions Downloaded to Server",
+    "has_apk": "Has APK",
+    "delete_version_confirm": "Are you sure you want to delete the version directory \"{dir}\"? This cannot be undone.",
+    "delete_version_success": "Version directory deleted"
   },
   "sync": {
     "master_config_title": "Master Server Authorization Config (for backup connections)",
