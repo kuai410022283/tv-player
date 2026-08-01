@@ -1148,7 +1148,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 			// 3. 重新编译打包
 			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
-			rebuildArgs := []string{"-jar", apktoolJar, "b", "--use-aapt2", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "-c", "--use-aapt2", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
