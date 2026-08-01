@@ -4155,7 +4155,7 @@ async function saveCustomSettings() {
 
   if (!d.app_name || !d.version_name || !d.version_code) {
     toast('请填写必填项(应用名称、版本名称、版本号)', 'error');
-    return;
+    return false;
   }
 
   await api('/admin/custom/settings', {
@@ -4163,14 +4163,32 @@ async function saveCustomSettings() {
     body: JSON.stringify(d)
   });
   toast('设置保存成功');
+  return true;
 }
 
 async function buildCustomApk() {
-  // 先保存设置
-  await saveCustomSettings();
-  
+  // 收集表单数据
+  const d = {
+    base_version: document.getElementById('cust-base-version') ? document.getElementById('cust-base-version').value : '',
+    app_name: document.getElementById('cust-app-name').value,
+    package_name: document.getElementById('cust-package-name') ? document.getElementById('cust-package-name').value : '',
+    version_name: document.getElementById('cust-version-name').value,
+    version_code: parseInt(document.getElementById('cust-version-code').value) || 0,
+    default_server_url: document.getElementById('cust-server-url').value,
+    custom_keystore_enabled: document.getElementById('cust-jks-enabled').checked,
+    keystore_alias: document.getElementById('cust-jks-alias').value,
+    keystore_password: document.getElementById('cust-jks-storepass').value,
+    key_password: document.getElementById('cust-jks-keypass').value
+  };
+
+  if (!d.app_name || !d.version_name || !d.version_code) {
+    toast('请填写必填项(应用名称、版本名称、版本号)', 'error');
+    return;
+  }
+
   try {
-    await api('/admin/custom/build', { method: 'POST' });
+    // 将表单参数一并传给 build 接口，后端自动保存后启动打包
+    await api('/admin/custom/build', { method: 'POST', body: JSON.stringify(d) });
     toast('开始在后台生成定制版 APK...', 'success');
     refreshCustomEnvStatus();
   } catch (e) {}

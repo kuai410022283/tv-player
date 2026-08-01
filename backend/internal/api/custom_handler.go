@@ -131,6 +131,19 @@ func (h *CustomHandler) UploadBanner(c *gin.Context) {
 
 // POST /api/v1/admin/custom/build
 func (h *CustomHandler) Build(c *gin.Context) {
+	// 接收可选的表单参数，自动保存后再启动打包，确保使用最新配置
+	var settings services.CustomSettings
+	if err := c.ShouldBindJSON(&settings); err == nil {
+		// 前端传了参数则先保存
+		if settings.AppName != "" || settings.VersionName != "" || settings.VersionCode > 0 {
+			if err := h.customSvc.SaveSettings(settings); err != nil {
+				fail(c, 500, "保存设置失败: "+err.Error())
+				return
+			}
+		}
+	}
+	// 无论如何都忽略绑定错误（可能没传 body），直接用 DB 中已有设置
+
 	if err := h.customSvc.StartBuildPackage(); err != nil {
 		fail(c, 400, err.Error())
 		return

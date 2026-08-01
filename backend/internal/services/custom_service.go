@@ -5,12 +5,18 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"os"
 	"os/exec"
@@ -89,7 +95,9 @@ type CustomService struct {
 
 func NewCustomService(db *sql.DB) *CustomService {
 	toolsDir := filepath.Join("library", "apk-tools", "v1")
-	_ = os.MkdirAll(toolsDir, 0755)
+	if err := os.MkdirAll(toolsDir, 0755); err != nil {
+		slog.Error("Failed to create tools directory", "path", toolsDir, "error", err)
+	}
 	return &CustomService{
 		db:          db,
 		toolsDir:    toolsDir,
@@ -485,6 +493,9 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 
 	size := resp.ContentLength
 	tempFile := destPath + ".tmp"
+	if err := os.MkdirAll(filepath.Dir(tempFile), 0755); err != nil {
+		return fmt.Errorf("创建下载目录失败: %w", err)
+	}
 	out, err := os.Create(tempFile)
 	if err != nil {
 		return err
@@ -688,6 +699,9 @@ func (s *CustomService) getSettingDb(key, fallback string) string {
 // SaveUserJks 保存用户上传的 JKS 证书文件
 func (s *CustomService) SaveUserJks(r io.Reader) error {
 	dest := filepath.Join(s.toolsDir, "user-release-key.jks")
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("创建证书目录失败: %w", err)
+	}
 	out, err := os.Create(dest)
 	if err != nil {
 		return err
@@ -700,6 +714,9 @@ func (s *CustomService) SaveUserJks(r io.Reader) error {
 // SaveUserLogo 保存用户上传的 PNG 图标并记录配置
 func (s *CustomService) SaveUserLogo(r io.Reader) error {
 	dest := filepath.Join(s.toolsDir, "logo.png")
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("创建图标目录失败: %w", err)
+	}
 	out, err := os.Create(dest)
 	if err != nil {
 		return err
@@ -716,6 +733,9 @@ func (s *CustomService) SaveUserLogo(r io.Reader) error {
 // SaveUserBanner 保存用户上传的 TV 宽屏横幅并记录配置
 func (s *CustomService) SaveUserBanner(r io.Reader) error {
 	dest := filepath.Join(s.toolsDir, "custom_banner.png")
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("创建横幅目录失败: %w", err)
+	}
 	out, err := os.Create(dest)
 	if err != nil {
 		return err
@@ -824,7 +844,6 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 	// 2. 检测并准备 Java 可执行文件路径
 	javaCmd := "java"
-	keytoolCmd := "keytool"
 
 	arch := runtime.GOARCH
 	jreDirName := "jre-x64"
@@ -832,16 +851,11 @@ func (s *CustomService) runBuild(baseApkPath string) {
 		jreDirName = "jre-arm64"
 	}
 	localJava := filepath.Join(s.toolsDir, jreDirName, "bin", "java")
-	localKeytool := filepath.Join(s.toolsDir, jreDirName, "bin", "keytool")
 
 	if fileExists(localJava) {
 		_ = os.Chmod(localJava, 0755)
 		javaCmd = localJava
 		s.appendLog("[INFO] 使用内置本地 JRE: %s", javaCmd)
-		if fileExists(localKeytool) {
-			_ = os.Chmod(localKeytool, 0755)
-			keytoolCmd = localKeytool
-		}
 	} else {
 		s.appendLog("[WARN] 未找到本地 JRE，将自动降级尝试使用系统全局环境变量中的 'java' 命令")
 	}
@@ -856,11 +870,14 @@ func (s *CustomService) runBuild(baseApkPath string) {
 		return
 	}
 
-	// 校验并准备默认签名证书
+	// 校验并准备签名证书
 	keystorePath := filepath.Join(s.toolsDir, "my-release-key.jks")
 	alias := "my-key-alias"
 	storePass := "123456"
 	keyPass := "123456"
+	usePemSigning := false // 是否使用 PEM 格式（Go 自生成）签名
+	defaultKeyPem := filepath.Join(s.toolsDir, "my-release-key.pem")
+	defaultCertPem := filepath.Join(s.toolsDir, "my-release-cert.pem")
 
 	if settings.CustomKeystoreEnabled {
 		userJks := filepath.Join(s.toolsDir, "user-release-key.jks")
@@ -878,25 +895,19 @@ func (s *CustomService) runBuild(baseApkPath string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
+	// 当需要使用默认证书且 JKS 不存在时，用 Go 原生生成 PEM 密钥对
 	if keystorePath == filepath.Join(s.toolsDir, "my-release-key.jks") && !fileExists(keystorePath) {
-		s.appendLog(">>> 正在自动生成系统默认签名证书库 %s...", keystorePath)
-		genKeyArgs := []string{
-			"-genkeypair", "-v",
-			"-keystore", keystorePath,
-			"-keyalg", "RSA",
-			"-keysize", "2048",
-			"-validity", "10000",
-			"-alias", alias,
-			"-storepass", storePass,
-			"-keypass", keyPass,
-			"-dname", "CN=AutoTool, O=AutoTool, L=City, S=State, C=CN",
+		if !fileExists(defaultKeyPem) || !fileExists(defaultCertPem) {
+			s.appendLog(">>> 正在自动生成系统默认签名证书 (PEM)...")
+			if err := s.generateDefaultSigningKeypair(defaultKeyPem, defaultCertPem); err != nil {
+				s.buildStatus = "failed"
+				s.buildError = "自动生成默认签名证书失败: " + err.Error()
+				s.appendLog("[ERROR] %s", s.buildError)
+				return
+			}
+			s.appendLog("[INFO] 默认签名证书已生成: %s / %s", defaultKeyPem, defaultCertPem)
 		}
-		if err := ExecuteCommandWithLog(ctx, keytoolCmd, genKeyArgs, s.appendLog); err != nil {
-			s.buildStatus = "failed"
-			s.buildError = "自动生成默认证书库失败: " + err.Error()
-			s.appendLog("[ERROR] %s", s.buildError)
-			return
-		}
+		usePemSigning = true
 	}
 
 	// 依次处理所有的底本 APK
@@ -992,16 +1003,29 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 			// 5. 签名
 			s.appendLog(">>> [5/5] 正在完成数字签名...")
-			signArgs := []string{
-				"-jar", apksignerJar, "sign",
-				"--ks", keystorePath,
-				"--ks-key-alias", alias,
-				"--ks-pass", "pass:" + storePass,
-				"--key-pass", "pass:" + keyPass,
-				"--v1-signing-enabled", "true",
-				"--v2-signing-enabled", "true",
-				"--out", outputApkPath,
-				tempAlignedApk,
+			var signArgs []string
+			if usePemSigning {
+				signArgs = []string{
+					"-jar", apksignerJar, "sign",
+					"--key", defaultKeyPem,
+					"--cert", defaultCertPem,
+					"--v1-signing-enabled", "true",
+					"--v2-signing-enabled", "true",
+					"--out", outputApkPath,
+					tempAlignedApk,
+				}
+			} else {
+				signArgs = []string{
+					"-jar", apksignerJar, "sign",
+					"--ks", keystorePath,
+					"--ks-key-alias", alias,
+					"--ks-pass", "pass:" + storePass,
+					"--key-pass", "pass:" + keyPass,
+					"--v1-signing-enabled", "true",
+					"--v2-signing-enabled", "true",
+					"--out", outputApkPath,
+					tempAlignedApk,
+				}
 			}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, signArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
@@ -1036,6 +1060,71 @@ func fileExists(path string) bool {
 		return false
 	}
 	return !info.IsDir() && info.Size() > 0
+}
+
+// generateDefaultSigningKeypair 使用 Go 原生 crypto 生成 RSA 密钥对 + 自签名证书 (PEM)
+// 替代 keytool，避免 Docker 等环境下 JRE 缺少 keytool 导致证书生成失败
+func (s *CustomService) generateDefaultSigningKeypair(keyPemPath, certPemPath string) error {
+	// 生成 RSA 2048 位私钥
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("生成 RSA 密钥失败: %w", err)
+	}
+
+	// 构造自签名证书模板
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return fmt.Errorf("生成证书序列号失败: %w", err)
+	}
+	template := &x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:   "AutoTool",
+			Organization: []string{"AutoTool"},
+			Locality:     []string{"City"},
+			Province:     []string{"State"},
+			Country:      []string{"CN"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 30 * 24 * time.Hour), // ~30 年
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return fmt.Errorf("创建自签名证书失败: %w", err)
+	}
+
+	// 保存私钥为 PKCS#8 PEM
+	if err := os.MkdirAll(filepath.Dir(keyPemPath), 0755); err != nil {
+		return fmt.Errorf("创建证书目录失败: %w", err)
+	}
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return fmt.Errorf("编码私钥失败: %w", err)
+	}
+	keyFile, err := os.Create(keyPemPath)
+	if err != nil {
+		return fmt.Errorf("创建私钥文件失败: %w", err)
+	}
+	defer keyFile.Close()
+	if err := pem.Encode(keyFile, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
+		return fmt.Errorf("写入私钥 PEM 失败: %w", err)
+	}
+
+	// 保存证书为 PEM
+	certFile, err := os.Create(certPemPath)
+	if err != nil {
+		return fmt.Errorf("创建证书文件失败: %w", err)
+	}
+	defer certFile.Close()
+	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
+		return fmt.Errorf("写入证书 PEM 失败: %w", err)
+	}
+
+	return nil
 }
 
 // FindAvailableBaseApks 检索 web/download 下所有包含官方基础 APK 的版本目录
