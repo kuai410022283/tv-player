@@ -50,7 +50,7 @@ async function api(path, opts = {}) {
       try { data = JSON.parse(text); } catch (e) { console.warn('JSON parse failed:', e, text.substring(0, 200)); }
     }
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
+      if (res.status === 401) {
         showLogin();
         throw new Error('需要重新登录');
       }
@@ -2815,8 +2815,18 @@ if (!window.location.pathname.includes('/login.html') && adminToken) {
       }
     } catch (e) { }
     const lastSection = localStorage.getItem('last_active_section') || 'dashboard';
-    showSection(lastSection);
-    updateLicenseUI(); // 控制授权相关 UI 显隐
+    // 先更新授权状态，再决定显示的页面
+    await updateLicenseUI();
+    // VIP 未激活时，VIP 保护页面回退到仪表盘
+    const vipSections = ['client-custom', 'client-config'];
+    const navRemoteConfig = document.getElementById('nav-client-config');
+    const isVipActive = navRemoteConfig && navRemoteConfig.style.display !== 'none';
+    const targetSection = (vipSections.includes(lastSection) && !isVipActive) ? 'dashboard' : lastSection;
+    showSection(targetSection);
+    // 如果回退了，更新 localStorage
+    if (targetSection !== lastSection) {
+      localStorage.setItem('last_active_section', 'dashboard');
+    }
   })();
 }
 function copyText(text) {
