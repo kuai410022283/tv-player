@@ -105,31 +105,19 @@ func NewCustomService(db *sql.DB) *CustomService {
 func (s *CustomService) GetEnvStatus() EnvStatus {
 	var tools []ToolStatus
 
-	// 1. 检查核心 jar 包
-	jarFiles := []string{"apktool.jar", "apksigner.jar"}
+	// 检查工具链包（包含 apktool.jar、apksigner.jar、JRE、zipalign，架构专用）
+	toolchainName := s.getToolchainName()
 	toolsReady := true
 
-	for _, name := range jarFiles {
-		path := filepath.Join(s.toolsDir, name)
-		exists := fileExists(path)
-		if !exists {
-			toolsReady = false
+	// 检查核心文件是否完整
+	coreFiles := []string{"apktool.jar", "apksigner.jar"}
+	allCoreReady := true
+	for _, name := range coreFiles {
+		if !fileExists(filepath.Join(s.toolsDir, name)) {
+			allCoreReady = false
+			break
 		}
-		prog := 0
-		if exists {
-			prog = 100
-		} else if v, ok := s.progressMap.Load(name); ok {
-			prog = v.(int)
-		}
-		var errMsg string
-		if val, ok := s.errorMap.Load(name); ok {
-			errMsg = val.(string)
-		}
-		tools = append(tools, ToolStatus{Name: name, Exists: exists, Progress: prog, Error: errMsg})
 	}
-
-	// 2. 检查工具链包（包含 JRE + zipalign，架构专用）
-	toolchainName := s.getToolchainName()
 
 	// 检查 JRE
 	jrePath := filepath.Join(s.toolsDir, "jre", "bin", "java")
@@ -138,7 +126,6 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 	}
 	jreExists := fileExists(jrePath)
 	if !jreExists {
-		// 检查系统全局环境变量中是否存在 java 可执行命令
 		if _, err := exec.LookPath("java"); err == nil {
 			jreExists = true
 		} else if _, err := exec.LookPath("java.exe"); err == nil {
@@ -161,8 +148,8 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 		}
 	}
 
-	// 工具链就绪 = JRE 和 zipalign 都可用
-	toolchainReady := jreExists && nativeToolsExists
+	// 工具链就绪 = 核心 jar + JRE + zipalign 都可用
+	toolchainReady := allCoreReady && jreExists && nativeToolsExists
 	if !toolchainReady {
 		toolsReady = false
 	}
@@ -574,11 +561,10 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 		return nil
 	}
 
-	// 针对国内环境，可以使用 ghproxy 等加速代理
-	// 这里默认提供多源尝试，优先通过 ghproxy 代理加速下载
-	mirrors := []string{
-		"https://mirror.ghproxy.com/" + url,
-		url,
+	// 多源尝试：直连 GitHub URL 时优先通过 ghproxy 加速，已有代理则跳过避免双重代理
+	mirrors := []string{url}
+	if strings.HasPrefix(url, "https://github.com/") {
+		mirrors = append([]string{"https://mirror.ghproxy.com/" + url}, mirrors...)
 	}
 
 	var resp *http.Response
