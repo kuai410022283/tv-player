@@ -2228,21 +2228,21 @@ async function loadLicenseStatus() {
       const expiresDisplay = d.expires_at ? d.expires_at : t('common.forever', '永久');
       container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="form-row">
-            <label>${t('license.machine_id', '机器码')}</label>
+          <div class="form-row" style="align-items:center;">
+            <label style="min-width:56px;flex-shrink:0;">${t('license.machine_id', '机器码')}</label>
             <div style="display:flex;align-items:center;gap:8px;flex:1;">
               <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
               <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">${t('action.copy', '复制')}</button>
             </div>
           </div>
 
-          <div class="form-row">
-            <label>${t('license.expire_time', '过期时间')}</label>
+          <div class="form-row" style="align-items:center;">
+            <label style="min-width:56px;flex-shrink:0;">${t('license.expire_time', '过期时间')}</label>
             <span style="flex:1;">${expiresDisplay}</span>
           </div>
 
-          <div class="form-row">
-            <label>${t('license.benefits', '会员权益')}</label>
+          <div class="form-row" style="align-items:center;">
+            <label style="min-width:56px;flex-shrink:0;">${t('license.benefits', '会员权益')}</label>
             <div style="flex:1;display:flex;gap:8px;flex-wrap:wrap;">
               <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val', '远程配置')}</span>
               <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val2', '客户端定制')}</span>
@@ -2268,16 +2268,23 @@ async function loadLicenseStatus() {
 
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:16px;">
-        <div class="form-row">
-          <label>${t('license.machine_id', '机器码')}</label>
+        <div class="form-row" style="align-items:center;">
+          <label style="min-width:56px;flex-shrink:0;">${t('license.machine_id', '机器码')}</label>
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
             <code style="font-size:13px;background:var(--bg2);padding:4px 8px;border-radius:4px;word-break:break-all;flex:1;">${d.machine_id}</code>
             <button class="btn btn-ghost" onclick="copyToClipboard('${d.machine_id}', this)">${t('action.copy', '复制')}</button>
           </div>
         </div>
         ${warningMsg}
-        <div class="form-row">
-          <label>${t('license.license_key', '授权码')}</label>
+        <div class="form-row" style="align-items:center;">
+          <label style="min-width:56px;flex-shrink:0;">${t('license.benefits', '会员权益')}</label>
+          <div style="flex:1;display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val', '远程配置')}</span>
+            <span style="background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:600;padding:2px 10px;border-radius:4px;font-size:13px;border:1px solid rgba(245,158,11,0.3);">${t('license.benefits_val2', '客户端定制')}</span>
+          </div>
+        </div>
+        <div class="form-row" style="align-items:center;">
+          <label style="min-width:56px;flex-shrink:0;">${t('license.license_key', '授权码')}</label>
           <input id="license-key-input" type="text" placeholder="${t('license.input_placeholder', '输入授权码')}" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:14px;font-family:monospace;" />
         </div>
         <div>

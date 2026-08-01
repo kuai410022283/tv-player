@@ -5,18 +5,19 @@ services:
     image: laoknas/mediaplayer:latest
     container_name: mediaplayer-server
     restart: always
-    # 如果想实现rtp、rtsp、组播等功能需要使用 host 网络模式，并把ports端口映射删掉，并且服务器和客户端在同一个局域网内
-    # network_mode: "host"
+    # host 模式：默认推荐，支持 rtp/rtsp/组播等协议，服务器和客户端需在同一局域网
+    # 如需使用 bridge 模式，请取消 network_mode 注释并启用 ports 映射
+    network_mode: "host"
     environment:
       - TZ=Asia/Shanghai
-    ports:
-      - "9527:9527"
+    # bridge 模式下启用端口映射（host 模式下请注释掉）
+    # ports:
+    #   - "9527:9527"
     volumes:
-      # 数据存储目录（包含数据库、缓存等）
+      # 数据存储目录（数据库、缓存、自定义配置等）
+      # 将 config.yaml 放入 ./data 目录即可自动识别，无需额外映射
       - ./data:/app/data
       # 客户端 APK 下载存放目录
       - ./downloads:/app/web/download
       # 频道logo目录
       - ./library:/app/library
-      # 配置文件（可自行修改IP和端口，需确保容器内的路径正确，通常是运行目录下的 config.yaml）
-      # - ./config.yaml:/app/config.yaml

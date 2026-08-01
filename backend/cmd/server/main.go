@@ -60,9 +60,13 @@ func main() {
 	fmt.Println("项目地址: https://github.com/kuai410022283/mediaplayer")
 
 	// ── 加载配置 ─────────────────────────────────────
+	// 优先级：环境变量 CONFIG_PATH > ./data/config.yaml > 内置 config.yaml
 	cfgPath := "config.yaml"
 	if p := os.Getenv("CONFIG_PATH"); p != "" {
 		cfgPath = p
+	} else if _, err := os.Stat("./data/config.yaml"); err == nil {
+		cfgPath = "./data/config.yaml"
+		slog.Info("using custom config from data directory", "path", cfgPath)
 	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
