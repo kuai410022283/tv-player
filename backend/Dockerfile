@@ -23,7 +23,7 @@ RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = 
 # ── 运行阶段 ─────────────────────────────────────────
 FROM alpine:3.19
 
-RUN apk add --no-cache sqlite-libs ca-certificates tzdata curl su-exec
+RUN apk add --no-cache sqlite-libs ca-certificates tzdata curl su-exec openssl
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)
 RUN addgroup -g 1000 -S mediaplayer && adduser -u 1000 -S mediaplayer -G mediaplayer -h /app
