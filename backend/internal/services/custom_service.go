@@ -648,6 +648,7 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 			_ = os.Remove(filepath.Join(s.toolsDir, "apktool.jar"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "apksigner.jar"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "zipalign"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "aapt2"))
 			err := s.extractTarGz(destPath, s.toolsDir)
 			if err != nil {
 				_ = os.Remove(destPath)
@@ -656,6 +657,7 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 			// 赋予可执行权限
 			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java"), 0755)
 			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2"), 0755)
 		} else {
 			// 兼容旧版独立包下载（如 linux_tools.tar.gz、jre_linux_*.tar.gz）
 			s.progressMap.Store(filename, 95)
@@ -708,12 +710,14 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 			continue
 		}
 
-		// 移除顶层公共目录以对齐 `--strip-components=1` 行为
+		// 如果 tar 包内有顶层目录，剥离一层（如 jre-17.0.20+8/ → jre/）
+		// 如果 tar 包内文件直接平铺，则直接提取
 		parts := strings.Split(cleaned, string(filepath.Separator))
-		if len(parts) <= 1 {
-			continue
+		targetRelative := cleaned
+		if len(parts) > 1 && strings.HasPrefix(parts[0], "jre") && parts[0] != "jre" {
+			// 顶层目录为 jre-xxx 变体时剥离
+			targetRelative = filepath.Join(parts[1:]...)
 		}
-		targetRelative := filepath.Join(parts[1:]...)
 		targetPath := filepath.Join(destDir, targetRelative)
 
 		switch header.Typeflag {
@@ -1268,19 +1272,15 @@ func (s *CustomService) FindBaseApkInDir(dirName string) (path string, versionNa
 
 // getZipalignCmd 智能检测并优先返回原生 zipalign 可执行二进制文件及参数
 func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...interface{})) (cmd string, args []string) {
-	// 1. 检测本地 linux_tools/zipalign 可执行文件
-	localBinName := "zipalign"
+	// 1. 检测工具链中的 zipalign（架构专属，最高优先级）
+	binName := "zipalign"
 	if runtime.GOOS == "windows" {
-		localBinName = "zipalign.exe"
-	} else if runtime.GOARCH == "arm64" {
-		if fileExists(filepath.Join(s.toolsDir, "linux_tools", "zipalign_arm64")) {
-			localBinName = "zipalign_arm64"
-		}
+		binName = "zipalign.exe"
 	}
-	localBin := filepath.Join(s.toolsDir, "linux_tools", localBinName)
+	localBin := filepath.Join(s.toolsDir, binName)
 	if fileExists(localBin) {
 		_ = os.Chmod(localBin, 0755)
-		logFunc("[INFO] 优先使用原生二进制 zipalign: %s", localBin)
+		logFunc("[INFO] 使用工具链原生 zipalign: %s", localBin)
 		return localBin, []string{"-p", "-f", "4"}
 	}
 
@@ -1295,10 +1295,6 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 		if entries, err := os.ReadDir(sdkDir); err == nil {
 			for i := len(entries) - 1; i >= 0; i-- {
 				if entries[i].IsDir() {
-					binName := "zipalign"
-					if runtime.GOOS == "windows" {
-						binName = "zipalign.exe"
-					}
 					binPath := filepath.Join(sdkDir, entries[i].Name(), binName)
 					if fileExists(binPath) {
 						logFunc("[INFO] 检测到 Android SDK zipalign 工具: %s", binPath)
@@ -1310,16 +1306,12 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 	}
 
 	// 3. 检测系统环境变量 PATH 中的 zipalign
-	binName := "zipalign"
-	if runtime.GOOS == "windows" {
-		binName = "zipalign.exe"
-	}
 	if path, err := exec.LookPath(binName); err == nil {
 		logFunc("[INFO] 使用系统环境变量中的 zipalign: %s", path)
 		return path, []string{"-p", "-f", "4"}
 	}
 
-	// 4. 退化
+	// 4. 退化到纯 Go 原生对齐
 	return javaCmd, nil
 }
 
