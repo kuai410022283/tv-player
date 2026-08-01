@@ -167,8 +167,14 @@ func (hs *Handlers) RegisterRoutes(r *gin.RouterGroup) {
 			adminCustom.POST("/reset-env", hs.CustomHandler.ResetEnv)
 			adminCustom.GET("/file-status", hs.CustomHandler.GetFileStatus)
 			adminCustom.DELETE("/uploaded-file", hs.CustomHandler.DeleteUploadedFile)
-			adminCustom.GET("/download-versions", hs.CustomHandler.ListDownloadVersions)
-			adminCustom.DELETE("/download-versions/:dir", hs.CustomHandler.DeleteDownloadVersion)
+		}
+
+		// 已下载版本列表（仅需管理员权限，无需 VIP 授权，供检查更新和客户端定制页面使用）
+		updateMgmt := api.Group("/admin")
+		updateMgmt.Use(middleware.RequireAdmin())
+		{
+			updateMgmt.GET("/update/versions", hs.CustomHandler.ListDownloadVersions)
+			updateMgmt.DELETE("/update/versions/:dir", hs.CustomHandler.DeleteDownloadVersion)
 		}
 
 		// 管理端：全局客户端远程配置（需要 VIP 授权）

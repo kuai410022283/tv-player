@@ -4111,7 +4111,7 @@ let downloadVersionsPageSize = 20;
 
 async function loadDownloadedVersions() {
   try {
-    const r = await api('/admin/custom/download-versions');
+    const r = await api('/admin/update/versions');
     downloadVersionsCache = (r.data || []).sort((a, b) => b.mod_time.localeCompare(a.mod_time));
     downloadVersionsPage = 1;
     renderDownloadVersions();
@@ -4162,7 +4162,7 @@ function renderDownloadVersions() {
 async function deleteDownloadVersion(dir) {
   if (!confirm(t('update.delete_version_confirm').replace('{dir}', dir))) return;
   try {
-    await api('/admin/custom/download-versions/' + encodeURIComponent(dir), { method: 'DELETE' });
+    await api('/admin/update/versions/' + encodeURIComponent(dir), { method: 'DELETE' });
     toast(t('update.delete_version_success'), 'success');
     loadDownloadedVersions();
   } catch (e) {}
