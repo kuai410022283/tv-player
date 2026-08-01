@@ -267,16 +267,18 @@ function toggleSidebar() {
 
 // ═══ Sidebar click to expand (mobile/tablet narrow mode) ═══
 // Capture phase ensures this runs BEFORE nav items' inline onclick handlers
-document.getElementById('sidebar').addEventListener('click', function (e) {
-  if (window.innerWidth >= 1025) return; // Desktop: no action needed
-  const sidebar = document.getElementById('sidebar');
-  // If sidebar is not expanded, expand it and block the nav item click
-  if (!sidebar.classList.contains('show')) {
-    e.stopPropagation();
-    sidebar.classList.add('show');
-    document.getElementById('sidebar-overlay').classList.add('show');
-  }
-}, true); // capture phase
+const sidebarEl = document.getElementById('sidebar');
+if (sidebarEl) {
+  sidebarEl.addEventListener('click', function (e) {
+    if (window.innerWidth >= 1025) return; // Desktop: no action needed
+    // If sidebar is not expanded, expand it and block the nav item click
+    if (!sidebarEl.classList.contains('show')) {
+      e.stopPropagation();
+      sidebarEl.classList.add('show');
+      document.getElementById('sidebar-overlay').classList.add('show');
+    }
+  }, true); // capture phase
+}
 
 // ═══ Dashboard ════════════════════════════════════════
 async function loadDashboard() {
