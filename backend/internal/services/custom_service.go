@@ -475,13 +475,17 @@ func (s *CustomService) GetUploadedFileStatus() []UploadedFileInfo {
 // DeleteUploadedFile 删除指定类型的已上传文件
 func (s *CustomService) DeleteUploadedFile(fileType string) error {
 	var filePath string
+	var key string
 	switch fileType {
 	case "jks":
 		filePath = filepath.Join(s.toolsDir, "user-release-key.jks")
+		key = "custom_jks_path"
 	case "logo":
 		filePath = filepath.Join(s.toolsDir, "logo.png")
+		key = "custom_logo_path"
 	case "banner":
 		filePath = filepath.Join(s.toolsDir, "custom_banner.png")
+		key = "custom_banner_path"
 	default:
 		return fmt.Errorf("不支持的文件类型: %s", fileType)
 	}
@@ -490,12 +494,6 @@ func (s *CustomService) DeleteUploadedFile(fileType string) error {
 	}
 	// 清除数据库中的路径记录
 	if s.db != nil {
-		key := "custom_" + fileType + "_path"
-		if fileType == "logo" {
-			key = "custom_logo_path"
-		} else if fileType == "banner" {
-			key = "custom_banner_path"
-		}
 		_, _ = s.db.Exec(`DELETE FROM user_settings WHERE key=?`, key)
 	}
 	return nil
