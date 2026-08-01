@@ -25,11 +25,12 @@ FROM debian:bookworm-slim
 
 # 安装运行时依赖 + JRE + Android 构建工具（glibc 原生，所有架构均有预编译包）
 # zipalign: APK 4 字节对齐（由 android-platform-build 源码包提供）
-# aapt:     Android 资源打包工具（由 android-platform-frameworks-base 源码包提供）
-#           用于替代 apktool 内置的 x86_64 专用 aapt2，确保 ARM64/ARMv7 下可用
+# 注意: apktool 3.0.x 仅支持 aapt2，不再兼容系统 aapt(v1)
+#       x86_64 平台使用 apktool 内置 aapt2（--use-aapt2），
+#       ARM64 平台若需原生 aapt2 请手动安装或挂在工具链中
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
-    zipalign aapt \
+    zipalign \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)

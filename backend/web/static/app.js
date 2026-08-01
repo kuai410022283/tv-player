@@ -4005,15 +4005,21 @@ function renderCustomDownloadProgress(tools) {
         shortErr = shortErr.slice(0, 38) + '...';
       }
       text = `失败: ${esc(shortErr)}`;
+    } else if (t.progress === 0 && !t.exists) {
+      text = '等待中...';
     }
+
+    // 工具链包显示完整进度条，其他工具在等待时只显示文字
+    const isToolchain = t.name.startsWith('toolchain-');
+    const showBar = t.progress > 0 || t.error || (t.exists && t.progress === 100) || isToolchain;
 
     return `<div style="font-size:12px; margin-bottom:4px; display:flex; justify-content:space-between;">
       <span>${esc(t.name)}</span>
       <span style="color:${color}; font-weight:500;" ${titleAttr}>${text}</span>
     </div>
-    <div style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:10px;">
+    ${showBar ? `<div style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-bottom:10px;">
       <div style="width:${t.progress}%; height:100%; background:${color}; transition: width 0.3s ease;"></div>
-    </div>`;
+    </div>` : ''}`;
   }).join('');
 }
 

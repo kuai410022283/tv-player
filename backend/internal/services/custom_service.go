@@ -43,7 +43,7 @@ type BaseVersionInfo struct {
 
 // EnvStatus 表示整体打包环境的状态
 type EnvStatus struct {
-	Arch           string            `json:"arch"`           // amd64 / arm64
+	Arch           string            `json:"arch"`           // amd64 / arm64 / arm
 	ToolsReady     bool              `json:"tools_ready"`    // 编译工具链是否全部就绪
 	Downloading    bool              `json:"downloading"`    // 是否正在下载中
 	BaseApkReady   bool              `json:"base_apk_ready"` // 官方底本是否存在
@@ -103,7 +103,6 @@ func NewCustomService(db *sql.DB) *CustomService {
 
 // GetEnvStatus 检查环境并返回状态
 func (s *CustomService) GetEnvStatus() EnvStatus {
-	arch := runtime.GOARCH
 	var tools []ToolStatus
 
 	// 1. 检查核心 jar 包
@@ -129,16 +128,13 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 		tools = append(tools, ToolStatus{Name: name, Exists: exists, Progress: prog, Error: errMsg})
 	}
 
-	// 2. 检查 JRE 目录
-	jreName := "jre_linux_x64.tar.gz"
-	jreDirName := "jre-x64"
-	if arch == "arm64" {
-		jreName = "jre_linux_arm64.tar.gz"
-		jreDirName = "jre-arm64"
-	}
-	jrePath := filepath.Join(s.toolsDir, jreDirName, "bin", "java")
+	// 2. 检查工具链包（包含 JRE + zipalign，架构专用）
+	toolchainName := s.getToolchainName()
+
+	// 检查 JRE
+	jrePath := filepath.Join(s.toolsDir, "jre", "bin", "java")
 	if runtime.GOOS == "windows" {
-		jrePath = filepath.Join(s.toolsDir, jreDirName, "bin", "java.exe")
+		jrePath = filepath.Join(s.toolsDir, "jre", "bin", "java.exe")
 	}
 	jreExists := fileExists(jrePath)
 	if !jreExists {
@@ -147,51 +143,41 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 			jreExists = true
 		} else if _, err := exec.LookPath("java.exe"); err == nil {
 			jreExists = true
-		} else {
-			toolsReady = false
 		}
 	}
-	jreProg := 0
-	if jreExists {
-		jreProg = 100
-	} else if v, ok := s.progressMap.Load(jreName); ok {
-		jreProg = v.(int)
-	}
-	var jreErr string
-	if val, ok := s.errorMap.Load(jreName); ok {
-		jreErr = val.(string)
-	}
-	tools = append(tools, ToolStatus{Name: jreName, Exists: jreExists, Progress: jreProg, Error: jreErr})
 
-	// 3. 检查 linux_tools 原生对齐工具链
-	nativeToolsName := "linux_tools.tar.gz"
+	// 检查 zipalign
 	binName := "zipalign"
 	if runtime.GOOS == "windows" {
 		binName = "zipalign.exe"
-	} else if arch == "arm64" {
-		binName = "zipalign_arm64"
 	}
-	nativeToolsPath := filepath.Join(s.toolsDir, "linux_tools", binName)
+	nativeToolsPath := filepath.Join(s.toolsDir, binName)
 	nativeToolsExists := fileExists(nativeToolsPath)
 	if !nativeToolsExists {
-		// 检查系统全局环境变量中是否存在 zipalign
 		if _, err := exec.LookPath("zipalign"); err == nil {
 			nativeToolsExists = true
 		} else if _, err := exec.LookPath("zipalign.exe"); err == nil {
 			nativeToolsExists = true
 		}
 	}
-	nativeToolsProg := 0
-	if nativeToolsExists {
-		nativeToolsProg = 100
-	} else if v, ok := s.progressMap.Load(nativeToolsName); ok {
-		nativeToolsProg = v.(int)
+
+	// 工具链就绪 = JRE 和 zipalign 都可用
+	toolchainReady := jreExists && nativeToolsExists
+	if !toolchainReady {
+		toolsReady = false
 	}
-	var nativeToolsErr string
-	if val, ok := s.errorMap.Load(nativeToolsName); ok {
-		nativeToolsErr = val.(string)
+
+	toolchainProg := 0
+	if toolchainReady {
+		toolchainProg = 100
+	} else if v, ok := s.progressMap.Load(toolchainName); ok {
+		toolchainProg = v.(int)
 	}
-	tools = append(tools, ToolStatus{Name: nativeToolsName, Exists: nativeToolsExists, Progress: nativeToolsProg, Error: nativeToolsErr})
+	var toolchainErr string
+	if val, ok := s.errorMap.Load(toolchainName); ok {
+		toolchainErr = val.(string)
+	}
+	tools = append(tools, ToolStatus{Name: toolchainName, Exists: toolchainReady, Progress: toolchainProg, Error: toolchainErr})
 
 	// 4. 检索选定或默认的官方底本 APK
 	var baseApkPath string
@@ -244,7 +230,7 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 	}
 
 	return EnvStatus{
-		Arch:           arch,
+		Arch:           runtime.GOARCH,
 		ToolsReady:     toolsReady,
 		Downloading:    atomic.LoadInt32(&s.downloading) == 1,
 		BaseApkReady:   baseReady,
@@ -322,7 +308,18 @@ func (s *CustomService) FindLatestBaseApk() (path string, versionName string, ve
 	return "", "", 0, false
 }
 
-// SetupEnvironment 触发并发下载 4 个依赖工具包
+// getToolchainName 返回当前架构对应的工具链包名
+func (s *CustomService) getToolchainName() string {
+	arch := runtime.GOARCH
+	if arch == "arm64" {
+		return "toolchain-linux-arm64.tar.gz"
+	} else if strings.HasPrefix(arch, "arm") {
+		return "toolchain-linux-arm.tar.gz"
+	}
+	return "toolchain-linux-x64.tar.gz"
+}
+
+// SetupEnvironment 触发下载架构专属的工具链包
 func (s *CustomService) SetupEnvironment(proxyURL string) error {
 	if !atomic.CompareAndSwapInt32(&s.downloading, 0, 1) {
 		return errors.New("打包环境正在下载部署中，请勿重复触发")
@@ -339,54 +336,37 @@ func (s *CustomService) SetupEnvironment(proxyURL string) error {
 	s.cancelFunc = cancel
 	s.cancelMu.Unlock()
 
-	arch := runtime.GOARCH
-	var wg sync.WaitGroup
-
-	// 需要下载的列表
-	targets := []string{"apktool.jar", "apksigner.jar", "linux_tools.tar.gz"}
-	jreName := "jre_linux_x64.tar.gz"
-	if arch == "arm64" {
-		jreName = "jre_linux_arm64.tar.gz"
-	}
-	targets = append(targets, jreName)
+	toolchainName := s.getToolchainName()
 
 	// 重置下载进度映射表为 0
-	for _, name := range targets {
-		s.progressMap.Store(name, 0)
-	}
+	s.progressMap.Store(toolchainName, 0)
 
 	baseURL := "https://github.com/kuai410022283/mediaplayer/releases/download/app-tools/"
 
-	for _, name := range targets {
-		wg.Add(1)
-		go func(filename string) {
-			defer wg.Done()
-
-			finalURL := baseURL + filename
-			if proxyURL != "" {
-				if !strings.HasSuffix(proxyURL, "/") {
-					finalURL = proxyURL + "/" + finalURL
-				} else {
-					finalURL = proxyURL + finalURL
-				}
-			}
-
-			err := s.downloadTool(ctx, finalURL, filename)
-			if err != nil {
-				slog.Error("Failed to download tool", "name", filename, "error", err)
-				s.errorMap.Store(filename, err.Error())
-			} else {
-				s.progressMap.Store(filename, 100)
-			}
-		}(name)
+	finalURL := baseURL + toolchainName
+	if proxyURL != "" {
+		if !strings.HasSuffix(proxyURL, "/") {
+			finalURL = proxyURL + "/" + finalURL
+		} else {
+			finalURL = proxyURL + finalURL
+		}
 	}
 
 	go func() {
-		wg.Wait()
-		s.cancelMu.Lock()
-		s.cancelFunc = nil
-		s.cancelMu.Unlock()
-		atomic.StoreInt32(&s.downloading, 0)
+		defer func() {
+			s.cancelMu.Lock()
+			s.cancelFunc = nil
+			s.cancelMu.Unlock()
+			atomic.StoreInt32(&s.downloading, 0)
+		}()
+
+		err := s.downloadTool(ctx, finalURL, toolchainName)
+		if err != nil {
+			slog.Error("Failed to download toolchain", "name", toolchainName, "error", err)
+			s.errorMap.Store(toolchainName, err.Error())
+		} else {
+			s.progressMap.Store(toolchainName, 100)
+		}
 	}()
 
 	return nil
@@ -577,43 +557,21 @@ func formatSize(bytes int64) string {
 }
 
 func (s *CustomService) downloadTool(ctx context.Context, url, filename string) error {
-	arch := runtime.GOARCH
 	destPath := filepath.Join(s.toolsDir, filename)
-	// 判断文件是否已就绪
-	if fileExists(destPath) {
-		if !strings.HasSuffix(filename, ".tar.gz") {
+
+	// 检查核心文件是否已就绪（不依赖 tar.gz 包是否存在）
+	if strings.HasPrefix(filename, "toolchain-") {
+		if fileExists(filepath.Join(s.toolsDir, "apktool.jar")) &&
+			fileExists(filepath.Join(s.toolsDir, "apksigner.jar")) &&
+			fileExists(filepath.Join(s.toolsDir, "jre", "bin", "java")) &&
+			fileExists(filepath.Join(s.toolsDir, "zipalign")) {
 			s.progressMap.Store(filename, 100)
 			return nil
 		}
-		// 针对 tar.gz 检查其解压目录是否完好
-		if filename == "linux_tools.tar.gz" {
-			binName := "zipalign"
-			if runtime.GOOS == "windows" {
-				binName = "zipalign.exe"
-			} else if arch == "arm64" {
-				binName = "zipalign_arm64"
-			}
-			destDir := filepath.Join(s.toolsDir, "linux_tools")
-			if fileExists(filepath.Join(destDir, binName)) {
-				s.progressMap.Store(filename, 100)
-				return nil
-			}
-			// 如果包存在但未解压完成，自动解压赋权
-			_ = s.extractTarGz(destPath, destDir)
-			_ = os.Chmod(filepath.Join(destDir, "zipalign"), 0755)
-			_ = os.Chmod(filepath.Join(destDir, "zipalign_arm64"), 0755)
-			s.progressMap.Store(filename, 100)
-			return nil
-		} else {
-			jreDir := "jre-x64"
-			if strings.Contains(filename, "arm64") {
-				jreDir = "jre-arm64"
-			}
-			if fileExists(filepath.Join(s.toolsDir, jreDir, "bin", "java")) {
-				s.progressMap.Store(filename, 100)
-				return nil
-			}
-		}
+	} else if fileExists(destPath) {
+		// 非 tar.gz 文件已存在则跳过
+		s.progressMap.Store(filename, 100)
+		return nil
 	}
 
 	// 针对国内环境，可以使用 ghproxy 等加速代理
@@ -694,33 +652,37 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 		return err
 	}
 
-	// 如果是 tar.gz 压缩包，立即触发后台解包释放 JRE 或原生工具链
+	// 如果是 tar.gz 压缩包，立即触发后台解包
 	if strings.HasSuffix(filename, ".tar.gz") {
-		if filename == "linux_tools.tar.gz" {
+		if strings.HasPrefix(filename, "toolchain-") {
+			// 架构专属工具链包：解压到 s.toolsDir 根目录
 			s.progressMap.Store(filename, 95)
-			destDir := filepath.Join(s.toolsDir, "linux_tools")
-			err := s.extractTarGz(destPath, destDir)
+			// 解压前先清理旧文件，确保完整替换
+			_ = os.RemoveAll(filepath.Join(s.toolsDir, "jre"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "apktool.jar"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "apksigner.jar"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "zipalign"))
+			err := s.extractTarGz(destPath, s.toolsDir)
 			if err != nil {
 				_ = os.Remove(destPath)
-				return fmt.Errorf("解压 linux_tools 失败: %w", err)
+				return fmt.Errorf("解压工具链失败: %w", err)
 			}
-			// 给解压出来的可执行二进制赋权
-			_ = os.Chmod(filepath.Join(destDir, "zipalign"), 0755)
-			_ = os.Chmod(filepath.Join(destDir, "zipalign_arm64"), 0755)
+			// 赋予可执行权限
+			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign"), 0755)
 		} else {
-			jreDir := "jre-x64"
-			if strings.Contains(filename, "arm64") {
-				jreDir = "jre-arm64"
-			}
-			s.progressMap.Store(filename, 95) // 标记解压中
-			err := s.extractTarGz(destPath, filepath.Join(s.toolsDir, jreDir))
+			// 兼容旧版独立包下载（如 linux_tools.tar.gz、jre_linux_*.tar.gz）
+			s.progressMap.Store(filename, 95)
+			err := s.extractTarGz(destPath, s.toolsDir)
 			if err != nil {
-				_ = os.Remove(destPath) // 损坏的包删除
-				return fmt.Errorf("解压 JRE 失败: %w", err)
+				_ = os.Remove(destPath)
+				return fmt.Errorf("解压 %s 失败: %w", filename, err)
 			}
-			// 赋予 bin/java 可执行权限
-			_ = os.Chmod(filepath.Join(s.toolsDir, jreDir, "bin", "java"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign"), 0755)
 		}
+		// 解压完成后删除 tar.gz 包，节省空间
+		_ = os.Remove(destPath)
 	}
 
 	s.progressMap.Store(filename, 100)
@@ -1011,13 +973,8 @@ func (s *CustomService) runBuild(baseApkPath string) {
 		javaCmd = systemJava
 		s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
 	} else {
-		// 系统无 Java，尝试使用内置本地 JRE
-		arch := runtime.GOARCH
-		jreDirName := "jre-x64"
-		if arch == "arm64" {
-			jreDirName = "jre-arm64"
-		}
-		localJava := filepath.Join(s.toolsDir, jreDirName, "bin", "java")
+		// 系统无 Java，尝试使用内置本地 JRE（架构专属工具链统一提取到 jre/）
+		localJava := filepath.Join(s.toolsDir, "jre", "bin", "java")
 		if fileExists(localJava) {
 			_ = os.Chmod(localJava, 0755)
 			javaCmd = localJava
@@ -1146,20 +1103,23 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 			// 3. 重新编译打包
 			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
-			// 优先使用系统 aapt（全架构原生支持），替代 apktool 内置的 x86_64 专用 aapt2
+			// apktool 3.0.x 仅支持 aapt2，优先使用工具链中的 aapt2，其次系统 aapt2
 			aaptBin := ""
-			if fileExists("/usr/bin/aapt") {
-				aaptBin = "/usr/bin/aapt"
-			} else if p, err := exec.LookPath("aapt"); err == nil {
+			if fileExists(filepath.Join(s.toolsDir, "aapt2")) {
+				aaptBin = filepath.Join(s.toolsDir, "aapt2")
+				s.appendLog("[INFO] 使用工具链原生 aapt2: %s", aaptBin)
+			} else if fileExists("/usr/bin/aapt2") {
+				aaptBin = "/usr/bin/aapt2"
+			} else if p, err := exec.LookPath("aapt2"); err == nil {
 				aaptBin = p
 			}
 			rebuildArgs := []string{"-jar", apktoolJar, "b", "-c", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if aaptBin != "" {
 				rebuildArgs = append(rebuildArgs, "-a", aaptBin)
-				s.appendLog("[INFO] 使用系统原生 aapt: %s", aaptBin)
+				s.appendLog("[INFO] 使用系统原生 aapt2: %s", aaptBin)
 			} else {
 				rebuildArgs = append(rebuildArgs, "--use-aapt2")
-				s.appendLog("[WARN] 系统无原生 aapt，退化使用 apktool 内置 aapt2（仅 x86_64 可用）")
+				s.appendLog("[INFO] 使用 apktool 内置 aapt2")
 			}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
