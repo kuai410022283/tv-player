@@ -13,8 +13,8 @@ if [ "$(id -u)" = '0' ]; then
     chown -R mediaplayer:mediaplayer /app/web/download
     chown -R mediaplayer:mediaplayer /app/library
     
-    # 使用 su-exec 降权到 mediaplayer 用户并执行传入的命令
-    exec su-exec mediaplayer "$@"
+    # 使用 gosu 降权到 mediaplayer 用户并执行传入的命令
+    exec gosu mediaplayer "$@"
 else
     # 如果已经以非 root 用户身份运行，则直接执行命令
     exec "$@"

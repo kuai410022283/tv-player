@@ -21,17 +21,15 @@ RUN GOARM=$([ "${TARGETVARIANT}" = "v7" ] && echo "7" || [ "${TARGETVARIANT}" = 
     -o mediaplayer ./cmd/server
 
 # ── 运行阶段 ─────────────────────────────────────────
-FROM alpine:3.19
+FROM debian:bookworm-slim
 
-# 安装 JRE：优先 openjdk17，不支持的系统降级到 openjdk11/openjdk8，均不支持则跳过（arm/v7 等 32 位架构可能无预编译包）
-RUN apk add --no-cache sqlite-libs ca-certificates tzdata curl su-exec openssl && \
-    (apk add --no-cache openjdk17-jre 2>/dev/null || \
-     apk add --no-cache openjdk11-jre 2>/dev/null || \
-     apk add --no-cache openjdk8-jre 2>/dev/null || \
-     echo "Warning: No OpenJDK package available for this architecture")
+# 安装运行时依赖 + JRE（glibc 原生，所有架构均有预编译包，含 arm/v7）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)
-RUN addgroup -g 1000 -S mediaplayer && adduser -u 1000 -S mediaplayer -G mediaplayer -h /app
+RUN groupadd -g 1000 mediaplayer && useradd -u 1000 -g mediaplayer -d /app -s /bin/sh mediaplayer
 
 WORKDIR /app
 COPY --from=builder /build/mediaplayer .
