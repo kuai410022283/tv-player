@@ -502,6 +502,11 @@
     "download_failed": "下载失败",
     "latest_suffix": "最新",
     "downloaded_versions": "已下载至服务端的版本",
+    "version_dir": "目录名",
+    "version_mod_time": "修改时间",
+    "version_size": "大小",
+    "version_status": "状态",
+    "version_action": "操作",
     "has_apk": "含APK",
     "delete_version_confirm": "确定要删除版本目录 \"{dir}\" 吗？此操作不可恢复。",
     "delete_version_success": "版本目录已删除"

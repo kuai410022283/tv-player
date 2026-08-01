@@ -4091,7 +4091,7 @@ let downloadVersionsPageSize = 20;
 async function loadDownloadedVersions() {
   try {
     const r = await api('/admin/custom/download-versions');
-    downloadVersionsCache = r.data || [];
+    downloadVersionsCache = (r.data || []).sort((a, b) => b.mod_time.localeCompare(a.mod_time));
     downloadVersionsPage = 1;
     renderDownloadVersions();
   } catch (e) {}
@@ -4117,16 +4117,22 @@ function renderDownloadVersions() {
   const start = (downloadVersionsPage - 1) * downloadVersionsPageSize;
   const page = downloadVersionsCache.slice(start, start + downloadVersionsPageSize);
 
-  list.innerHTML = page.map(v => `
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg1); border-radius:var(--radius); border:1px solid var(--border);">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <span style="font-weight:600; font-size:13px;">${escapeHtml(v.dir)}</span>
-        <span style="font-size:11px; color:var(--text2);">${v.mod_time}</span>
-        <span style="font-size:11px; color:var(--text2);">${v.size}</span>
-        ${v.has_apk ? '<span style="font-size:11px; color:#52c41a;">✓ ' + t('update.has_apk') + '</span>' : ''}
-      </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteDownloadVersion('${escapeHtml(v.dir)}')" style="padding:4px 12px; font-size:12px;">${t('client_custom.delete_file')}</button>
-    </div>
+  list.innerHTML = `\
+    <div style="display:grid; grid-template-columns:1fr 180px 100px 100px 80px; gap:8px; padding:8px 14px; font-size:12px; font-weight:600; color:var(--text2); border-bottom:1px solid var(--border);">\
+      <span>${t('update.version_dir')}</span>\
+      <span>${t('update.version_mod_time')}</span>\
+      <span>${t('update.version_size')}</span>\
+      <span style="text-align:center;">${t('update.version_status')}</span>\
+      <span style="text-align:center;">${t('update.version_action')}</span>\
+    </div>\
+  ` + page.map(v => `\
+    <div style="display:grid; grid-template-columns:1fr 180px 100px 100px 80px; gap:8px; align-items:center; padding:10px 14px; background:var(--bg1); border-radius:var(--radius); border:1px solid var(--border);">\
+      <span style="font-weight:600; font-size:13px;">${escapeHtml(v.dir)}</span>\
+      <span style="font-size:11px; color:var(--text2);">${v.mod_time}</span>\
+      <span style="font-size:11px; color:var(--text2);">${v.size}</span>\
+      <span style="font-size:11px; text-align:center; ${v.has_apk ? 'color:#52c41a;' : 'color:var(--text2);'}">${v.has_apk ? '✓ ' + t('update.has_apk') : '-'}</span>\
+      <span style="text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteDownloadVersion('${escapeHtml(v.dir)}')" style="padding:4px 12px; font-size:12px;">${t('client_custom.delete_file')}</button></span>\
+    </div>\
   `).join('');
 
   renderPagination('update-version-pagination', downloadVersionsPage, totalPages, 'changeDownloadPage', downloadVersionsPageSize);

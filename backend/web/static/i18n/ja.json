@@ -502,6 +502,11 @@
     "download_failed": "ダウンロード失敗",
     "latest_suffix": "最新",
     "downloaded_versions": "サーバーにダウンロードされたバージョン",
+    "version_dir": "ディレクトリ",
+    "version_mod_time": "更新日時",
+    "version_size": "サイズ",
+    "version_status": "状態",
+    "version_action": "操作",
     "has_apk": "APKあり",
     "delete_version_confirm": "バージョンディレクトリ \"{dir}\" を削除してもよろしいですか？この操作は元に戻せません。",
     "delete_version_success": "バージョンディレクトリを削除しました"

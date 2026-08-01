@@ -502,6 +502,11 @@
     "download_failed": "Échec du téléchargement",
     "latest_suffix": "Dernier",
     "downloaded_versions": "Versions téléchargées sur le serveur",
+    "version_dir": "Répertoire",
+    "version_mod_time": "Modifié",
+    "version_size": "Taille",
+    "version_status": "État",
+    "version_action": "Action",
     "has_apk": "Avec APK",
     "delete_version_confirm": "Êtes-vous sûr de vouloir supprimer le répertoire de version \"{dir}\" ? Cette action est irréversible.",
     "delete_version_success": "Répertoire de version supprimé"

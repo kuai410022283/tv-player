@@ -502,6 +502,11 @@
     "download_failed": "Download failed",
     "latest_suffix": "Latest",
     "downloaded_versions": "Versions Downloaded to Server",
+    "version_dir": "Directory",
+    "version_mod_time": "Modified",
+    "version_size": "Size",
+    "version_status": "Status",
+    "version_action": "Action",
     "has_apk": "Has APK",
     "delete_version_confirm": "Are you sure you want to delete the version directory \"{dir}\"? This cannot be undone.",
     "delete_version_success": "Version directory deleted"

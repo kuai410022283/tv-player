@@ -502,6 +502,11 @@
     "download_failed": "다운로드 실패",
     "latest_suffix": "최신",
     "downloaded_versions": "서버에 다운로드된 버전",
+    "version_dir": "디렉토리명",
+    "version_mod_time": "수정 시간",
+    "version_size": "크기",
+    "version_status": "상태",
+    "version_action": "작업",
     "has_apk": "APK 있음",
     "delete_version_confirm": "버전 디렉토리 \"{dir}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "delete_version_success": "버전 디렉토리가 삭제되었습니다"

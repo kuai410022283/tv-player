@@ -502,6 +502,11 @@
     "download_failed": "Download fehlgeschlagen",
     "latest_suffix": "Neueste",
     "downloaded_versions": "Auf den Server heruntergeladene Versionen",
+    "version_dir": "Verzeichnis",
+    "version_mod_time": "Geändert",
+    "version_size": "Größe",
+    "version_status": "Status",
+    "version_action": "Aktion",
     "has_apk": "Mit APK",
     "delete_version_confirm": "Sind Sie sicher, dass Sie das Versionsverzeichnis \"{dir}\" löschen möchten? Dies kann nicht rückgängig gemacht werden.",
     "delete_version_success": "Versionsverzeichnis gelöscht"

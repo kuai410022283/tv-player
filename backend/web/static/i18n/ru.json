@@ -502,6 +502,11 @@
     "download_failed": "Ошибка скачивания",
     "latest_suffix": "Новейшая",
     "downloaded_versions": "Версии, загруженные на сервер",
+    "version_dir": "Каталог",
+    "version_mod_time": "Изменён",
+    "version_size": "Размер",
+    "version_status": "Статус",
+    "version_action": "Действие",
     "has_apk": "Есть APK",
     "delete_version_confirm": "Вы уверены, что хотите удалить каталог версии \"{dir}\"? Это действие нельзя отменить.",
     "delete_version_success": "Каталог версии удален"
