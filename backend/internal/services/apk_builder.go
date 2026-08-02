@@ -136,7 +136,7 @@ func (m *VersionModifier) Modify(ctx context.Context, tempDir string, settings *
 	verCodeReg := regexp.MustCompile(`versionCode: .*`)
 
 	ymlStr = verNameReg.ReplaceAllString(ymlStr, fmt.Sprintf("versionName: '%s'", settings.VersionName))
-	ymlStr = verCodeReg.ReplaceAllString(ymlStr, fmt.Sprintf("versionCode: '%s'", fmt.Sprintf("%d", settings.VersionCode)))
+	ymlStr = verCodeReg.ReplaceAllString(ymlStr, fmt.Sprintf("versionCode: %d", settings.VersionCode))
 
 	// 针对 targetSdkVersion >= 30 (Android 11) 的强制要求，确保 resources.arsc 存储时不进行压缩
 	if !strings.Contains(ymlStr, "- resources.arsc") {

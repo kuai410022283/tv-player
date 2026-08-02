@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"sort"
@@ -982,7 +983,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 		if fileExists(localJava) {
 			_ = os.Chmod(localJava, 0755)
 			javaCmd = localJava
-			s.appendLog("[INFO] 使用内置本地 JRE: %s", javaCmd)
+			slog.Info("使用内置本地 JRE", "path", javaCmd)
 		} else {
 			s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
 		}
@@ -1027,7 +1028,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				return
 			}
 		}
-		s.appendLog("[INFO] 已启用内嵌默认签名证书")
+		slog.Info("已启用内嵌默认签名证书")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
@@ -1105,24 +1106,38 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				}
 			}
 
+			// 清理 public.xml 中 $ 开头的非法资源名（aapt2 不支持）
+			publicXmlPath := filepath.Join(tempUnpackedDir, "res", "values", "public.xml")
+			if data, err := os.ReadFile(publicXmlPath); err == nil {
+				re := regexp.MustCompile(`(?m)^\s*<public[^>]*name="\$[^"]*"[^>]*/>\s*$`)
+				cleaned := re.ReplaceAll(data, nil)
+				if len(cleaned) != len(data) {
+					if err := os.WriteFile(publicXmlPath, cleaned, 0644); err == nil {
+						slog.Info("已清理 public.xml 中不合法的资源条目", "path", publicXmlPath)
+					}
+				}
+			}
+
 			// 3. 重新编译打包
 			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
 			// apktool 3.0.x 仅支持 aapt2，优先使用工具链中的 aapt2，其次系统 aapt2
 			aaptBin := ""
 			if fileExists(filepath.Join(s.toolsDir, "aapt2")) {
 				aaptBin = filepath.Join(s.toolsDir, "aapt2")
-				s.appendLog("[INFO] 使用工具链原生 aapt2: %s", aaptBin)
+				slog.Info("使用工具链原生 aapt2", "path", aaptBin)
 			} else if fileExists("/usr/bin/aapt2") {
 				aaptBin = "/usr/bin/aapt2"
 			} else if p, err := exec.LookPath("aapt2"); err == nil {
 				aaptBin = p
 			}
-			rebuildArgs := []string{"-jar", apktoolJar, "b", "-nc", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			// 注意：工具链 JRE 的 argument parser 会拦截 -a/-c/-nc 等短选项，
+			// 因此使用 --aapt 长格式，避免被 JRE 误解析为 Java 选项
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if aaptBin != "" {
-				rebuildArgs = append(rebuildArgs, "-a", aaptBin)
+				rebuildArgs = append(rebuildArgs, "--aapt", aaptBin)
 			} else {
 				rebuildArgs = append(rebuildArgs, "--use-aapt2")
-				s.appendLog("[INFO] 使用 apktool 内置 aapt2")
+				slog.Info("使用 apktool 内置 aapt2")
 			}
 			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
 				s.buildStatus = "failed"
@@ -1133,14 +1148,16 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			// 4. 对齐优化
 			s.appendLog(">>> [5/6] 正在优化应用结构...")
 			execCmd, flags := s.getZipalignCmd(javaCmd, s.appendLog)
+			aligned := false
 			if execCmd != javaCmd {
 				alignArgs := append(flags, tempUnsignedApk, tempAlignedApk)
 				if err := ExecuteCommandWithLog(ctx, execCmd, alignArgs, s.appendLog); err != nil {
-					s.buildStatus = "failed"
-					s.buildError = fmt.Sprintf("[%s] 优化应用结构失败: %v", baseName, err)
-					return
+					slog.Warn("工具链 zipalign 执行失败，回退到原生对齐", "error", err)
+				} else {
+					aligned = true
 				}
-			} else {
+			}
+			if !aligned {
 				if err := NativeZipAlign(tempUnsignedApk, tempAlignedApk, 4); err != nil {
 					s.buildStatus = "failed"
 					s.buildError = fmt.Sprintf("[%s] 原生对齐优化失败: %v", baseName, err)
