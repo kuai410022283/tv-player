@@ -9,147 +9,24 @@ permissions:
   contents: write
 
 jobs:
-  # ── Linux 工具链（含 ARM64/ARM） ─────────────────────
-  linux-toolchain:
-    name: Linux ${{ matrix.arch }}
-    strategy:
-      matrix:
-        include:
-          - arch: x64
-            jre_arch: x64
-            jre_os: linux
-            sdk_os: linux
-            package: toolchain-linux-x64.tar.gz
-            native_aapt: true
-          - arch: arm64
-            jre_arch: aarch64
-            jre_os: linux
-            sdk_os: linux
-            package: toolchain-linux-arm64.tar.gz
-            native_aapt: false
-            deb_arch: arm64
-          - arch: arm
-            jre_arch: arm
-            jre_os: linux
-            sdk_os: linux
-            package: toolchain-linux-arm.tar.gz
-            native_aapt: false
-            deb_arch: armhf
-    runs-on: ubuntu-latest
-
-    steps:
-      # ── 下载各架构 JRE ──
-      - name: Download JRE (Adoptium)
-        run: |
-          JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/${{ matrix.jre_os }}/${{ matrix.jre_arch }}/jre/hotspot/normal/eclipse"
-          echo "Downloading JRE from $JRE_URL"
-          curl -fsSL -o jre.tar.gz "$JRE_URL"
-          mkdir -p jre-tmp
-          tar -xzf jre.tar.gz -C jre-tmp
-          JRE_DIR=$(ls jre-tmp | head -1)
-          mv "jre-tmp/$JRE_DIR" jre
-          rm -rf jre.tar.gz jre-tmp
-          chmod +x jre/bin/java 2>/dev/null || true
-          echo "JRE files: $(ls jre/bin/ | head -5)"
-
-      # ── 下载 Android Build-Tools（x86_64，用于 apksigner.jar + aapt2）──
-      - name: Download Android Build-Tools (x86_64)
-        run: |
-          URL="https://dl.google.com/android/repository/build-tools_r35.0.0-linux.zip"
-          echo "Downloading build-tools from $URL"
-          curl -fsSL -o build-tools.zip "$URL"
-          mkdir -p bt-tmp
-          unzip -q build-tools.zip -d bt-tmp
-          BT_DIR=$(ls -d bt-tmp/android-* | head -1)
-          echo "Build-tools dir: $BT_DIR"
-          # apksigner.jar 是 Java 字节码，跨平台
-          cp "$BT_DIR/lib/apksigner.jar" .
-          # x86_64 aapt2（ARM 架构通过 QEMU 包装使用）
-          cp "$BT_DIR/aapt2" aapt2.x86_64
-          chmod +x aapt2.x86_64
-          # x86_64 zipalign（仅 x64 架构使用）
-          if [ "${{ matrix.native_aapt }}" = "true" ]; then
-            cp "$BT_DIR/zipalign" .
-            cp aapt2.x86_64 aapt2
-            chmod +x zipalign aapt2
-          fi
-          rm -rf build-tools.zip bt-tmp
-
-      # ── ARM64/ARM: 下载对应架构的 zipalign（Debian 包）──
-      - name: Download zipalign (ARM via Debian)
-        if: matrix.native_aapt == false
-        run: |
-          echo "Adding ${{ matrix.deb_arch }} architecture and downloading zipalign..."
-          dpkg --add-architecture ${{ matrix.deb_arch }}
-          apt-get update -qq
-          apt-get download zipalign:${{ matrix.deb_arch }}
-          ZP_DEB=$(ls zipalign_*.deb | head -1)
-          echo "Extracting from $ZP_DEB"
-          dpkg-deb -x "$ZP_DEB" zp-tmp
-          cp zp-tmp/usr/bin/zipalign .
-          chmod +x zipalign
-          rm -rf "$ZP_DEB" zp-tmp
-
-      # ── ARM64/ARM: 下载 QEMU 静态二进制 + 创建 aapt2 包装脚本 ──
-      - name: Setup QEMU wrapper for aapt2 (ARM)
-        if: matrix.native_aapt == false
-        run: |
-          echo "Downloading qemu-x86_64-static..."
-          apt-get download qemu-user-static:amd64
-          QEMU_DEB=$(ls qemu-user-static_*.deb | head -1)
-          dpkg-deb -x "$QEMU_DEB" qemu-tmp
-          cp qemu-tmp/usr/bin/qemu-x86_64-static .
-          chmod +x qemu-x86_64-static
-          rm -rf "$QEMU_DEB" qemu-tmp
-          # 创建 aapt2 包装脚本
-          cat > aapt2 << 'SCRIPT'
-          #!/bin/sh
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          exec "$DIR/qemu-x86_64-static" "$DIR/aapt2.x86_64" "$@"
-          SCRIPT
-          chmod +x aapt2
-          echo "aapt2 wrapper created (QEMU + x86_64 binary)"
-
-      # ── 下载 apktool.jar ──
-      - name: Download apktool.jar
-        run: |
-          curl -fsSL -o apktool.jar \
-            "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.0/apktool_2.11.0.jar"
-
-      # ── 打包 ──
-      - name: Package
-        run: |
-          tar -czvf "${{ matrix.package }}" \
-            jre/ apktool.jar apksigner.jar zipalign aapt2 \
-            $( [ "${{ matrix.native_aapt }}" = "false" ] && echo "aapt2.x86_64 qemu-x86_64-static" || true )
-          echo "Package size: $(du -sh ${{ matrix.package }} | cut -f1)"
-          echo "Contents:"
-          tar -tzf "${{ matrix.package }}" | head -20
-
-      # ── 上传到 app-tools Release ──
-      - name: Update Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: app-tools
-          files: ${{ matrix.package }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  # ── macOS 工具链（在 ubuntu 上交叉打包）──────────────
+  # ── macOS 工具链 ──────────────────────────────────────
   macos-toolchain:
     name: macOS ${{ matrix.arch }}
     strategy:
       matrix:
         include:
           - arch: x64
+            runs-on: macos-13
             jre_arch: x64
             package: toolchain-darwin-x64.tar.gz
           - arch: arm64
+            runs-on: macos-latest
             jre_arch: aarch64
             package: toolchain-darwin-arm64.tar.gz
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
 
     steps:
-      - name: Download macOS JRE (Adoptium)
+      - name: Download JRE (Adoptium)
         run: |
           JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/mac/${{ matrix.jre_arch }}/jre/hotspot/normal/eclipse"
           echo "Downloading JRE from $JRE_URL"
@@ -157,25 +34,43 @@ jobs:
           mkdir -p jre-tmp
           tar -xzf jre.tar.gz -C jre-tmp
           JRE_DIR=$(ls jre-tmp | head -1)
-          # macOS JRE 有 Contents/Home 结构
-          mv "jre-tmp/$JRE_DIR/Contents/Home" jre
+          # macOS JRE 有 Contents/Home 结构，提取到 jre/
+          if [ -d "jre-tmp/$JRE_DIR/Contents/Home" ]; then
+            mv "jre-tmp/$JRE_DIR/Contents/Home" jre
+          else
+            mv "jre-tmp/$JRE_DIR" jre
+          fi
+          chmod +x jre/bin/java
           rm -rf jre.tar.gz jre-tmp
-          echo "JRE files: $(ls jre/bin/ | head -5)"
+          echo "JRE version: $(jre/bin/java -version 2>&1 | head -1)"
 
-      - name: Download macOS Android Build-Tools
+      - name: Install JDK for sdkmanager
+        run: brew install openjdk@17
+
+      - name: Download Android SDK Command-line Tools
         run: |
-          URL="https://dl.google.com/android/repository/build-tools_r35.0.0-macosx.zip"
-          echo "Downloading build-tools from $URL"
-          curl -fsSL -o build-tools.zip "$URL"
-          mkdir -p bt-tmp
-          unzip -q build-tools.zip -d bt-tmp
-          BT_DIR=$(ls -d bt-tmp/android-* | head -1)
-          echo "Build-tools dir: $BT_DIR"
-          cp "$BT_DIR/zipalign" .
-          cp "$BT_DIR/aapt2" .
-          cp "$BT_DIR/lib/apksigner.jar" .
+          # macOS ARM64 版 cmdline-tools
+          curl -fsSL -o cmdline-tools.zip \
+            "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
+          unzip -q cmdline-tools.zip
+          mkdir -p android-sdk/cmdline-tools
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+          rm cmdline-tools.zip
+
+      - name: Install Android Build-Tools
+        run: |
+          export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+          export ANDROID_SDK_ROOT=$PWD/android-sdk
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
+            --sdk_root=$ANDROID_SDK_ROOT "build-tools;35.0.0"
+
+      - name: Copy zipalign, aapt2, apksigner.jar
+        run: |
+          BUILD_TOOLS="android-sdk/build-tools/35.0.0"
+          cp "$BUILD_TOOLS/zipalign" .
+          cp "$BUILD_TOOLS/aapt2" .
+          cp "$BUILD_TOOLS/lib/apksigner.jar" .
           chmod +x zipalign aapt2
-          rm -rf build-tools.zip bt-tmp
 
       - name: Download apktool.jar
         run: |
@@ -195,38 +90,73 @@ jobs:
           files: ${{ matrix.package }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Windows 工具链 ───────────────────────────────────
-  windows-toolchain:
-    name: Windows x64
+  # ── Linux ARM 工具链（QEMU 包装 aapt2）───────────────
+  linux-arm-toolchain:
+    name: Linux ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            jre_arch: aarch64
+            deb_arch: arm64
+            package: toolchain-linux-arm64.tar.gz
+          - arch: arm
+            jre_arch: arm
+            deb_arch: armhf
+            package: toolchain-linux-arm.tar.gz
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Windows JRE (Adoptium)
+      - name: Download JRE (Adoptium)
         run: |
-          JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse"
+          JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/linux/${{ matrix.jre_arch }}/jre/hotspot/normal/eclipse"
           echo "Downloading JRE from $JRE_URL"
-          curl -fsSL -o jre.zip "$JRE_URL"
+          curl -fsSL -o jre.tar.gz "$JRE_URL"
           mkdir -p jre-tmp
-          unzip -q jre.zip -d jre-tmp
+          tar -xzf jre.tar.gz -C jre-tmp
           JRE_DIR=$(ls jre-tmp | head -1)
           mv "jre-tmp/$JRE_DIR" jre
-          rm -rf jre.zip jre-tmp
-          echo "JRE files: $(ls jre/bin/ | head -5)"
+          rm -rf jre.tar.gz jre-tmp
+          chmod +x jre/bin/java 2>/dev/null || true
 
-      - name: Download Windows Android Build-Tools
+      - name: Download zipalign (Debian)
         run: |
-          URL="https://dl.google.com/android/repository/build-tools_r35.0.0-windows.zip"
-          echo "Downloading build-tools from $URL"
-          curl -fsSL -o build-tools.zip "$URL"
-          mkdir -p bt-tmp
+          dpkg --add-architecture ${{ matrix.deb_arch }}
+          apt-get update -qq
+          apt-get download zipalign:${{ matrix.deb_arch }}
+          ZP_DEB=$(ls zipalign_*.deb | head -1)
+          dpkg-deb -x "$ZP_DEB" zp-tmp
+          cp zp-tmp/usr/bin/zipalign .
+          chmod +x zipalign
+          rm -rf "$ZP_DEB" zp-tmp
+
+      - name: Download aapt2 + QEMU wrapper
+        run: |
+          # 下载 x86_64 aapt2（ARM 无原生版本，通过 QEMU 模拟运行）
+          curl -fsSL -o build-tools.zip \
+            "https://dl.google.com/android/repository/build-tools_r35.0.0-linux.zip"
           unzip -q build-tools.zip -d bt-tmp
           BT_DIR=$(ls -d bt-tmp/android-* | head -1)
-          echo "Build-tools dir: $BT_DIR"
-          cp "$BT_DIR/zipalign.exe" .
-          cp "$BT_DIR/aapt2.exe" .
+          cp "$BT_DIR/aapt2" aapt2.x86_64
           cp "$BT_DIR/lib/apksigner.jar" .
-          chmod +x zipalign.exe aapt2.exe 2>/dev/null || true
+          chmod +x aapt2.x86_64
           rm -rf build-tools.zip bt-tmp
+
+          # 下载 QEMU 静态二进制
+          apt-get download qemu-user-static:amd64
+          QEMU_DEB=$(ls qemu-user-static_*.deb | head -1)
+          dpkg-deb -x "$QEMU_DEB" qemu-tmp
+          cp qemu-tmp/usr/bin/qemu-x86_64-static .
+          chmod +x qemu-x86_64-static
+          rm -rf "$QEMU_DEB" qemu-tmp
+
+          # 创建 aapt2 包装脚本
+          cat > aapt2 << 'SCRIPT'
+          #!/bin/sh
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          exec "$DIR/qemu-x86_64-static" "$DIR/aapt2.x86_64" "$@"
+          SCRIPT
+          chmod +x aapt2
 
       - name: Download apktool.jar
         run: |
@@ -235,13 +165,14 @@ jobs:
 
       - name: Package
         run: |
-          tar -czvf toolchain-windows-x64.tar.gz \
-            jre/ apktool.jar apksigner.jar zipalign.exe aapt2.exe
-          echo "Package size: $(du -sh toolchain-windows-x64.tar.gz | cut -f1)"
+          tar -czvf "${{ matrix.package }}" \
+            jre/ apktool.jar apksigner.jar zipalign \
+            aapt2 aapt2.x86_64 qemu-x86_64-static
+          echo "Package size: $(du -sh ${{ matrix.package }} | cut -f1)"
 
       - name: Update Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-tools
-          files: toolchain-windows-x64.tar.gz
+          files: ${{ matrix.package }}
           token: ${{ secrets.GITHUB_TOKEN }}
