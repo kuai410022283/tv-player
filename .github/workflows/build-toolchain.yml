@@ -1,0 +1,91 @@
+name: Build Toolchain Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["toolchain-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS 工具链 ──────────────────────────────────────
+  macos-toolchain:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runs-on: macos-13
+            jre_arch: x64
+            package: toolchain-darwin-x64.tar.gz
+          - arch: arm64
+            runs-on: macos-latest
+            jre_arch: aarch64
+            package: toolchain-darwin-arm64.tar.gz
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      - name: Download JRE (Adoptium)
+        run: |
+          JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/mac/${{ matrix.jre_arch }}/jre/hotspot/normal/eclipse"
+          echo "Downloading JRE from $JRE_URL"
+          curl -fsSL -o jre.tar.gz "$JRE_URL"
+          mkdir -p jre-tmp
+          tar -xzf jre.tar.gz -C jre-tmp
+          JRE_DIR=$(ls jre-tmp | head -1)
+          # macOS JRE 有 Contents/Home 结构，提取到 jre/
+          if [ -d "jre-tmp/$JRE_DIR/Contents/Home" ]; then
+            mv "jre-tmp/$JRE_DIR/Contents/Home" jre
+          else
+            mv "jre-tmp/$JRE_DIR" jre
+          fi
+          chmod +x jre/bin/java
+          rm -rf jre.tar.gz jre-tmp
+          echo "JRE version: $(jre/bin/java -version 2>&1 | head -1)"
+
+      - name: Install JDK for sdkmanager
+        run: brew install openjdk@17
+
+      - name: Download Android SDK Command-line Tools
+        run: |
+          # macOS ARM64 版 cmdline-tools
+          curl -fsSL -o cmdline-tools.zip \
+            "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
+          unzip -q cmdline-tools.zip
+          mkdir -p android-sdk/cmdline-tools
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+          rm cmdline-tools.zip
+
+      - name: Install Android Build-Tools
+        run: |
+          export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+          export ANDROID_SDK_ROOT=$PWD/android-sdk
+          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
+            --sdk_root=$ANDROID_SDK_ROOT "build-tools;35.0.0"
+
+      - name: Copy zipalign, aapt2, apksigner.jar
+        run: |
+          BUILD_TOOLS="android-sdk/build-tools/35.0.0"
+          cp "$BUILD_TOOLS/zipalign" .
+          cp "$BUILD_TOOLS/aapt2" .
+          cp "$BUILD_TOOLS/lib/apksigner.jar" .
+          chmod +x zipalign aapt2
+
+      - name: Download apktool.jar
+        run: |
+          curl -fsSL -o apktool.jar \
+            "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.0/apktool_2.11.0.jar"
+
+      - name: Package
+        run: |
+          tar -czvf "${{ matrix.package }}" \
+            jre/ apktool.jar apksigner.jar zipalign aapt2
+          echo "Package size: $(du -sh ${{ matrix.package }} | cut -f1)"
+
+      - name: Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-tools
+          files: ${{ matrix.package }}
+          token: ${{ secrets.GITHUB_TOKEN }}
