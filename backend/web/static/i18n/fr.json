@@ -388,7 +388,7 @@
     "external_sub_label": "Abonnement externe",
     "external_sub_off": "Désactiver l'abonnement externe",
     "external_sub_on": "Activer l'abonnement externe",
-    "external_sub_desc": "Permet d'importer les playlists dans des lecteurs tiers (VLC, Tivimate, etc.) sans mode développeur.",
+    "external_sub_desc": "Permet d'importer les playlists dans des lecteurs tiers (VLC, Tivimate, etc.) <strong style=\"color:var(--accent)\">sans mode développeur</strong>.",
     "channel_source_config": "Configuration des sources de chaînes",
     "allow_local_file_label": "Autoriser les chemins de fichiers locaux",
     "allow_local_file_off": "URLs réseau uniquement",

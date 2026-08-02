@@ -388,7 +388,7 @@
     "external_sub_label": "Внешняя подписка",
     "external_sub_off": "Отключить внешнюю подписку",
     "external_sub_on": "Включить внешнюю подписку",
-    "external_sub_desc": "Позволяет пользователям импортировать плейлисты M3U/TXT в сторонние плееры (VLC, Tivimate и т.д.) без режима разработчика.",
+    "external_sub_desc": "Позволяет пользователям импортировать плейлисты M3U/TXT в сторонние плееры (VLC, Tivimate и т.д.) <strong style=\"color:var(--accent)\">без режима разработчика</strong>.",
     "channel_source_config": "Конфигурация источников каналов",
     "allow_local_file_label": "Разрешить локальные пути",
     "allow_local_file_off": "Только сетевые URL",

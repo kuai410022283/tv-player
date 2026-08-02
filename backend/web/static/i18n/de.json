@@ -388,7 +388,7 @@
     "external_sub_label": "Externe Abonnements",
     "external_sub_off": "Deaktivieren (Externe Abonnements verbieten)",
     "external_sub_on": "Aktivieren (Externe Abonnements erlauben)",
-    "external_sub_desc": "Erlaubt Benutzern das direkte Importieren in Drittanbieter-Player (VLC, Tivimate etc.) ohne Entwicklermodus.",
+    "external_sub_desc": "Erlaubt Benutzern das direkte Importieren in Drittanbieter-Player (VLC, Tivimate etc.) <strong style=\"color:var(--accent)\">ohne Entwicklermodus</strong>.",
     "channel_source_config": "Kanalkonfiguration",
     "allow_local_file_label": "Lokale Pfade erlauben",
     "allow_local_file_off": "Nur Netzwerk-URLs",
