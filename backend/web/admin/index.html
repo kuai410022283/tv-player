@@ -78,16 +78,6 @@
         </svg>
         <span data-i18n="sidebar.plans">套餐管理</span>
       </div>
-      <div class="nav-item" onclick="showSection('client-logs',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-        </svg>
-        <span data-i18n="sidebar.logs">访问日志</span>
-      </div>
-      <div class="nav-section" data-i18n="sidebar.system_manage">系统管理</div>
       <div class="nav-item" id="nav-client-config" onclick="showSection('client-config',this)" style="display: none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -109,6 +99,16 @@
         <span data-i18n="sidebar.client_custom">客户端定制</span>
         <span class="vip-badge" style="background: #f59e0b; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; line-height: 1; margin-left: 4px; flex-shrink: 0;">VIP</span>
       </div>
+      <div class="nav-item" onclick="showSection('client-logs',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+        <span data-i18n="sidebar.logs">访问日志</span>
+      </div>
+      <div class="nav-section" data-i18n="sidebar.system_manage">系统管理</div>
       <div class="nav-item" onclick="showSection('client-settings',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3" />
@@ -1083,7 +1083,10 @@
                 </svg>
                 <span data-i18n="client_custom.env_status">打包编译环境状态</span>
               </span>
-              <span id="custom-env-badge" data-i18n="client_custom.checking" style="font-size:12px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff;">检测中...</span>
+              <span style="display:flex; align-items:center; gap:10px;">
+                <span id="custom-env-badge" data-i18n="client_custom.checking" style="font-size:12px; padding:2px 8px; border-radius:10px; background:#ef4444; color:#fff;">检测中...</span>
+                <button class="btn btn-ghost btn-sm" onclick="resetCustomEnv()" data-i18n="client_custom.reset_env" style="padding:2px 8px; font-size:11px; color:var(--text2);">重置环境</button>
+              </span>
             </h3>
             <div id="custom-env-download-box" style="display:none; margin-top:16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1108,9 +1111,6 @@
                 </select>
               </div>
               <button class="btn btn-primary" onclick="setupCustomEnv()" data-i18n="client_custom.deploy_env">⚡ 一键部署打包环境</button>
-            </div>
-            <div id="custom-reset-box" style="margin-top:8px;">
-              <button class="btn btn-danger" onclick="resetCustomEnv()" data-i18n="client_custom.reset_env">🗑️ 重置依赖环境</button>
             </div>
           </div>
 

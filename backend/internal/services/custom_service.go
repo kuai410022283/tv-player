@@ -3,6 +3,7 @@ package services
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"database/sql"
@@ -403,6 +404,10 @@ func (s *CustomService) ResetEnvironment() error {
 		s.errorMap.Delete(key)
 		return true
 	})
+	// 清除编译日志
+	s.buildLogMu.Lock()
+	s.buildLog.Reset()
+	s.buildLogMu.Unlock()
 	return nil
 }
 
@@ -676,6 +681,17 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign.exe"), 0755)
 			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2"), 0755)
 			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2.exe"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2.x86_64"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "qemu-x86_64-static"), 0755)
+
+			// 修复 aapt2 包装脚本可能的 Windows 换行符（\r\n → \n），否则 Linux shebang 无法识别
+			s.fixAapt2LineEndings()
+
+			// ARM 架构：工具链包中的 qemu-x86_64-static 可能是 amd64 二进制，无法在 ARM 上执行。
+			// 尝试用系统安装的 qemu-user-static 替换（Dockerfile 已预装）。
+			if runtime.GOARCH != "amd64" && runtime.GOOS == "linux" {
+				s.replaceQemuIfNeeded()
+			}
 		} else {
 			// 兼容旧版独立包下载（如 linux_tools.tar.gz、jre_linux_*.tar.gz）
 			s.progressMap.Store(filename, 95)
@@ -689,6 +705,9 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 		}
 		// 解压完成后删除 tar.gz 包，节省空间
 		_ = os.Remove(destPath)
+
+		// 记录环境部署日志到控制台
+		s.logEnvSetupResult()
 	}
 
 	s.progressMap.Store(filename, 100)
@@ -761,6 +780,115 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 		}
 	}
 	return nil
+}
+
+// replaceQemuIfNeeded 在 ARM 等非 amd64 架构上，检查工具链中的 qemu-x86_64-static 是否可用。
+// 若不可用（如工具链包中的 QEMU 是 amd64 二进制），则用系统安装的版本替换。
+func (s *CustomService) replaceQemuIfNeeded() {
+	localQemu := filepath.Join(s.toolsDir, "qemu-x86_64-static")
+	if !fileExists(localQemu) {
+		return
+	}
+
+	// 尝试执行本地 QEMU 看是否可用（-version 应返回 1）
+	cmd := exec.Command(localQemu, "-version")
+	if err := cmd.Run(); err == nil {
+		slog.Info("工具链 QEMU 可用", "path", localQemu)
+		return
+	}
+
+	// 本地 QEMU 不可用，尝试用系统 QEMU 替换
+	systemQemu := "/usr/bin/qemu-x86_64-static"
+	if !fileExists(systemQemu) {
+		slog.Warn("工具链 QEMU 不可用且系统未安装 qemu-user-static，aapt2 可能无法工作")
+		return
+	}
+
+	data, err := os.ReadFile(systemQemu)
+	if err != nil {
+		slog.Warn("读取系统 QEMU 失败", "error", err)
+		return
+	}
+	if err := os.WriteFile(localQemu, data, 0755); err != nil {
+		slog.Warn("替换 QEMU 失败", "error", err)
+		return
+	}
+	slog.Info("已用系统 QEMU 替换工具链 QEMU", "system", systemQemu, "target", localQemu)
+}
+
+// fixAapt2LineEndings 修复 aapt2 包装脚本中可能的 Windows 换行符 (\r\n)。
+// 仅当文件是 shell 脚本（以 #!/ 开头）时才处理，避免破坏原生二进制 aapt2。
+func (s *CustomService) fixAapt2LineEndings() {
+	aapt2Path := filepath.Join(s.toolsDir, "aapt2")
+	if !fileExists(aapt2Path) {
+		return
+	}
+	data, err := os.ReadFile(aapt2Path)
+	if err != nil {
+		return
+	}
+	// 仅处理 shell 包装脚本，不对原生二进制做替换
+	if !bytes.HasPrefix(data, []byte("#!/")) {
+		return
+	}
+	if bytes.Contains(data, []byte("\r\n")) {
+		fixed := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+		if err := os.WriteFile(aapt2Path, fixed, 0755); err != nil {
+			slog.Warn("修复 aapt2 换行符失败", "error", err)
+		} else {
+			slog.Info("已修复 aapt2 包装脚本换行符 (CRLF -> LF)")
+		}
+	}
+}
+
+// logEnvSetupResult 将环境部署结果写入编译日志控制台
+func (s *CustomService) logEnvSetupResult() {
+	s.buildLogMu.Lock()
+	s.buildLog.Reset()
+	defer s.buildLogMu.Unlock()
+
+	s.buildLog.WriteString(">>> 打包编译环境部署完成\n")
+	s.buildLog.WriteString(fmt.Sprintf(">>> 目标架构: %s/%s\n", runtime.GOOS, runtime.GOARCH))
+
+	// 列出已解压的工具
+	entries, err := os.ReadDir(s.toolsDir)
+	if err != nil {
+		s.buildLog.WriteString(fmt.Sprintf("[WARN] 无法读取工具目录: %v\n", err))
+		return
+	}
+
+	s.buildLog.WriteString(">>> 已安装工具:\n")
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() {
+			// 检查目录内关键文件
+			javaBin := filepath.Join(s.toolsDir, name, "bin", "java")
+			if runtime.GOOS == "windows" {
+				javaBin += ".exe"
+			}
+			if fileExists(javaBin) {
+				s.buildLog.WriteString(fmt.Sprintf("  - %s/ (JRE 已就绪)\n", name))
+			} else {
+				s.buildLog.WriteString(fmt.Sprintf("  - %s/\n", name))
+			}
+		} else {
+			info, _ := entry.Info()
+			size := ""
+			if info != nil {
+				if info.Size() > 1024*1024 {
+					size = fmt.Sprintf(" (%.1f MB)", float64(info.Size())/1024/1024)
+				} else if info.Size() > 1024 {
+					size = fmt.Sprintf(" (%.1f KB)", float64(info.Size())/1024)
+				}
+			}
+			perm := ""
+			if info != nil && info.Mode()&0111 != 0 {
+				perm = " [可执行]"
+			}
+			s.buildLog.WriteString(fmt.Sprintf("  - %s%s%s\n", name, size, perm))
+		}
+	}
+	s.buildLog.WriteString(">>> 环境就绪，可以开始定制打包。\n")
 }
 
 // GetSettings 读取定制参数

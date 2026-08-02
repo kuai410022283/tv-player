@@ -3866,14 +3866,12 @@ async function refreshCustomEnvStatus(silent = false) {
     const formContainer = document.getElementById('custom-form-container');
     const envBtnBox = document.getElementById('custom-env-btn-box');
     const downloadBox = document.getElementById('custom-env-download-box');
-    const resetBox = document.getElementById('custom-reset-box');
 
     if (env.tools_ready) {
       envBadge.textContent = '环境就绪';
       envBadge.style.background = '#52c41a';
       envBtnBox.style.display = 'none';
       downloadBox.style.display = 'none';
-      if (resetBox) resetBox.style.display = 'block';
       
       if (customEnvPollInterval) {
         clearInterval(customEnvPollInterval);
@@ -3897,7 +3895,6 @@ async function refreshCustomEnvStatus(silent = false) {
       if (env.downloading) {
         envBtnBox.style.display = 'none';
         downloadBox.style.display = 'block';
-        if (resetBox) resetBox.style.display = 'none';
         renderCustomDownloadProgress(env.tools);
         // 继续轮询
         if (!customEnvPollInterval) {
@@ -3909,7 +3906,6 @@ async function refreshCustomEnvStatus(silent = false) {
           customEnvPollInterval = null;
         }
         envBtnBox.style.display = 'block';
-        if (resetBox) resetBox.style.display = 'block';
         // 如果有任何一个工具报错，或者下载进度未完成，说明处于异常中断状态，保持展示以显示红字错误原因
         const hasError = env.tools.some(t => t.error || (t.progress > 0 && t.progress < 100));
         if (hasError) {
@@ -3932,7 +3928,16 @@ async function refreshCustomEnvStatus(silent = false) {
 
     statusBadge.textContent = env.build_status;
     if (env.build_status === 'idle') {
-      consoleBox.style.display = 'none';
+      // 环境就绪时默认显示部署日志，否则隐藏控制台
+      if (env.tools_ready) {
+        consoleBox.style.display = 'block';
+        spinner.style.display = 'none';
+        statusBadge.textContent = 'ready';
+        statusBadge.style.background = '#52c41a';
+        pollBuildLog();
+      } else {
+        consoleBox.style.display = 'none';
+      }
       resultBox.style.display = 'none';
     } else if (env.build_status === 'building') {
       consoleBox.style.display = 'block';
@@ -4054,6 +4059,11 @@ async function resetCustomEnv() {
   try {
     await api('/admin/custom/reset-env', { method: 'POST' });
     toast(t('client_custom.reset_env_success'), 'success');
+    // 隐藏构建日志控制台
+    const consoleBox = document.getElementById('custom-build-console');
+    if (consoleBox) consoleBox.style.display = 'none';
+    const logBox = document.getElementById('custom-build-log');
+    if (logBox) logBox.textContent = '';
     refreshCustomEnvStatus();
   } catch (e) {}
 }
