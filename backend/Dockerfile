@@ -25,11 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # ── 运行阶段 ─────────────────────────────────────────
 FROM debian:bookworm-slim
 
-# 安装运行时依赖 + JRE + Android 构建工具（glibc 原生，所有架构均有预编译包）
-# zipalign: APK 4 字节对齐（由 android-platform-build 源码包提供）
-# 注意: apktool 3.0.x 仅支持 aapt2，不再兼容系统 aapt(v1)
-#       x86_64 平台使用 apktool 内置 aapt2（--use-aapt2），
-#       ARM64 平台若需原生 aapt2 请手动安装或挂在工具链中
+# 运行时依赖 + 系统 Java / zipalign（兜底，工具链下载后优先使用工具链内的 JRE + zipalign + aapt2）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
     zipalign \

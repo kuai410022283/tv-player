@@ -121,30 +121,26 @@ func (s *CustomService) GetEnvStatus() EnvStatus {
 	}
 
 	// 检查 JRE
-	jrePath := filepath.Join(s.toolsDir, "jre", "bin", "java")
+	jreBin := "java"
+	zipalignBin := "zipalign"
 	if runtime.GOOS == "windows" {
-		jrePath = filepath.Join(s.toolsDir, "jre", "bin", "java.exe")
+		jreBin = "java.exe"
+		zipalignBin = "zipalign.exe"
 	}
+	jrePath := filepath.Join(s.toolsDir, "jre", "bin", jreBin)
 	jreExists := fileExists(jrePath)
 	if !jreExists {
-		if _, err := exec.LookPath("java"); err == nil {
-			jreExists = true
-		} else if _, err := exec.LookPath("java.exe"); err == nil {
+		// 工具链内无 JRE 时，回退到系统 PATH
+		if _, err := exec.LookPath(jreBin); err == nil {
 			jreExists = true
 		}
 	}
 
 	// 检查 zipalign
-	binName := "zipalign"
-	if runtime.GOOS == "windows" {
-		binName = "zipalign.exe"
-	}
-	nativeToolsPath := filepath.Join(s.toolsDir, binName)
+	nativeToolsPath := filepath.Join(s.toolsDir, zipalignBin)
 	nativeToolsExists := fileExists(nativeToolsPath)
 	if !nativeToolsExists {
-		if _, err := exec.LookPath("zipalign"); err == nil {
-			nativeToolsExists = true
-		} else if _, err := exec.LookPath("zipalign.exe"); err == nil {
+		if _, err := exec.LookPath(zipalignBin); err == nil {
 			nativeToolsExists = true
 		}
 	}
@@ -296,8 +292,17 @@ func (s *CustomService) FindLatestBaseApk() (path string, versionName string, ve
 	return "", "", 0, false
 }
 
-// getToolchainName 返回当前架构对应的工具链包名
+// getToolchainName 返回当前平台+架构对应的工具链包名
 func (s *CustomService) getToolchainName() string {
+	if runtime.GOOS == "windows" {
+		return "toolchain-windows-x64.tar.gz"
+	}
+	if runtime.GOOS == "darwin" {
+		if runtime.GOARCH == "arm64" {
+			return "toolchain-darwin-arm64.tar.gz"
+		}
+		return "toolchain-darwin-x64.tar.gz"
+	}
 	arch := runtime.GOARCH
 	if arch == "arm64" {
 		return "toolchain-linux-arm64.tar.gz"
@@ -651,29 +656,26 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 			// 架构专属工具链包：解压到 s.toolsDir 根目录
 			s.progressMap.Store(filename, 95)
 
-			// 确定当前平台的二进制文件名
-			jreBin := "java"
-			zipalignBin := "zipalign"
-			if runtime.GOOS == "windows" {
-				jreBin = "java.exe"
-				zipalignBin = "zipalign.exe"
-			}
-
-			// 解压前先清理旧文件，确保完整替换
+			// 解压前先清理旧文件（同时清理 Linux 和 Windows 两种格式的文件名）
 			_ = os.RemoveAll(filepath.Join(s.toolsDir, "jre"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "apktool.jar"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "apksigner.jar"))
-			_ = os.Remove(filepath.Join(s.toolsDir, zipalignBin))
+			_ = os.Remove(filepath.Join(s.toolsDir, "zipalign"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "zipalign.exe"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "aapt2"))
+			_ = os.Remove(filepath.Join(s.toolsDir, "aapt2.exe"))
 			err := s.extractTarGz(destPath, s.toolsDir)
 			if err != nil {
 				_ = os.Remove(destPath)
 				return fmt.Errorf("解压工具链失败: %w", err)
 			}
 			// 赋予可执行权限
-			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", jreBin), 0755)
-			_ = os.Chmod(filepath.Join(s.toolsDir, zipalignBin), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java.exe"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign.exe"), 0755)
 			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2.exe"), 0755)
 		} else {
 			// 兼容旧版独立包下载（如 linux_tools.tar.gz、jre_linux_*.tar.gz）
 			s.progressMap.Store(filename, 95)
@@ -728,7 +730,8 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 
 		// 如果 tar 包内有顶层目录，剥离一层（如 jre-17.0.20+8/ → jre/）
 		// 如果 tar 包内文件直接平铺，则直接提取
-		parts := strings.Split(cleaned, string(filepath.Separator))
+		// tar 包内路径始终使用 "/" 分隔符，不受宿主机 OS 影响
+		parts := strings.Split(cleaned, "/")
 		targetRelative := cleaned
 		if len(parts) > 1 && strings.HasPrefix(parts[0], "jre") && parts[0] != "jre" {
 			// 顶层目录为 jre-xxx 变体时重命名为 jre
@@ -972,21 +975,19 @@ func (s *CustomService) runBuild(baseApkPath string) {
 	}
 
 	// 2. 检测并准备 Java 可执行文件路径
-	// 优先使用系统 Java（Docker 中由包管理器提供，兼容性最好；本地 JRE 可能因 glibc/musl 不兼容而无法执行）
+	// 优先使用工具链 JRE（与 aapt2/zipalign 同源，确保全平台兼容性一致），
+	// 工具链不可用时回退到系统 Java
 	javaCmd := "java"
-	if systemJava, err := exec.LookPath("java"); err == nil {
+	localJava := filepath.Join(s.toolsDir, "jre", "bin", "java")
+	if fileExists(localJava) {
+		_ = os.Chmod(localJava, 0755)
+		javaCmd = localJava
+		slog.Info("使用内置本地 JRE", "path", javaCmd)
+	} else if systemJava, err := exec.LookPath("java"); err == nil {
 		javaCmd = systemJava
 		s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
 	} else {
-		// 系统无 Java，尝试使用内置本地 JRE（架构专属工具链统一提取到 jre/）
-		localJava := filepath.Join(s.toolsDir, "jre", "bin", "java")
-		if fileExists(localJava) {
-			_ = os.Chmod(localJava, 0755)
-			javaCmd = localJava
-			slog.Info("使用内置本地 JRE", "path", javaCmd)
-		} else {
-			s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
-		}
+		s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
 	}
 
 	apktoolJar := filepath.Join(s.toolsDir, "apktool.jar")
@@ -1122,12 +1123,20 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			s.appendLog(">>> [4/6] 正在编译构建客户端应用...")
 			// apktool 3.0.x 仅支持 aapt2，优先使用工具链中的 aapt2，其次系统 aapt2
 			aaptBin := ""
-			if fileExists(filepath.Join(s.toolsDir, "aapt2")) {
+			aaptName := "aapt2"
+			if runtime.GOOS == "windows" {
+				aaptName = "aapt2.exe"
+			}
+			if fileExists(filepath.Join(s.toolsDir, aaptName)) {
+				aaptBin = filepath.Join(s.toolsDir, aaptName)
+				slog.Info("使用工具链原生 aapt2", "path", aaptBin)
+			} else if runtime.GOOS == "windows" && fileExists(filepath.Join(s.toolsDir, "aapt2")) {
+				// Windows 上也尝试检查无后缀版本（兼容旧工具链）
 				aaptBin = filepath.Join(s.toolsDir, "aapt2")
 				slog.Info("使用工具链原生 aapt2", "path", aaptBin)
 			} else if fileExists("/usr/bin/aapt2") {
 				aaptBin = "/usr/bin/aapt2"
-			} else if p, err := exec.LookPath("aapt2"); err == nil {
+			} else if p, err := exec.LookPath(aaptName); err == nil {
 				aaptBin = p
 			}
 			// 注意：工具链 JRE 的 argument parser 会拦截 -a/-c/-nc 等短选项，
@@ -1303,16 +1312,25 @@ func (s *CustomService) FindBaseApkInDir(dirName string) (path string, versionNa
 
 // getZipalignCmd 智能检测并优先返回原生 zipalign 可执行二进制文件及参数
 func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...interface{})) (cmd string, args []string) {
-	// 1. 检测工具链中的 zipalign（架构专属，最高优先级）
-	binName := "zipalign"
+	// 1. 检测工具链中的 zipalign（根据平台检查 .exe 后缀）
+	localBinName := "zipalign"
 	if runtime.GOOS == "windows" {
-		binName = "zipalign.exe"
+		localBinName = "zipalign.exe"
 	}
-	localBin := filepath.Join(s.toolsDir, binName)
+	localBin := filepath.Join(s.toolsDir, localBinName)
+	if !fileExists(localBin) && runtime.GOOS == "windows" {
+		// Windows 上也尝试检查无后缀版本（兼容旧工具链）
+		localBin = filepath.Join(s.toolsDir, "zipalign")
+	}
 	if fileExists(localBin) {
 		_ = os.Chmod(localBin, 0755)
 		slog.Info("使用工具链原生 zipalign", "path", localBin)
 		return localBin, []string{"-p", "-f", "4"}
+	}
+
+	binName := "zipalign"
+	if runtime.GOOS == "windows" {
+		binName = "zipalign.exe"
 	}
 
 	// 2. 检测 Android SDK build-tools
