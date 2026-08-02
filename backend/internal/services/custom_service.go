@@ -548,10 +548,16 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 
 	// 检查核心文件是否已就绪（不依赖 tar.gz 包是否存在）
 	if strings.HasPrefix(filename, "toolchain-") {
+		jreBin := "java"
+		zipalignBin := "zipalign"
+		if runtime.GOOS == "windows" {
+			jreBin = "java.exe"
+			zipalignBin = "zipalign.exe"
+		}
 		if fileExists(filepath.Join(s.toolsDir, "apktool.jar")) &&
 			fileExists(filepath.Join(s.toolsDir, "apksigner.jar")) &&
-			fileExists(filepath.Join(s.toolsDir, "jre", "bin", "java")) &&
-			fileExists(filepath.Join(s.toolsDir, "zipalign")) {
+			fileExists(filepath.Join(s.toolsDir, "jre", "bin", jreBin)) &&
+			fileExists(filepath.Join(s.toolsDir, zipalignBin)) {
 			s.progressMap.Store(filename, 100)
 			return nil
 		}
@@ -643,11 +649,20 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 		if strings.HasPrefix(filename, "toolchain-") {
 			// 架构专属工具链包：解压到 s.toolsDir 根目录
 			s.progressMap.Store(filename, 95)
+
+			// 确定当前平台的二进制文件名
+			jreBin := "java"
+			zipalignBin := "zipalign"
+			if runtime.GOOS == "windows" {
+				jreBin = "java.exe"
+				zipalignBin = "zipalign.exe"
+			}
+
 			// 解压前先清理旧文件，确保完整替换
 			_ = os.RemoveAll(filepath.Join(s.toolsDir, "jre"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "apktool.jar"))
 			_ = os.Remove(filepath.Join(s.toolsDir, "apksigner.jar"))
-			_ = os.Remove(filepath.Join(s.toolsDir, "zipalign"))
+			_ = os.Remove(filepath.Join(s.toolsDir, zipalignBin))
 			_ = os.Remove(filepath.Join(s.toolsDir, "aapt2"))
 			err := s.extractTarGz(destPath, s.toolsDir)
 			if err != nil {
@@ -655,8 +670,8 @@ func (s *CustomService) downloadTool(ctx context.Context, url, filename string) 
 				return fmt.Errorf("解压工具链失败: %w", err)
 			}
 			// 赋予可执行权限
-			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", "java"), 0755)
-			_ = os.Chmod(filepath.Join(s.toolsDir, "zipalign"), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, "jre", "bin", jreBin), 0755)
+			_ = os.Chmod(filepath.Join(s.toolsDir, zipalignBin), 0755)
 			_ = os.Chmod(filepath.Join(s.toolsDir, "aapt2"), 0755)
 		} else {
 			// 兼容旧版独立包下载（如 linux_tools.tar.gz、jre_linux_*.tar.gz）
@@ -706,7 +721,7 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 
 		// 净化路径，防止 zip-slip 漏洞
 		cleaned := filepath.Clean(header.Name)
-		if strings.HasPrefix(cleaned, "..") || strings.HasPrefix(cleaned, "/") {
+		if strings.Contains(cleaned, "..") || filepath.IsAbs(cleaned) {
 			continue
 		}
 
@@ -715,8 +730,8 @@ func (s *CustomService) extractTarGz(tarPath, destDir string) error {
 		parts := strings.Split(cleaned, string(filepath.Separator))
 		targetRelative := cleaned
 		if len(parts) > 1 && strings.HasPrefix(parts[0], "jre") && parts[0] != "jre" {
-			// 顶层目录为 jre-xxx 变体时剥离
-			targetRelative = filepath.Join(parts[1:]...)
+			// 顶层目录为 jre-xxx 变体时重命名为 jre
+			targetRelative = filepath.Join(append([]string{"jre"}, parts[1:]...)...)
 		}
 		targetPath := filepath.Join(destDir, targetRelative)
 
@@ -1102,10 +1117,9 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			} else if p, err := exec.LookPath("aapt2"); err == nil {
 				aaptBin = p
 			}
-			rebuildArgs := []string{"-jar", apktoolJar, "b", "-c", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
+			rebuildArgs := []string{"-jar", apktoolJar, "b", "-nc", "-p", tempFrameDir, tempUnpackedDir, "-o", tempUnsignedApk}
 			if aaptBin != "" {
 				rebuildArgs = append(rebuildArgs, "-a", aaptBin)
-				s.appendLog("[INFO] 使用系统原生 aapt2: %s", aaptBin)
 			} else {
 				rebuildArgs = append(rebuildArgs, "--use-aapt2")
 				s.appendLog("[INFO] 使用 apktool 内置 aapt2")
@@ -1176,7 +1190,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if err != nil {
 		return false
 	}
 	return !info.IsDir() && info.Size() > 0
