@@ -1311,7 +1311,7 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 	localBin := filepath.Join(s.toolsDir, binName)
 	if fileExists(localBin) {
 		_ = os.Chmod(localBin, 0755)
-		logFunc("[INFO] 使用工具链原生 zipalign: %s", localBin)
+		slog.Info("使用工具链原生 zipalign", "path", localBin)
 		return localBin, []string{"-p", "-f", "4"}
 	}
 
@@ -1328,7 +1328,7 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 				if entries[i].IsDir() {
 					binPath := filepath.Join(sdkDir, entries[i].Name(), binName)
 					if fileExists(binPath) {
-						logFunc("[INFO] 检测到 Android SDK zipalign 工具: %s", binPath)
+						slog.Info("检测到 Android SDK zipalign", "path", binPath)
 						return binPath, []string{"-p", "-f", "4"}
 					}
 				}
@@ -1338,7 +1338,7 @@ func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...i
 
 	// 3. 检测系统环境变量 PATH 中的 zipalign
 	if path, err := exec.LookPath(binName); err == nil {
-		logFunc("[INFO] 使用系统环境变量中的 zipalign: %s", path)
+		slog.Info("使用系统环境变量中的 zipalign", "path", path)
 		return path, []string{"-p", "-f", "4"}
 	}
 
