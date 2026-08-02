@@ -3866,12 +3866,14 @@ async function refreshCustomEnvStatus(silent = false) {
     const formContainer = document.getElementById('custom-form-container');
     const envBtnBox = document.getElementById('custom-env-btn-box');
     const downloadBox = document.getElementById('custom-env-download-box');
+    const resetBox = document.getElementById('custom-reset-box');
 
     if (env.tools_ready) {
       envBadge.textContent = '环境就绪';
       envBadge.style.background = '#52c41a';
       envBtnBox.style.display = 'none';
       downloadBox.style.display = 'none';
+      if (resetBox) resetBox.style.display = 'block';
       
       if (customEnvPollInterval) {
         clearInterval(customEnvPollInterval);
@@ -3895,6 +3897,7 @@ async function refreshCustomEnvStatus(silent = false) {
       if (env.downloading) {
         envBtnBox.style.display = 'none';
         downloadBox.style.display = 'block';
+        if (resetBox) resetBox.style.display = 'none';
         renderCustomDownloadProgress(env.tools);
         // 继续轮询
         if (!customEnvPollInterval) {
@@ -3906,6 +3909,7 @@ async function refreshCustomEnvStatus(silent = false) {
           customEnvPollInterval = null;
         }
         envBtnBox.style.display = 'block';
+        if (resetBox) resetBox.style.display = 'block';
         // 如果有任何一个工具报错，或者下载进度未完成，说明处于异常中断状态，保持展示以显示红字错误原因
         const hasError = env.tools.some(t => t.error || (t.progress > 0 && t.progress < 100));
         if (hasError) {
