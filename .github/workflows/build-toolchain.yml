@@ -9,24 +9,24 @@ permissions:
   contents: write
 
 jobs:
-  # ── macOS 工具链 ──────────────────────────────────────
+  # ── macOS 工具链（在 ubuntu-latest 上交叉打包）────────
   macos-toolchain:
     name: macOS ${{ matrix.arch }}
     strategy:
       matrix:
         include:
           - arch: x64
-            runs-on: macos-13
             jre_arch: x64
+            sdk_os: macosx
             package: toolchain-darwin-x64.tar.gz
           - arch: arm64
-            runs-on: macos-latest
             jre_arch: aarch64
+            sdk_os: macosx
             package: toolchain-darwin-arm64.tar.gz
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Download JRE (Adoptium)
+      - name: Download macOS JRE (Adoptium)
         run: |
           JRE_URL="https://api.adoptium.net/v3/binary/latest/17/ga/mac/${{ matrix.jre_arch }}/jre/hotspot/normal/eclipse"
           echo "Downloading JRE from $JRE_URL"
@@ -35,42 +35,26 @@ jobs:
           tar -xzf jre.tar.gz -C jre-tmp
           JRE_DIR=$(ls jre-tmp | head -1)
           # macOS JRE 有 Contents/Home 结构，提取到 jre/
-          if [ -d "jre-tmp/$JRE_DIR/Contents/Home" ]; then
-            mv "jre-tmp/$JRE_DIR/Contents/Home" jre
-          else
-            mv "jre-tmp/$JRE_DIR" jre
-          fi
-          chmod +x jre/bin/java
+          mv "jre-tmp/$JRE_DIR/Contents/Home" jre
           rm -rf jre.tar.gz jre-tmp
-          echo "JRE version: $(jre/bin/java -version 2>&1 | head -1)"
+          echo "JRE files: $(ls jre/bin/ | head -5)"
 
-      - name: Install JDK for sdkmanager
-        run: brew install openjdk@17
-
-      - name: Download Android SDK Command-line Tools
+      - name: Download macOS Android Build-Tools
         run: |
-          # macOS ARM64 版 cmdline-tools
-          curl -fsSL -o cmdline-tools.zip \
-            "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
-          unzip -q cmdline-tools.zip
-          mkdir -p android-sdk/cmdline-tools
-          mv cmdline-tools android-sdk/cmdline-tools/latest
-          rm cmdline-tools.zip
-
-      - name: Install Android Build-Tools
-        run: |
-          export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-          export ANDROID_SDK_ROOT=$PWD/android-sdk
-          yes | android-sdk/cmdline-tools/latest/bin/sdkmanager \
-            --sdk_root=$ANDROID_SDK_ROOT "build-tools;35.0.0"
-
-      - name: Copy zipalign, aapt2, apksigner.jar
-        run: |
-          BUILD_TOOLS="android-sdk/build-tools/35.0.0"
-          cp "$BUILD_TOOLS/zipalign" .
-          cp "$BUILD_TOOLS/aapt2" .
-          cp "$BUILD_TOOLS/lib/apksigner.jar" .
+          BUILD_TOOLS_VER="35.0.0"
+          URL="https://dl.google.com/android/repository/build-tools_r${BUILD_TOOLS_VER}-${{ matrix.sdk_os }}.zip"
+          echo "Downloading build-tools from $URL"
+          curl -fsSL -o build-tools.zip "$URL"
+          mkdir -p bt-tmp
+          unzip -q build-tools.zip -d bt-tmp
+          # 目录名因版本而异，用通配符匹配
+          BT_DIR=$(ls -d bt-tmp/android-* | head -1)
+          echo "Build-tools dir: $BT_DIR"
+          cp "$BT_DIR/zipalign" .
+          cp "$BT_DIR/aapt2" .
+          cp "$BT_DIR/lib/apksigner.jar" .
           chmod +x zipalign aapt2
+          rm -rf build-tools.zip bt-tmp
 
       - name: Download apktool.jar
         run: |
