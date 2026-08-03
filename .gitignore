@@ -1,6 +1,8 @@
 # Go
 backend/bin/
 backend/data/
+backend/web/download/*
+backend/internal/license/*.txt
 *.exe
 *.exe~
 *.dll

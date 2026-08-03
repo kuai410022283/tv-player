@@ -1,5 +1,5 @@
 #!/bin/bash
-# 编译 license-gen Windows 版 + Android APK 授权客户端
+# 编译 license-gen (Windows/macOS) + Android APK 授权客户端
 # 用法: bash build_license_win.sh [密钥种子]
 #
 # 生产部署时指定自定义密钥种子：
@@ -15,6 +15,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ANDROID_DIR="$SCRIPT_DIR/android"
+CMD_PATH="./cmd/license-gen/"
 
 # 修复 JAVA_HOME 指向错误的问题（去掉末尾的 \bin）
 export JAVA_HOME="D:/Program Files/Android/Android Studio/jbr"
@@ -33,20 +34,34 @@ if [ -n "$1" ]; then
   echo "==> 使用命令行参数密钥种子编译"
 fi
 
-# ── 1. 编译 license-gen.exe (Windows) ──────────────────
+# ── 1. 编译 license-gen (Windows) ──────────────────────
 
 echo ""
-echo "==> [1/2] 编译 license-gen (Windows amd64) ..."
+echo "==> [1/3] 编译 license-gen (Windows amd64) ..."
 cd "$PROJECT_DIR"
-GOOS=windows GOARCH=amd64 go build "${LDFLAGS[@]}" -o "$SCRIPT_DIR/license-gen.exe" ./cmd/license-gen/
+GOOS=windows GOARCH=amd64 go build "${LDFLAGS[@]}" -o "$SCRIPT_DIR/license-gen.exe" $CMD_PATH
 
 echo "  -> 编译完成: $SCRIPT_DIR/license-gen.exe"
 ls -lh "$SCRIPT_DIR/license-gen.exe"
 
-# ── 2. 编译 Android APK ────────────────────────────────
+# ── 2. 编译 license-gen (macOS) ────────────────────────
 
 echo ""
-echo "==> [2/2] 编译 Android APK 授权客户端 ..."
+echo "==> [2/3] 编译 license-gen (macOS amd64 + arm64) ..."
+cd "$PROJECT_DIR"
+
+GOOS=darwin GOARCH=amd64 go build "${LDFLAGS[@]}" -o "$SCRIPT_DIR/license-gen-darwin-amd64" $CMD_PATH
+echo "  -> 编译完成: $SCRIPT_DIR/license-gen-darwin-amd64"
+ls -lh "$SCRIPT_DIR/license-gen-darwin-amd64"
+
+GOOS=darwin GOARCH=arm64 go build "${LDFLAGS[@]}" -o "$SCRIPT_DIR/license-gen-darwin-arm64" $CMD_PATH
+echo "  -> 编译完成: $SCRIPT_DIR/license-gen-darwin-arm64"
+ls -lh "$SCRIPT_DIR/license-gen-darwin-arm64"
+
+# ── 3. 编译 Android APK ────────────────────────────────
+
+echo ""
+echo "==> [3/3] 编译 Android APK 授权客户端 ..."
 
 # 检查 gomobile 是否可用
 GOMOBILE="$(go env GOPATH)/bin/gomobile"
@@ -54,7 +69,10 @@ if [ ! -f "$GOMOBILE" ]; then
   echo "  -> 跳过: gomobile 未安装 (go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init)"
   echo ""
   echo "================================================"
-  echo "  license-gen.exe 编译完成!"
+  echo "  编译完成!"
+  echo "  license-gen.exe          : $SCRIPT_DIR/license-gen.exe"
+  echo "  license-gen-darwin-amd64 : $SCRIPT_DIR/license-gen-darwin-amd64"
+  echo "  license-gen-darwin-arm64 : $SCRIPT_DIR/license-gen-darwin-arm64"
   echo "  APK 编译跳过（缺少 gomobile）"
   echo "================================================"
   exit 0
@@ -100,8 +118,10 @@ if [ -f "$APK_OUTPUT" ]; then
   echo ""
   echo "================================================"
   echo "  编译完成!"
-  echo "  license-gen.exe : $SCRIPT_DIR/license-gen.exe"
-  echo "  MediaPlayer授权.apk : $SCRIPT_DIR/MediaPlayer授权.apk"
+  echo "  license-gen.exe          : $SCRIPT_DIR/license-gen.exe"
+  echo "  license-gen-darwin-amd64 : $SCRIPT_DIR/license-gen-darwin-amd64"
+  echo "  license-gen-darwin-arm64 : $SCRIPT_DIR/license-gen-darwin-arm64"
+  echo "  MediaPlayer授权.apk      : $SCRIPT_DIR/MediaPlayer授权.apk"
   echo "================================================"
 else
   echo "  -> APK 输出未找到，编译可能失败"

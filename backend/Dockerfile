@@ -26,9 +26,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM debian:bookworm-slim
 
 # 运行时依赖 + 系统 Java / zipalign（兜底，工具链下载后优先使用工具链内的 JRE + zipalign + aapt2）
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
+#     zipalign qemu-user-static \
+#     && rm -rf /var/lib/apt/lists/*
+
+# 运行时依赖（工具链内置 JRE + zipalign + aapt2，使用前须先下载工具链）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata curl gosu openssl openjdk-17-jre-headless \
-    zipalign qemu-user-static \
+    ca-certificates tzdata curl gosu openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户并指定固定的 UID/GID (1000)

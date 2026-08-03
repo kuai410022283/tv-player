@@ -1,9 +1,9 @@
 <libraries>
   <library
       name="__local_aars__:D:\UGit\tv-player\backend\internal\license\android\app\libs\licensegen.aar:unspecified@jar"
-      jars="C:\Users\kuai\.gradle\caches\transforms-3\7d8972c302fe942ef4715dc43abe95b9\transformed\licensegen\jars\classes.jar"
+      jars="C:\Users\kuai\.gradle\caches\transforms-3\81b736a5a40573152af0766aa4c1f18d\transformed\licensegen\jars\classes.jar"
       resolved="__local_aars__:D:\UGit\tv-player\backend\internal\license\android\app\libs\licensegen.aar:unspecified"
-      folder="C:\Users\kuai\.gradle\caches\transforms-3\7d8972c302fe942ef4715dc43abe95b9\transformed\licensegen"
+      folder="C:\Users\kuai\.gradle\caches\transforms-3\81b736a5a40573152af0766aa4c1f18d\transformed\licensegen"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"

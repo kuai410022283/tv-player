@@ -1439,7 +1439,7 @@ func (s *CustomService) FindBaseApkInDir(dirName string) (path string, versionNa
 }
 
 // getZipalignCmd 智能检测并优先返回原生 zipalign 可执行二进制文件及参数
-func (s *CustomService) getZipalignCmd(javaCmd string, logFunc func(string, ...interface{})) (cmd string, args []string) {
+func (s *CustomService) getZipalignCmd(javaCmd string, _ func(string, ...interface{})) (cmd string, args []string) {
 	// 1. 检测工具链中的 zipalign（根据平台检查 .exe 后缀）
 	localBinName := "zipalign"
 	if runtime.GOOS == "windows" {

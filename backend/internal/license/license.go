@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -361,6 +362,22 @@ func collectMachineID() string {
 				source = strings.Join(macs, "|")
 			}
 		}
+	case "darwin":
+		// 来源①：IOPlatformUUID（Apple 平台级 UUID，硬件绑定，重装系统不变）
+		if uuid := readDarwinIOPlatformUUID(); uuid != "" {
+			source = uuid
+			break
+		}
+		// 来源②：IOPlatformSerialNumber（Mac 机器序列号）
+		if serial := readDarwinSerialNumber(); serial != "" {
+			source = serial
+			break
+		}
+		// 来源③：物理 MAC 地址（兜底）
+		if macs := readDarwinPhysicalMACs(); len(macs) > 0 {
+			sort.Strings(macs)
+			source = strings.Join(macs, "|")
+		}
 	default:
 		return ""
 	}
@@ -492,6 +509,73 @@ func readWindowsSystemUUID() string {
 		}
 	}
 	return ""
+}
+
+// readDarwinIOPlatformUUID 读取 macOS IOPlatformUUID（硬件级，重装系统不变）
+func readDarwinIOPlatformUUID() string {
+	out, err := execCommand("ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	if err != nil {
+		return ""
+	}
+	return parseDarwinIoregValue(out, "IOPlatformUUID")
+}
+
+// readDarwinSerialNumber 读取 Mac 序列号（备用来源）
+func readDarwinSerialNumber() string {
+	out, err := execCommand("ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	if err != nil {
+		return ""
+	}
+	return parseDarwinIoregValue(out, "IOPlatformSerialNumber")
+}
+
+// parseDarwinIoregValue 从 ioreg 输出中提取指定字段的值
+// ioreg 输出示例: "IOPlatformUUID" = "12345678-ABCD-1234-ABCD-123456789012"
+func parseDarwinIoregValue(output, key string) string {
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, `"`+key+`"`) {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		val := strings.TrimSpace(parts[1])
+		val = strings.Trim(val, `"`)
+		val = strings.TrimSpace(val)
+		if val != "" && val != "0" {
+			return val
+		}
+	}
+	return ""
+}
+
+// readDarwinPhysicalMACs 读取 macOS 物理网卡 MAC 地址（兜底来源）
+func readDarwinPhysicalMACs() []string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var macs []string
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		name := iface.Name
+		// 跳过 macOS 虚拟/隧道接口
+		if strings.HasPrefix(name, "utun") || strings.HasPrefix(name, "gif") ||
+			strings.HasPrefix(name, "stf") || strings.HasPrefix(name, "bridge") ||
+			strings.HasPrefix(name, "p2p") || strings.HasPrefix(name, "awdl") ||
+			strings.HasPrefix(name, "llw") {
+			continue
+		}
+		mac := iface.HardwareAddr.String()
+		if mac != "" && mac != "00:00:00:00:00:00" {
+			macs = append(macs, strings.ToUpper(mac))
+		}
+	}
+	return macs
 }
 
 // execCommand 执行系统命令（在 Windows 上使用）
