@@ -232,6 +232,16 @@ class ExoPlayerHelper(
         // 这样不仅能对 HTTP/HTTPS 注入自定义头，还能完美向下兼容 file://、asset:// 等本地视频播放，防止负优化！
         val defaultDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
+        // 点播流（VOD）开启 LRU 磁盘缓存，加速拖动与二次播放；直播流（Live）保持网络直连旁路
+        val finalDataSourceFactory: androidx.media3.datasource.DataSource.Factory = if (!isLiveStream) {
+            androidx.media3.datasource.cache.CacheDataSource.Factory()
+                .setCache(getCache(context))
+                .setUpstreamDataSourceFactory(defaultDataSourceFactory)
+                .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        } else {
+            defaultDataSourceFactory
+        }
+
         // 缓存 ExtractorsFactory，只创建一次，避免每次切换频道都重建
         if (cachedExtractorsFactory == null) {
             val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
@@ -265,7 +275,7 @@ class ExoPlayerHelper(
         val extractorsFactory = cachedExtractorsFactory!!
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context, extractorsFactory)
-            .setDataSourceFactory(defaultDataSourceFactory)
+            .setDataSourceFactory(finalDataSourceFactory)
         this.mediaSourceFactory = mediaSourceFactory
 
         val mediaItem = if (url.lowercase().startsWith("rtsp://")) {
@@ -914,6 +924,22 @@ class ExoPlayerHelper(
         exoPlayer = null
         isPlayerPlaying = false
         lastResolution = ""
+    }
+
+    companion object {
+        @Volatile
+        private var simpleCache: androidx.media3.datasource.cache.SimpleCache? = null
+
+        @Synchronized
+        fun getCache(context: Context): androidx.media3.datasource.cache.Cache {
+            if (simpleCache == null) {
+                val cacheDir = java.io.File(context.cacheDir, "exo_cache")
+                val evictor = androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor(512 * 1024 * 1024L) // 512MB
+                val dbProvider = androidx.media3.database.StandaloneDatabaseProvider(context.applicationContext)
+                simpleCache = androidx.media3.datasource.cache.SimpleCache(cacheDir, evictor, dbProvider)
+            }
+            return simpleCache!!
+        }
     }
 }
 
