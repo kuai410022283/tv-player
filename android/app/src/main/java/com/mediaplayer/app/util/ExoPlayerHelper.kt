@@ -91,6 +91,10 @@ class ExoPlayerHelper(
     private var criticalErrorCount: Int = 0
     private var criticalErrorLastTime: Long = 0L
 
+    // 解码器初始化失败时的一次性软解降级标记
+    // 每次 play() 调用重置，确保每个新频道/新内容独立判断
+    private var decoderInitFallbackTriggered: Boolean = false
+
     // 缓冲超时兜底：ExoPlayer 卡在 STATE_BUFFERING 超过 15 秒自动触发降级
     // 解决某些 RTSP 或异常流不报错也不就绪的卡死问题
     private val bufferingTimeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -112,6 +116,7 @@ class ExoPlayerHelper(
         behindLiveWindowLastTime = 0L
         criticalErrorCount = 0
         criticalErrorLastTime = 0L
+        decoderInitFallbackTriggered = false
         
         playInternal(url, userAgent, customHeaders, null, startTimeMs, contentType, streamType)
     }
@@ -231,6 +236,7 @@ class ExoPlayerHelper(
         if (cachedExtractorsFactory == null) {
             val defaultExtractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
                 .setTsExtractorFlags(androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+                .setTsExtractorTimestampSearchBytes(androidx.media3.extractor.ts.TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES * 10)
 
             cachedExtractorsFactory = androidx.media3.extractor.ExtractorsFactory {
                 val extractors = defaultExtractorsFactory.createExtractors()
@@ -358,6 +364,11 @@ class ExoPlayerHelper(
                 super.buildAudioRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, audioSink, eventHandler, eventListener, out)
                 
                 // 注入 Av3aAudioRenderer 以支持 AV3A 音频解码
+                // 设计意图：此处使用 out.add() 显式追加，独立于 extensionRendererMode 控制。
+                // 即使 DECODER_MODE_HARDWARE (EXTENSION_RENDERER_MODE_OFF) 下，
+                // super() 不添加 FFmpeg 渲染器，Av3aAudioRenderer 依然始终注入。
+                // 原因：MediaCodecAudioRenderer 不识别 "audio/av3a"，
+                // 若不强制注入，AV3A 内容在 HARDWARE 模式下将无法播放（静音）。
                 out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
             }
         }.apply {
@@ -543,7 +554,27 @@ class ExoPlayerHelper(
                 }
             }
             
-            // 2. 音视频解码或 AudioTrack 崩溃导致卡死，触发自愈重启 (兜底)
+            // 2. 解码器初始化/查询失败 → 一次性自动切换到软解模式 (仅对 HARDWARE 模式生效)
+            if ((error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                 error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED) &&
+                currentDecoderMode == Prefs.DECODER_MODE_HARDWARE &&
+                !decoderInitFallbackTriggered
+            ) {
+                decoderInitFallbackTriggered = true
+                currentDecoderMode = Prefs.DECODER_MODE_AUTO
+                lastBuiltDecoderMode = -1
+                com.mediaplayer.app.util.RemoteLogger.e(
+                    "ExoPlayer",
+                    "Decoder init failed in HARDWARE mode. Auto-fallback to AUTO (software) mode."
+                )
+                playInternal(
+                    currentUrl, currentUserAgent, currentHeaders,
+                    null, 0L, currentContentType, currentStreamType
+                )
+                return
+            }
+
+            // 3. 音视频解码或 AudioTrack 崩溃导致卡死，触发自愈重启 (兜底)
             if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
                 error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
                 error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
