@@ -1379,6 +1379,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         var currentShowLogo = prefs.getBoolean(Prefs.KEY_SHOW_CHANNEL_LOGO, true)
         var currentReverseChannels = prefs.getBoolean(Prefs.KEY_REVERSE_CHANNEL_KEYS, false)
         var currentAudioPassthrough = prefs.getBoolean(Prefs.KEY_AUDIO_PASSTHROUGH, false)
+        var currentAudioNormalizer = prefs.getBoolean(Prefs.KEY_AUDIO_NORMALIZER, true)
         var currentStopPrevious = prefs.getBoolean(Prefs.KEY_STOP_PREVIOUS_MEDIA, false)
         var currentEnablePip = prefs.getBoolean(Prefs.KEY_ENABLE_PIP, false)
         var currentGestureBrightness = prefs.getBoolean(Prefs.KEY_GESTURE_BRIGHTNESS, true)
@@ -1387,6 +1388,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         fun updateAudioPassthroughText(enabled: Boolean) {
             tvSettingsAudioPassthroughValue?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
+        }
+
+        fun updateAudioNormalizerText(enabled: Boolean) {
+            findViewById<TextView>(R.id.tvSettingsAudioNormalizerValue)?.text = if (enabled) getString(R.string.status_on) else getString(R.string.status_off)
         }
 
         fun updateStopPreviousText(enabled: Boolean) {
@@ -1404,6 +1409,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateShowLogoText(currentShowLogo)
         updateReverseChannelsText(currentReverseChannels)
         updateAudioPassthroughText(currentAudioPassthrough)
+        updateAudioNormalizerText(currentAudioNormalizer)
         updateStopPreviousText(currentStopPrevious)
         updatePipText(currentEnablePip)
         updateGestureBrightnessText(currentGestureBrightness)
@@ -1411,6 +1417,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         updateDnsPolicyText(currentDnsPolicy)
         controlScheme = prefs.getInt(Prefs.KEY_CONTROL_SCHEME, Prefs.CONTROL_SCHEME_MODERN)
         updateControlSchemeText(controlScheme)
+
+        findViewById<View>(R.id.btnSettingsAudioNormalizer)?.setOnClickListener {
+            if (isManagedSetting(Prefs.KEY_AUDIO_NORMALIZER)) return@setOnClickListener
+            currentAudioNormalizer = !currentAudioNormalizer
+            updateAudioNormalizerText(currentAudioNormalizer)
+            prefs.edit().putBoolean(Prefs.KEY_AUDIO_NORMALIZER, currentAudioNormalizer).apply()
+            val statusText = if (currentAudioNormalizer) getString(R.string.status_on) else getString(R.string.status_off)
+            Toast.makeText(this, "${getString(R.string.settings_audio_normalizer)}: $statusText", Toast.LENGTH_SHORT).show()
+        }
         
         findViewById<View>(R.id.btnSettingsDnsPolicy)?.setOnClickListener {
             if (isManagedSetting(Prefs.KEY_DNS_POLICY)) return@setOnClickListener

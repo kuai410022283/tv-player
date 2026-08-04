@@ -26,7 +26,8 @@
     <string name="settings_config_mode">Конфигурация</string>
     <string name="settings_decoder_mode">Декодер</string>
     <string name="settings_player_core">Движок</string>
-    <string name="settings_audio_passthrough">Сквозной звук</string>
+    <string name="settings_audio_passthrough">Сквозной аудиопоток</string>
+    <string name="settings_audio_normalizer">Выравнивание громкости</string>
     <string name="settings_stop_previous">Очистка памяти</string>
     <string name="settings_pip">Картинка в к.</string>
     <string name="settings_show_logo">Логотипы</string>

@@ -17,6 +17,8 @@ data class RemoteClientConfig(
     @SerializedName("network_cache_ms")    val networkCacheMs: Int? = null,
     /** 音频直通 */
     @SerializedName("audio_passthrough")   val audioPassthrough: Boolean? = null,
+    /** 音频响度归一化防爆音 */
+    @SerializedName("audio_normalizer_enabled") val audioNormalizer: Boolean? = null,
     /** 画面比例: 0-5 */
     @SerializedName("scale_mode")          val scaleMode: Int? = null,
     /** DNS策略: 0=自动 1=仅IPv4 2=仅IPv6 */

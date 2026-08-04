@@ -26,7 +26,8 @@
     <string name="settings_config_mode">Konfig-Modus</string>
     <string name="settings_decoder_mode">Decoder</string>
     <string name="settings_player_core">Core-Player</string>
-    <string name="settings_audio_passthrough">Audio-Passth.</string>
+    <string name="settings_audio_passthrough">Audio-Durchschleifung</string>
+    <string name="settings_audio_normalizer">Lautstärke-Normalisierung</string>
     <string name="settings_stop_previous">RAM leeren</string>
     <string name="settings_pip">Bild-in-Bild</string>
     <string name="settings_show_logo">Kanallogos</string>

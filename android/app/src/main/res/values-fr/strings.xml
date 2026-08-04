@@ -26,7 +26,8 @@
     <string name="settings_config_mode">Mode config</string>
     <string name="settings_decoder_mode">Décodeur</string>
     <string name="settings_player_core">Lecteur</string>
-    <string name="settings_audio_passthrough">Audio Passth.</string>
+    <string name="settings_audio_passthrough">Passthrough audio</string>
+    <string name="settings_audio_normalizer">Normalisation du volume</string>
     <string name="settings_stop_previous">Libérer RAM</string>
     <string name="settings_pip">Incrustation</string>
     <string name="settings_show_logo">Logos chaînes</string>

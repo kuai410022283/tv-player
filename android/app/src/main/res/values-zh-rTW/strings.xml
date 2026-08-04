@@ -28,6 +28,7 @@
     <string name="settings_decoder_mode">解碼模式</string>
     <string name="settings_player_core">播放核心</string>
     <string name="settings_audio_passthrough">音訊直通</string>
+    <string name="settings_audio_normalizer">響度平滑防爆音</string>
     <string name="settings_stop_previous">釋放內存</string>
     <string name="settings_pip">畫中畫</string>
     <string name="settings_show_logo">顯示台標</string>

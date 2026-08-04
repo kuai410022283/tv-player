@@ -28,6 +28,7 @@
     <string name="settings_decoder_mode">디코더 모드</string>
     <string name="settings_player_core">재생 엔진</string>
     <string name="settings_audio_passthrough">오디오 패스스루</string>
+    <string name="settings_audio_normalizer">음량 평탄화 및 오버슈트 방지</string>
     <string name="settings_stop_previous">메모리 최적화</string>
     <string name="settings_pip">PIP 모드</string>
     <string name="settings_show_logo">채널 로고 표시</string>

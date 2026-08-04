@@ -28,6 +28,7 @@
     <string name="settings_decoder_mode">Decoder Mode</string>
     <string name="settings_player_core">Player Engine</string>
     <string name="settings_audio_passthrough">Audio Passthrough</string>
+    <string name="settings_audio_normalizer">Audio Normalizer</string>
     <string name="settings_stop_previous">Free Memory</string>
     <string name="settings_pip">PIP Mode</string>
     <string name="settings_show_logo">Show Logo</string>

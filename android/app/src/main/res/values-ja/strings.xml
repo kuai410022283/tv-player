@@ -28,6 +28,7 @@
     <string name="settings_decoder_mode">デコードモード</string>
     <string name="settings_player_core">再生エンジン</string>
     <string name="settings_audio_passthrough">音声パススルー</string>
+    <string name="settings_audio_normalizer">音量平坦化・爆音防止</string>
     <string name="settings_stop_previous">メモリ解放</string>
     <string name="settings_pip">画中画</string>
     <string name="settings_show_logo">ロゴ表示</string>

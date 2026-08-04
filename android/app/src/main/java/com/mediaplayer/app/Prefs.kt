@@ -55,6 +55,9 @@ object Prefs {
     // Tunneling 隧道解码模式键名 (默认开启)
     const val KEY_TUNNELING_ENABLED = "tunneling_enabled"
 
+    // 音频响度归一化与动态限幅键名 (默认开启)
+    const val KEY_AUDIO_NORMALIZER = "audio_normalizer_enabled"
+
     // 频道独立解码记忆键名
     fun getKeyChannelVideoDecode(channelId: Long) = "channel_video_decode_$channelId"
     fun getKeyChannelAudioDecode(channelId: Long) = "channel_audio_decode_$channelId"

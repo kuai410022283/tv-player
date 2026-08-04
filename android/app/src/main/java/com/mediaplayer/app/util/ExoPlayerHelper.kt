@@ -361,7 +361,25 @@ class ExoPlayerHelper(
         val isPassthroughEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_AUDIO_PASSTHROUGH, false)
         val enableAv3aTvStereoSafety = !isPassthroughEnabled
 
+        val isAudioNormalizerEnabled = prefs.getBoolean(Prefs.KEY_AUDIO_NORMALIZER, true)
+        val audioProcessors = mutableListOf<androidx.media3.common.audio.AudioProcessor>()
+        if (isAudioNormalizerEnabled && !isPassthroughEnabled) {
+            audioProcessors.add(AudioLoudnessProcessor())
+        }
+
         val renderersFactory = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): androidx.media3.exoplayer.audio.AudioSink {
+                return androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(audioProcessors.toTypedArray())
+                    .build()
+            }
+
             override fun buildAudioRenderers(
                 context: Context,
                 extensionRendererMode: Int,

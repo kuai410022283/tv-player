@@ -46,6 +46,7 @@ object RemoteConfigManager {
             applyInt(this, prefs, Prefs.KEY_DECODER_MODE, config.decoderMode)
             applyInt(this, prefs, Prefs.KEY_NETWORK_CACHE, config.networkCacheMs)
             applyBool(this, prefs, Prefs.KEY_AUDIO_PASSTHROUGH, config.audioPassthrough)
+            applyBool(this, prefs, Prefs.KEY_AUDIO_NORMALIZER, config.audioNormalizer)
             applyInt(this, prefs, Prefs.KEY_SCALE_MODE, config.scaleMode)
             applyInt(this, prefs, Prefs.KEY_DNS_POLICY, config.dnsPolicy)
             applyBool(this, prefs, Prefs.KEY_STOP_PREVIOUS_MEDIA, config.stopPreviousMedia)
