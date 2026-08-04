@@ -735,6 +735,7 @@
     "opt_player_core_1": "ExoPlayer",
     "opt_player_core_3": "MPV",
     "audio_passthrough_label": "돌비 오디오",
+    "audio_normalizer_enabled_label": "음량 노멀라이저",
     "stop_previous_media_label": "채널 전환 모드",
     "enable_pip_label": "PIP(화면 속 화면) 모드",
     "show_channel_logo_label": "채널 로고 표시",

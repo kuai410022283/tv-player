@@ -3409,6 +3409,7 @@ const CLIENT_CONFIG_ITEMS = [
   { group: '播放与画面', key: 'decoder_mode', label: '解码模式', type: 'select', options: { '0': '自动', '1': '强制硬解', '2': '强制软解' } },
   { group: '播放与画面', key: 'player_core', label: '播放内核', type: 'select', options: { '0': '自动', '1': 'ExoPlayer', '3': 'MPV' } },
   { group: '播放与画面', key: 'audio_passthrough', label: '杜比音频', type: 'toggle' },
+  { group: '播放与画面', key: 'audio_normalizer_enabled', label: '音量平衡', type: 'toggle' },
   { group: '播放与画面', key: 'stop_previous_media', label: '切台模式', type: 'toggle' },
   { group: '播放与画面', key: 'enable_pip', label: '画中画模式', type: 'toggle' },
   { group: '播放与画面', key: 'show_channel_logo', label: '显示频道台标', type: 'toggle' },

@@ -735,6 +735,7 @@
     "opt_player_core_1": "ExoPlayer",
     "opt_player_core_3": "MPV",
     "audio_passthrough_label": "Dolby Pass-Through",
+    "audio_normalizer_enabled_label": "Lautstärke-Normalisierung",
     "stop_previous_media_label": "Kanalwechsel-Modus",
     "enable_pip_label": "Bild-in-Bild (PiP)",
     "show_channel_logo_label": "Kanallogos anzeigen",

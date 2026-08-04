@@ -352,7 +352,8 @@ type ClientRemoteConfig struct {
 	PlayerCore        *int  `json:"player_core,omitempty"`         // 0=自动 1=ExoPlayer 3=MPV
 	DecoderMode       *int  `json:"decoder_mode,omitempty"`        // 0=自动 1=硬解 2=软解
 	NetworkCacheMs    *int  `json:"network_cache_ms,omitempty"`    // 网络缓冲毫秒
-	AudioPassthrough  *bool `json:"audio_passthrough,omitempty"`   // 音频直通
+	AudioPassthrough  *bool `json:"audio_passthrough,omitempty"`          // 音频直通
+	AudioNormalizer   *bool `json:"audio_normalizer_enabled,omitempty"` // 响度平滑防爆音
 	ScaleMode         *int  `json:"scale_mode,omitempty"`          // 画面比例 0-5
 	DnsPolicy         *int  `json:"dns_policy,omitempty"`          // DNS策略 0-2
 	StopPreviousMedia *bool `json:"stop_previous_media,omitempty"` // 切台停止上一路

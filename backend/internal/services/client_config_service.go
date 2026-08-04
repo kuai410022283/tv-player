@@ -231,7 +231,7 @@ func clientScope(clientID int64) string {
 func isValidConfigKey(key string) bool {
 	validKeys := map[string]bool{
 		"player_core": true, "decoder_mode": true, "network_cache_ms": true,
-		"audio_passthrough": true, "scale_mode": true, "dns_policy": true,
+		"audio_passthrough": true, "audio_normalizer_enabled": true, "scale_mode": true, "dns_policy": true,
 		"stop_previous_media": true, "show_channel_logo": true,
 		"show_group_source": true, "global_progress_bar": true,
 		"time_show_mode": true, "control_scheme": true, "auto_start": true,
@@ -283,6 +283,7 @@ func buildRemoteConfig(m map[string]string) *models.ClientRemoteConfig {
 	setInt("decoder_mode", &cfg.DecoderMode)
 	setInt("network_cache_ms", &cfg.NetworkCacheMs)
 	setBool("audio_passthrough", &cfg.AudioPassthrough)
+	setBool("audio_normalizer_enabled", &cfg.AudioNormalizer)
 	setInt("scale_mode", &cfg.ScaleMode)
 	setInt("dns_policy", &cfg.DnsPolicy)
 	setBool("stop_previous_media", &cfg.StopPreviousMedia)
