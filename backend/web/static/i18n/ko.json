@@ -779,7 +779,9 @@
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "러시아어",
     "opt_app_language_7": "독일어",
-    "opt_app_language_8": "프랑스어"
+    "opt_app_language_8": "프랑스어",
+    "opt_app_language_9": "스페인어",
+    "opt_app_language_10": "이탈리아어"
   },
   "license": {
     "status_error": "라이선스 검증 실패",

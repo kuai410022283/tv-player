@@ -779,7 +779,9 @@
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "Russisch",
     "opt_app_language_7": "Deutsch",
-    "opt_app_language_8": "Französisch"
+    "opt_app_language_8": "Französisch",
+    "opt_app_language_9": "Spanisch",
+    "opt_app_language_10": "Italienisch"
   },
   "license": {
     "status_error": "Fehler bei der Lizenzprüfung",

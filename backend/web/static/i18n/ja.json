@@ -779,7 +779,9 @@
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "ロシア語",
     "opt_app_language_7": "ドイツ語",
-    "opt_app_language_8": "フランス語"
+    "opt_app_language_8": "フランス語",
+    "opt_app_language_9": "スペイン語",
+    "opt_app_language_10": "イタリア語"
   },
   "license": {
     "status_error": "ライセンス取得失敗",

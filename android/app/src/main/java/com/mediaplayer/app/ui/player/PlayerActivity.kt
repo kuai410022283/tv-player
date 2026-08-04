@@ -50,6 +50,11 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             Prefs.LANG_ZH_TW -> "zh-TW"
             Prefs.LANG_KO -> "ko"
             Prefs.LANG_JA -> "ja"
+            Prefs.LANG_RU -> "ru"
+            Prefs.LANG_DE -> "de"
+            Prefs.LANG_FR -> "fr"
+            Prefs.LANG_ES -> "es"
+            Prefs.LANG_IT -> "it"
             else -> "auto"
         }
         super.attachBaseContext(com.mediaplayer.app.util.LocaleHelper.wrap(newBase, langCode))

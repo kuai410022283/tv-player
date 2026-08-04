@@ -76,6 +76,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
             Prefs.LANG_RU -> "ru"
             Prefs.LANG_DE -> "de"
             Prefs.LANG_FR -> "fr"
+            Prefs.LANG_ES -> "es"
+            Prefs.LANG_IT -> "it"
             else -> "auto"
         }
         super.attachBaseContext(LocaleHelper.wrap(newBase, langCode))
@@ -573,6 +575,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                     Prefs.LANG_RU -> "Русский"
                     Prefs.LANG_DE -> "Deutsch"
                     Prefs.LANG_FR -> "Français"
+                    Prefs.LANG_ES -> "Español"
+                    Prefs.LANG_IT -> "Italiano"
                     else -> getString(R.string.status_auto)
                 }
             }
@@ -1717,6 +1721,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 Prefs.LANG_RU -> "Русский"
                 Prefs.LANG_DE -> "Deutsch"
                 Prefs.LANG_FR -> "Français"
+                Prefs.LANG_ES -> "Español"
+                Prefs.LANG_IT -> "Italiano"
                 else -> getString(R.string.status_auto)
             }
         }
@@ -1726,8 +1732,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
         btnSettingsLanguage?.setOnClickListener {
             if (isManagedSetting(Prefs.KEY_APP_LANGUAGE)) return@setOnClickListener
-            // 循环切换：0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 0
-            currentLang = (currentLang + 1) % 9
+            // 循环切换：0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 0
+            currentLang = (currentLang + 1) % 11
             prefs.edit().putInt(Prefs.KEY_APP_LANGUAGE, currentLang).apply()
             updateLanguageText()
 

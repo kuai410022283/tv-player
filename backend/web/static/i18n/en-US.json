@@ -779,7 +779,9 @@
     "opt_app_language_5": "日本語",
     "opt_app_language_6": "Russian",
     "opt_app_language_7": "German",
-    "opt_app_language_8": "French"
+    "opt_app_language_8": "French",
+    "opt_app_language_9": "Español",
+    "opt_app_language_10": "Italiano"
   },
   "license": {
     "status_error": "Failed to verify license",

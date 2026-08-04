@@ -28,7 +28,7 @@
     <string name="settings_decoder_mode">解码模式</string>
     <string name="settings_player_core">播放内核</string>
     <string name="settings_audio_passthrough">杜比音频</string>
-    <string name="settings_audio_normalizer">响度平滑防爆音</string>
+    <string name="settings_audio_normalizer">音量平衡</string>
     <string name="settings_stop_previous">渲染方式</string>
     <string name="settings_pip">窗口模式</string>
     <string name="settings_show_logo">显示台标</string>
@@ -41,7 +41,7 @@
     <string name="settings_control_scheme">操控方案</string>
     <string name="settings_global_progress">全局进度</string>
     <string name="settings_group_source">显示来源</string>
-    <string name="settings_dns_policy">DNS 策略</string>
+    <string name="settings_dns_policy">DNS策略</string>
     <string name="settings_preferred_server">服务器</string>
     <string name="settings_auto_start">开机自启</string>
     <string name="settings_reverse_channels">换台反转</string>
