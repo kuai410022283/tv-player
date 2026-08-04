@@ -82,6 +82,7 @@ class ExoPlayerHelper(
     // SOCKS5 代理状态（用于重试时保持代理配置）
     private var currentProxyType: String = ""
     private var currentProxyUrl: String = ""
+    private var currentChannelId: Long = 0L
     
     // Circuit breaker for Behind Live Window
     private var behindLiveWindowCount: Int = 0
@@ -111,6 +112,7 @@ class ExoPlayerHelper(
         currentStreamType = streamType
         currentProxyType = channel?.proxyType ?: ""
         currentProxyUrl = channel?.proxyUrl ?: ""
+        currentChannelId = channel?.id ?: 0L
         isMimeTypeFallback = false
         behindLiveWindowCount = 0
         behindLiveWindowLastTime = 0L
@@ -424,11 +426,15 @@ class ExoPlayerHelper(
         }
         val loadControl = loadControlBuilder.build()
 
+        val isTunnelingEnabled = prefs.getBoolean(Prefs.KEY_TUNNELING_ENABLED, true)
         val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-            setParameters(buildUponParameters()
-                // 允许自动切换视频分辨率以匹配电视面板
+            val builder = buildUponParameters()
                 .setAllowVideoMixedMimeTypeAdaptiveness(true)
-            )
+            // 处于硬解/自动模式时，开启硬件 Tunneling (隧道) 模式降低渲染延迟与 CPU 占用
+            if (isTunnelingEnabled && currentDecoderMode != Prefs.DECODER_MODE_SOFTWARE) {
+                builder.setTunnelingEnabled(true)
+            }
+            setParameters(builder)
         }
 
         val audioAttributes = androidx.media3.common.AudioAttributes.Builder()
@@ -573,6 +579,18 @@ class ExoPlayerHelper(
                 decoderInitFallbackTriggered = true
                 currentDecoderMode = Prefs.DECODER_MODE_AUTO
                 lastBuiltDecoderMode = -1
+                
+                // 自动将“视频软解+音频硬解(AUTO)”降级自愈结果写入该频道的独立记忆！
+                if (currentChannelId > 0L) {
+                    try {
+                        context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE).edit()
+                            .putInt(Prefs.getKeyChannelVideoDecode(currentChannelId), Prefs.DECODER_MODE_SOFTWARE)
+                            .putInt(Prefs.getKeyChannelAudioDecode(currentChannelId), Prefs.DECODER_MODE_HARDWARE)
+                            .apply()
+                        com.mediaplayer.app.util.RemoteLogger.i("ExoPlayer", "Auto-saved channel $currentChannelId decode memory: Video=SOFT, Audio=HARD")
+                    } catch (e: Exception) {}
+                }
+
                 com.mediaplayer.app.util.RemoteLogger.e(
                     "ExoPlayer",
                     "Decoder init failed in HARDWARE mode. Auto-fallback to AUTO (software) mode."

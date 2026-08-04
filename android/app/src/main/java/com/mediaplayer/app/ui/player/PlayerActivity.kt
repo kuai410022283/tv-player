@@ -598,6 +598,19 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
             initPlayerWithCore(desiredCore)
         }
 
+        // 优先读取该频道的独立解码记忆（自愈自适应结果）；若无记忆，回退全局设置
+        val currentChannel = allChannels.getOrNull(channelIndex)
+        val channelVideoDecode = if (currentChannel != null) {
+            prefs.getInt(Prefs.getKeyChannelVideoDecode(currentChannel.id), -1)
+        } else -1
+
+        val effectiveDecoderMode = if (channelVideoDecode != -1) {
+            channelVideoDecode
+        } else {
+            prefs.getInt(Prefs.KEY_DECODER_MODE, Prefs.DECODER_MODE_AUTO)
+        }
+        playerHelper?.setDecoderMode(effectiveDecoderMode)
+
         // 应用保存的画面比例设置
         val savedScaleMode = prefs.getInt(Prefs.KEY_SCALE_MODE, Prefs.SCALE_MODE_DEFAULT)
         playerHelper?.setAspectRatio(savedScaleMode)

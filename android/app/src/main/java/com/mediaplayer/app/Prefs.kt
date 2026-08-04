@@ -51,6 +51,13 @@ object Prefs {
     const val DECODER_MODE_AUTO = 0
     const val DECODER_MODE_HARDWARE = 1
     const val DECODER_MODE_SOFTWARE = 2
+
+    // Tunneling 隧道解码模式键名 (默认开启)
+    const val KEY_TUNNELING_ENABLED = "tunneling_enabled"
+
+    // 频道独立解码记忆键名
+    fun getKeyChannelVideoDecode(channelId: Long) = "channel_video_decode_$channelId"
+    fun getKeyChannelAudioDecode(channelId: Long) = "channel_audio_decode_$channelId"
     
     // 音频直通开关
     const val KEY_AUDIO_PASSTHROUGH = "audio_passthrough"
