@@ -1104,29 +1104,69 @@ func (s *CustomService) runBuild(baseApkPath string) {
 
 	// 2. 检测并准备 Java 可执行文件路径
 	// 优先使用工具链 JRE（与 aapt2/zipalign 同源，确保全平台兼容性一致），
-	// 工具链不可用时回退到系统 Java
+	// 工具链不可用或校验失败时回退到系统 Java
+	fixJrePermissions(s.toolsDir)
+
 	javaCmd := "java"
 	localJava := filepath.Join(s.toolsDir, "jre", "bin", "java")
 	if runtime.GOOS == "windows" {
 		localJava += ".exe"
 	}
+
+	javaEnv := []string{}
+
 	if fileExists(localJava) {
-		_ = os.Chmod(localJava, 0755)
-		javaCmd = localJava
-		slog.Info("使用工具链 JRE", "path", javaCmd)
-	} else if systemJava, err := exec.LookPath("java"); err == nil {
-		javaCmd = systemJava
-		s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
-	} else {
-		s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
+		javaHome := filepath.Dir(filepath.Dir(localJava)) // jre/bin/java → jre
+		binDir := filepath.Dir(localJava)
+
+		candidateEnv := []string{
+			"JAVA_HOME=" + javaHome,
+			"JAVA_TOOL_OPTIONS=",
+			"_JAVA_OPTIONS=",
+			"CLASSPATH=",
+		}
+
+		if currentPath := os.Getenv("PATH"); currentPath != "" {
+			candidateEnv = append(candidateEnv, "PATH="+binDir+string(os.PathListSeparator)+s.toolsDir+string(os.PathListSeparator)+currentPath)
+		} else {
+			candidateEnv = append(candidateEnv, "PATH="+binDir+string(os.PathListSeparator)+s.toolsDir)
+		}
+
+		if runtime.GOOS == "linux" {
+			jreLib := filepath.Join(javaHome, "lib")
+			jreServer := filepath.Join(javaHome, "lib", "server")
+			if oldLd := os.Getenv("LD_LIBRARY_PATH"); oldLd != "" {
+				candidateEnv = append(candidateEnv, "LD_LIBRARY_PATH="+jreLib+":"+jreServer+":"+oldLd)
+			} else {
+				candidateEnv = append(candidateEnv, "LD_LIBRARY_PATH="+jreLib+":"+jreServer)
+			}
+		}
+
+		// 验证工具链 JRE 是否正常可用（测试能否正常加载 JNI 原生库）
+		cmdTest := exec.Command(localJava, "-version")
+		cmdTest.Env = BuildCleanEnv(candidateEnv)
+		if err := cmdTest.Run(); err == nil {
+			javaCmd = localJava
+			javaEnv = candidateEnv
+			slog.Info("使用工具链 JRE", "path", javaCmd)
+		} else {
+			slog.Warn("工具链 JRE 运行验证失败，尝试回退到系统 Java", "error", err)
+			s.appendLog("[WARN] 工具链 JRE 校验失败 (%v)，尝试回退系统 Java...", err)
+		}
 	}
 
-	// 工具链 JRE 环境隔离：强制设置 JAVA_HOME，防止系统残留 Java 环境变量干扰原生库加载
-	javaEnv := []string{}
-	if strings.Contains(javaCmd, "jre") {
-		javaHome := filepath.Dir(filepath.Dir(javaCmd)) // jre/bin/java → jre
-		javaEnv = append(javaEnv, "JAVA_HOME="+javaHome)
-		slog.Info("设置 JAVA_HOME 隔离", "path", javaHome)
+	if javaCmd == "java" {
+		if systemJava, err := exec.LookPath("java"); err == nil {
+			javaCmd = systemJava
+			s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
+			javaEnv = []string{
+				"JAVA_TOOL_OPTIONS=",
+				"_JAVA_OPTIONS=",
+				"CLASSPATH=",
+			}
+		} else {
+			s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
+		}
 	}
 
 	apktoolJar := filepath.Join(s.toolsDir, "apktool.jar")
@@ -1704,3 +1744,29 @@ func cleanAlignmentExtra(extra []byte) []byte {
 	}
 	return result
 }
+
+// fixJrePermissions 递归纠正 JRE 目录下所有文件与 JNI 原生动态库 (.so / .dll) 的读取与执行权限
+func fixJrePermissions(toolsDir string) {
+	jreDir := filepath.Join(toolsDir, "jre")
+	if !fileExists(jreDir) {
+		return
+	}
+	_ = filepath.Walk(jreDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			_ = os.Chmod(path, 0755)
+		} else {
+			ext := strings.ToLower(filepath.Ext(path))
+			baseName := filepath.Base(path)
+			if ext == ".so" || ext == ".dll" || baseName == "java" || baseName == "java.exe" || baseName == "keytool" || baseName == "keytool.exe" {
+				_ = os.Chmod(path, 0755)
+			} else {
+				_ = os.Chmod(path, 0644)
+			}
+		}
+		return nil
+	})
+}
+

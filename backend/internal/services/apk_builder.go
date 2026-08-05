@@ -434,7 +434,7 @@ func replaceSmaliConstant(filePath, fieldName string, newValue interface{}) erro
 func ExecuteCommandWithLog(ctx context.Context, cmdName string, args []string, logFunc func(string, ...interface{}), env ...string) error {
 	cmd := exec.CommandContext(ctx, cmdName, args...)
 	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+		cmd.Env = BuildCleanEnv(env)
 	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -452,6 +452,28 @@ func ExecuteCommandWithLog(ctx context.Context, cmdName string, args []string, l
 		return fmt.Errorf("命令执行失败 %s: %w", cleanCmd, err)
 	}
 	return nil
+}
+
+// BuildCleanEnv 将 extraEnv 覆盖合并到 os.Environ() 中，防止产生重复或冲突的环境变量键
+func BuildCleanEnv(extraEnv []string) []string {
+	if len(extraEnv) == 0 {
+		return os.Environ()
+	}
+	overrideMap := make(map[string]bool)
+	for _, e := range extraEnv {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) > 0 {
+			overrideMap[parts[0]] = true
+		}
+	}
+	var clean []string
+	for _, e := range os.Environ() {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) > 0 && !overrideMap[parts[0]] {
+			clean = append(clean, e)
+		}
+	}
+	return append(clean, extraEnv...)
 }
 
 // PackageNameModifier 修改 APK 包名（应用 ID），用于解决特定电视系统的安装限制
@@ -591,6 +613,15 @@ func (m *PackageNameModifier) Modify(ctx context.Context, tempDir string, settin
 		}
 		// 删除旧目录
 		_ = os.RemoveAll(oldDir)
+	}
+
+	// 5. 更新 apktool.yml 中的包名配置（防止 apktool 回编译时重置包名）
+	apktoolYml := filepath.Join(tempDir, "apktool.yml")
+	if ymlData, err := os.ReadFile(apktoolYml); err == nil {
+		if bytes.Contains(ymlData, []byte(oldPkg)) {
+			newYmlData := bytes.ReplaceAll(ymlData, []byte(oldPkg), []byte(settings.PackageName))
+			_ = os.WriteFile(apktoolYml, newYmlData, 0644)
+		}
 	}
 
 	return nil
