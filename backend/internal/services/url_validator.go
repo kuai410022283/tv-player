@@ -32,7 +32,7 @@ func ValidateStreamURL(rawURL string) error {
 
 	scheme := strings.ToLower(u.Scheme)
 	switch scheme {
-	case "http", "https", "rtmp", "rtsp", "rtp", "udp", "p2p":
+	case "http", "https", "rtmp", "rtsp", "rtp", "udp", "p2p", "tvbus":
 		// OK - 网络协议
 	case "file":
 		// file:// 协议

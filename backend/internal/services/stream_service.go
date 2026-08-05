@@ -406,6 +406,12 @@ func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamT
 		} else if strings.HasPrefix(lowerURL, "udp://") || strings.HasPrefix(lowerURL, "rtp://") {
 			streamType = "udp"
 			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
+		} else if strings.HasPrefix(lowerURL, "p2p://") {
+			streamType = "p2p"
+			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
+		} else if strings.HasPrefix(lowerURL, "tvbus://") {
+			streamType = "tvbus"
+			_ = sp.channelSvc.UpdateStreamType(channelID, lineIdx, streamType)
 		}
 	}
 
@@ -496,7 +502,7 @@ func (sp *StreamProxy) CheckHealth(channelID int64, lineIdx int, rawURL, streamT
 			status.Status = "offline"
 			status.ErrorMsg = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		}
-	case "rtmp", "rtsp", "udp":
+	case "rtmp", "rtsp", "udp", "p2p", "tvbus":
 		// For RTMP/RTSP/UDP, we just mark as online (simplified; real impl would use ffmpeg probe)
 		status.Status = "online"
 	default:
@@ -694,9 +700,9 @@ func getFlushThreshold(streamType string, originalLineURL string, finalURL strin
 		hasPathSuffix(u, ".ts") || hasPathSuffix(u, ".flv"):
 		return 512 * 1024 // 512KB: 降低 HTTP Chunk 开销，解决 4K 播放卡顿问题
 	// ── 低延迟协议 ──
-	case st == "rtsp" || st == "rtmp" ||
-		strings.HasPrefix(src, "rtsp://") || strings.HasPrefix(src, "rtmp://") ||
-		strings.HasPrefix(u, "rtsp://") || strings.HasPrefix(u, "rtmp://"):
+	case st == "rtsp" || st == "rtmp" || st == "p2p" || st == "tvbus" ||
+		strings.HasPrefix(src, "rtsp://") || strings.HasPrefix(src, "rtmp://") || strings.HasPrefix(src, "p2p://") || strings.HasPrefix(src, "tvbus://") ||
+		strings.HasPrefix(u, "rtsp://") || strings.HasPrefix(u, "rtmp://") || strings.HasPrefix(u, "p2p://") || strings.HasPrefix(u, "tvbus://"):
 		return 128 * 1024 // 128KB: 低延迟协议
 	// ── RTP-over-HTTP / 组播网关（必须用原始源判断，代理 URL 不含 /rtp/）──
 	case strings.Contains(allURL, "/rtp/") || strings.Contains(allURL, "/udp/") ||
@@ -800,6 +806,12 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	}
 	if strings.HasPrefix(firstURL, "rtmp://") {
 		return sp.serveRtmpProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
+	if strings.HasPrefix(firstURL, "p2p://") {
+		return sp.serveP2pProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
+	if strings.HasPrefix(firstURL, "tvbus://") {
+		return sp.serveTvbusProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
 	}
 	if isLocalPath(firstURL) {
 		return sp.serveLocalFileProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)

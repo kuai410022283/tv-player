@@ -137,13 +137,13 @@ class ExoPlayerHelper(
         val isLiveStream = when {
             ct == "live" -> true
             ct == "vod" -> false
-            st in listOf("rtp", "udp", "rtsp", "rtmp") -> true
+            st in listOf("rtp", "udp", "rtsp", "rtmp", "p2p", "tvbus") -> true
             st in listOf("mp4", "mkv", "avi", "mov", "webm") -> false
             st == "flv" -> true
             st == "ts" -> !lowerUrl.contains("/stream/proxy/")  // 代理TS流按点播处理
             st == "hls" -> false  // HLS 默认按点播（缓冲更稳），如需直播由管理员设 content_type=live
             else -> lowerUrl.run {
-                startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || contains("/udp/") || contains("/rtp/")
+                startsWith("udp://") || startsWith("rtsp://") || startsWith("rtp://") || startsWith("p2p://") || startsWith("tvbus://") || contains("/udp/") || contains("/rtp/")
             }
         }
         RemoteLogger.i("ExoPlayer", "isLiveStream=$isLiveStream (streamType=$st, contentType=$ct, url=${url.take(80)})")
@@ -157,7 +157,8 @@ class ExoPlayerHelper(
             val originalLower = originalUrl.lowercase()
             if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
                 originalLower.startsWith("igmp://") || originalLower.startsWith("rtsp://") ||
-                originalLower.startsWith("rtmp://")) {
+                originalLower.startsWith("rtmp://") || originalLower.startsWith("p2p://") ||
+                originalLower.startsWith("tvbus://")) {
                 val proxyUrl = "http://127.0.0.1:${MediaPlayerApp.localProxyPort}/proxy?url=${Uri.encode(originalUrl)}"
                 RemoteLogger.i("ExoPlayer", "直连流走本地代理: ${proxyUrl.take(80)}")
                 url = proxyUrl
