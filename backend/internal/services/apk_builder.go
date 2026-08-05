@@ -429,9 +429,13 @@ func replaceSmaliConstant(filePath, fieldName string, newValue interface{}) erro
 	return os.WriteFile(filePath, []byte(newContent), 0644)
 }
 
-// ExecuteCommandWithLog 封装执行带有 Context 超时控制和标准流捕获的子命令
-func ExecuteCommandWithLog(ctx context.Context, cmdName string, args []string, logFunc func(string, ...interface{})) error {
+// ExecuteCommandWithLog 封装执行带有 Context 超时控制和标准流捕获的子命令。
+// 可选 env 参数用于注入环境变量（如 "JAVA_HOME=/path"），隔离系统残留 Java 干扰。
+func ExecuteCommandWithLog(ctx context.Context, cmdName string, args []string, logFunc func(string, ...interface{}), env ...string) error {
 	cmd := exec.CommandContext(ctx, cmdName, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf

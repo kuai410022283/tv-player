@@ -1107,15 +1107,26 @@ func (s *CustomService) runBuild(baseApkPath string) {
 	// 工具链不可用时回退到系统 Java
 	javaCmd := "java"
 	localJava := filepath.Join(s.toolsDir, "jre", "bin", "java")
+	if runtime.GOOS == "windows" {
+		localJava += ".exe"
+	}
 	if fileExists(localJava) {
 		_ = os.Chmod(localJava, 0755)
 		javaCmd = localJava
-		slog.Info("使用内置本地 JRE", "path", javaCmd)
+		slog.Info("使用工具链 JRE", "path", javaCmd)
 	} else if systemJava, err := exec.LookPath("java"); err == nil {
 		javaCmd = systemJava
 		s.appendLog("[INFO] 使用系统 Java: %s", javaCmd)
 	} else {
 		s.appendLog("[WARN] 未找到可用的 Java 运行时，请确保系统已安装 Java 或下载 JRE 工具包")
+	}
+
+	// 工具链 JRE 环境隔离：强制设置 JAVA_HOME，防止系统残留 Java 环境变量干扰原生库加载
+	javaEnv := []string{}
+	if strings.Contains(javaCmd, "jre") {
+		javaHome := filepath.Dir(filepath.Dir(javaCmd)) // jre/bin/java → jre
+		javaEnv = append(javaEnv, "JAVA_HOME="+javaHome)
+		slog.Info("设置 JAVA_HOME 隔离", "path", javaHome)
 	}
 
 	apktoolJar := filepath.Join(s.toolsDir, "apktool.jar")
@@ -1201,7 +1212,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			// 0. 安装框架文件，确保不同环境（虚拟机/实体机）资源解码一致
 			s.appendLog(">>> [1/6] 正在安装框架资源...")
 			installFrameArgs := []string{"-jar", apktoolJar, "if", "-p", tempFrameDir, currentBaseApk}
-			if err := ExecuteCommandWithLog(ctx, javaCmd, installFrameArgs, s.appendLog); err != nil {
+			if err := ExecuteCommandWithLog(ctx, javaCmd, installFrameArgs, s.appendLog, javaEnv...); err != nil {
 				s.appendLog("[WARN] 安装框架资源失败，尝试继续: %v", err)
 				// 不中断流程，某些 APK 可能不需要框架文件
 			}
@@ -1209,7 +1220,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			// 1. 反编译
 			s.appendLog(">>> [2/6] 正在解析应用底本...")
 			decompileArgs := []string{"-jar", apktoolJar, "d", "-p", tempFrameDir, currentBaseApk, "-o", tempUnpackedDir, "-f"}
-			if err := ExecuteCommandWithLog(ctx, javaCmd, decompileArgs, s.appendLog); err != nil {
+			if err := ExecuteCommandWithLog(ctx, javaCmd, decompileArgs, s.appendLog, javaEnv...); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 解析应用底本失败: %v", baseName, err)
 				return
@@ -1276,7 +1287,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				rebuildArgs = append(rebuildArgs, "--use-aapt2")
 				slog.Info("使用 apktool 内置 aapt2")
 			}
-			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog); err != nil {
+			if err := ExecuteCommandWithLog(ctx, javaCmd, rebuildArgs, s.appendLog, javaEnv...); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 编译客户端失败: %v", baseName, err)
 				return
@@ -1288,7 +1299,10 @@ func (s *CustomService) runBuild(baseApkPath string) {
 			aligned := false
 			if execCmd != javaCmd {
 				alignArgs := append(flags, tempUnsignedApk, tempAlignedApk)
-				if err := ExecuteCommandWithLog(ctx, execCmd, alignArgs, s.appendLog); err != nil {
+				// 直接用 exec.Command 而非 ExecuteCommandWithLog，避免失败时向用户显示 [ERROR]；
+				// 工具链 zipalign 可能缺少 libzopfli.so.1 等依赖，失败是预期内行为，有 Go 原生对齐兜底。
+				cmd := exec.CommandContext(ctx, execCmd, alignArgs...)
+				if err := cmd.Run(); err != nil {
 					slog.Warn("工具链 zipalign 执行失败，回退到原生对齐", "error", err)
 				} else {
 					aligned = true
@@ -1315,7 +1329,7 @@ func (s *CustomService) runBuild(baseApkPath string) {
 				"--out", outputApkPath,
 				tempAlignedApk,
 			}
-			if err := ExecuteCommandWithLog(ctx, javaCmd, signArgs, s.appendLog); err != nil {
+			if err := ExecuteCommandWithLog(ctx, javaCmd, signArgs, s.appendLog, javaEnv...); err != nil {
 				s.buildStatus = "failed"
 				s.buildError = fmt.Sprintf("[%s] 数字签名失败: %v", baseName, err)
 				return
