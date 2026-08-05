@@ -103,8 +103,8 @@ class MpvPlayerHelper(
     private fun applyPlayerOptions(url: String, startTimeMs: Long) {
         val enableHw = currentDecoderMode == Prefs.DECODER_MODE_HARDWARE || currentDecoderMode == Prefs.DECODER_MODE_AUTO
         if (enableHw) {
-            // 核心配置：使用 mediacodec 直通渲染硬解，避免 mediacodec-copy 的内存拷贝性能消耗
-            mpv?.setOptionString("hwdec", "mediacodec")
+            // 核心配置：优先使用 mediacodec 直通渲染硬解，回退备选 mediacodec-copy / auto
+            mpv?.setOptionString("hwdec", "mediacodec,mediacodec-copy,auto")
             mpv?.setOptionString("hwdec-codecs", "all")
         } else {
             mpv?.setOptionString("hwdec", "no")
@@ -119,14 +119,15 @@ class MpvPlayerHelper(
         mpv?.setOptionString("audio-set-media-role", "yes")          // 规范音频角色，防止抢占系统音频通道
         mpv?.setOptionString("video-latency-hacks", "yes")           // 开启低延迟 hack 优化，提升起播秒开速度
         
-        // 软解多线程优化
-        mpv?.setOptionString("vd-lavc-threads", "4")
+        // 软解多线程优化：0 自动匹配 TV 设备物理核心数 (避免硬编码 4 线程在双核上开销过高或 8 核上利用不足)
+        mpv?.setOptionString("vd-lavc-threads", "0")
         
         // 电视源通常是 1080i 隔行扫描，必须开启反交错，否则画面会有横纹或严重卡顿
         mpv?.setOptionString("deinterlace", "yes")
         
-        // 允许视频掉帧来保证音视频同步，防止累积性卡顿
-        mpv?.setOptionString("framedrop", "vo")
+        // 音画同步与丢帧控制：以音频时钟为基准，开启解码层+渲染层双重丢帧，防止弱网下 4K 掉帧堆积卡死
+        mpv?.setOptionString("video-sync", "audio")
+        mpv?.setOptionString("framedrop", "decoder+vo")
 
         mpv?.setOptionString("tls-verify", "no")
 
@@ -156,7 +157,7 @@ class MpvPlayerHelper(
         mpv?.setOptionString("demuxer-max-back-bytes", backBytes.toString())
         mpv?.setOptionString(
             "demuxer-lavf-o",
-            if (isLiveStream) "probesize=5000000,analyzeduration=5000000" else ""
+            if (isLiveStream) "probesize=1500000,analyzeduration=1500000" else ""
         )
 
         if (currentCacheMs > 0) {

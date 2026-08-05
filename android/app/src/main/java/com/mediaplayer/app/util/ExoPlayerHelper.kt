@@ -167,7 +167,7 @@ class ExoPlayerHelper(
         // 每次起播前探测一下当前电视/盒子的 HDR 体质
         HdrCapabilitiesHelper.printHdrInfo(context)
 
-        val needRebuild = exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode || isLiveStream != lastBuiltIsLive
+        val needRebuild = exoPlayer == null || currentCacheMs != lastBuiltCacheMs || currentDecoderMode != lastBuiltDecoderMode
         if (needRebuild) {
             val buildStart = android.os.SystemClock.uptimeMillis()
             buildPlayer(isLiveStream)
@@ -400,7 +400,8 @@ class ExoPlayerHelper(
                 // super() 不添加 FFmpeg 渲染器，Av3aAudioRenderer 依然始终注入。
                 // 原因：MediaCodecAudioRenderer 不识别 "audio/av3a"，
                 // 若不强制注入，AV3A 内容在 HARDWARE 模式下将无法播放（静音）。
-                out.add(androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
+                // 优先置顶注入 Av3aAudioRenderer，确保遇到 AV3A 格式时直接首选命中，避免被系统的 MediaCodecAudioRenderer 错误拦截导致首播静音
+                out.add(0, androidx.media3.decoder.av3a.Av3aAudioRenderer(eventHandler, eventListener, audioSink, enableAv3aTvStereoSafety))
             }
         }.apply {
             setEnableDecoderFallback(true) // 开启解码器容错回退机制
@@ -423,10 +424,10 @@ class ExoPlayerHelper(
             .setBackBuffer(0, true) // 切台时保留前一帧，避免黑屏
 
         if (isLiveStream) {
-            // 直播流（TS/UDP/RTSP）：激进策略，低延迟优先
+            // 直播流（TS/UDP/RTSP/RTMP）：低延迟极速秒开策略 (500ms 起播阀值)
             loadControlBuilder
                 .setPrioritizeTimeOverSizeThresholds(false)
-                .setBufferDurationsMs(0, 60000, 0, 0)
+                .setBufferDurationsMs(0, 60000, 500, 1000)
         } else if (currentCacheMs > 0) {
             // 点播流 + 用户自定义缓冲：适中策略
             loadControlBuilder
