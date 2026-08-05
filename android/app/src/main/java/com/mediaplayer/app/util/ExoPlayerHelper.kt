@@ -156,7 +156,8 @@ class ExoPlayerHelper(
         if (MediaPlayerApp.isProxyEnabled && MediaPlayerApp.localProxyPort > 0) {
             val originalLower = originalUrl.lowercase()
             if (originalLower.startsWith("udp://") || originalLower.startsWith("rtp://") ||
-                originalLower.startsWith("igmp://") || originalLower.startsWith("rtsp://")) {
+                originalLower.startsWith("igmp://") || originalLower.startsWith("rtsp://") ||
+                originalLower.startsWith("rtmp://")) {
                 val proxyUrl = "http://127.0.0.1:${MediaPlayerApp.localProxyPort}/proxy?url=${Uri.encode(originalUrl)}"
                 RemoteLogger.i("ExoPlayer", "直连流走本地代理: ${proxyUrl.take(80)}")
                 url = proxyUrl

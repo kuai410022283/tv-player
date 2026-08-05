@@ -798,6 +798,9 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 	if strings.HasPrefix(firstURL, "rtsp://") {
 		return sp.serveRtspProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
 	}
+	if strings.HasPrefix(firstURL, "rtmp://") {
+		return sp.serveRtmpProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
+	}
 	if isLocalPath(firstURL) {
 		return sp.serveLocalFileProxy(channelID, clientID, clientIP, clientName, w, r, ch, firstURL)
 	}
