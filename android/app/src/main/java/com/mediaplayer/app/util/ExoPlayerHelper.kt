@@ -424,21 +424,26 @@ class ExoPlayerHelper(
             .setTargetBufferBytes(targetBuffer)
             .setBackBuffer(0, true) // 切台时保留前一帧，避免黑屏
 
-        if (isLiveStream) {
-            // 直播流（TS/UDP/RTSP/RTMP）：低延迟极速秒开策略 (500ms 起播阀值)
-            loadControlBuilder
-                .setPrioritizeTimeOverSizeThresholds(false)
-                .setBufferDurationsMs(0, 60000, 500, 1000)
-        } else if (currentCacheMs > 0) {
-            // 点播流 + 用户自定义缓冲：适中策略
+        if (currentCacheMs > 0) {
+            // 优先遵从用户在“设置 - 网络缓存”中手动设定的缓存时长（例如 2000ms、5000ms）！
+            // 适用场景：弱网/波动网络环境下，用户手动调大缓存以防止播放卡顿
+            val startPlaybackMs = Math.min(currentCacheMs, 1000)
+            val rebufferMs = Math.min(currentCacheMs, 2000)
+            val minBuf = Math.max(startPlaybackMs, Math.max(rebufferMs, currentCacheMs))
+            val maxBuf = Math.max(minBuf * 2, 60000)
             loadControlBuilder
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .setBufferDurationsMs(
-                    currentCacheMs * 2,
-                    currentCacheMs * 4,
-                    1000,
-                    2000
+                    minBuf,
+                    maxBuf,
+                    startPlaybackMs,
+                    rebufferMs
                 )
+        } else if (isLiveStream) {
+            // 直播流（默认/极速秒开模式）：低延迟极速秒开策略 (500ms 起播阀值，1000ms 最小缓冲)
+            loadControlBuilder
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBufferDurationsMs(1000, 60000, 500, 1000)
         } else {
             // 点播流 + 默认缓冲：适中策略，兼顾起播速度和 Seek 稳定性
             loadControlBuilder
