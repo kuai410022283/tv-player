@@ -184,6 +184,9 @@ class OsdOverlayView @JvmOverloads constructor(
     }
 
     fun hideOsd() {
+        if (hasFocus()) {
+            clearFocus()
+        }
         layoutOsd.visibility = View.GONE
         RemoteLogger.i("PanelTrace", "OSD GONE")
         onOsdVisibilityChanged?.invoke(false)

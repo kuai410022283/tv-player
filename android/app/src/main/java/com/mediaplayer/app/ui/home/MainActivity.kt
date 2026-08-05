@@ -4399,10 +4399,10 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
     // ── TV key events ──────────────────────────────────
 
-    /** 检查当前焦点是否在 OSD 音轨/字幕按钮上 */
+    /** 检查当前焦点是否在 OSD 音轨/字幕/投屏/控件按钮上 */
     private fun isFocusOnTrackButton(): Boolean {
         return currentFocus?.let { view ->
-            view.id == R.id.tvBtnAudio || view.id == R.id.tvBtnSubtitle
+            view.id == R.id.tvBtnAudio || view.id == R.id.tvBtnSubtitle || view.id == R.id.btnCast || view.id == R.id.tvVodIcon
         } ?: false
     }
 
@@ -4492,8 +4492,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                         if (groupsRv != null && channelsRv != null && channelsRv.hasFocus()) {
                             val groupIndex = groupAdapter.currentList.indexOfFirst { it.id == currentGroupId }
                             if (groupIndex >= 0) {
-                                val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
-                                lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+                                groupsRv.scrollToPosition(groupIndex)
+                                groupsRv.post {
+                                    val lm = groupsRv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                                    lm?.findViewByPosition(groupIndex)?.requestFocus() ?: groupsRv.requestFocus()
+                                }
                             } else {
                                 groupsRv.requestFocus()
                             }
