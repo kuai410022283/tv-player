@@ -4,10 +4,12 @@
 server:
   host: "0.0.0.0"  
   port: 9527  # 
-  # trusted_proxies:    # 反向代理 IP，用于读取真实客户端 IP（默认信任本机 127.0.0.1/::1）
-  #   - "127.0.0.1"
+  # trusted_proxies:    # 反向代理 IP 列表，用于获取真实客户端 IP
+  #   - "127.0.0.1"      # 默认值（不配置时自动信任本机）
   #   - "::1"
-  #   - "172.17.0.1"    # Docker 部署时取消注释
+  #   - "172.17.0.1"     # Docker bridge 网络
+  #   - "10.0.0.0/8"     # 支持 CIDR 格式
+  #   或者配置 ["*"] 信任所有代理（推荐反代/Docker 场景使用）
 
 database:
   path: "./data/mediaplayer.db"

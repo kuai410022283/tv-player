@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mediaplayer/backend/internal/models"
 	"github.com/mediaplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/utils"
 )
 
 type ClientHandler struct {
@@ -37,7 +38,7 @@ func (h *ClientHandler) Register(c *gin.Context) {
 		return
 	}
 
-	ip := c.ClientIP()
+	ip := utils.GetRealClientIP(c)
 	resp, err := h.clientSvc.Register(&req, ip)
 	if err != nil {
 		slog.Error("client register failed", "error", err, "device_id", req.DeviceID)
@@ -147,7 +148,7 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		token = token[7:]
 	}
 
-	client, err := h.clientSvc.Validate(token, c.ClientIP())
+	client, err := h.clientSvc.Validate(token, utils.GetRealClientIP(c))
 	if err != nil {
 		fail(c, 401, "令牌无效或已过期")
 		return
@@ -508,7 +509,7 @@ func (h *ClientHandler) UploadLog(c *gin.Context) {
 		fail(c, 401, "缺少令牌")
 		return
 	}
-	client, err := h.clientSvc.Validate(token, c.ClientIP())
+	client, err := h.clientSvc.Validate(token, utils.GetRealClientIP(c))
 	if err != nil {
 		fail(c, 401, "令牌无效或已过期")
 		return

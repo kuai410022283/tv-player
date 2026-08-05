@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/mediaplayer/backend/internal/utils"
 )
 
 var publicPaths = map[string]bool{
@@ -77,7 +78,7 @@ func AuthMiddleware(secret string, db *sql.DB) gin.HandlerFunc {
 				if token != "" {
 					slog.Warn("token 通过 URL query 传递 (调试模式已开启)",
 						"path", c.Request.URL.Path,
-						"ip", c.ClientIP(),
+						"ip", utils.GetRealClientIP(c),
 					)
 				}
 			} else if c.Query("plan") == "1" {
@@ -332,7 +333,7 @@ func (rl *rateLimiter) Cleanup() {
 // LoginRateLimit 登录接口限流（每 IP 每分钟 5 次）
 func LoginRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := utils.GetRealClientIP(c)
 		if !loginLimiter.allow(ip) {
 			slog.Warn("rate limit exceeded", "ip", ip, "path", c.Request.URL.Path)
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -349,7 +350,7 @@ func LoginRateLimit() gin.HandlerFunc {
 // APIRateLimit 全局 API 限流（每 IP 每分钟 300 次）
 func APIRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := utils.GetRealClientIP(c)
 		if !apiLimiter.allow(ip) {
 			slog.Warn("API rate limit exceeded", "ip", ip)
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -366,7 +367,7 @@ func APIRateLimit() gin.HandlerFunc {
 // ClientAuthRateLimit 客户端注册与验证接口限流（每 IP 每分钟 60 次）
 func ClientAuthRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := utils.GetRealClientIP(c)
 		if !clientAuthLimiter.allow(ip) {
 			slog.Warn("client auth rate limit exceeded", "ip", ip, "path", c.Request.URL.Path)
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -383,7 +384,7 @@ func ClientAuthRateLimit() gin.HandlerFunc {
 // LogoRateLimit 台标接口限流（每 IP 每分钟 600 次），独立于 API 限流
 func LogoRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := utils.GetRealClientIP(c)
 		if !logoLimiter.allow(ip) {
 			slog.Warn("logo rate limit exceeded", "ip", ip)
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -400,7 +401,7 @@ func LogoRateLimit() gin.HandlerFunc {
 // StreamRateLimit 流代理接口限流（每 IP 每分钟 60 次），独立于 API 限流
 func StreamRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := utils.GetRealClientIP(c)
 		if !streamLimiter.allow(ip) {
 			slog.Warn("stream rate limit exceeded", "ip", ip, "path", c.Request.URL.Path)
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -444,7 +445,7 @@ func Logger() gin.HandlerFunc {
 
 		latency := time.Since(start)
 		status := c.Writer.Status()
-		clientIP := c.ClientIP()
+		clientIP := utils.GetRealClientIP(c)
 		method := c.Request.Method
 
 		// 检测是否获取到真实 IP：如果 IP 是回环地址或私有地址，且有反向代理头，说明配置可能有问题

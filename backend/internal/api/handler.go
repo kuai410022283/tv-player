@@ -27,6 +27,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mediaplayer/backend/internal/models"
 	"github.com/mediaplayer/backend/internal/services"
+	"github.com/mediaplayer/backend/internal/utils"
 )
 
 // startTime 记录服务启动时间，用于 uptime 统计
@@ -689,7 +690,7 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 	if cname, exists := c.Get("client_name"); exists {
 		clientName = cname.(string)
 	}
-	clientIP := c.ClientIP()
+	clientIP := utils.GetRealClientIP(c)
 
 	var targetURL string
 	if subPath != "" && subPath != "/" && !strings.HasPrefix(subPath, "/play.") {
@@ -983,7 +984,7 @@ func (h *Handler) CatchupStream(c *gin.Context) {
 	if cname, exists := c.Get("client_name"); exists {
 		clientName = cname.(string)
 	}
-	clientIP := c.ClientIP()
+	clientIP := utils.GetRealClientIP(c)
 
 	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request, targetURL); err != nil {
 		slog.Error("catchup stream proxy failed", "channel_id", id, "error", err)
@@ -1033,7 +1034,7 @@ func (h *Handler) UpdatePlayingStatus(c *gin.Context) {
 	}
 
 	clientID := int64(0)
-	clientIP := c.ClientIP()
+	clientIP := utils.GetRealClientIP(c)
 	clientName := "Unknown"
 
 	// 尝试从 token 提取 ClientID (如果经过 auth middleware)
@@ -1052,7 +1053,7 @@ func (h *Handler) UpdatePlayingStatus(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	if clientID == 0 {
 		fail(c, 401, "未授权")
 		return
@@ -1646,7 +1647,7 @@ func (h *Handler) AdminLogin(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.Password)); err != nil {
-		slog.Warn("admin login failed", "ip", c.ClientIP(), "err", err)
+		slog.Warn("admin login failed", "ip", utils.GetRealClientIP(c), "err", err)
 		fail(c, 401, "密码错误")
 		return
 	}

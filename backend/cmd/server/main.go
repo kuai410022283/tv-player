@@ -126,10 +126,15 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	// 信任反向代理，从 X-Forwarded-For/X-Real-IP 读取真实客户端 IP
-	// 默认信任本机代理，Docker 部署需在 config.yaml 中配置 server.trusted_proxies
+	// 默认信任本机代理
+	// - 配置 ["*"] 信任所有代理（适合反代/Docker 场景，简单但安全性略低）
+	// - 不配置时默认信任 127.0.0.1/::1，同时结合 GetRealClientIP() 自动检测私有 IP
 	trustedProxies := cfg.Server.TrustedProxies
 	if len(trustedProxies) == 0 {
 		trustedProxies = []string{"127.0.0.1", "::1"}
+	} else if len(trustedProxies) == 1 && trustedProxies[0] == "*" {
+		// nil 表示信任所有代理
+		trustedProxies = nil
 	}
 	_ = r.SetTrustedProxies(trustedProxies)
 	r.Use(gin.Recovery())
