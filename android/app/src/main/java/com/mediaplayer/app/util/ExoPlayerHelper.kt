@@ -303,7 +303,8 @@ class ExoPlayerHelper(
         // RTSP 流需要使用 RtspMediaSource，HLS 流需使用带有 Av3aHlsExtractorFactory 的 HlsMediaSource
         val lowerUrlForType = url.lowercase()
         val isRtsp = lowerUrlForType.startsWith("rtsp://")
-        val isHls = lowerUrlForType.contains(".m3u8") || mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8 || ct == "hls" || st == "hls"
+        val isFlv = lowerUrlForType.contains(".flv") || st == "flv"
+        val isHls = !isFlv && (lowerUrlForType.contains(".m3u8") || mimeType == androidx.media3.common.MimeTypes.APPLICATION_M3U8 || ct == "hls" || st == "hls")
         
         val mediaSource = try {
             if (isRtsp) {
