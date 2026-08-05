@@ -213,10 +213,34 @@ func (h *ClientHandler) Verify(c *gin.Context) {
 		}
 	}
 
+	// 排队信息
+	queuePosition := 0
+	activeDeviceCount := 0
+	planMaxStreams := 0
+	if pid, exists := c.Get("plan_id"); exists {
+		planID := pid.(int64)
+		if ms, exists := c.Get("max_streams"); exists {
+			planMaxStreams = ms.(int)
+		}
+		queuePosition = h.streamProxy.GetQueuePosition(planID, client.ID)
+		if count, err := h.clientSvc.CountActiveDevices(planID, client.ID); err == nil {
+			activeDeviceCount = count
+		}
+		// 如果活跃设备数未满且当前设备在排队，尝试出队
+		if activeDeviceCount < planMaxStreams && queuePosition > 0 {
+			if dequeued := h.streamProxy.TryDequeueNext(planID, activeDeviceCount, planMaxStreams); dequeued == client.ID {
+				queuePosition = 0
+			}
+		}
+	}
+
 	ok(c, gin.H{
 		"client_id":             client.ID,
 		"name":                  client.Name,
 		"max_streams":           client.MaxStreams,
+		"plan_max_streams":      planMaxStreams,
+		"active_device_count":   activeDeviceCount,
+		"queue_position":        queuePosition,
 		"expires_at":            client.ExpiresAt,
 		"plan_name":             client.PlanName,
 		"server_name":           serverName,

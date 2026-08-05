@@ -57,6 +57,9 @@ type StreamProxy struct {
 	healthCheckCurrent   int
 	healthCheckDelayMs   int
 	tempBanned           map[string]time.Time // 临时踢出黑名单 (session_id -> expire_time)
+	deviceQueueMu        sync.Mutex           // 设备排队锁
+	deviceQueue          map[int64][]int64    // planID → 排队中的 clientID 列表
+	deviceQueueTime      map[int64]time.Time  // clientID → 入队时间
 }
 
 // removed streamState
@@ -67,13 +70,15 @@ func NewStreamProxy(cfg *config.StreamConfig, channelSvc *ChannelService) *Strea
 		maxConcurrent = 50
 	}
 	sp := &StreamProxy{
-		cfg:            cfg,
-		streams:        make(map[string]*models.ActiveStream),
-		cancels:        make(map[string]context.CancelFunc),
-		redirectedURLs: make(map[int64]string),
-		broadcasters:   make(map[int64]*ChannelBroadcaster),
-		tempBanned:     make(map[string]time.Time),
-		channelSvc:     channelSvc,
+		cfg:             cfg,
+		streams:         make(map[string]*models.ActiveStream),
+		cancels:         make(map[string]context.CancelFunc),
+		redirectedURLs:  make(map[int64]string),
+		broadcasters:    make(map[int64]*ChannelBroadcaster),
+		tempBanned:      make(map[string]time.Time),
+		deviceQueue:     make(map[int64][]int64),
+		deviceQueueTime: make(map[int64]time.Time),
+		channelSvc:      channelSvc,
 		client: &http.Client{
 			// 不设置全局 Timeout（长流会被中断），但限制连接建立和响应头超时
 			Transport: &http.Transport{
@@ -1110,21 +1115,143 @@ func (sp *StreamProxy) serveDirectProxy(channelID int64, clientID int64, clientI
 func (sp *StreamProxy) KillStream(sessionID string) bool {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
-	
+
 	// Set temp ban (5 mins) for both proxy and direct to prevent immediate reconnect
 	sp.tempBanned[sessionID] = time.Now().Add(5 * time.Minute)
-	
+
 	_, exists := sp.streams[sessionID]
 	if cancel, ok := sp.cancels[sessionID]; ok {
 		cancel()
 		delete(sp.cancels, sessionID)
 	}
-	
+
 	if exists {
 		delete(sp.streams, sessionID)
 		return true
 	}
 	return false
+}
+
+// CountActiveStreamsByClient 统计指定客户端的活跃流数（用于管理面板展示）。
+// 排除 3 秒内未活跃的旧流，避免切台瞬间的短时重叠误判。
+func (sp *StreamProxy) CountActiveStreamsByClient(clientID int64) int {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	count := 0
+	threshold := time.Now().Add(-3 * time.Second)
+	for _, s := range sp.streams {
+		if s.ClientID == clientID && s.Status == "playing" && s.LastActive.After(threshold) {
+			count++
+		}
+	}
+	return count
+}
+
+// ── 设备排队机制 ──────────────────────────────────────
+
+// EnqueueDevice 将设备加入排队，返回当前排队位置（1-based）。
+func (sp *StreamProxy) EnqueueDevice(planID, clientID int64) int {
+	sp.deviceQueueMu.Lock()
+	defer sp.deviceQueueMu.Unlock()
+
+	// 清理过期排队（超过 10 分钟未重试的视为放弃）
+	now := time.Now()
+	sp.cleanExpiredQueueLocked(now)
+
+	// 检查是否已在队列中
+	for _, cid := range sp.deviceQueue[planID] {
+		if cid == clientID {
+			// 已在队列，更新入队时间，返回当前位置
+			sp.deviceQueueTime[clientID] = now
+			return sp.getPositionLocked(planID, clientID)
+		}
+	}
+
+	// 新入队
+	sp.deviceQueue[planID] = append(sp.deviceQueue[planID], clientID)
+	sp.deviceQueueTime[clientID] = now
+	return len(sp.deviceQueue[planID])
+}
+
+// DequeueDevice 将设备移出排队（主动取消或已获得槽位）。
+func (sp *StreamProxy) DequeueDevice(planID, clientID int64) {
+	sp.deviceQueueMu.Lock()
+	defer sp.deviceQueueMu.Unlock()
+
+	queue := sp.deviceQueue[planID]
+	for i, cid := range queue {
+		if cid == clientID {
+			sp.deviceQueue[planID] = append(queue[:i], queue[i+1:]...)
+			delete(sp.deviceQueueTime, clientID)
+			return
+		}
+	}
+}
+
+// GetQueuePosition 获取设备在排队中的位置（0 = 未在排队，即可以接入）。
+func (sp *StreamProxy) GetQueuePosition(planID, clientID int64) int {
+	sp.deviceQueueMu.Lock()
+	defer sp.deviceQueueMu.Unlock()
+
+	// 清理过期
+	sp.cleanExpiredQueueLocked(time.Now())
+
+	return sp.getPositionLocked(planID, clientID)
+}
+
+// TryDequeueNext 尝试释放排队中的下一个设备。
+// 当活跃设备数 < maxStreams 时，将队列中最先排队的设备出队。
+// 返回出队的 clientID，0 表示无人排队。
+func (sp *StreamProxy) TryDequeueNext(planID int64, activeCount, maxStreams int) int64 {
+	if activeCount >= maxStreams {
+		return 0
+	}
+
+	sp.deviceQueueMu.Lock()
+	defer sp.deviceQueueMu.Unlock()
+
+	sp.cleanExpiredQueueLocked(time.Now())
+
+	queue := sp.deviceQueue[planID]
+	if len(queue) == 0 {
+		return 0
+	}
+
+	// 出队第一个
+	clientID := queue[0]
+	sp.deviceQueue[planID] = queue[1:]
+	delete(sp.deviceQueueTime, clientID)
+	return clientID
+}
+
+// getPositionLocked 需要在持有 deviceQueueMu 锁的情况下调用。
+func (sp *StreamProxy) getPositionLocked(planID, clientID int64) int {
+	for i, cid := range sp.deviceQueue[planID] {
+		if cid == clientID {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// cleanExpiredQueueLocked 清理超过 10 分钟未刷新的排队记录。
+func (sp *StreamProxy) cleanExpiredQueueLocked(now time.Time) {
+	expireThreshold := now.Add(-10 * time.Minute)
+	for planID, queue := range sp.deviceQueue {
+		filtered := queue[:0]
+		for _, cid := range queue {
+			if qt, ok := sp.deviceQueueTime[cid]; ok && qt.After(expireThreshold) {
+				filtered = append(filtered, cid)
+			} else {
+				delete(sp.deviceQueueTime, cid)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(sp.deviceQueue, planID)
+		} else {
+			sp.deviceQueue[planID] = filtered
+		}
+	}
 }
 
 // GetActiveStreams returns currently active stream states

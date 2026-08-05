@@ -732,6 +732,32 @@ func (h *Handler) ProxyStream(c *gin.Context) {
 		}
 	}
 
+	// 设备数量限制：统计套餐下 30 分钟内活跃的设备数（基于心跳）
+	if clientID > 0 {
+		if ms, exists := c.Get("max_streams"); exists {
+			if maxStreams := ms.(int); maxStreams > 0 {
+				if pid, exists := c.Get("plan_id"); exists {
+					planID := pid.(int64)
+					activeCount, err := h.clientSvc.CountActiveDevices(planID, clientID)
+					if err == nil && activeCount >= maxStreams {
+						position := h.streamProxy.EnqueueDevice(planID, clientID)
+						c.JSON(429, gin.H{
+							"code":           "DEVICE_LIMIT_REACHED",
+							"message":        fmt.Sprintf("设备数已达上限(%d/%d)，排队中(第%d位)，请稍后重试", activeCount, maxStreams, position),
+							"active_count":   activeCount,
+							"max_streams":    maxStreams,
+							"queue_position": position,
+						})
+						c.Abort()
+						return
+					}
+					// 未超限：如果之前在排队，移出队列
+					h.streamProxy.DequeueDevice(planID, clientID)
+				}
+			}
+		}
+	}
+
 	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request, targetURL); err != nil {
 		slog.Error("stream proxy failed", "channel_id", id, "subPath", subPath, "error", err)
 		// 流代理失败时 Writer 可能已经写入了 header，不能再写 JSON
@@ -985,6 +1011,31 @@ func (h *Handler) CatchupStream(c *gin.Context) {
 		clientName = cname.(string)
 	}
 	clientIP := utils.GetRealClientIP(c)
+
+	// 设备数量限制：统计套餐下 30 分钟内活跃的设备数（基于心跳）
+	if clientID > 0 {
+		if ms, exists := c.Get("max_streams"); exists {
+			if maxStreams := ms.(int); maxStreams > 0 {
+				if pid, exists := c.Get("plan_id"); exists {
+					planID := pid.(int64)
+					activeCount, err := h.clientSvc.CountActiveDevices(planID, clientID)
+					if err == nil && activeCount >= maxStreams {
+						position := h.streamProxy.EnqueueDevice(planID, clientID)
+						c.JSON(429, gin.H{
+							"code":           "DEVICE_LIMIT_REACHED",
+							"message":        fmt.Sprintf("设备数已达上限(%d/%d)，排队中(第%d位)，请稍后重试", activeCount, maxStreams, position),
+							"active_count":   activeCount,
+							"max_streams":    maxStreams,
+							"queue_position": position,
+						})
+						c.Abort()
+						return
+					}
+					h.streamProxy.DequeueDevice(planID, clientID)
+				}
+			}
+		}
+	}
 
 	if err := h.streamProxy.ServeStream(id, clientID, clientIP, clientName, c.Writer, c.Request, targetURL); err != nil {
 		slog.Error("catchup stream proxy failed", "channel_id", id, "error", err)

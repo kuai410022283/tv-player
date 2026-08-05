@@ -183,6 +183,18 @@ func (s *ClientService) Validate(token, ip string) (*models.Client, error) {
 	return &c, nil
 }
 
+// CountActiveDevices 统计指定套餐下 30 分钟内活跃的设备数（排除当前设备）。
+// 活跃定义：last_seen 在 30 分钟内，表明客户端心跳仍在运行。
+func (s *ClientService) CountActiveDevices(planID int64, excludeClientID int64) (int, error) {
+	var count int
+	threshold := time.Now().Add(-30 * time.Minute)
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM clients WHERE plan_id=? AND status='approved' AND last_seen > ? AND id != ?`,
+		planID, threshold, excludeClientID,
+	).Scan(&count)
+	return count, err
+}
+
 // ── 审批 ───────────────────────────────────────────────
 
 func (s *ClientService) Approve(clientID int64, req *models.ClientApproveReq, approver string) error {
