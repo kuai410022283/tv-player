@@ -735,7 +735,7 @@
     "opt_player_core_1": "ExoPlayer",
     "opt_player_core_3": "MPV",
     "audio_passthrough_label": "杜比音频",
-    "audio_normalizer_enabled_label": "音量平衡",
+    "audio_normalizer_enabled_label": "响度均衡",
     "stop_previous_media_label": "切台模式",
     "enable_pip_label": "窗口模式",
     "show_channel_logo_label": "显示频道台标",

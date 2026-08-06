@@ -28,7 +28,7 @@
     <string name="settings_decoder_mode">解码模式</string>
     <string name="settings_player_core">播放内核</string>
     <string name="settings_audio_passthrough">杜比音频</string>
-    <string name="settings_audio_normalizer">音量平衡</string>
+    <string name="settings_audio_normalizer">响度均衡</string>
     <string name="settings_stop_previous">渲染方式</string>
     <string name="settings_pip">窗口模式</string>
     <string name="settings_show_logo">显示台标</string>
