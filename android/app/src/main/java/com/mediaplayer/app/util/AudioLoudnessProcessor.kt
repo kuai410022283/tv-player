@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 /**
  * 实时音频响度归一化与防爆音限幅处理器。
  * 平滑拉高过小音量频道，压低过大音量频道，并毫秒级限幅防止音响爆音。
+ * 支持单声道、立体声以及多声道（如 AV3A / 5.1 / 7.1 声道）PCM。
  */
 class AudioLoudnessProcessor : BaseAudioProcessor() {
 
@@ -16,6 +17,9 @@ class AudioLoudnessProcessor : BaseAudioProcessor() {
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT && inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
+            return AudioProcessor.AudioFormat.NOT_SET
+        }
+        if (inputAudioFormat.channelCount <= 0) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
         return inputAudioFormat
@@ -39,20 +43,20 @@ class AudioLoudnessProcessor : BaseAudioProcessor() {
     }
 
     private fun processPcm16(input: ByteBuffer, output: ByteBuffer) {
-        val sampleCount = input.remaining() / 2
-        if (sampleCount <= 0) return
+        val totalShorts = input.remaining() / 2
+        if (totalShorts <= 0) return
 
         val startPos = input.position()
         var sumSquare = 0.0
 
-        // 1. 快速计算当前 Buffer 的 RMS 响度
+        // 1. 计算当前 Buffer 内全声道的 RMS 响度
         while (input.hasRemaining()) {
             val sample = input.short.toFloat() / 32768.0f
             sumSquare += (sample * sample).toDouble()
         }
         input.position(startPos)
 
-        val rms = Math.sqrt(sumSquare / sampleCount).toFloat()
+        val rms = Math.sqrt(sumSquare / totalShorts).toFloat()
 
         // 2. 平滑增益调整 (Alpha 滤波，避免增益突变导致跳音)
         if (rms > 0.001f) {
@@ -77,8 +81,8 @@ class AudioLoudnessProcessor : BaseAudioProcessor() {
     }
 
     private fun processPcmFloat(input: ByteBuffer, output: ByteBuffer) {
-        val sampleCount = input.remaining() / 4
-        if (sampleCount <= 0) return
+        val totalFloats = input.remaining() / 4
+        if (totalFloats <= 0) return
 
         val startPos = input.position()
         var sumSquare = 0.0
@@ -89,7 +93,7 @@ class AudioLoudnessProcessor : BaseAudioProcessor() {
         }
         input.position(startPos)
 
-        val rms = Math.sqrt(sumSquare / sampleCount).toFloat()
+        val rms = Math.sqrt(sumSquare / totalFloats).toFloat()
 
         if (rms > 0.001f) {
             val desiredGain = (targetRms / rms).coerceIn(0.5f, 2.5f)
