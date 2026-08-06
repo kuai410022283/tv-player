@@ -140,14 +140,14 @@ public final class SmartAudioSnifferReader implements ElementaryStreamReader {
                 return;
             }
         }
-        // AV3A sync word (0xFF Fx) is extremely loose — 0xFF is very common in binary data.
-        // Only check at position 0 (the start of the PES payload), because an AV3A frame
-        // MUST start with 0xFF 0xF0. Checking at arbitrary positions causes frequent
-        // false positives on non-AV3A TS streams, which triggers the Av3aLibrary to load
-        // ~12MB of native libraries (~3s delay on ARM devices).
-        if (bufferLength >= 2 && data[0] == (byte) 0xFF && (data[1] & 0xF0) == 0xF0) {
-            if (sniffResultListener != null) sniffResultListener.onSniffResult(true);
-            initDelegate(new Av3aReader(language, roleFlags));
+        // Scan for AV3A sync word (0xFF Fx) within the first 32 bytes of the payload
+        // to handle PES headers with padding or offsets.
+        for (int i = 0; i < bufferLength - 1 && i < 32; i++) {
+            if (data[i] == (byte) 0xFF && (data[i + 1] & 0xF0) == 0xF0) {
+                if (sniffResultListener != null) sniffResultListener.onSniffResult(true);
+                initDelegate(new Av3aReader(language, roleFlags));
+                return;
+            }
         }
     }
 

@@ -26,9 +26,6 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
     private static final int STREAM_TYPE_AV3A_ALT1 = 0xD1;
     private static final int STREAM_TYPE_AV3A_ALT2 = 0xDA;
 
-    // Cache: streamType -> isAv3a (once sniffed).  Key present means "sniffed, result known".
-    private static final ConcurrentHashMap<Integer, Boolean> sniffCache = new ConcurrentHashMap<>();
-
     public Av3aTsPayloadReaderFactory(int flags, List<androidx.media3.common.Format> closedCaptionFormats) {
         this.defaultFactory = new DefaultTsPayloadReaderFactory(flags, closedCaptionFormats);
     }
@@ -44,25 +41,18 @@ public class Av3aTsPayloadReaderFactory implements TsPayloadReader.Factory {
 
     @Override
     public TsPayloadReader createPayloadReader(int streamType, TsPayloadReader.EsInfo esInfo) {
+        // 对于明确标准的 STREAM_TYPE_AV3A_STANDARD (0xD5)，无需嗅探，直接交由 Av3aReader 解析
+        if (streamType == STREAM_TYPE_AV3A_STANDARD) {
+            return new PesReader(new Av3aReader(esInfo.language, esInfo.getRoleFlags()));
+        }
+
+        // 对于私有流类型 (0x06, 0x81 等)，每次换台建立 Stream 时独立嗅探，避免静态 Cache 造成跨频道误判
         if (streamType == STREAM_TYPE_AV3A_PRIVATE_1 || streamType == STREAM_TYPE_AV3A_PRIVATE_2
-                || streamType == STREAM_TYPE_AV3A_STANDARD || streamType == STREAM_TYPE_AV3A_ALT1 || streamType == STREAM_TYPE_AV3A_ALT2
+                || streamType == STREAM_TYPE_AV3A_ALT1 || streamType == STREAM_TYPE_AV3A_ALT2
                 || streamType == 0x06 || streamType == 0x81) {
 
-            // If we already sniffed this stream type and it was NOT AV3A, skip sniffing
-            Boolean cached = sniffCache.get(streamType);
-            if (cached != null && !cached) {
-                return defaultFactory.createPayloadReader(streamType, esInfo);
-            }
-
-            // If cached as AV3A, go straight to Av3aReader (no sniffing needed)
-            if (cached != null) { // cached == true (AV3A)
-                return new PesReader(new Av3aReader(esInfo.language, esInfo.getRoleFlags()));
-            }
-
-            // First time seeing this stream type — sniff and cache the result
             return new PesReader(new SmartAudioSnifferReader(
-                    esInfo.language, esInfo.getRoleFlags(),
-                    isAv3a -> sniffCache.put(streamType, isAv3a)));
+                    esInfo.language, esInfo.getRoleFlags()));
         }
 
         return defaultFactory.createPayloadReader(streamType, esInfo);
