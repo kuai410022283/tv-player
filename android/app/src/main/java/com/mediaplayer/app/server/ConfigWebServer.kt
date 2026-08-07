@@ -61,11 +61,33 @@ class ConfigWebServer(
                 val map = HashMap<String, String>()
                 session.parseBody(map)
                 val params = session.parameters
+                
+                val localEnabled = params["local_enabled"]?.firstOrNull()?.toBoolean() ?: false
+                val localPlaylist = params["local_playlist"]?.firstOrNull()?.trim() ?: ""
+                val localEpg = params["local_epg"]?.firstOrNull()?.trim() ?: ""
+                
                 val rawInput = params["server_url"]?.firstOrNull()?.trim()
                 val location = params["location"]?.firstOrNull()?.trim()
 
+                val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+
+                // 保存本地数据源配置
+                prefs.edit().apply {
+                    putBoolean(com.mediaplayer.app.Prefs.KEY_LOCAL_SOURCE_ENABLED, localEnabled)
+                    putString(com.mediaplayer.app.Prefs.KEY_LOCAL_PLAYLIST_URL, localPlaylist)
+                    putString(com.mediaplayer.app.Prefs.KEY_LOCAL_EPG_URL, localEpg)
+                }.apply()
+
+                if (localEnabled && localPlaylist.isNotEmpty()) {
+                    // 本地源开启直接生效，无需验证服务端授权
+                    authStatus = "approved"
+                    // 广播通知主界面刷新本地列表
+                    onUrlSaved(emptyList())
+                    return newFixedLengthResponse(getSuccessHtml())
+                }
+
                 if (rawInput.isNullOrEmpty()) {
-                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_HTML, getErrorHtml("请输入配置信息"))
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_HTML, getErrorHtml("请输入服务器配置信息"))
                 }
 
                 val resolvedUrls = parseMultipleUrls(rawInput)
@@ -73,7 +95,6 @@ class ConfigWebServer(
                     return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_HTML, getErrorHtml("所有配置信息均无效，请检查后重试"))
                 }
 
-                val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
                 if (!location.isNullOrEmpty()) {
                     prefs.edit().putString("device_location", location).apply()
                 } else {
@@ -234,6 +255,13 @@ class ConfigWebServer(
     }
 
     private fun getHtmlForm(): String {
+        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, Context.MODE_PRIVATE)
+        val localEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+        val playlistUrl = prefs.getString(com.mediaplayer.app.Prefs.KEY_LOCAL_PLAYLIST_URL, "") ?: ""
+        val epgUrl = prefs.getString(com.mediaplayer.app.Prefs.KEY_LOCAL_EPG_URL, "") ?: ""
+        val serverUrl = prefs.getString(com.mediaplayer.app.Prefs.KEY_SERVER_URL, "") ?: ""
+        val location = prefs.getString("device_location", "") ?: ""
+
         return """
             <!DOCTYPE html>
             <html lang="zh-CN">
@@ -242,27 +270,88 @@ class ConfigWebServer(
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>服务器配置</title>
                 <style>
-                    body { font-family: -apple-system, sans-serif; background: #f4f4f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                    .card { padding: 2rem; width: 90%; max-width: 420px; text-align: center; }
+                    body { font-family: -apple-system, sans-serif; background: #f4f4f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px 0; box-sizing: border-box; }
+                    .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 90%; max-width: 420px; text-align: center; }
                     h2 { margin-top: 0; color: #333; }
-                    textarea { width: 100%; padding: 12px; margin: 12px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; resize: vertical; min-height: 100px; }
-                    input, textarea { width: 100%; padding: 12px; margin: 12px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+                    input, textarea { width: 100%; padding: 12px; margin: 12px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+                    textarea { resize: vertical; min-height: 100px; }
                     .hint { text-align: left; color: #888; font-size: 12px; margin: -8px 0 12px; line-height: 1.5; }
-                    button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+                    .switch-container { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px; border-radius: 6px; margin: 12px 0; border: 1px solid #eee; }
+                    .switch-label { font-size: 14px; color: #495057; font-weight: bold; }
+                    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+                    .switch input { opacity: 0; width: 0; height: 0; }
+                    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 24px; }
+                    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+                    input:checked + .slider { background-color: #007bff; }
+                    input:checked + .slider:before { transform: translateX(20px); }
+                    button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: 0.3s; margin-top: 12px; }
                     button:hover { background: #0056b3; }
+                    .form-section { display: none; transition: all 0.3s ease; }
+                    .active-section { display: block; }
                 </style>
             </head>
             <body>
                 <div class="card">
                     <h2>欢迎使用</h2>
-                    <p style="color:#666; font-size:14px;">请输入授权与位置信息</p>
-                    <form action="/save" method="post">
-                        <textarea name="server_url" placeholder="请在此粘贴服务商提供的授权码&#10;支持多个授权码，当主服务器宕机时，会自动切换至备用服务器" required></textarea>
-                        <div class="hint">第一行为主服务器，每行填写一个。</div>
-                        <input type="text" name="location" placeholder="安装位置（例如：13号楼一单元302），方便服务器识别设备。" required>
+                    <p style="color:#666; font-size:14px; margin-bottom: 20px;">配置播放器的频道与授权数据源</p>
+                    <form action="/save" method="post" id="configForm">
+                        
+                        <div class="switch-container">
+                            <span class="switch-label">启用用户本地数据源</span>
+                            <label class="switch">
+                                <input type="checkbox" name="local_enabled" id="localEnabled" value="true" ${if (localEnabled) "checked" else ""}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- 本地源配置区块 -->
+                        <div id="localSection" class="form-section ${if (localEnabled) "active-section" else ""}">
+                            <input type="text" name="local_playlist" value="${playlistUrl}" placeholder="用户源地址 (支持 M3U / TXT)">
+                            <div class="hint">填写您的 M3U 或 TXT 格式播放列表 URL。</div>
+                            <input type="text" name="local_epg" value="${epgUrl}" placeholder="自定义 EPG 地址 (XML / XML.GZ)">
+                            <div class="hint">可选：XMLTV 电子节目单地址，支持 .xml.gz 压缩包。</div>
+                        </div>
+
+                        <!-- 原有服务器授权码区块 -->
+                        <div id="serverSection" class="form-section ${if (!localEnabled) "active-section" else ""}">
+                            <textarea name="server_url" placeholder="请在此粘贴服务商提供的授权码&#10;支持多个授权码，自动切换备用服务器">${serverUrl}</textarea>
+                            <div class="hint">第一行为主服务器，每行填写一个。</div>
+                            <input type="text" name="location" value="${location}" placeholder="安装位置 (例如：一号楼101房间)">
+                        </div>
+
                         <button type="submit">保存配置</button>
                     </form>
                 </div>
+
+                <script>
+                    const localCheckbox = document.getElementById('localEnabled');
+                    const localSection = document.getElementById('localSection');
+                    const serverSection = document.getElementById('serverSection');
+                    
+                    localCheckbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            localSection.classList.add('active-section');
+                            serverSection.classList.remove('active-section');
+                            document.querySelector('[name="server_url"]').required = false;
+                            document.querySelector('[name="location"]').required = false;
+                            document.querySelector('[name="local_playlist"]').required = true;
+                        } else {
+                            localSection.classList.remove('active-section');
+                            serverSection.classList.add('active-section');
+                            document.querySelector('[name="server_url"]').required = true;
+                            document.querySelector('[name="location"]').required = true;
+                            document.querySelector('[name="local_playlist"]').required = false;
+                        }
+                    });
+
+                    // 初始运行一次，设定 required 校验
+                    if (localCheckbox.checked) {
+                        document.querySelector('[name="local_playlist"]').required = true;
+                    } else {
+                        document.querySelector('[name="server_url"]').required = true;
+                        document.querySelector('[name="location"]').required = true;
+                    }
+                </script>
             </body>
             </html>
         """.trimIndent()

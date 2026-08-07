@@ -54,6 +54,25 @@ class ServerAuthFlowManager(
     fun startAuthFlow() {
         cancelRetry()
 
+        val prefs = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
+        val localEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+        if (localEnabled) {
+            callback?.onSuccess(VerifyResponse(
+                announcement = null,
+                announcementInterval = 0,
+                startupMediaEnabled = false,
+                startupMedia = null,
+                startupMediaType = "",
+                startupDuration = 0,
+                startupSkipAfter = 0,
+                globalMaintenance = false,
+                backupServers = null,
+                isTester = true,
+                appDisplayName = null
+            ))
+            return
+        }
+
         scope.launch {
             if (authManager.isApproved()) {
                 verifyServers()

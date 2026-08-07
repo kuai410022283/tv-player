@@ -26,8 +26,79 @@ class ChannelRepository {
         private const val PAGE_SIZE = 500 // 恢复为 500 条/页
     }
 
+    // 本地数据缓存
+    private var localCachedData: List<Pair<ChannelGroup, List<Channel>>>? = null
+
     /** 获取所有分组 */
-    suspend fun getGroups(): Result<List<ChannelGroup>> = withContext(Dispatchers.IO) {
+    suspend fun getGroups(context: android.content.Context): Result<List<ChannelGroup>> = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences(com.mediaplayer.app.Prefs.FILE, android.content.Context.MODE_PRIVATE)
+        val localEnabled = prefs.getBoolean(com.mediaplayer.app.Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+        val playlistUrl = prefs.getString(com.mediaplayer.app.Prefs.KEY_LOCAL_PLAYLIST_URL, "") ?: ""
+
+        if (localEnabled && playlistUrl.isNotEmpty()) {
+            try {
+                // 如果没有缓存，则发起网络请求下载并解析
+                val content = if (playlistUrl.startsWith("http://") || playlistUrl.startsWith("https://")) {
+                    val call = okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(playlistUrl).build())
+                    call.execute().body?.string() ?: ""
+                } else {
+                    ""
+                }
+                
+                if (content.isNotEmpty()) {
+                    var detectedEpgUrl = ""
+                    val parsed = com.mediaplayer.app.data.parser.LocalPlaylistParser.parse(content) { epg ->
+                        detectedEpgUrl = epg
+                    }
+                    if (parsed.isNotEmpty()) {
+                        localCachedData = parsed
+                        
+                        // 异步拉取并解析 EPG 绑定
+                        var epgUrl = prefs.getString(com.mediaplayer.app.Prefs.KEY_LOCAL_EPG_URL, "") ?: ""
+                        if (epgUrl.isEmpty() && detectedEpgUrl.isNotEmpty()) {
+                            // 自动回填检测到的 M3U 头部 EPG 地址
+                            epgUrl = detectedEpgUrl
+                            prefs.edit().putString(com.mediaplayer.app.Prefs.KEY_LOCAL_EPG_URL, epgUrl).apply()
+                        }
+                        if (epgUrl.isNotEmpty()) {
+                            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                                try {
+                                    val client = okhttp3.OkHttpClient.Builder()
+                                        .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                                        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                                        .build()
+                                    val req = okhttp3.Request.Builder().url(epgUrl).build()
+                                    val res = client.newCall(req).execute()
+                                    res.body?.byteStream()?.let { stream ->
+                                        val isGzip = epgUrl.endsWith(".gz") || (res.header("Content-Encoding")?.contains("gzip") ?: false)
+                                        val allChannels = parsed.flatMap { it.second }
+                                        com.mediaplayer.app.data.parser.LocalEpgParser.parseAndBind(stream, allChannels, isGzip) {
+                                            // 绑定成功后，通知 UI 刷新列表
+                                            (context as? android.app.Activity)?.runOnUiThread {
+                                                try {
+                                                    // 利用反射或直接调用通知 UI 刷新 RecyclerView
+                                                    val rv = (context as? android.app.Activity)?.findViewById<androidx.recyclerview.widget.RecyclerView>(com.mediaplayer.app.R.id.rvChannels)
+                                                    rv?.adapter?.notifyDataSetChanged()
+                                                } catch (_: Exception) {}
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                        
+                        return@withContext Result.success(parsed.map { it.first })
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // 降级为网络获取
+            }
+        }
+
+        // 云端获取逻辑
         try {
             val resp = ApiClient.getService().getGroups()
             if (resp.isSuccessful && resp.body()?.code == 0) {
@@ -48,6 +119,15 @@ class ChannelRepository {
         groups: List<ChannelGroup>
     ): Flow<List<Channel>> = channelFlow {
         if (groups.isEmpty()) return@channelFlow
+
+        // 如果是本地数据源，直接吐出缓存的频道数据
+        val localData = localCachedData
+        if (localData != null) {
+            localData.forEach { (_, channels) ->
+                send(channels)
+            }
+            return@channelFlow
+        }
 
         val semaphore = Semaphore(20)
 

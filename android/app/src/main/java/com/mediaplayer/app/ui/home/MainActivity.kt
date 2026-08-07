@@ -42,6 +42,7 @@ import com.mediaplayer.app.R
 import com.mediaplayer.app.data.api.ApiClient
 import com.mediaplayer.app.data.api.ClientAuthManager
 import com.mediaplayer.app.data.api.ServerAuthFlowManager
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.mediaplayer.app.data.model.Channel
 import com.mediaplayer.app.data.model.ChannelGroup
 import com.mediaplayer.app.data.model.ChannelLine
@@ -583,7 +584,12 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         }
 
         // 启动认证流程（必须在 onConfigApplied 设置之后）
-        authFlowManager.startAuthFlow()
+        val localEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+        if (localEnabled) {
+            showContent()
+        } else {
+            authFlowManager.startAuthFlow()
+        }
 
         // 检查版本更新
         if (prefs.getBoolean(Prefs.KEY_AUTO_CHECK_UPDATE, true)) {
@@ -2192,6 +2198,11 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         if (configWebServer == null) {
             configWebServer = com.mediaplayer.app.server.ConfigWebServer(this, 0) { urls ->
                 runOnUiThread {
+                    if (urls.isEmpty()) {
+                        // 本地模式配置成功触发的回调
+                        onUrlUpdated()
+                        return@runOnUiThread
+                    }
                     val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
                     // 将纯 URL 列表转换为 ServerEntry 列表（无名称）
                     val entries = urls.map { com.mediaplayer.app.data.model.ServerEntry("", it) }
@@ -3319,6 +3330,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         authPollRunnable?.let { authPollHandler.removeCallbacks(it) }
         val runnable = object : Runnable {
             override fun run() {
+                val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+                val localEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+                if (localEnabled) {
+                    authPollRunnable?.let { authPollHandler.postDelayed(it, 180_000) }
+                    return
+                }
+
                 lifecycleScope.launch {
                     authManager.checkStatus().onSuccess { status ->
                         if (status == "approved") { 
@@ -3382,10 +3400,15 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         if (actualShowQr) {
             val ip = com.mediaplayer.app.util.NetworkUtils.getLocalIpAddress()
             if (ip != null) {
-                setupQrConfigServer {
+                setupQrConfigServer(onUrlUpdated = {
                     Toast.makeText(this@MainActivity, "配置已保存，正在重试...", Toast.LENGTH_LONG).show()
-                    authFlowManager.startAuthFlow()
-                }
+                    val isLocal = getSharedPreferences(Prefs.FILE, MODE_PRIVATE).getBoolean(Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+                    if (isLocal) {
+                        showContent()
+                    } else {
+                        authFlowManager.startAuthFlow()
+                    }
+                })
                 
                 val qrPort = configWebServer?.actualPort ?: 9528
                 val webUrls = com.mediaplayer.app.util.NetworkUtils.getAvailableWebUrls(qrPort)
@@ -3582,6 +3605,13 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
     private var heartbeatFailCount = 0
 
     private fun startHeartbeat() {
+        val prefs = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val localEnabled = prefs.getBoolean(Prefs.KEY_LOCAL_SOURCE_ENABLED, false)
+        if (localEnabled) {
+            // 本地数据源模式，无需向远程服务器发起心跳，防止误触发重连
+            return
+        }
+
         heartbeatRunnable?.let { heartbeatHandler.removeCallbacks(it) }
         heartbeatFailCount = 0
         val runnable = object : Runnable {
@@ -3662,7 +3692,7 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         lifecycleScope.launch {
             try {
                 // 1. 先拉分组列表
-                val realGroups = repo.getGroups().getOrElse { emptyList() }
+                val realGroups = repo.getGroups(this@MainActivity).getOrElse { emptyList() }
                 baseGroups = realGroups
                 
                 withContext(Dispatchers.Main) {

@@ -154,6 +154,9 @@ dependencies {
     // Splash Screen
     implementation 'androidx.core:core-splashscreen:1.0.1'
 
+    // Material Components for Android
+    implementation 'com.google.android.material:material:1.11.0'
+    
     // Go Mobile Proxy Engine (本地代理，用于直连组播流)
     implementation files('libs/mobile.aar')
 }

@@ -113,6 +113,11 @@ object Prefs {
     const val KEY_SERVER_NAME = "server_name"
     const val KEY_APP_DISPLAY_NAME = "app_display_name"
 
+    // 本地数据源配置
+    const val KEY_LOCAL_SOURCE_ENABLED = "local_source_enabled"
+    const val KEY_LOCAL_PLAYLIST_URL = "local_playlist_url"
+    const val KEY_LOCAL_EPG_URL = "local_epg_url"
+
     // 时间显示模式：0=隐藏, 1=常显, 2=整点, 3=半点
     const val KEY_TIME_SHOW_MODE = "time_show_mode"
     const val TIME_SHOW_MODE_HIDDEN = 0

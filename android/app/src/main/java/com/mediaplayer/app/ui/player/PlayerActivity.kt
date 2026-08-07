@@ -799,7 +799,7 @@ class PlayerActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCa
 
     private fun loadChannels() {
         lifecycleScope.launch {
-            val realGroups = repo.getGroups().getOrElse { emptyList() }
+            val realGroups = repo.getGroups(this@PlayerActivity).getOrElse { emptyList() }
             repo.getAllChannelsByGroups(realGroups).onSuccess { allChannels = it }
         }
     }
