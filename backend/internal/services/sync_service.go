@@ -52,7 +52,7 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 	}
 
 	downloadPath := filepath.Join("data", fmt.Sprintf("master_sync_%d.db", time.Now().UnixNano()))
-	
+
 	// Ensure data dir exists
 	_ = os.MkdirAll("data", 0755)
 
@@ -101,10 +101,9 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path of downloaded db: %w", err)
 	}
-	
+
 	// Format absolute path for Windows SQLite properly (replace \ with /)
 	absPath = filepath.ToSlash(absPath)
-
 
 	// 3. Obtain a dedicated connection for ATTACH/DETACH
 	ctx := context.Background()
@@ -140,18 +139,24 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 	queries := []string{
 		"DELETE FROM main.channel_groups",
 		"INSERT INTO main.channel_groups (id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, proxy_type, proxy_url, created_at, updated_at) SELECT id, name, icon, sort_order, is_direct, source, user_agent, custom_headers, enable_multiplex, proxy_type, proxy_url, created_at, updated_at FROM master_db.channel_groups",
-		
+
 		"DELETE FROM main.channels",
 		"INSERT INTO main.channels (id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, is_enabled, is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, proxy_type, proxy_url, content_type, fcc, fcc_type, linked_channel_id, is_protected, created_at, updated_at) SELECT id, group_id, name, logo, description, stream_url, stream_type, epg_channel_id, is_hidden, COALESCE(is_enabled, 1), is_direct, sort_order, status, last_check, m3u_source_id, source, user_agent, custom_headers, support_catchup, catchup_type, catchup_source, catchup_days, enable_multiplex, proxy_type, proxy_url, COALESCE(content_type, ''), COALESCE(fcc, 0), COALESCE(fcc_type, ''), COALESCE(linked_channel_id, 0), COALESCE(is_protected, 0), created_at, updated_at FROM master_db.channels",
-		
+
 		"DELETE FROM main.subscription_plans",
-		"INSERT INTO main.subscription_plans (id, name, days, max_streams, price, description, subscription_token, created_at, updated_at) SELECT id, name, days, max_streams, price, description, subscription_token, created_at, updated_at FROM master_db.subscription_plans",
-		
+		"INSERT INTO main.subscription_plans (id, name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at) SELECT id, name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at FROM master_db.subscription_plans",
+
 		"DELETE FROM main.plan_group_relations",
 		"INSERT INTO main.plan_group_relations (plan_id, group_id, sort_order) SELECT plan_id, group_id, sort_order FROM master_db.plan_group_relations",
-		
+
 		"DELETE FROM main.m3u_sources",
 		"INSERT INTO main.m3u_sources (id, name, url, auto_sync, sync_interval, user_agent, custom_headers, proxy_type, proxy_url, last_sync, created_at) SELECT id, name, url, auto_sync, sync_interval, user_agent, custom_headers, proxy_type, proxy_url, last_sync, created_at FROM master_db.m3u_sources",
+
+		"DELETE FROM main.clients",
+		"INSERT INTO main.clients (id, name, device_id, device_model, device_os, app_version, ip, access_token, status, plan_id, max_streams, expires_at, approved_by, reject_reason, last_seen, total_play_minutes, request_note, enable_log, is_tester, created_at, updated_at) SELECT id, name, device_id, device_model, device_os, app_version, ip, access_token, status, plan_id, max_streams, expires_at, approved_by, reject_reason, last_seen, total_play_minutes, request_note, enable_log, is_tester, created_at, updated_at FROM master_db.clients",
+
+		"DELETE FROM main.client_remote_configs",
+		"INSERT INTO main.client_remote_configs (id, scope, config_key, config_val, updated_at, hidden) SELECT id, scope, config_key, config_val, updated_at, hidden FROM master_db.client_remote_configs",
 
 		`INSERT OR REPLACE INTO main.user_settings 
 		 SELECT * FROM master_db.user_settings 
@@ -230,23 +235,23 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 	_ = os.MkdirAll(dir, 0755)
 
 	entries, _ := os.ReadDir(dir)
-	
+
 	// Check existing files
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		
+
 		name := entry.Name()
 		filePath := filepath.Join(dir, name)
-		
+
 		masterHash, exists := masterLogos[name]
 		if !exists {
 			// Master deleted it, remove locally
 			_ = os.Remove(filePath)
 			continue
 		}
-		
+
 		// Check hash
 		f, err := os.Open(filePath)
 		if err == nil {
@@ -266,14 +271,14 @@ func (s *SyncService) syncLogosFromMaster(masterURL, masterToken string) error {
 	for name := range masterLogos {
 		downloadURL := fmt.Sprintf("%s/library/channel_logo/%s", masterURL, name)
 		slog.Info("Syncing logo from master", "file", name)
-		
+
 		// Simple GET download
 		resp, err := client.Get(downloadURL)
 		if err != nil {
 			slog.Error("failed to download logo", "file", name, "error", err)
 			continue
 		}
-		
+
 		if resp.StatusCode == 200 {
 			filePath := filepath.Join(dir, name)
 			out, err := os.Create(filePath)
