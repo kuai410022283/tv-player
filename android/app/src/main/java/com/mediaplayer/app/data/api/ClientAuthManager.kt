@@ -145,6 +145,7 @@ class ClientAuthManager(private val context: Context) {
                 val data = response.body()?.data
                 if (data != null) {
                     prefs.edit().apply {
+                        putString(Prefs.KEY_SERVER_URL, ApiClient.getServerUrl())
                         putLong(Prefs.KEY_CLIENT_ID, data.clientId)
                         putBoolean(Prefs.KEY_ENABLE_LOG, data.enableLog)
                         putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
@@ -180,6 +181,7 @@ class ClientAuthManager(private val context: Context) {
                     val data = response.body()?.data
                     if (data != null) {
                         prefs.edit().apply {
+                            putString(Prefs.KEY_SERVER_URL, ApiClient.getServerUrl())
                             putLong(Prefs.KEY_CLIENT_ID, data.clientId)
                             putString(Prefs.KEY_CLIENT_STATUS, "approved")
                             putString(Prefs.KEY_PLAN_NAME, data.planName ?: "")
@@ -231,6 +233,7 @@ class ClientAuthManager(private val context: Context) {
 
     private fun saveAuth(resp: ClientRegisterResp) {
         prefs.edit().apply {
+            putString(Prefs.KEY_SERVER_URL, ApiClient.getServerUrl())
             resp.accessToken.takeIf { it.isNotEmpty() }?.let {
                 putString(Prefs.KEY_ACCESS_TOKEN, it)
                 ApiClient.accessToken = it

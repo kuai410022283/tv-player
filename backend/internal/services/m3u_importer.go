@@ -448,6 +448,9 @@ func (imp *M3UImporter) importChannels(channels []map[string]string, sourceID in
 				strings.Contains(u, "aishang.ctlcdn") || strings.Contains(u, "userid=gf001") ||
 				(strings.Contains(u, "rtsp") && strings.Contains(u, "AuthInfo=")) || strings.Contains(u, "/cms001/") {
 				catchupType = "append"
+			} else {
+				// 默认缺省值设为 append，保证所有频道的默认回看类型均为 append
+				catchupType = "append"
 			}
 		}
 

@@ -488,6 +488,9 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
 
             override fun onSuccess(resp: com.mediaplayer.app.data.model.VerifyResponse) {
                 configWebServer?.updateAuthStatus("approved")
+                getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
+                    .putString(Prefs.KEY_SERVER_URL, com.mediaplayer.app.data.api.ApiClient.getServerUrl())
+                    .apply()
                 handleAuthSuccess(
                     resp.announcement, resp.announcementInterval,
                     resp.startupMediaEnabled, resp.startupMedia,
@@ -871,9 +874,8 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
         epgAdapter.setOnItemClickListener { prog ->
             val channel = allChannels.getOrNull(currentChannelIndex) ?: return@setOnItemClickListener
             try {
-                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
-                val startUnix = sdf.parse(prog.startTime)?.time?.div(1000) ?: 0L
-                val endUnix = sdf.parse(prog.endTime)?.time?.div(1000) ?: 0L
+                val startUnix = parseIsoTime(prog.startTime)?.time?.div(1000) ?: 0L
+                val endUnix = parseIsoTime(prog.endTime)?.time?.div(1000) ?: 0L
                 if (startUnix > 0 && endUnix > 0) {
                     val lines = channel.getLinesSafely()
                     val ua = if (lines.isNotEmpty()) lines[0].userAgent else ""
@@ -3115,6 +3117,45 @@ class MainActivity : AppCompatActivity(), com.mediaplayer.app.util.PipActionCall
                 }
             }
         }
+
+    private fun parseIsoTime(timeStr: String): java.util.Date? {
+        if (timeStr.isEmpty()) return null
+        val patterns = arrayOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
+        for (pattern in patterns) {
+            try {
+                val sdf = java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault())
+                val date = sdf.parse(timeStr)
+                if (date != null) return date
+            } catch (e: Exception) {
+                // Try next
+            }
+        }
+        try {
+            var normalized = timeStr
+            if (normalized.endsWith("Z")) {
+                normalized = normalized.substring(0, normalized.length - 1) + "+0000"
+            } else {
+                val len = normalized.length
+                if (len > 6 && (normalized[len - 3] == ':' && (normalized[len - 6] == '+' || normalized[len - 6] == '-'))) {
+                    normalized = normalized.substring(0, len - 3) + normalized.substring(len - 2)
+                }
+            }
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.getDefault())
+            return sdf.parse(normalized)
+        } catch (e: Exception) {
+            try {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                return sdf.parse(timeStr)
+            } catch (ex: Exception) {
+                return null
+            }
+        }
+    }
 
     // ═══════════════════════════════════════════════════
     // SHARED LOGIC

@@ -787,9 +787,9 @@ func canSupportCatchup(streamURL, catchupSource string) bool {
 	return false
 }
 
-func generateSingleCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
-	start := time.Unix(startUnix, 0).In(time.Local)
-	end := time.Unix(endUnix, 0).In(time.Local)
+func generateSingleCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64, loc *time.Location) string {
+	start := time.Unix(startUnix, 0).In(loc)
+	end := time.Unix(endUnix, 0).In(loc)
 	durationSec := endUnix - startUnix
 	if durationSec < 0 {
 		durationSec = 0
@@ -908,9 +908,9 @@ func generateSingleCatchupURL(streamURL, catchupSource string, startUnix, endUni
 }
 
 // generateCatchupURL 包装了 generateSingleCatchupURL，支持处理带 "#" 的多线路流地址。
-func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64) string {
+func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int64, loc *time.Location) string {
 	if !strings.Contains(streamURL, "#") {
-		return generateSingleCatchupURL(streamURL, catchupSource, startUnix, endUnix)
+		return generateSingleCatchupURL(streamURL, catchupSource, startUnix, endUnix, loc)
 	}
 
 	rawURLs := strings.Split(streamURL, "#")
@@ -920,7 +920,7 @@ func generateCatchupURL(streamURL, catchupSource string, startUnix, endUnix int6
 		if trimmed == "" {
 			continue
 		}
-		results = append(results, generateSingleCatchupURL(trimmed, catchupSource, startUnix, endUnix))
+		results = append(results, generateSingleCatchupURL(trimmed, catchupSource, startUnix, endUnix, loc))
 	}
 	if len(results) == 0 {
 		return streamURL
@@ -993,7 +993,7 @@ func (h *Handler) CatchupStream(c *gin.Context) {
 		return
 	}
 
-	targetURL := generateCatchupURL(ch.StreamURL, ch.CatchupSource, startUnix, endUnix)
+	targetURL := generateCatchupURL(ch.StreamURL, ch.CatchupSource, startUnix, endUnix, h.epgSvc.GetTimezone())
 
 	if ch.IsDirect {
 		// 直连模式：返回 JSON 格式的回看 URL，客户端读取后直接播放

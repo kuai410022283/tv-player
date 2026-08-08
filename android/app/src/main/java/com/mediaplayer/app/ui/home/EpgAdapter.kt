@@ -44,11 +44,10 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         
         // 如果没有选中的回看节目，或者没找到，则使用当前时间判断直播节目
         val now = Date()
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
         val liveIndex = programs.indexOfFirst {
             try {
-                val start = sdf.parse(it.startTime)
-                val end = sdf.parse(it.endTime)
+                val start = parseIsoTime(it.startTime)
+                val end = parseIsoTime(it.endTime)
                 start != null && end != null && now.after(start) && now.before(end)
             } catch (e: Exception) { false }
         }
@@ -58,6 +57,45 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         }
 
         notifyDataSetChanged()
+    }
+    
+    private fun parseIsoTime(timeStr: String): Date? {
+        if (timeStr.isEmpty()) return null
+        val patterns = arrayOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        )
+        for (pattern in patterns) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.getDefault())
+                val date = sdf.parse(timeStr)
+                if (date != null) return date
+            } catch (e: Exception) {
+                // Try next
+            }
+        }
+        try {
+            var normalized = timeStr
+            if (normalized.endsWith("Z")) {
+                normalized = normalized.substring(0, normalized.length - 1) + "+0000"
+            } else {
+                val len = normalized.length
+                if (len > 6 && (normalized[len - 3] == ':' && (normalized[len - 6] == '+' || normalized[len - 6] == '-'))) {
+                    normalized = normalized.substring(0, len - 3) + normalized.substring(len - 2)
+                }
+            }
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault())
+            return sdf.parse(normalized)
+        } catch (e: Exception) {
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                return sdf.parse(timeStr)
+            } catch (ex: Exception) {
+                return null
+            }
+        }
     }
     
     fun getPlayingIndex(): Int = playingIndex
@@ -73,8 +111,7 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         // format time from "2026-05-25T19:00:00Z" to "19:00"
         var timeStr = ""
         try {
-            val sdfIn = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            val date = sdfIn.parse(prog.startTime)
+            val date = parseIsoTime(prog.startTime)
             if (date != null) {
                 val sdfOut = SimpleDateFormat("HH:mm", Locale.getDefault())
                 timeStr = sdfOut.format(date)
@@ -88,10 +125,9 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         
         val isLiveProgram = position == programs.indexOfFirst {
             val now = Date()
-            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
             try {
-                val start = sdf.parse(it.startTime)
-                val end = sdf.parse(it.endTime)
+                val start = parseIsoTime(it.startTime)
+                val end = parseIsoTime(it.endTime)
                 start != null && end != null && now.after(start) && now.before(end)
             } catch (e: Exception) { false }
         }
@@ -109,10 +145,9 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
             // 这里判断是否是往期节目。如果是回看模式，且位置在当前直播节目前面，就显示回看图标
             val liveIdx = programs.indexOfFirst {
                 val now = Date()
-                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
                 try {
-                    val start = sdf.parse(it.startTime)
-                    val end = sdf.parse(it.endTime)
+                    val start = parseIsoTime(it.startTime)
+                    val end = parseIsoTime(it.endTime)
                     start != null && end != null && now.after(start) && now.before(end)
                 } catch (e: Exception) { false }
             }
@@ -139,10 +174,9 @@ class EpgAdapter : RecyclerView.Adapter<EpgAdapter.ViewHolder>() {
         holder.itemView.setOnClickListener {
             val liveIdx = programs.indexOfFirst {
                 val now = Date()
-                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
                 try {
-                    val start = sdf.parse(it.startTime)
-                    val end = sdf.parse(it.endTime)
+                    val start = parseIsoTime(it.startTime)
+                    val end = parseIsoTime(it.endTime)
                     start != null && end != null && now.after(start) && now.before(end)
                 } catch (e: Exception) { false }
             }

@@ -41,6 +41,12 @@ func (s *PlanService) GetEPGTimeShift() int {
 	return shift
 }
 
+// GetChinaTimezone 返回中国时区（UTC+8），用于回看 URL 生成和 EPG 日期索引。
+// 中国 IPTV 源站和 EPG 数据均以北京时间为准，与服务器物理位置无关。
+func GetChinaTimezone() *time.Location {
+	return time.FixedZone("CST", 8*3600)
+}
+
 func (s *PlanService) GetPlans(search string) ([]*models.SubscriptionPlan, error) {
 	query := `SELECT id, name, days, max_streams, price, description, subscription_token, enable_aggregation, created_at, updated_at FROM subscription_plans`
 	var args []interface{}

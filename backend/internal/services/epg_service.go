@@ -20,11 +20,20 @@ import (
 )
 
 type EPGService struct {
-	db *sql.DB
+	db       *sql.DB
+	timezone *time.Location
 }
 
 func NewEPGService(db *sql.DB) *EPGService {
-	return &EPGService{db: db}
+	return &EPGService{
+		db:       db,
+		timezone: GetChinaTimezone(),
+	}
+}
+
+// GetTimezone 返回中国时区（UTC+8），用于回看 URL 生成和 EPG 日期索引。
+func (s *EPGService) GetTimezone() *time.Location {
+	return s.timezone
 }
 
 // ── XMLTV 解析结构体 ──
@@ -69,21 +78,20 @@ var globalEPGIndex = &epgIndex{
 }
 
 // xmltv 时间格式 "20060102150405 -0700"
-func parseXmltvTime(s string) (time.Time, error) {
-	if len(s) >= 14 {
+func (s *EPGService) parseXmltvTime(timeStr string) (time.Time, error) {
+	if len(timeStr) >= 14 {
 		// 注意：Go 的时间解析模板必须使用 "-0700" 来代表时区，不能写 "+0800"
-		t, err := time.Parse("20060102150405 -0700", s)
+		t, err := time.Parse("20060102150405 -0700", timeStr)
 		if err == nil {
 			return t, nil
 		}
-		// 尝试无时区，默认按照东八区解析
-		loc := time.FixedZone("CST", 8*3600)
-		t, err = time.ParseInLocation("20060102150405", s[:14], loc)
+		// 尝试无时区，使用 epg_time_shift 配置的时区解析
+		t, err = time.ParseInLocation("20060102150405", timeStr[:14], s.timezone)
 		if err == nil {
 			return t, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("invalid time format: %s", s)
+	return time.Time{}, fmt.Errorf("invalid time format: %s", timeStr)
 }
 
 type parsedEPGResult struct {
@@ -309,13 +317,14 @@ func (s *EPGService) FetchAndBuildIndex() {
 					continue
 				}
 
-				start, err1 := parseXmltvTime(prog.Start)
-				stop, err2 := parseXmltvTime(prog.Stop)
+				start, err1 := s.parseXmltvTime(prog.Start)
+				stop, err2 := s.parseXmltvTime(prog.Stop)
 				if err1 != nil || err2 != nil {
 					continue
 				}
 
-				dateKey := start.In(time.Local).Format("2006-01-02")
+				loc := s.timezone
+				dateKey := start.In(loc).Format("2006-01-02")
 				if dateKey < sevenDaysAgoStr {
 					continue
 				}
@@ -654,9 +663,13 @@ func (s *EPGService) autoCompleteEPGChannelIDs() {
 		slog.Error("自动补全 EPG 频道 ID 时查询失败", "error", err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	updatedCount := 0
+	type updateInfo struct {
+		id      int64
+		matchID string
+	}
+	var updates []updateInfo
+
 	for rows.Next() {
 		var id int64
 		var name string
@@ -669,13 +682,41 @@ func (s *EPGService) autoCompleteEPGChannelIDs() {
 		}
 
 		if matchID, found := s.MatchEPGChannel(name); found {
-			// 这里将真正匹配到的标准 EPG ID 写入数据库，而不是原始的 name
-			_, err := s.db.Exec(`UPDATE channels SET epg_channel_id = ? WHERE id = ?`, matchID, id)
-			if err == nil {
-				updatedCount++
-				slog.Info("自动补全 EPG 频道 ID 成功", "channel_id", id, "original_name", name, "matched_epg_id", matchID)
-			}
+			updates = append(updates, updateInfo{id: id, matchID: matchID})
 		}
+	}
+	_ = rows.Close() // 提前关闭读取连接，释放共享锁
+
+	if len(updates) == 0 {
+		return
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		slog.Error("自动补全 EPG 开启事务失败", "error", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`UPDATE channels SET epg_channel_id = ? WHERE id = ?`)
+	if err != nil {
+		slog.Error("自动补全 EPG 准备语句失败", "error", err)
+		return
+	}
+	defer func() { _ = stmt.Close() }()
+
+	updatedCount := 0
+	for _, u := range updates {
+		_, err := stmt.Exec(u.matchID, u.id)
+		if err == nil {
+			updatedCount++
+			slog.Info("自动补全 EPG 频道 ID 成功", "channel_id", u.id, "matched_epg_id", u.matchID)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		slog.Error("自动补全 EPG 提交事务失败", "error", err)
+		return
 	}
 
 	if updatedCount > 0 {

@@ -276,7 +276,7 @@ func (h *PlanHandler) GetSubscription(c *gin.Context) {
 		if ch.SupportCatchup {
 			catchupType := ch.CatchupType
 			if catchupType == "" {
-				catchupType = "default"
+				catchupType = "append"
 			}
 			catchupStr = fmt.Sprintf(` catchup="%s" catchup-days="%d"`, catchupType, ch.CatchupDays)
 			if ch.CatchupSource != "" {

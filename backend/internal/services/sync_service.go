@@ -163,6 +163,7 @@ func (s *SyncService) SyncFromMaster(masterURL, masterToken string) error {
 		 WHERE key NOT IN (
 			'server_name',
 			'server_url', 
+			'server_backup_urls',
 			'admin_password_hash',
 			'sync_enable', 
 			'sync_master_url', 
